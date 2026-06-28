@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const stations = await prisma.station.findMany({
-    orderBy: { order: "asc" },
+    orderBy: { name: "asc" },
     include: { _count: { select: { commercialSpaces: true, virtualTourScenes: true } } },
   });
   return NextResponse.json(stations);

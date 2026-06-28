@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { cmsFetch } from "@/lib/cms-fetch";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,14 +24,17 @@ export default function CmsLeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
 
   async function load() {
-    const res = await fetch("/api/cms/leads");
+    const res = await cmsFetch("/api/cms/leads");
     setLeads(await res.json());
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   async function updateStatus(id: string, status: string) {
-    await fetch("/api/cms/leads", {
+    await cmsFetch("/api/cms/leads", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status }),

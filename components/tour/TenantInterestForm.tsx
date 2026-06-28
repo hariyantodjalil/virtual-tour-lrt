@@ -70,47 +70,47 @@ export default function TenantInterestForm({ spaceId, spaceCode, stationName, on
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 border-t border-gray-100 pt-4">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Formulir Minat Sewa</p>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 border-t border-gray-100 pt-6">
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-gray-400">Formulir Minat Sewa</p>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label htmlFor="companyName" className="text-xs">Nama Perusahaan *</Label>
-          <Input id="companyName" placeholder="PT Contoh" className="h-9 text-sm" {...register("companyName")} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="companyName" className="text-sm font-semibold text-gray-800">Nama Perusahaan *</Label>
+          <Input id="companyName" placeholder="PT Contoh" className="h-12 text-base" {...register("companyName")} />
           {errors.companyName && <p className="text-xs text-red-500">{errors.companyName.message}</p>}
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="contactName" className="text-xs">Nama Kontak *</Label>
-          <Input id="contactName" placeholder="Budi Santoso" className="h-9 text-sm" {...register("contactName")} />
+        <div className="space-y-2">
+          <Label htmlFor="contactName" className="text-sm font-semibold text-gray-800">Nama Kontak *</Label>
+          <Input id="contactName" placeholder="Budi Santoso" className="h-12 text-base" {...register("contactName")} />
           {errors.contactName && <p className="text-xs text-red-500">{errors.contactName.message}</p>}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label htmlFor="phone" className="text-xs">Telepon *</Label>
-          <Input id="phone" type="tel" placeholder="08123456789" className="h-9 text-sm" {...register("phone")} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="phone" className="text-sm font-semibold text-gray-800">Telepon *</Label>
+          <Input id="phone" type="tel" placeholder="08123456789" className="h-12 text-base" {...register("phone")} />
           {errors.phone && <p className="text-xs text-red-500">{errors.phone.message}</p>}
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="email" className="text-xs">Email *</Label>
-          <Input id="email" type="email" placeholder="budi@perusahaan.com" className="h-9 text-sm" {...register("email")} />
+        <div className="space-y-2">
+          <Label htmlFor="email" className="text-sm font-semibold text-gray-800">Email *</Label>
+          <Input id="email" type="email" placeholder="budi@perusahaan.com" className="h-12 text-base" {...register("email")} />
           {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
         </div>
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="businessType" className="text-xs">Jenis Usaha *</Label>
-        <Input id="businessType" placeholder="F&B, Retail, Perbankan, dll." className="h-9 text-sm" {...register("businessType")} />
+      <div className="space-y-2">
+        <Label htmlFor="businessType" className="text-sm font-semibold text-gray-800">Jenis Usaha *</Label>
+        <Input id="businessType" placeholder="F&B, Retail, Perbankan, dll." className="h-12 text-base" {...register("businessType")} />
         {errors.businessType && <p className="text-xs text-red-500">{errors.businessType.message}</p>}
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="message" className="text-xs">Pesan Tambahan</Label>
-        <Textarea id="message" placeholder="Kebutuhan khusus, pertanyaan, dll." className="h-20 text-sm resize-none" {...register("message")} />
+      <div className="space-y-2">
+        <Label htmlFor="message" className="text-sm font-semibold text-gray-800">Pesan Tambahan</Label>
+        <Textarea id="message" placeholder="Kebutuhan khusus, pertanyaan, dll." className="min-h-28 resize-none text-base" {...register("message")} />
       </div>
 
-      <Button type="submit" className="w-full" disabled={isLoading}>
+      <Button type="submit" className="h-12 w-full text-base" disabled={isLoading}>
         {isLoading ? (
           <><Loader2 className="h-4 w-4 animate-spin" /> Mengirim...</>
         ) : (

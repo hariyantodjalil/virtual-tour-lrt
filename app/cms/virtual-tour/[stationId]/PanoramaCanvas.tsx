@@ -2,22 +2,14 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
+import type { AddMode, HotspotItem } from "@/lib/hotspot-types";
+import { hotspotColor } from "@/lib/hotspot-types";
+
+export type { AddMode, HotspotItem } from "@/lib/hotspot-types";
 
 // SVG coordinate space — represents full equirectangular (2:1)
 export const PANO_W = 3600;
 export const PANO_H = 1800;
-
-export type AddMode = "none" | "scene" | "space";
-
-export type HotspotItem = {
-  _id: string; // temp UI id, stripped before saving
-  pitch: number;
-  yaw: number;
-  type: "scene" | "space";
-  text: string;
-  sceneId?: string;
-  spaceCode?: string;
-};
 
 export function hotspotToXY(h: { yaw: number; pitch: number }) {
   return {
@@ -291,8 +283,9 @@ export function PanoramaCanvas({
         {hotspots.map((h) => {
           const { x, y } = hotspotToXY(h);
           const isScene = h.type === "scene";
+          const isInfo = h.type === "info";
           const isSelected = h._id === selectedId;
-          const fill = isScene ? "#10b981" : "#f59e0b";
+          const fill = hotspotColor(h.type);
           const strokeColor = isSelected ? "#ffffff" : "rgba(255,255,255,0.8)";
 
           return (
@@ -323,7 +316,6 @@ export function PanoramaCanvas({
 
               {/* Icon */}
               {isScene ? (
-                // Arrow for scene
                 <path
                   d="M-7 0 L5 0 M1 -6 L7 0 L1 6"
                   stroke="white"
@@ -332,8 +324,9 @@ export function PanoramaCanvas({
                   strokeLinejoin="round"
                   fill="none"
                 />
+              ) : isInfo ? (
+                <text y={5} textAnchor="middle" fontSize={16} fill="white" fontWeight="700">i</text>
               ) : (
-                // Target for space
                 <circle r={7} fill="white" />
               )}
 

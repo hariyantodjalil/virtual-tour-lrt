@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cmsFetch } from "@/lib/cms-fetch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,16 +22,19 @@ export default function CmsUsersPage() {
   const [error, setError] = useState("");
 
   async function load() {
-    const res = await fetch("/api/cms/users");
+    const res = await cmsFetch("/api/cms/users");
     if (res.ok) setUsers(await res.json());
     else setError("Akses ditolak — hanya ADMIN");
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   async function createUser(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/cms/users", {
+    const res = await cmsFetch("/api/cms/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
@@ -42,7 +46,7 @@ export default function CmsUsersPage() {
   }
 
   async function toggleActive(user: User) {
-    await fetch(`/api/cms/users/${user.id}`, {
+    await cmsFetch(`/api/cms/users/${user.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isActive: !user.isActive }),

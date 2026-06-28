@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { cmsFetch } from "@/lib/cms-fetch";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,15 +29,19 @@ export default function CmsSpacesStationPage() {
   const [editing, setEditing] = useState<Space | null>(null);
 
   async function load() {
-    const res = await fetch(`/api/cms/spaces/station/${stationId}`);
+    const res = await cmsFetch(`/api/cms/spaces/station/${stationId}`);
     setSpaces(await res.json());
   }
 
-  useEffect(() => { load(); }, [stationId]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stationId]);
 
   async function saveSpace() {
     if (!editing) return;
-    await fetch(`/api/cms/spaces/${editing.id}`, {
+    await cmsFetch(`/api/cms/spaces/${editing.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(editing),
@@ -47,7 +52,7 @@ export default function CmsSpacesStationPage() {
 
   async function deleteSpace(id: string) {
     if (!confirm("Hapus unit ini?")) return;
-    await fetch(`/api/cms/spaces/${id}`, { method: "DELETE" });
+    await cmsFetch(`/api/cms/spaces/${id}`, { method: "DELETE" });
     load();
   }
 
@@ -55,7 +60,7 @@ export default function CmsSpacesStationPage() {
     const code = prompt("Kode unit:");
     const name = prompt("Nama unit:");
     if (!code || !name) return;
-    await fetch(`/api/cms/spaces/station/${stationId}`, {
+    await cmsFetch(`/api/cms/spaces/station/${stationId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

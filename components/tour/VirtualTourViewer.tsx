@@ -5,6 +5,8 @@ import { Navigation, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PanoramaScene } from "@/lib/tour-types";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
+import { applyHotspotBaseStyle, attachHotspotTooltip } from "@/lib/pannellum-hotspot";
+import type { HotspotType } from "@/lib/hotspot-types";
 
 declare global {
   interface Window {
@@ -16,6 +18,7 @@ declare global {
 type Props = {
   scenes: PanoramaScene[];
   onSpaceClick?: (spaceCode: string) => void;
+  onInfoClick?: (title: string, description: string) => void;
   onSceneChange?: (sceneId: string) => void;
   initialScene?: string;
   selectedSceneId?: string;
@@ -57,68 +60,13 @@ function loadPannellum(): Promise<void> {
 }
 
 // ─── Shared: custom hotspot visual builder ────────────────────────────────
-function buildHotspotElement(div: HTMLDivElement, isScene: boolean, label: string) {
-  const color = isScene ? "#10b981" : "#f59e0b";
-  const arrowSvg =
-    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
-  const dotSvg =
-    '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="8.5" fill="none" stroke="white" stroke-width="2"/></svg>';
-
-  Object.assign(div.style, {
-    width: "44px",
-    height: "44px",
-    borderRadius: "50%",
-    border: "3px solid rgba(255,255,255,0.9)",
-    backgroundColor: color,
-    cursor: "pointer",
-    boxShadow: "0 3px 14px rgba(0,0,0,0.55)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "transform 0.15s ease, box-shadow 0.15s ease",
-    overflow: "visible",
-    animation: "lrt-hotspot-pulse 2.8s ease-in-out infinite",
-  });
-  div.innerHTML = isScene ? arrowSvg : dotSvg;
-
-  const tooltip = document.createElement("div");
-  tooltip.textContent = label;
-  Object.assign(tooltip.style, {
-    position: "absolute",
-    bottom: "calc(100% + 8px)",
-    left: "50%",
-    transform: "translateX(-50%)",
-    background: "rgba(15,23,42,0.95)",
-    color: "#f1f5f9",
-    padding: "5px 12px",
-    borderRadius: "8px",
-    fontSize: "12px",
-    fontWeight: "600",
-    whiteSpace: "nowrap",
-    pointerEvents: "none",
-    display: "none",
-    border: "1px solid rgba(255,255,255,0.15)",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
-    zIndex: "10",
-  });
-  div.appendChild(tooltip);
-
-  div.addEventListener("mouseenter", () => {
-    tooltip.style.display = "block";
-    div.style.transform = "scale(1.22)";
-    div.style.boxShadow = "0 6px 22px rgba(0,0,0,0.65)";
-    div.style.animation = "none";
-  });
-  div.addEventListener("mouseleave", () => {
-    tooltip.style.display = "none";
-    div.style.transform = "scale(1)";
-    div.style.boxShadow = "0 3px 14px rgba(0,0,0,0.55)";
-    div.style.animation = "lrt-hotspot-pulse 2.8s ease-in-out infinite";
-  });
+function buildHotspotElement(div: HTMLDivElement, hotspotType: HotspotType, label: string) {
+  applyHotspotBaseStyle(div, { type: hotspotType, label, pulse: true });
+  attachHotspotTooltip(div, label);
 }
 
 export default function VirtualTourViewer({
-  scenes, onSpaceClick, onSceneChange, initialScene, selectedSceneId, stationName, hideSceneBar = false,
+  scenes, onSpaceClick, onInfoClick, onSceneChange, initialScene, selectedSceneId, stationName, hideSceneBar = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -160,29 +108,31 @@ export default function VirtualTourViewer({
       if (!isMounted.current || !containerRef.current) return;
 
       const hotSpots = currentScene.hotspots.map((h) => {
-        const isScene = h.type === "scene" && !!h.sceneId;
-        const isSpace = h.type === "space";
         const label = h.text;
 
         const hs: Record<string, unknown> = {
           pitch: h.pitch,
           yaw: h.yaw,
           type: "custom",
-          cssClass: isScene ? "lrt-scene-hotspot" : "lrt-space-hotspot",
+          cssClass: `lrt-${h.type}-hotspot`,
           createTooltipFunc: (div: HTMLDivElement) => {
-            buildHotspotElement(div, isScene, label);
+            buildHotspotElement(div, h.type, label);
           },
         };
 
-        if (isSpace && onSpaceClick && h.spaceCode) {
-          const code = h.spaceCode;
-          hs.clickHandlerFunc = () => onSpaceClick(code);
-        } else if (isScene) {
-          const sceneId = h.sceneId!;
+        if (h.type === "scene" && h.sceneId) {
+          const sceneId = h.sceneId;
           hs.clickHandlerFunc = () => {
             const idx = scenes.findIndex((scene) => scene.id === sceneId);
             if (idx >= 0) switchScene(idx);
           };
+        } else if (h.type === "space" && onSpaceClick && h.spaceCode) {
+          const code = h.spaceCode;
+          hs.clickHandlerFunc = () => onSpaceClick(code);
+        } else if (h.type === "info" && onInfoClick) {
+          const title = h.text;
+          const description = h.description ?? "";
+          hs.clickHandlerFunc = () => onInfoClick(title, description);
         }
         return hs;
       });
@@ -226,7 +176,7 @@ export default function VirtualTourViewer({
         setIsLoading(false);
       }
     }
-  }, [currentScene, onSpaceClick, scenes, switchScene]);
+  }, [currentScene, onSpaceClick, onInfoClick, scenes, switchScene]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -332,48 +282,9 @@ export default function VirtualTourViewer({
         </div>
       )}
 
-      {/* Hotspot styles */}
+      {/* Pannellum container background — styling hotspot kini sepenuhnya via buildHotspotElement */}
       <style>{`
         .pnlm-container { background: #111827 !important; }
-        .lrt-space-hotspot {
-          height: 30px !important;
-          width: 30px !important;
-          border-radius: 999px !important;
-          background: #E31E2D !important;
-          border: 2px solid white !important;
-          box-shadow: 0 12px 30px rgba(227, 30, 45, .35) !important;
-          animation: hotspot-pulse 2s ease-in-out infinite !important;
-        }
-        .lrt-space-hotspot:after {
-          content: "";
-          position: absolute;
-          inset: 8px;
-          border-radius: inherit;
-          background: white;
-        }
-        .lrt-scene-hotspot {
-          height: 34px !important;
-          width: 34px !important;
-          border-radius: 999px !important;
-          background: #111827 !important;
-          border: 2px solid #6EE7B7 !important;
-          box-shadow: 0 12px 30px rgba(16, 185, 129, .35) !important;
-        }
-        .lrt-scene-hotspot:after {
-          content: "";
-          position: absolute;
-          left: 10px;
-          top: 8px;
-          width: 10px;
-          height: 10px;
-          border-right: 3px solid #6EE7B7;
-          border-bottom: 3px solid #6EE7B7;
-          transform: rotate(-45deg);
-        }
-        @keyframes hotspot-pulse {
-          0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(227,30,45,0.5); }
-          50% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(227,30,45,0); }
-        }
       `}</style>
     </div>
   );

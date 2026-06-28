@@ -1,19 +1,14 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getStationBySlug, getStationSlugs } from "@/lib/stations-data";
+import { getStationBySlug } from "@/lib/stations-data";
 import StationTourClient from "./StationTourClient";
 import Navbar from "@/components/Navbar";
 
-type Props = { params: Promise<{ slug: string }> };
+// Selalu render fresh dari DB — tidak pakai static generation
+// agar perubahan data di CMS langsung terlihat di halaman publik
+export const dynamic = "force-dynamic";
 
-export async function generateStaticParams() {
-  try {
-    const slugs = await getStationSlugs();
-    return slugs.map((slug) => ({ slug }));
-  } catch {
-    return [];
-  }
-}
+type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;

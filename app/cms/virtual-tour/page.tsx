@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { cmsFetch } from "@/lib/cms-fetch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Map } from "lucide-react";
@@ -17,7 +18,7 @@ export default function CmsVirtualTourIndexPage() {
   const [stations, setStations] = useState<Station[]>([]);
 
   useEffect(() => {
-    fetch("/api/cms/stations").then((r) => r.json()).then(setStations);
+    cmsFetch("/api/cms/stations").then((r) => r.json()).then(setStations);
   }, []);
 
   return (

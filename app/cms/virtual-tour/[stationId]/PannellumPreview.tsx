@@ -1,13 +1,44 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
-import type { HotspotItem } from "./PanoramaCanvas";
+import type { HotspotItem } from "@/lib/hotspot-types";
+import { applyHotspotBaseStyle, attachHotspotTooltip } from "@/lib/pannellum-hotspot";
+import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
+import InTourInfoPopup from "@/components/tour/InTourInfoPopup";
+
+type CommercialSpace = {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  area: number;
+  monthlyRent: number;
+  deposit: number;
+  floor: string;
+  location: string;
+  nearestExit: string | null;
+  exposure: number;
+  powerSupply: string | null;
+  waterAccess: boolean;
+  airConditioning: boolean;
+  description: string | null;
+};
+
+type PreviewScene = {
+  sceneId: string;
+  title: string;
+};
 
 interface Props {
   panoramaUrl: string;
   hotspots: HotspotItem[];
   sceneName: string;
+  scenes?: PreviewScene[];
+  spaces?: CommercialSpace[];
+  stationName?: string;
+  onSceneNavigate?: (sceneId: string) => void;
 }
 
 declare global {
@@ -19,10 +50,7 @@ declare global {
 
 function loadPannellum(): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (window.pannellum) {
-      resolve();
-      return;
-    }
+    if (window.pannellum) { resolve(); return; }
     if (!document.getElementById("pannellum-css")) {
       const link = document.createElement("link");
       link.id = "pannellum-css";
@@ -40,85 +68,33 @@ function loadPannellum(): Promise<void> {
     } else {
       let attempts = 0;
       const check = setInterval(() => {
-        if (window.pannellum) {
-          clearInterval(check);
-          resolve();
-        } else if (++attempts > 40) {
-          clearInterval(check);
-          reject(new Error("Pannellum timeout"));
-        }
+        if (window.pannellum) { clearInterval(check); resolve(); }
+        else if (++attempts > 40) { clearInterval(check); reject(new Error("Pannellum timeout")); }
       }, 100);
     }
   });
 }
 
-// ─── Helper: build a fully-custom hotspot button + tooltip ───────────────────
-function buildHotspotElement(div: HTMLDivElement, isScene: boolean, label: string) {
-  const color = isScene ? "#10b981" : "#f59e0b";
-  const arrowSvg =
-    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
-  const dotSvg =
-    '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="8.5" fill="none" stroke="white" stroke-width="2"/></svg>';
-
-  // Style the hotspot circle
-  Object.assign(div.style, {
-    width: "44px",
-    height: "44px",
-    borderRadius: "50%",
-    border: "3px solid rgba(255,255,255,0.9)",
-    backgroundColor: color,
-    cursor: "pointer",
-    boxShadow: "0 3px 14px rgba(0,0,0,0.55)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "transform 0.15s ease, box-shadow 0.15s ease",
-    overflow: "visible",
-    animation: "lrt-hotspot-pulse 2.8s ease-in-out infinite",
-  });
-  div.innerHTML = isScene ? arrowSvg : dotSvg;
-
-  // Tooltip
-  const tooltip = document.createElement("div");
-  tooltip.textContent = label;
-  Object.assign(tooltip.style, {
-    position: "absolute",
-    bottom: "calc(100% + 8px)",
-    left: "50%",
-    transform: "translateX(-50%)",
-    background: "rgba(15,23,42,0.95)",
-    color: "#f1f5f9",
-    padding: "5px 12px",
-    borderRadius: "8px",
-    fontSize: "12px",
-    fontWeight: "600",
-    whiteSpace: "nowrap",
-    pointerEvents: "none",
-    display: "none",
-    border: "1px solid rgba(255,255,255,0.15)",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
-    zIndex: "10",
-  });
-  div.appendChild(tooltip);
-
-  div.addEventListener("mouseenter", () => {
-    tooltip.style.display = "block";
-    div.style.transform = "scale(1.22)";
-    div.style.boxShadow = "0 6px 22px rgba(0,0,0,0.65)";
-    div.style.animation = "none";
-  });
-  div.addEventListener("mouseleave", () => {
-    tooltip.style.display = "none";
-    div.style.transform = "scale(1)";
-    div.style.boxShadow = "0 3px 14px rgba(0,0,0,0.55)";
-    div.style.animation = "lrt-hotspot-pulse 2.8s ease-in-out infinite";
-  });
-}
-
-export function PannellumPreview({ panoramaUrl, hotspots, sceneName }: Props) {
+export function PannellumPreview({
+  panoramaUrl,
+  hotspots,
+  sceneName,
+  scenes = [],
+  spaces = [],
+  stationName = "",
+  onSceneNavigate,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewerRef = useRef<any>(null);
+  const onSceneNavigateRef = useRef(onSceneNavigate);
+  onSceneNavigateRef.current = onSceneNavigate;
+
+  const spacesRef = useRef(spaces);
+  spacesRef.current = spaces;
+
+  const [selectedSpace, setSelectedSpace] = useState<CommercialSpace | null>(null);
+  const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || !panoramaUrl) return;
@@ -130,22 +106,38 @@ export function PannellumPreview({ panoramaUrl, hotspots, sceneName }: Props) {
         if (!isMounted.current || !containerRef.current) return;
 
         if (viewerRef.current) {
-          viewerRef.current.destroy();
+          try { viewerRef.current.destroy(); } catch { /* ignore */ }
           viewerRef.current = null;
         }
 
         const hotSpots = hotspots.map((h) => {
-          const isScene = h.type === "scene";
-          const label = h.text;
-          return {
+          const hs: Record<string, unknown> = {
             pitch: h.pitch,
             yaw: h.yaw,
             type: "custom",
-            cssClass: isScene ? "lrt-scene-hotspot" : "lrt-space-hotspot",
+            cssClass: `lrt-${h.type}-hotspot`,
             createTooltipFunc: (div: HTMLDivElement) => {
-              buildHotspotElement(div, isScene, label);
+              applyHotspotBaseStyle(div, { type: h.type, label: h.text, pulse: true });
+              attachHotspotTooltip(div, h.text);
             },
           };
+
+          if (h.type === "scene" && h.sceneId) {
+            const sceneId = h.sceneId;
+            hs.clickHandlerFunc = () => onSceneNavigateRef.current?.(sceneId);
+          } else if (h.type === "space" && h.spaceCode) {
+            const code = h.spaceCode;
+            hs.clickHandlerFunc = () => {
+              const space = spacesRef.current.find((s) => s.code === code);
+              if (space) setSelectedSpace(space);
+            };
+          } else if (h.type === "info") {
+            const title = h.text;
+            const description = h.description ?? "";
+            hs.clickHandlerFunc = () => setInfoPopup({ title, description });
+          }
+
+          return hs;
         });
 
         viewerRef.current = window.pannellum.viewer(containerRef.current, {
@@ -171,9 +163,7 @@ export function PannellumPreview({ panoramaUrl, hotspots, sceneName }: Props) {
     return () => {
       isMounted.current = false;
       if (viewerRef.current) {
-        try {
-          viewerRef.current.destroy();
-        } catch {}
+        try { viewerRef.current.destroy(); } catch { /* ignore */ }
         viewerRef.current = null;
       }
     };
@@ -189,20 +179,32 @@ export function PannellumPreview({ panoramaUrl, hotspots, sceneName }: Props) {
   }
 
   return (
-    <div className="w-full h-full relative">
-      <div
-        ref={containerRef}
-        className="w-full h-full"
-        style={{ background: "#0f172a" }}
-      />
-      {/* Scene label overlay */}
-      <div className="absolute top-3 left-3 bg-slate-900/90 backdrop-blur text-slate-200 text-xs px-3 py-1.5 rounded-full border border-slate-700 pointer-events-none flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
+    <div className="cms-vt-panorama relative h-full min-h-0 w-full overflow-hidden overscroll-none">
+      <div ref={containerRef} className="absolute inset-0" style={{ background: "#0f172a" }} />
+
+      <div className="absolute top-3 left-3 bg-slate-900/90 backdrop-blur text-slate-200 text-xs px-3 py-1.5 rounded-full border border-slate-700 pointer-events-none flex items-center gap-1.5 z-10">
+        <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse inline-block" />
         Preview — {sceneName}
       </div>
-      <div className="absolute top-3 right-3 bg-slate-900/90 backdrop-blur text-slate-400 text-xs px-3 py-1.5 rounded-full border border-slate-700 pointer-events-none">
-        {hotspots.length} hotspot
+      <div className="absolute top-3 right-3 bg-slate-900/90 backdrop-blur text-slate-400 text-xs px-3 py-1.5 rounded-full border border-slate-700 pointer-events-none z-10">
+        {hotspots.length} hotspot · klik untuk interaksi
       </div>
+
+      {selectedSpace && (
+        <InTourSpacePopup
+          space={selectedSpace}
+          stationName={stationName}
+          onClose={() => setSelectedSpace(null)}
+        />
+      )}
+
+      {infoPopup && (
+        <InTourInfoPopup
+          title={infoPopup.title}
+          description={infoPopup.description}
+          onClose={() => setInfoPopup(null)}
+        />
+      )}
     </div>
   );
 }

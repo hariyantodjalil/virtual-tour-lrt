@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertCircle,
   ArrowRight,
@@ -62,7 +63,7 @@ type Props = {
 };
 
 export default function InTourSpacePopup({ space, stationName, onClose, returnToList = false }: Props) {
-  const [showForm, setShowForm] = useState(false);
+  const [showInterestModal, setShowInterestModal] = useState(false);
   const waMessage = `Halo, saya tertarik dengan unit komersial ${space.code} (${space.name}) di Stasiun ${stationName}. Mohon informasi lebih lanjut.`;
   const waUrl = getWhatsAppUrl(WA_NUMBER, waMessage);
 
@@ -291,21 +292,18 @@ export default function InTourSpacePopup({ space, stationName, onClose, returnTo
             </div>
           </div>
 
-          {showForm && space.status === "TERSEDIA" && (
-            <TenantInterestForm
-              spaceId={space.id}
-              spaceCode={space.code}
-              stationName={stationName}
-              onSuccess={() => setShowForm(false)}
-            />
-          )}
         </div>
 
         <div className="space-y-2 border-t border-gray-100 bg-white p-4">
           {space.status === "TERSEDIA" ? (
             <>
-              <Button className="w-full" onClick={() => { setShowForm(!showForm); trackEvent("FORM_SUBMIT"); }}>
-                {showForm ? "Tutup Formulir" : "Ajukan Minat Sewa"}
+              <Button
+                className="w-full"
+                onClick={() => {
+                  setShowInterestModal(true);
+                }}
+              >
+                Ajukan Minat Sewa
                 <ArrowRight className="h-4 w-4" />
               </Button>
               <div className="grid grid-cols-2 gap-2">
@@ -331,6 +329,70 @@ export default function InTourSpacePopup({ space, stationName, onClose, returnTo
           )}
         </div>
       </div>
+
+      {showInterestModal && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#020817]/78 p-4 backdrop-blur-md sm:p-6">
+          <div className="relative grid max-h-[calc(100vh-48px)] w-full max-w-6xl overflow-hidden rounded-[28px] border border-white/20 bg-white shadow-2xl md:grid-cols-[390px_minmax(0,1fr)]">
+            <div className="hidden bg-[#102a4d] p-8 text-white md:block">
+              <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/12 px-3 py-1 text-xs font-black text-emerald-200">
+                {statusConfig.icon}
+                {statusConfig.label}
+              </div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-white/45">Formulir Tenant</p>
+              <h2 className="mt-3 text-4xl font-black leading-tight">{space.name}</h2>
+              <p className="mt-4 text-lg leading-relaxed text-white/68">
+                {space.code} - Stasiun {stationName}
+              </p>
+
+              <div className="mt-10 space-y-4">
+                <div className="rounded-2xl bg-white/10 p-5">
+                  <p className="text-sm text-white/50">Luas</p>
+                  <p className="text-3xl font-black">{space.area} m2</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-5">
+                  <p className="text-sm text-white/50">Sewa per Bulan</p>
+                  <p className="text-3xl font-black">{formatRupiah(space.monthlyRent)}</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-5">
+                  <p className="text-sm text-white/50">Eksposur</p>
+                  <p className="text-3xl font-black">{formatNumber(Math.round(space.exposure))}</p>
+                  <p className="text-lg font-black">orang/hari</p>
+                </div>
+              </div>
+
+              <p className="mt-10 text-base leading-relaxed text-white/65">
+                Isi data kontak di sebelah kanan. Setelah terkirim, lead akan tersimpan di database dan masuk pipeline CMS.
+              </p>
+            </div>
+
+            <div className="max-h-[calc(100vh-48px)] overflow-y-auto p-6 sm:p-8 lg:p-10">
+              <button
+                type="button"
+                onClick={() => setShowInterestModal(false)}
+                className="absolute right-5 top-5 rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                aria-label="Tutup formulir minat"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              <div className="mb-8 pr-10">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#E31E2D]">Ajukan Minat Sewa</p>
+                <h3 className="mt-2 text-4xl font-black leading-tight text-gray-950">Data Calon Tenant</h3>
+                <p className="mt-3 max-w-xl text-base leading-relaxed text-gray-500">
+                  Form ini khusus untuk unit {space.code} di Stasiun {stationName}.
+                </p>
+              </div>
+
+              <TenantInterestForm
+                spaceId={space.id}
+                spaceCode={space.code}
+                stationName={stationName}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

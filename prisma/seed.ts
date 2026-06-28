@@ -8,25 +8,40 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-const stations = [
-  { name: "Dukuh Atas BNI", slug: "dukuh-atas", line: "Jabodebek", address: "Jl. Jend. Sudirman, Jakarta Pusat", dailyPassengers: 45000, order: 1 },
-  { name: "Setiabudi Astra", slug: "setiabudi", line: "Jabodebek", address: "Jl. HR Rasuna Said, Jakarta Selatan", dailyPassengers: 32000, order: 2 },
-  { name: "Rasuna Said", slug: "rasuna-said", line: "Jabodebek", address: "Jl. HR Rasuna Said, Jakarta Selatan", dailyPassengers: 28000, order: 3 },
-  { name: "Kuningan", slug: "kuningan", line: "Jabodebek", address: "Jl. Prof. Dr. Satrio, Jakarta Selatan", dailyPassengers: 35000, order: 4 },
-  { name: "Pancoran", slug: "pancoran", line: "Jabodebek", address: "Jl. MT Haryono, Jakarta Selatan", dailyPassengers: 22000, order: 5 },
-  { name: "Cikoko", slug: "cikoko", line: "Jabodebek", address: "Jl. Cikoko Barat, Jakarta Selatan", dailyPassengers: 18000, order: 6 },
-  { name: "Ciliwung", slug: "ciliwung", line: "Jabodebek", address: "Jl. MT Haryono, Jakarta Timur", dailyPassengers: 16000, order: 7 },
-  { name: "Cawang", slug: "cawang", line: "Jabodebek", address: "Jl. Mayjen Sutoyo, Jakarta Timur", dailyPassengers: 38000, order: 8 },
-  { name: "TMII", slug: "tmii", line: "Jabodebek", address: "Jl. Raya Taman Mini, Jakarta Timur", dailyPassengers: 25000, order: 9 },
-  { name: "Kampung Rambutan", slug: "kampung-rambutan", line: "Jabodebek", address: "Jl. Raya Bogor, Jakarta Timur", dailyPassengers: 42000, order: 10 },
-  { name: "Ciracas", slug: "ciracas", line: "Jabodebek", address: "Jl. Raya Ciracas, Jakarta Timur", dailyPassengers: 19000, order: 11 },
-  { name: "Harjamukti", slug: "harjamukti", line: "Jabodebek", address: "Jl. Transyogi, Cibubur", dailyPassengers: 28000, order: 12 },
-  { name: "Jatibening Baru", slug: "jatibening-baru", line: "Jabodebek", address: "Jl. Raya Bekasi, Bekasi Barat", dailyPassengers: 21000, order: 13 },
-  { name: "Halim", slug: "halim", line: "Jabodebek", address: "Jl. Raya Halim, Jakarta Timur", dailyPassengers: 31000, order: 14 },
-  { name: "Jatimulya", slug: "jatimulya", line: "Jabodebek", address: "Jl. Jatimulya, Bekasi", dailyPassengers: 24000, order: 15 },
-  { name: "Bekasi Barat", slug: "bekasi-barat", line: "Jabodebek", address: "Jl. Ir. H. Juanda, Bekasi", dailyPassengers: 36000, order: 16 },
-  { name: "Padurenan", slug: "padurenan", line: "Jabodebek", address: "Jl. Padurenan, Bekasi", dailyPassengers: 17000, order: 17 },
-  { name: "Jatiasih", slug: "jatiasih", line: "Jabodebek", address: "Jl. Raya Jatiasih, Bekasi", dailyPassengers: 20000, order: 18 },
+// Daftar stasiun LRT Jabodebek — kode & urutan dari portal-lrt-db
+type StationSeed = {
+  name: string;
+  nameId: string;
+  slug: string;
+  code: string;
+  line: string;
+  address: string;
+  location: string;
+  dailyPassengers: number;
+  order: number;
+  latitude: number;
+  longitude: number;
+};
+
+const stations: StationSeed[] = [
+  { name: "Dukuh Atas BNI", nameId: "Dukuh Atas BNI", slug: "dukuh-atas", code: "DKA", line: "Jabodebek", address: "Tanah Abang, Jakarta Pusat", location: "Jakarta Pusat", dailyPassengers: 45000, order: 1, latitude: -6.204828, longitude: 106.8255301 },
+  { name: "Setiabudi", nameId: "Setiabudi", slug: "setiabudi", code: "SET", line: "Jabodebek", address: "Setia Budi, Jakarta Selatan", location: "Jakarta Selatan", dailyPassengers: 32000, order: 2, latitude: -6.2093184, longitude: 106.8302209 },
+  { name: "Rasuna Said", nameId: "Rasuna Said", slug: "rasuna-said", code: "RAS", line: "Jabodebek", address: "Setia Budi, Jakarta Selatan", location: "Jakarta Selatan", dailyPassengers: 28000, order: 3, latitude: -6.2216089, longitude: 106.8322373 },
+  { name: "Kuningan", nameId: "Kuningan", slug: "kuningan", code: "KUA", line: "Jabodebek", address: "Setia Budi, Jakarta Selatan", location: "Jakarta Selatan", dailyPassengers: 35000, order: 4, latitude: -6.2287727, longitude: 106.8332031 },
+  { name: "Pancoran Bank BJB", nameId: "Pancoran Bank BJB", slug: "pancoran-bank-bjb", code: "PAN", line: "Jabodebek", address: "Pancoran, Jakarta Selatan", location: "Jakarta Selatan", dailyPassengers: 22000, order: 5, latitude: -6.2421415, longitude: 106.8385146 },
+  { name: "Cikoko", nameId: "Cikoko", slug: "cikoko", code: "CIK", line: "Jabodebek", address: "Pancoran, Jakarta Selatan", location: "Jakarta Selatan", dailyPassengers: 18000, order: 6, latitude: -6.2434846, longitude: 106.8570718 },
+  { name: "Ciliwung", nameId: "Ciliwung", slug: "ciliwung", code: "CIL", line: "Jabodebek", address: "Pancoran, Jakarta Selatan", location: "Jakarta Timur", dailyPassengers: 16000, order: 7, latitude: -6.2434448, longitude: 106.8639705 },
+  { name: "Cawang", nameId: "Cawang", slug: "cawang", code: "CWG", line: "Jabodebek", address: "Jatinegara, Jakarta Timur", location: "Jakarta Timur", dailyPassengers: 38000, order: 8, latitude: -6.2459023, longitude: 106.8712426 },
+  { name: "Halim", nameId: "Halim", slug: "halim", code: "HAL", line: "Jabodebek", address: "Makasar, Jakarta Timur", location: "Jakarta Timur", dailyPassengers: 31000, order: 9, latitude: -6.2458656, longitude: 106.8872875 },
+  { name: "Jatibening Baru", nameId: "Jatibening Baru", slug: "jatibening-baru", code: "JTU", line: "Jabodebek", address: "Pondokgede, Kota Bekasi", location: "Kota Bekasi", dailyPassengers: 21000, order: 10, latitude: -6.2577476, longitude: 106.9279199 },
+  { name: "Cikunir 1", nameId: "Cikunir 1", slug: "cikunir-1", code: "CK1", line: "Jabodebek", address: "Pondokmelati, Kota Bekasi", location: "Kota Bekasi", dailyPassengers: 19000, order: 11, latitude: -6.2566001, longitude: 106.9518734 },
+  { name: "Cikunir 2", nameId: "Cikunir 2", slug: "cikunir-2", code: "CK2", line: "Jabodebek", address: "Pondokmelati, Kota Bekasi", location: "Kota Bekasi", dailyPassengers: 18500, order: 12, latitude: -6.2546849, longitude: 106.9632233 },
+  { name: "Bekasi Barat", nameId: "Bekasi Barat", slug: "bekasi-barat", code: "BEK", line: "Jabodebek", address: "Bekasi Barat, Kota Bekasi", location: "Kota Bekasi", dailyPassengers: 36000, order: 13, latitude: -6.2529489, longitude: 106.9904237 },
+  { name: "Jatimulya", nameId: "Jatimulya", slug: "jatimulya", code: "JTM", line: "Jabodebek", address: "Tambun Selatan, Kota Bekasi", location: "Kota Bekasi", dailyPassengers: 24000, order: 14, latitude: -6.2641077, longitude: 107.0216701 },
+  { name: "TMII", nameId: "TMII", slug: "tmii", code: "TMI", line: "Jabodebek", address: "Pasar Rebo, Jakarta Timur", location: "Jakarta Timur", dailyPassengers: 25000, order: 15, latitude: -6.2928955, longitude: 106.8806355 },
+  { name: "Kampung Rambutan", nameId: "Kampung Rambutan", slug: "kampung-rambutan", code: "KAM", line: "Jabodebek", address: "Pasar Rebo, Jakarta Timur", location: "Jakarta Timur", dailyPassengers: 42000, order: 16, latitude: -6.3095494, longitude: 106.8843804 },
+  { name: "Ciracas", nameId: "Ciracas", slug: "ciracas", code: "CRC", line: "Jabodebek", address: "Cipayung, Jakarta Timur", location: "Jakarta Timur", dailyPassengers: 19000, order: 17, latitude: -6.3237795, longitude: 106.8867366 },
+  { name: "Harjamukti", nameId: "Harjamukti", slug: "harjamukti", code: "HAR", line: "Jabodebek", address: "Cipayung, Depok", location: "Depok", dailyPassengers: 28000, order: 18, latitude: -6.3739095, longitude: 106.8956745 },
 ];
 
 const spaceTemplates: { type: SpaceType; name: string; area: number; rent: number }[] = [
@@ -46,32 +61,34 @@ const DEMO_PANORAMAS = [
   "https://pannellum.org/images/jfk.jpg",
 ];
 
-function getSpacePrefix(slug: string): string {
-  return slug.toUpperCase().replace(/-/g, "").slice(0, 3);
+function getSpacePrefix(code: string): string {
+  return code.toUpperCase();
 }
 
-function makeSceneData(slug: string, index: number) {
-  const code = getSpacePrefix(slug);
+function makeSceneData(stationCode: string, index: number) {
+  const prefix = getSpacePrefix(stationCode);
   return [
     {
       sceneId: "concourse",
       title: "Concourse",
+      level: "CONCOURSE",
       panoramaUrl: DEMO_PANORAMAS[index % DEMO_PANORAMAS.length],
       order: 0,
       hotspots: [
-        { pitch: -4, yaw: 118, type: "space", text: `Kios ${code}-01`, spaceCode: `${code}-01` },
-        { pitch: -6, yaw: -58, type: "space", text: `Ruko ${code}-02`, spaceCode: `${code}-02` },
+        { pitch: -4, yaw: 118, type: "space", text: `Kios ${prefix}-01`, spaceCode: `${prefix}-01` },
+        { pitch: -6, yaw: -58, type: "space", text: `Ruko ${prefix}-02`, spaceCode: `${prefix}-02` },
         { pitch: -2, yaw: 28, type: "scene", text: "Ke Gate Area", sceneId: "gate-area" },
       ],
     },
     {
       sceneId: "gate-area",
       title: "Gate Area",
+      level: "CONCOURSE",
       panoramaUrl: DEMO_PANORAMAS[(index + 1) % DEMO_PANORAMAS.length],
       order: 1,
       hotspots: [
-        { pitch: -3, yaw: 88, type: "space", text: `ATM ${code}-03`, spaceCode: `${code}-03` },
-        { pitch: -5, yaw: -112, type: "space", text: `Vending ${code}-04`, spaceCode: `${code}-04` },
+        { pitch: -3, yaw: 88, type: "space", text: `ATM ${prefix}-03`, spaceCode: `${prefix}-03` },
+        { pitch: -5, yaw: -112, type: "space", text: `Vending ${prefix}-04`, spaceCode: `${prefix}-04` },
         { pitch: -1, yaw: -30, type: "scene", text: "Kembali ke Concourse", sceneId: "concourse" },
         { pitch: 0, yaw: 142, type: "scene", text: "Ke Platform", sceneId: "platform" },
       ],
@@ -79,11 +96,12 @@ function makeSceneData(slug: string, index: number) {
     {
       sceneId: "platform",
       title: "Platform",
+      level: "PLATFORM",
       panoramaUrl: DEMO_PANORAMAS[(index + 2) % DEMO_PANORAMAS.length],
       order: 2,
       hotspots: [
-        { pitch: -4, yaw: 45, type: "space", text: `Media Iklan ${code}-05`, spaceCode: `${code}-05` },
-        { pitch: -3, yaw: -80, type: "space", text: `Area Promosi ${code}-06`, spaceCode: `${code}-06` },
+        { pitch: -4, yaw: 45, type: "space", text: `Media Iklan ${prefix}-05`, spaceCode: `${prefix}-05` },
+        { pitch: -3, yaw: -80, type: "space", text: `Area Promosi ${prefix}-06`, spaceCode: `${prefix}-06` },
         { pitch: 0, yaw: 165, type: "scene", text: "Turun ke Gate Area", sceneId: "gate-area" },
       ],
     },
@@ -96,6 +114,7 @@ async function main() {
   await prisma.visitEvent.deleteMany();
   await prisma.tenantLead.deleteMany();
   await prisma.virtualTourScene.deleteMany();
+  await prisma.stationVirtualTour.deleteMany();
   await prisma.commercialSpace.deleteMany();
   await prisma.station.deleteMany();
   await prisma.user.deleteMany();
@@ -114,12 +133,23 @@ async function main() {
   for (const stationData of stations) {
     const station = await prisma.station.create({
       data: {
-        ...stationData,
-        description: `Stasiun ${stationData.name} merupakan bagian dari jaringan LRT Jabodebek yang melayani kawasan strategis di ${stationData.address.split(",").slice(-1)[0].trim()}.`,
+        code: stationData.code,
+        name: stationData.name,
+        nameId: stationData.nameId,
+        slug: stationData.slug,
+        line: stationData.line,
+        address: stationData.address,
+        location: stationData.location,
+        dailyPassengers: stationData.dailyPassengers,
+        order: stationData.order,
+        latitude: stationData.latitude,
+        longitude: stationData.longitude,
+        isActive: true,
+        description: `Stasiun ${stationData.name} merupakan bagian dari jaringan LRT Jabodebek yang melayani kawasan strategis di ${stationData.location}.`,
       },
     });
 
-    const prefix = stationData.slug.toUpperCase().replace(/-/g, "").slice(0, 3);
+    const prefix = stationData.code;
 
     for (let i = 0; i < spaceTemplates.length; i++) {
       const tmpl = spaceTemplates[i];
@@ -146,20 +176,34 @@ async function main() {
       });
     }
 
-    for (const scene of makeSceneData(stationData.slug, stationData.order - 1)) {
+    for (const scene of makeSceneData(stationData.code, stationData.order - 1)) {
       await prisma.virtualTourScene.create({
         data: {
           stationId: station.id,
           sceneId: scene.sceneId,
           title: scene.title,
+          level: scene.level,
           panoramaUrl: scene.panoramaUrl,
           order: scene.order,
           hotspots: scene.hotspots,
+          canvasData: { initialView: { yaw: 0, pitch: 0, hfov: 100 } },
         },
       });
     }
 
-    console.log(`  ok ${stationData.name} (${spaceTemplates.length} unit, 3 scenes)`);
+    // Konfigurasi agregat virtual tour — paralel station_floorplans di portal-lrt
+    await prisma.stationVirtualTour.create({
+      data: {
+        stationId: station.id,
+        data: {
+          defaultSceneId: "concourse",
+          editorSettings: { autoRotate: -2, defaultHfov: 100 },
+        },
+        isActive: true,
+      },
+    });
+
+    console.log(`  ok ${stationData.name} [${stationData.code}] (${spaceTemplates.length} unit, 3 scenes)`);
   }
 
   console.log(`\nok Seeding selesai: ${stations.length} stasiun berhasil ditambahkan.`);

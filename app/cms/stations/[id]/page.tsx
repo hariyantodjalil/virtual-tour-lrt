@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
+import { cmsFetch } from "@/lib/cms-fetch";
 import { ArrowLeft, Upload } from "lucide-react";
 
 type Station = {
@@ -31,7 +32,7 @@ export default function CmsStationEditPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    fetch(`/api/cms/stations/${id}`)
+    cmsFetch(`/api/cms/stations/${id}`)
       .then((r) => r.json())
       .then(setStation);
   }, [id]);
@@ -40,7 +41,7 @@ export default function CmsStationEditPage() {
     e.preventDefault();
     if (!station) return;
     setSaving(true);
-    const res = await fetch(`/api/cms/stations/${id}`, {
+    const res = await cmsFetch(`/api/cms/stations/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -62,7 +63,7 @@ export default function CmsStationEditPage() {
     if (!file) return;
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch(`/api/cms/stations/${id}/upload`, { method: "POST", body: formData });
+    const res = await cmsFetch(`/api/cms/stations/${id}/upload`, { method: "POST", body: formData });
     const data = await res.json();
     if (res.ok && station) {
       setStation({ ...station, imageUrl: data.imageUrl });

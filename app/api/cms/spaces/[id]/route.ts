@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateS3Key, uploadToS3 } from "@/lib/s3";
+import { processSpacePhoto } from "@/lib/image-processor";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -33,9 +34,11 @@ export async function POST(request: NextRequest, { params }: Params) {
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "File wajib diisi" }, { status: 400 });
 
-  const s3Key = generateS3Key("spaces", file.name);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await uploadToS3(buffer, s3Key, file.type);
+  const originalBuffer = Buffer.from(await file.arrayBuffer());
+  const result = await processSpacePhoto(originalBuffer);
+
+  const s3Key = generateS3Key("spaces", `${id}.webp`);
+  await uploadToS3(result.buffer, s3Key, "image/webp");
   const panoramaUrl = `/${s3Key}`;
 
   const space = await prisma.commercialSpace.update({

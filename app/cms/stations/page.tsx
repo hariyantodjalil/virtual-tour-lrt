@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
+import { cmsFetch } from "@/lib/cms-fetch";
 import { Pencil, Map } from "lucide-react";
 
 type Station = {
@@ -24,7 +25,7 @@ export default function CmsStationsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/cms/stations")
+    cmsFetch("/api/cms/stations")
       .then((r) => r.json())
       .then(setStations)
       .finally(() => setLoading(false));

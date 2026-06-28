@@ -15,6 +15,8 @@ export default function CmsLoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const isExpired = searchParams.get("reason") === "expired";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -48,6 +50,11 @@ export default function CmsLoginForm() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {isExpired && (
+            <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+              Sesi Anda telah berakhir. Silakan login kembali untuk melanjutkan.
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

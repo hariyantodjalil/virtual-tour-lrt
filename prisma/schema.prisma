@@ -20,40 +20,60 @@ model User {
 }
 
 model Station {
-  id               String             @id @default(cuid())
-  name             String
-  slug             String             @unique
-  line             String
-  address          String
-  dailyPassengers  Int                @default(0)
-  latitude         Float?
-  longitude        Float?
-  imageUrl         String?
-  floorPlanUrl     String?
-  floorPlanData    Json?
-  description      String?
-  order            Int                @default(0)
-  commercialSpaces CommercialSpace[]
-  visitEvents      VisitEvent[]
+  id                String              @id @default(cuid())
+  code              String?             @unique // Kode stasiun resmi (DKA, SET, dll.) — selaras portal-lrt
+  name              String
+  nameId            String?             // Nama tampilan ID (biasanya sama dengan name)
+  slug              String              @unique
+  line              String
+  address           String
+  location          String?             // Wilayah: Jakarta Selatan, Kota Bekasi, dll.
+  dailyPassengers   Int                 @default(0)
+  latitude          Float?
+  longitude         Float?
+  imageUrl          String?
+  description       String?
+  order             Int                 @default(0)
+  isActive          Boolean             @default(true)
+  commercialSpaces  CommercialSpace[]
+  visitEvents       VisitEvent[]
   virtualTourScenes VirtualTourScene[]
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  virtualTour       StationVirtualTour?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   @@map("stations")
 }
 
+// Agregat konfigurasi virtual tour per stasiun — paralel station_floorplans di portal-lrt.
+// Scene & hotspot tetap dinormalisasi di virtual_tour_scenes.
+model StationVirtualTour {
+  id        String   @id @default(cuid())
+  stationId String   @unique
+  station   Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  data      Json     @default("{}") // defaultSceneId, initialViews per scene, editorSettings
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("station_virtual_tours")
+}
+
 model VirtualTourScene {
-  id          String   @id @default(cuid())
-  stationId   String
-  station     Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
-  sceneId     String
-  title       String
-  panoramaUrl String
-  order       Int      @default(0)
-  hotspots    Json     @default("[]")
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  stationId    String
+  station      Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  sceneId      String   // slug scene: concourse, gate-area, platform
+  title        String
+  panoramaUrl  String   // path S3 equirectangular — paralel svgPath di floorplan
+  level        String   @default("CONCOURSE") // CONCOURSE, PLATFORM, OUTDOOR, TRANSFER, COMMERCIAL
+  thumbnailUrl String?  // thumbnail preview scene
+  order        Int      @default(0)
+  hotspots     Json     @default("[]") // array hotspot — paralel placedAssets di floorplan
+  canvasData   Json?    // initialView {yaw,pitch,hfov}, editor viewport state
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([stationId, sceneId])
   @@map("virtual_tour_scenes")

@@ -17,6 +17,7 @@ export async function getAllStationsData(): Promise<StationInfo[]> {
   return stations.map((station) => ({
     slug: station.slug,
     name: station.name,
+    code: station.code ?? undefined,
     line: station.line,
     order: station.order,
     dailyPassengers: station.dailyPassengers,
@@ -25,6 +26,7 @@ export async function getAllStationsData(): Promise<StationInfo[]> {
       id: scene.sceneId,
       title: scene.title,
       panoramaUrl: scene.panoramaUrl,
+      thumbnailUrl: scene.thumbnailUrl ?? undefined,
       hotspots: (scene.hotspots as Hotspot[]) ?? [],
     })),
   }));
@@ -46,6 +48,7 @@ export async function getStationBySlug(slug: string): Promise<StationInfo | null
   return {
     slug: station.slug,
     name: station.name,
+    code: station.code ?? undefined,
     line: station.line,
     order: station.order,
     dailyPassengers: station.dailyPassengers,
@@ -54,6 +57,7 @@ export async function getStationBySlug(slug: string): Promise<StationInfo | null
       id: scene.sceneId,
       title: scene.title,
       panoramaUrl: scene.panoramaUrl,
+      thumbnailUrl: scene.thumbnailUrl ?? undefined,
       hotspots: (scene.hotspots as Hotspot[]) ?? [],
     })),
   };

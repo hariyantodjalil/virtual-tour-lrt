@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
-  Building2,
   LayoutDashboard,
   LogOut,
   Map,
@@ -11,8 +11,9 @@ import {
   Users,
   UserCircle,
   Train,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/cms/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -23,9 +24,85 @@ const navItems = [
   { href: "/cms/users", label: "Users", icon: Users, adminOnly: true },
 ];
 
+type CmsUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+};
+
+// Halaman yang butuh konten full-width tanpa padding dan max-width
+function isFullWidthPage(pathname: string) {
+  return (
+    pathname.startsWith("/cms/virtual-tour/") &&
+    pathname !== "/cms/virtual-tour"
+  );
+}
+
+function getPageMeta(pathname: string) {
+  if (pathname.startsWith("/cms/dashboard")) {
+    return { title: "Dashboard", subtitle: "Ringkasan performa komersial dan aktivitas tenant" };
+  }
+  if (pathname.startsWith("/cms/stations/")) {
+    return { title: "Detail Stasiun", subtitle: "Kelola profil, gambar, dan data operasional stasiun" };
+  }
+  if (pathname.startsWith("/cms/stations")) {
+    return { title: "Stasiun", subtitle: "Master data stasiun LRT Jabodebek" };
+  }
+  if (pathname.startsWith("/cms/virtual-tour/")) {
+    return { title: "Editor Virtual Tour", subtitle: "Atur panorama, hotspot, dan alur tur 360" };
+  }
+  if (pathname.startsWith("/cms/virtual-tour")) {
+    return { title: "Virtual Tour", subtitle: "Daftar konfigurasi tur 360 setiap stasiun" };
+  }
+  if (pathname.startsWith("/cms/spaces/")) {
+    return { title: "Ruang Komersial", subtitle: "Kelola unit sewa per stasiun" };
+  }
+  if (pathname.startsWith("/cms/spaces")) {
+    return { title: "Ruang Komersial", subtitle: "Inventori tenant, kios, media, dan area promosi" };
+  }
+  if (pathname.startsWith("/cms/leads")) {
+    return { title: "Leads", subtitle: "Pipeline calon tenant dari public virtual tour" };
+  }
+  if (pathname.startsWith("/cms/users")) {
+    return { title: "Users", subtitle: "Akses pengguna dan peran admin CMS" };
+  }
+  return { title: "CMS", subtitle: "Virtual Tour Komersial LRT Jabodebek" };
+}
+
 export default function CmsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("cms-sidebar-collapsed") === "true";
+  });
+  const [currentUser, setCurrentUser] = useState<CmsUser | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    fetch("/api/auth/verify")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!active) return;
+        setCurrentUser(data?.authenticated ? data.user : null);
+      })
+      .catch(() => {
+        if (active) setCurrentUser(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function toggleSidebar() {
+    setCollapsed((c) => {
+      localStorage.setItem("cms-sidebar-collapsed", String(!c));
+      return !c;
+    });
+  }
 
   if (pathname === "/cms/login") {
     return <>{children}</>;
@@ -36,19 +113,36 @@ export default function CmsLayout({ children }: { children: React.ReactNode }) {
     router.push("/cms/login");
   }
 
+  const fullWidth = isFullWidthPage(pathname);
+  const pageMeta = getPageMeta(pathname);
+
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100">
-      <aside className="w-64 border-r border-slate-800 bg-slate-900 flex flex-col">
-        <div className="p-5 border-b border-slate-800">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-6 w-6 text-emerald-400" />
-            <div>
-              <p className="font-semibold text-sm">Virtual Tour CMS</p>
+    <div className="cms-shell flex h-screen bg-[#07111f] text-slate-100 overflow-hidden">
+      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
+      <aside
+        className={`relative z-20 flex h-full min-h-0 flex-none flex-col border-r border-white/10 bg-[#081426]/95 shadow-2xl shadow-black/30 transition-all duration-200 ${
+          collapsed ? "w-14" : "w-56"
+        }`}
+      >
+        {/* Logo */}
+        <div
+          className={`border-b border-white/10 flex items-center ${
+            collapsed ? "justify-center p-3" : "gap-2.5 p-4"
+          }`}
+        >
+          <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-[#E31E2D] text-xs font-black text-white">
+            LRT
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="text-sm font-black text-white leading-tight">Virtual Tour CMS</p>
               <p className="text-xs text-slate-400">LRT Jabodebek</p>
             </div>
-          </div>
+          )}
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+
+        {/* Nav items */}
+        <nav className="min-h-0 flex-1 p-2 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
@@ -56,25 +150,84 @@ export default function CmsLayout({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  active ? "bg-emerald-600/20 text-emerald-300" : "text-slate-300 hover:bg-slate-800"
+                title={collapsed ? item.label : undefined}
+                className={`flex items-center rounded-lg text-sm transition-colors group ${
+                  collapsed ? "justify-center w-10 h-10 mx-auto" : "gap-3 px-3 py-2"
+                } ${
+                  active
+                    ? "bg-emerald-400/12 text-emerald-200 ring-1 ring-emerald-300/20"
+                    : "text-slate-300 hover:bg-white/8 hover:text-white"
                 }`}
               >
-                <Icon className="h-4 w-4" />
-                {item.label}
+                <Icon className="h-4 w-4 flex-none" />
+                {!collapsed && <span className="truncate">{item.label}</span>}
               </Link>
             );
           })}
         </nav>
-        <div className="p-3 border-t border-slate-800">
-          <Button variant="ghost" className="w-full justify-start text-slate-300" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
+
+        {/* Footer */}
+        <div className={`border-t border-white/10 p-2 ${collapsed ? "flex flex-col items-center gap-2" : "space-y-2"}`}>
+          <div
+            title={collapsed ? currentUser?.name ?? currentUser?.email ?? "User" : undefined}
+            className={`flex items-center rounded-xl border border-white/10 bg-white/[0.035] text-slate-300 ${
+              collapsed ? "h-10 w-10 justify-center" : "gap-3 p-2"
+            }`}
+          >
+            <UserCircle className="h-5 w-5 flex-none text-emerald-300" />
+            {!collapsed && (
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-white">
+                  {currentUser?.name ?? currentUser?.email ?? "User"}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            title={collapsed ? "Logout" : undefined}
+            className={`flex items-center justify-center rounded-lg text-slate-400 hover:bg-red-900/30 hover:text-red-300 transition-colors ${
+              collapsed ? "w-10 h-10" : "w-full h-9 gap-2 px-3"
+            }`}
+          >
+            <LogOut className="h-4 w-4 flex-none" />
+            {!collapsed && <span className="text-sm flex-1 text-left">Logout</span>}
+          </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto">
-        <div className="p-6 max-w-7xl mx-auto">{children}</div>
+
+      {/* ── Main content ─────────────────────────────────────────────────── */}
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="relative z-20 border-b border-white/10 bg-[#081426]/95 shadow-lg shadow-black/10">
+          <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              title={collapsed ? "Perluas sidebar" : "Sembunyikan sidebar"}
+              aria-label={collapsed ? "Perluas sidebar" : "Sembunyikan sidebar"}
+              className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 transition hover:border-emerald-300/30 hover:bg-emerald-400/10 hover:text-emerald-100"
+            >
+              {collapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+            </button>
+
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-black text-white sm:text-lg">{pageMeta.title}</h1>
+            </div>
+          </div>
+        </header>
+        {/* Background gradient */}
+        <div className={`relative min-h-0 flex-1 ${fullWidth ? "overflow-hidden" : "overflow-auto"}`}>
+          <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,.13),transparent_32%),radial-gradient(circle_at_85%_8%,rgba(227,30,45,.11),transparent_30%)]" />
+
+        {/* Content wrapper — full width untuk editor, punya max-width untuk halaman lain */}
+        {fullWidth ? (
+          <div className="relative z-10 flex h-full min-h-0 w-full flex-col overflow-hidden">{children}</div>
+        ) : (
+          <div className="relative z-10 mx-auto max-w-7xl p-6">{children}</div>
+        )}
+        </div>
       </main>
     </div>
   );

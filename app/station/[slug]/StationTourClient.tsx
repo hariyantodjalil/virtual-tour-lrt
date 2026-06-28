@@ -7,6 +7,7 @@ import {
   Grid3X3, Info, MapPin, Play, Route, Users, X,
 } from "lucide-react";
 import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
+import InTourInfoPopup from "@/components/tour/InTourInfoPopup";
 import VirtualTourViewer from "@/components/tour/VirtualTourViewer";
 import { formatNumber, formatRupiah } from "@/lib/utils";
 import type { StationInfo } from "@/lib/stations-data";
@@ -54,6 +55,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
   const lastScene = stationInfo.scenes.at(-1)?.id ?? firstScene;
 
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
+  const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
   const [activeSceneId, setActiveSceneId] = useState(firstScene);
   const [routeFrom, setRouteFrom] = useState(firstScene);
   const [routeTo, setRouteTo] = useState(lastScene);
@@ -100,6 +102,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
       <VirtualTourViewer
         scenes={stationInfo.scenes}
         onSpaceClick={openSpaceFromHotspot}
+        onInfoClick={(title, description) => setInfoPopup({ title, description })}
         onSceneChange={setActiveSceneId}
         selectedSceneId={activeSceneId}
         stationName={stationInfo.name}
@@ -364,6 +367,14 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
           stationName={stationInfo.name}
           returnToList={openedFromUnitsList}
           onClose={closeSpaceDetail}
+        />
+      )}
+
+      {infoPopup && (
+        <InTourInfoPopup
+          title={infoPopup.title}
+          description={infoPopup.description}
+          onClose={() => setInfoPopup(null)}
         />
       )}
     </div>

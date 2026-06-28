@@ -107,12 +107,14 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const data = await getDashboardData();
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="container mx-auto max-w-7xl px-4 py-8">
+    <div className="min-h-screen bg-[#07111f] text-slate-100">
+      <Navbar variant="dark" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,.14),transparent_32%),radial-gradient(circle_at_85%_10%,rgba(227,30,45,.12),transparent_28%)]" />
+      <div className="relative container mx-auto max-w-7xl px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-black text-gray-900">Dashboard Analitik</h1>
-          <p className="text-gray-500 mt-1">Pantau performa virtual tour & pipeline lead tenant</p>
+          <p className="mb-2 text-xs font-black uppercase tracking-[0.22em] text-emerald-300">Commercial Intelligence</p>
+          <h1 className="text-3xl font-black text-white">Dashboard Analitik</h1>
+          <p className="mt-1 text-slate-400">Pantau performa virtual tour & pipeline lead tenant</p>
         </div>
         <DashboardClient data={data} />
       </div>

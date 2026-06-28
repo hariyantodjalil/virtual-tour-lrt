@@ -22,6 +22,28 @@ body {
   border-radius: inherit;
 }
 
+/* Kunci Pannellum di dalam editor CMS — cegah canvas melebar saat drag */
+.cms-vt-panorama .pnlm-container,
+.cms-vt-panorama .pnlm-ui,
+.cms-vt-panorama .pnlm-render-container,
+.cms-vt-panorama .pnlm-dragfix {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  max-width: 100% !important;
+}
+
+.cms-vt-editor {
+  overscroll-behavior: none;
+}
+
+.cms-vt-panorama {
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
 .pnlm-hotspot-base {
   cursor: pointer;
 }
@@ -32,7 +54,8 @@ body {
  * CSS ini hanya menyediakan: pulse animation + reset Pannellum sprite.
  */
 .lrt-scene-hotspot,
-.lrt-space-hotspot {
+.lrt-space-hotspot,
+.lrt-info-hotspot {
   /* Reset sprite bawaan Pannellum agar createTooltipFunc yang berlaku */
   background-image: none !important;
   overflow: visible !important;
@@ -80,4 +103,16 @@ body {
 @keyframes slideUpIn {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Hotspot pulse animation (PannellumEditor) */
+@keyframes lrt-hotspot-pulse {
+  0%, 100% { box-shadow: 0 3px 14px rgba(0,0,0,0.55); }
+  50%       { box-shadow: 0 3px 20px rgba(0,0,0,0.7), 0 0 0 6px rgba(255,255,255,0.12); }
+}
+.lrt-editor-hs {
+  /* Pannellum renders hotspot wrapper — align our content */
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
 }
