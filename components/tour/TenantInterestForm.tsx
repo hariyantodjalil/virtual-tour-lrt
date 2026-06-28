@@ -1,0 +1,122 @@
+"use client";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { CheckCircle, Loader2, Send } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+
+const schema = z.object({
+  companyName: z.string().min(2, "Nama perusahaan minimal 2 karakter"),
+  contactName: z.string().min(2, "Nama kontak minimal 2 karakter"),
+  phone: z.string().min(10, "Nomor telepon tidak valid").regex(/^\+?[\d\s-]+$/, "Format nomor tidak valid"),
+  email: z.string().email("Format email tidak valid"),
+  businessType: z.string().min(3, "Jenis usaha wajib diisi"),
+  message: z.string().optional(),
+});
+
+type FormValues = z.infer<typeof schema>;
+
+type Props = {
+  spaceId: string;
+  spaceCode: string;
+  stationName: string;
+  onSuccess?: () => void;
+};
+
+export default function TenantInterestForm({ spaceId, spaceCode, stationName, onSuccess }: Props) {
+  const [submitted, setSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+  });
+
+  const onSubmit = async (data: FormValues) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, spaceId }),
+      });
+      if (res.ok) {
+        setSubmitted(true);
+        onSuccess?.();
+      }
+    } catch {
+      alert("Gagal mengirim formulir. Coba lagi.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-6 text-center">
+        <CheckCircle className="h-10 w-10 text-emerald-500" />
+        <div>
+          <p className="font-bold text-gray-900">Minat Anda Tercatat!</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Tim komersial LRT Jabodebek akan menghubungi Anda dalam 1×24 jam untuk unit {spaceCode} di Stasiun {stationName}.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 border-t border-gray-100 pt-4">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Formulir Minat Sewa</p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="companyName" className="text-xs">Nama Perusahaan *</Label>
+          <Input id="companyName" placeholder="PT Contoh" className="h-9 text-sm" {...register("companyName")} />
+          {errors.companyName && <p className="text-xs text-red-500">{errors.companyName.message}</p>}
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="contactName" className="text-xs">Nama Kontak *</Label>
+          <Input id="contactName" placeholder="Budi Santoso" className="h-9 text-sm" {...register("contactName")} />
+          {errors.contactName && <p className="text-xs text-red-500">{errors.contactName.message}</p>}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="phone" className="text-xs">Telepon *</Label>
+          <Input id="phone" type="tel" placeholder="08123456789" className="h-9 text-sm" {...register("phone")} />
+          {errors.phone && <p className="text-xs text-red-500">{errors.phone.message}</p>}
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="email" className="text-xs">Email *</Label>
+          <Input id="email" type="email" placeholder="budi@perusahaan.com" className="h-9 text-sm" {...register("email")} />
+          {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="businessType" className="text-xs">Jenis Usaha *</Label>
+        <Input id="businessType" placeholder="F&B, Retail, Perbankan, dll." className="h-9 text-sm" {...register("businessType")} />
+        {errors.businessType && <p className="text-xs text-red-500">{errors.businessType.message}</p>}
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="message" className="text-xs">Pesan Tambahan</Label>
+        <Textarea id="message" placeholder="Kebutuhan khusus, pertanyaan, dll." className="h-20 text-sm resize-none" {...register("message")} />
+      </div>
+
+      <Button type="submit" className="w-full" disabled={isLoading}>
+        {isLoading ? (
+          <><Loader2 className="h-4 w-4 animate-spin" /> Mengirim...</>
+        ) : (
+          <><Send className="h-4 w-4" /> Kirim Minat Sewa</>
+        )}
+      </Button>
+    </form>
+  );
+}

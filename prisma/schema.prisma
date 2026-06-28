@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(EDITOR)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Station {
+  id               String             @id @default(cuid())
+  name             String
+  slug             String             @unique
+  line             String
+  address          String
+  dailyPassengers  Int                @default(0)
+  latitude         Float?
+  longitude        Float?
+  imageUrl         String?
+  floorPlanUrl     String?
+  floorPlanData    Json?
+  description      String?
+  order            Int                @default(0)
+  commercialSpaces CommercialSpace[]
+  visitEvents      VisitEvent[]
+  virtualTourScenes VirtualTourScene[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@map("stations")
+}
+
+model VirtualTourScene {
+  id          String   @id @default(cuid())
+  stationId   String
+  station     Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  sceneId     String
+  title       String
+  panoramaUrl String
+  order       Int      @default(0)
+  hotspots    Json     @default("[]")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([stationId, sceneId])
+  @@map("virtual_tour_scenes")
+}
+
+model CommercialSpace {
+  id              String        @id @default(cuid())
+  stationId       String
+  station         Station       @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  code            String
+  name            String
+  type            SpaceType     @default(KIOS)
+  status          SpaceStatus   @default(TERSEDIA)
+  area            Float
+  monthlyRent     Float
+  deposit         Float         @default(0)
+  floor           String        @default("G")
+  location        String
+  nearestExit     String?
+  exposure        Int           @default(0)
+  powerSupply     String?
+  waterAccess     Boolean       @default(false)
+  airConditioning Boolean       @default(false)
+  description     String?
+  panoramaUrl     String?
+  tenantLeads     TenantLead[]
+  visitEvents     VisitEvent[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([stationId, code])
+  @@map("commercial_spaces")
+}
+
+model TenantLead {
+  id               String           @id @default(cuid())
+  spaceId          String?
+  space            CommercialSpace? @relation(fields: [spaceId], references: [id])
+  companyName      String
+  contactName      String
+  phone            String
+  email            String
+  businessType     String
+  spaceRequirement String?
+  message          String?
+  status           LeadStatus       @default(NEW)
+  notes            String?
+  followUpAt       DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@map("tenant_leads")
+}
+
+model VisitEvent {
+  id        String           @id @default(cuid())
+  stationId String?
+  station   Station?         @relation(fields: [stationId], references: [id])
+  spaceId   String?
+  space     CommercialSpace? @relation(fields: [spaceId], references: [id])
+  eventType EventType
+  sessionId String?
+  userAgent String?
+  createdAt DateTime         @default(now())
+
+  @@map("visit_events")
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+}
+
+enum SpaceType {
+  KIOS
+  RUKO
+  ATM
+  VENDING
+  MEDIA_IKLAN
+  AREA_PROMOSI
+}
+
+enum SpaceStatus {
+  TERSEDIA
+  TERISI
+  MAINTENANCE
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  NEGOTIATING
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum EventType {
+  STATION_VIEW
+  SPACE_VIEW
+  TOUR_START
+  FORM_SUBMIT
+  WHATSAPP_CLICK
+  PDF_DOWNLOAD
+}
