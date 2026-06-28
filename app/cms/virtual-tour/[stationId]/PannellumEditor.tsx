@@ -133,18 +133,24 @@ export function PannellumEditor({
   const hotspotDomRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const hotspotTypeRef = useRef<Map<string, HotspotItem["type"]>>(new Map());
   const hotspotsRef = useRef(hotspots);
-  hotspotsRef.current = hotspots;
 
   const onSelectRef = useRef(onHotspotSelect);
   const onDeleteRef = useRef(onHotspotDelete);
   const onAddRef = useRef(onHotspotAdd);
   const onMoveRef = useRef(onHotspotMove);
   const addModeRef = useRef(addMode);
-  onSelectRef.current = onHotspotSelect;
-  onDeleteRef.current = onHotspotDelete;
-  onAddRef.current = onHotspotAdd;
-  onMoveRef.current = onHotspotMove;
-  addModeRef.current = addMode;
+
+  useEffect(() => {
+    hotspotsRef.current = hotspots;
+  }, [hotspots]);
+
+  useEffect(() => {
+    onSelectRef.current = onHotspotSelect;
+    onDeleteRef.current = onHotspotDelete;
+    onAddRef.current = onHotspotAdd;
+    onMoveRef.current = onHotspotMove;
+    addModeRef.current = addMode;
+  }, [addMode, onHotspotAdd, onHotspotDelete, onHotspotMove, onHotspotSelect]);
 
   const [dragging, setDragging] = useState(false);
   const pointerRef = useRef<{
@@ -164,7 +170,10 @@ export function PannellumEditor({
   }, []);
 
   const onPointerDownHotspotRef = useRef(onPointerDownHotspot);
-  onPointerDownHotspotRef.current = onPointerDownHotspot;
+
+  useEffect(() => {
+    onPointerDownHotspotRef.current = onPointerDownHotspot;
+  }, [onPointerDownHotspot]);
 
   const syncHotspots = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
