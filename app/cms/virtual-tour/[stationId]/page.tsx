@@ -95,8 +95,9 @@ export default function VirtualTourEditorPage() {
   }
 
   // ─── Load data ───────────────────────────────────────────────────────────
+  // keepIndex: preserve current selected scene (used after save/upload)
 
-  async function load() {
+  async function load(keepIndex?: number) {
     const [stRes, scRes] = await Promise.all([
       fetch(`/api/cms/stations/${stationId}`),
       fetch(`/api/cms/virtual-tour/${stationId}`),
@@ -106,8 +107,9 @@ export default function VirtualTourEditorPage() {
     setStation({ id: stData.id, name: stData.name });
     setScenes(scData);
     if (scData.length > 0) {
-      setSelectedSceneIndex(0);
-      setHotspots(sceneToHotspots(scData[0]));
+      const idx = keepIndex !== undefined && keepIndex < scData.length ? keepIndex : 0;
+      setSelectedSceneIndex(idx);
+      setHotspots(sceneToHotspots(scData[idx]));
     }
     setHasUnsaved(false);
   }
@@ -187,7 +189,7 @@ export default function VirtualTourEditorPage() {
       if (res.ok) {
         showToast("ok", "Scene disimpan");
         setHasUnsaved(false);
-        load();
+        load(selectedSceneIndex);
       } else {
         showToast("err", "Gagal menyimpan scene");
       }
@@ -213,7 +215,7 @@ export default function VirtualTourEditorPage() {
       );
       if (res.ok) {
         showToast("ok", "Panorama diupload");
-        load();
+        load(selectedSceneIndex);
       } else {
         showToast("err", "Upload gagal");
       }
@@ -259,7 +261,10 @@ export default function VirtualTourEditorPage() {
     });
     if (res.ok) {
       showToast("ok", "Scene dihapus");
-      load();
+      // Jika scene yang dihapus bukan yang aktif, pertahankan index (dikurangi 1 jika perlu)
+      const deletedIdx = scenes.findIndex((s) => s.sceneId === scene.sceneId);
+      const nextIdx = deletedIdx <= selectedSceneIndex ? Math.max(0, selectedSceneIndex - 1) : selectedSceneIndex;
+      load(nextIdx);
     }
   }
 

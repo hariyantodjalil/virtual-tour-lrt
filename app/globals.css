@@ -26,6 +26,27 @@ body {
   cursor: pointer;
 }
 
+/* ── LRT Virtual Tour – Custom Hotspot Styles ─────────────────────────── */
+/*
+ * Hotspot visual dikendalikan via createTooltipFunc (inline styles).
+ * CSS ini hanya menyediakan: pulse animation + reset Pannellum sprite.
+ */
+.lrt-scene-hotspot,
+.lrt-space-hotspot {
+  /* Reset sprite bawaan Pannellum agar createTooltipFunc yang berlaku */
+  background-image: none !important;
+  overflow: visible !important;
+}
+
+@keyframes lrt-hotspot-pulse {
+  0%, 100% {
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.55), 0 0 0 0 rgba(255, 255, 255, 0.45);
+  }
+  50% {
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.55), 0 0 0 10px rgba(255, 255, 255, 0);
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 5px;

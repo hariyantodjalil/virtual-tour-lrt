@@ -56,6 +56,67 @@ function loadPannellum(): Promise<void> {
   });
 }
 
+// ─── Shared: custom hotspot visual builder ────────────────────────────────
+function buildHotspotElement(div: HTMLDivElement, isScene: boolean, label: string) {
+  const color = isScene ? "#10b981" : "#f59e0b";
+  const arrowSvg =
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
+  const dotSvg =
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="8.5" fill="none" stroke="white" stroke-width="2"/></svg>';
+
+  Object.assign(div.style, {
+    width: "44px",
+    height: "44px",
+    borderRadius: "50%",
+    border: "3px solid rgba(255,255,255,0.9)",
+    backgroundColor: color,
+    cursor: "pointer",
+    boxShadow: "0 3px 14px rgba(0,0,0,0.55)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "transform 0.15s ease, box-shadow 0.15s ease",
+    overflow: "visible",
+    animation: "lrt-hotspot-pulse 2.8s ease-in-out infinite",
+  });
+  div.innerHTML = isScene ? arrowSvg : dotSvg;
+
+  const tooltip = document.createElement("div");
+  tooltip.textContent = label;
+  Object.assign(tooltip.style, {
+    position: "absolute",
+    bottom: "calc(100% + 8px)",
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: "rgba(15,23,42,0.95)",
+    color: "#f1f5f9",
+    padding: "5px 12px",
+    borderRadius: "8px",
+    fontSize: "12px",
+    fontWeight: "600",
+    whiteSpace: "nowrap",
+    pointerEvents: "none",
+    display: "none",
+    border: "1px solid rgba(255,255,255,0.15)",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+    zIndex: "10",
+  });
+  div.appendChild(tooltip);
+
+  div.addEventListener("mouseenter", () => {
+    tooltip.style.display = "block";
+    div.style.transform = "scale(1.22)";
+    div.style.boxShadow = "0 6px 22px rgba(0,0,0,0.65)";
+    div.style.animation = "none";
+  });
+  div.addEventListener("mouseleave", () => {
+    tooltip.style.display = "none";
+    div.style.transform = "scale(1)";
+    div.style.boxShadow = "0 3px 14px rgba(0,0,0,0.55)";
+    div.style.animation = "lrt-hotspot-pulse 2.8s ease-in-out infinite";
+  });
+}
+
 export default function VirtualTourViewer({
   scenes, onSpaceClick, onSceneChange, initialScene, selectedSceneId, stationName, hideSceneBar = false,
 }: Props) {
@@ -99,22 +160,25 @@ export default function VirtualTourViewer({
       if (!isMounted.current || !containerRef.current) return;
 
       const hotSpots = currentScene.hotspots.map((h) => {
+        const isScene = h.type === "scene" && !!h.sceneId;
+        const isSpace = h.type === "space";
+        const label = h.text;
+
         const hs: Record<string, unknown> = {
           pitch: h.pitch,
           yaw: h.yaw,
-          text: h.text,
+          type: "custom",
+          cssClass: isScene ? "lrt-scene-hotspot" : "lrt-space-hotspot",
+          createTooltipFunc: (div: HTMLDivElement) => {
+            buildHotspotElement(div, isScene, label);
+          },
         };
-        if (h.type === "space") {
-          hs.type = "custom";
-          hs.cssClass = "lrt-space-hotspot";
-          if (onSpaceClick && h.spaceCode) {
-            const code = h.spaceCode;
-            hs.clickHandlerFunc = () => onSpaceClick(code);
-          }
-        } else if (h.sceneId) {
-          hs.type = "custom";
-          hs.cssClass = "lrt-scene-hotspot";
-          const sceneId = h.sceneId;
+
+        if (isSpace && onSpaceClick && h.spaceCode) {
+          const code = h.spaceCode;
+          hs.clickHandlerFunc = () => onSpaceClick(code);
+        } else if (isScene) {
+          const sceneId = h.sceneId!;
           hs.clickHandlerFunc = () => {
             const idx = scenes.findIndex((scene) => scene.id === sceneId);
             if (idx >= 0) switchScene(idx);

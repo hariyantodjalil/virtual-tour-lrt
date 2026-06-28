@@ -91,16 +91,16 @@ export function PanoramaCanvas({
     setPan({ x: (el.clientWidth - cw) / 2, y: (el.clientHeight - ch) / 2 });
   }, []); // eslint-disable-line
 
+  // getBoundingClientRect() handles CSS transforms correctly,
+  // unlike getScreenCTM() which can fail with translate+scale CSS transforms.
   const pixelToSVG = useCallback((px: number, py: number) => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
-    const pt = svg.createSVGPoint();
-    pt.x = px;
-    pt.y = py;
-    const ctm = svg.getScreenCTM();
-    if (!ctm) return { x: 0, y: 0 };
-    const svgPt = pt.matrixTransform(ctm.inverse());
-    return { x: svgPt.x, y: svgPt.y };
+    const rect = svg.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
+    const svgX = (px - rect.left) * (PANO_W / rect.width);
+    const svgY = (py - rect.top) * (PANO_H / rect.height);
+    return { x: svgX, y: svgY };
   }, []);
 
   // Wheel zoom — centered
