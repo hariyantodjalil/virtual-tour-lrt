@@ -1,5 +1,3 @@
-name: ${VIRTUALTOUR_STACK_NAME:-lrt-dev-virtualtour}
-
 services:
   postgres:
     image: postgres:17-alpine
