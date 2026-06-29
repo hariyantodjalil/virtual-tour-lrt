@@ -93,13 +93,19 @@ export function PannellumPreview({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewerRef = useRef<any>(null);
   const onSceneNavigateRef = useRef(onSceneNavigate);
-  onSceneNavigateRef.current = onSceneNavigate;
 
   const spacesRef = useRef(spaces);
-  spacesRef.current = spaces;
 
   const [selectedSpace, setSelectedSpace] = useState<CommercialSpace | null>(null);
   const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
+
+  useEffect(() => {
+    onSceneNavigateRef.current = onSceneNavigate;
+  }, [onSceneNavigate]);
+
+  useEffect(() => {
+    spacesRef.current = spaces;
+  }, [spaces]);
 
   useEffect(() => {
     if (!containerRef.current || !panoramaUrl) return;

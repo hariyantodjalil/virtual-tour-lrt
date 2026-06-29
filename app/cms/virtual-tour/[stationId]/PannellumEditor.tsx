@@ -160,12 +160,7 @@ export function PannellumEditor({
   const hotspotsRef = useRef(hotspots);
   const privacyBlursRef = useRef(privacyBlurs);
   const spacesRef = useRef(spaces);
-  hotspotsRef.current = hotspots;
-  privacyBlursRef.current = privacyBlurs;
-  spacesRef.current = spaces;
-
   const getSpaceStatusRef = useRef((code: string) => findSpaceStatus(spacesRef.current, code));
-  getSpaceStatusRef.current = (code: string) => findSpaceStatus(spacesRef.current, code);
 
   const onSelectRef = useRef(onHotspotSelect);
   const onBlurSelectRef = useRef(onBlurSelect);
@@ -176,15 +171,35 @@ export function PannellumEditor({
   const onMoveRef = useRef(onHotspotMove);
   const onBlurMoveRef = useRef(onBlurMove);
   const addModeRef = useRef(addMode);
-  onSelectRef.current = onHotspotSelect;
-  onBlurSelectRef.current = onBlurSelect;
-  onDeleteRef.current = onHotspotDelete;
-  onBlurDeleteRef.current = onBlurDelete;
-  onAddRef.current = onHotspotAdd;
-  onBlurAddRef.current = onBlurAdd;
-  onMoveRef.current = onHotspotMove;
-  onBlurMoveRef.current = onBlurMove;
-  addModeRef.current = addMode;
+
+  useEffect(() => {
+    hotspotsRef.current = hotspots;
+    privacyBlursRef.current = privacyBlurs;
+    spacesRef.current = spaces;
+    getSpaceStatusRef.current = (code: string) => findSpaceStatus(spacesRef.current, code);
+  }, [hotspots, privacyBlurs, spaces]);
+
+  useEffect(() => {
+    onSelectRef.current = onHotspotSelect;
+    onBlurSelectRef.current = onBlurSelect;
+    onDeleteRef.current = onHotspotDelete;
+    onBlurDeleteRef.current = onBlurDelete;
+    onAddRef.current = onHotspotAdd;
+    onBlurAddRef.current = onBlurAdd;
+    onMoveRef.current = onHotspotMove;
+    onBlurMoveRef.current = onBlurMove;
+    addModeRef.current = addMode;
+  }, [
+    addMode,
+    onBlurAdd,
+    onBlurDelete,
+    onBlurMove,
+    onBlurSelect,
+    onHotspotAdd,
+    onHotspotDelete,
+    onHotspotMove,
+    onHotspotSelect,
+  ]);
 
   const [dragging, setDragging] = useState(false);
   const pointerRef = useRef<{
@@ -197,8 +212,11 @@ export function PannellumEditor({
   const dragIdRef = useRef<{ kind: "hotspot" | "blur"; id: string } | null>(null);
   const selectedIdRef = useRef(selectedId);
   const selectedBlurIdRef = useRef(selectedBlurId);
-  selectedIdRef.current = selectedId;
-  selectedBlurIdRef.current = selectedBlurId;
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+    selectedBlurIdRef.current = selectedBlurId;
+  }, [selectedBlurId, selectedId]);
 
   const onPointerDownItem = useCallback((kind: "hotspot" | "blur", id: string, e: PointerEvent) => {
     if (addModeRef.current !== "none") return;
@@ -208,12 +226,14 @@ export function PannellumEditor({
   }, []);
 
   const onPointerDownItemRef = useRef(onPointerDownItem);
-  onPointerDownItemRef.current = onPointerDownItem;
-
   const onDeleteItemRef = useRef((kind: "hotspot" | "blur", id: string) => {
     if (kind === "hotspot") onDeleteRef.current(id);
     else onBlurDeleteRef.current(id);
   });
+
+  useEffect(() => {
+    onPointerDownItemRef.current = onPointerDownItem;
+  }, [onPointerDownItem]);
 
   const syncPrivacyBlurs = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
