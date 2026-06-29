@@ -59,6 +59,7 @@ image_env_file="$release_dir/image-overrides.env"
 registry_env_file="$release_dir/registry-login.env"
 render_env_file="$release_dir/compose.env"
 project_name="lrt-$environment-virtualtour"
+carriage_return=$(awk 'BEGIN { printf "%c", 13 }')
 
 load_env_file() {
   env_file="$1"
@@ -82,7 +83,7 @@ docker compose version >/dev/null 2>&1 || { echo "docker compose is not availabl
 [ -f "$compose_file" ] || { echo "Compose file not found: $compose_file" >&2; exit 1; }
 [ -f "$image_env_file" ] || { echo "Image env file not found: $image_env_file" >&2; exit 1; }
 
-cat "$runtime_env_file" "$image_env_file" > "$render_env_file"
+cat "$runtime_env_file" "$image_env_file" | tr -d "$carriage_return" > "$render_env_file"
 
 if [ "$environment" = "prod" ]; then
   prod_port="$(awk -F= '/^VIRTUALTOUR_HTTP_PORT=/{print $2}' "$render_env_file" | tail -n 1)"
