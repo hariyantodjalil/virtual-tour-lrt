@@ -34,29 +34,29 @@ export default function StationGrid({ stations }: { stations: StationData[] }) {
   return (
     <div>
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row gap-3 mb-8">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             placeholder="Cari stasiun atau area..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="pl-9 bg-slate-900/40 border-white/5 text-slate-100 placeholder:text-slate-500 focus-visible:ring-red-500/30 focus-visible:border-red-500"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
           {[
-            { value: "all", label: "Semua" },
-            { value: "available", label: "Ada Ruang Tersedia" },
+            { value: "all", label: "Semua Stasiun" },
+            { value: "available", label: "Kios Tersedia" },
             { value: "occupied", label: "Penuh" },
           ].map((opt) => (
             <button
               key={opt.value}
               onClick={() => setFilter(opt.value as typeof filter)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                 filter === opt.value
-                  ? "bg-[#1B3A6B] text-white shadow-sm"
-                  : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                  ? "bg-red-600 text-white shadow-md shadow-red-500/20"
+                  : "bg-slate-900/40 text-slate-300 border border-white/5 hover:border-white/10 hover:bg-slate-800/40"
               }`}
             >
               {opt.label}
