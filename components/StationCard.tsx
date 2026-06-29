@@ -22,12 +22,12 @@ type StationCardProps = {
 };
 
 const STATION_GRADIENTS = [
-  "from-blue-600 to-blue-800",
-  "from-red-600 to-red-800",
-  "from-emerald-600 to-emerald-800",
-  "from-purple-600 to-purple-800",
-  "from-orange-500 to-orange-700",
-  "from-teal-600 to-teal-800",
+  "from-blue-600 to-indigo-950",
+  "from-red-600 to-rose-950",
+  "from-emerald-600 to-teal-950",
+  "from-purple-600 to-fuchsia-950",
+  "from-orange-500 to-amber-950",
+  "from-cyan-600 to-sky-950",
 ];
 
 export default function StationCard({
@@ -38,7 +38,7 @@ export default function StationCard({
   const hasAvailable = availableCount > 0;
 
   return (
-    <Card className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-gray-200">
+    <Card className="group overflow-hidden hover:shadow-2xl hover:shadow-blue-500/5 transition-all duration-300 hover:-translate-y-1.5 border-white/5 bg-slate-900/40 backdrop-blur-sm">
       {/* Station Visual Header */}
       <div className={`relative h-36 bg-gradient-to-br ${gradient} flex items-end p-4`}>
         {/* 360 Badge */}
@@ -53,12 +53,12 @@ export default function StationCard({
         {/* Status badge */}
         <div className="absolute top-3 right-3">
           {hasAvailable ? (
-            <span className="flex items-center gap-1 rounded-full bg-emerald-500/90 backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold text-white">
+            <span className="flex items-center gap-1 rounded-full bg-emerald-500/90 backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold text-white shadow-md shadow-emerald-500/20">
               <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
               {availableCount} Tersedia
             </span>
           ) : (
-            <span className="rounded-full bg-gray-600/70 backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold text-white">
+            <span className="rounded-full bg-slate-800/80 backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold text-slate-400">
               Penuh
             </span>
           )}
@@ -66,29 +66,29 @@ export default function StationCard({
 
         {/* Station name overlay */}
         <div>
-          <p className="text-xs text-white/70 font-medium mb-0.5">Stasiun #{order}</p>
-          <h3 className="text-lg font-black text-white leading-tight">{name}</h3>
+          <p className="text-[10px] text-white/50 font-semibold mb-0.5 tracking-wider uppercase">Stasiun #{order}</p>
+          <h3 className="text-base font-black text-white leading-tight">{name}</h3>
         </div>
       </div>
 
       <CardContent className="p-4">
         {/* Info rows */}
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+        <div className="space-y-2.5 mb-5 text-slate-300">
+          <div className="flex items-center gap-2 text-xs">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-500" />
             <span className="truncate">{address}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Users className="h-3.5 w-3.5 shrink-0 text-[#E31E2D]" />
-            <span><strong className="text-gray-900">{formatNumber(dailyPassengers)}</strong> penumpang/hari</span>
+          <div className="flex items-center gap-2 text-xs">
+            <Users className="h-3.5 w-3.5 shrink-0 text-red-400" />
+            <span><strong className="text-white font-extrabold">{formatNumber(dailyPassengers)}</strong> penumpang/hari</span>
           </div>
           {spaceStats && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Building2 className="h-3.5 w-3.5 shrink-0 text-[#1B3A6B]" />
+            <div className="flex items-center gap-2 text-xs">
+              <Building2 className="h-3.5 w-3.5 shrink-0 text-blue-400" />
               <span>
-                <strong className="text-gray-900">{spaceStats.total}</strong> unit komersial
+                <strong className="text-white font-extrabold">{spaceStats.total}</strong> unit komersial
                 {" · "}
-                <span className="text-emerald-600 font-medium">{spaceStats.available} tersedia</span>
+                <span className="text-emerald-400 font-semibold">{spaceStats.available} tersedia</span>
               </span>
             </div>
           )}
@@ -96,14 +96,14 @@ export default function StationCard({
 
         {/* Line badge */}
         <div className="flex items-center justify-between mb-4">
-          <Badge variant="secondary" className="text-[10px] font-semibold">
+          <Badge className="text-[9px] font-bold bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10">
             {line}
           </Badge>
         </div>
 
         {/* CTA */}
-        <Button asChild className="w-full" size="sm">
-          <Link href={`/station/${slug}`} className="flex items-center justify-center gap-1.5">
+        <Button asChild className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-9 text-xs rounded-xl shadow-lg shadow-red-600/10" size="sm">
+          <Link href={`/station/${slug}`} className="flex items-center justify-center gap-1">
             Mulai Virtual Tour
             <ChevronRight className="h-4 w-4" />
           </Link>
