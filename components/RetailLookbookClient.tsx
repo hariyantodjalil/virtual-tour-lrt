@@ -4,20 +4,11 @@ import { useState } from "react";
 import StationTourClient from "./StationTourClient";
 import { formatNumber } from "@/lib/utils";
 import { MapPin, Search, ChevronRight, Store, MoveRight, Users, Eye } from "lucide-react";
-import type { CommercialSpace } from "@prisma/client";
+import type { LandingStation } from "@/lib/landing-data";
 import type { StationInfo } from "@/lib/stations-data";
 
-type StationSummary = {
-  id: string;
-  name: string;
-  slug: string;
-  line: string;
-  dailyPassengers: number;
-  spaces: CommercialSpace[];
-};
-
 interface Props {
-  stations: StationSummary[];
+  stations: LandingStation[];
   tourDataMap: Record<string, StationInfo>;
 }
 
