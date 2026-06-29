@@ -40,12 +40,14 @@ export function ManageAreaDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!state) return;
     if (state.mode === "edit") setLabel(state.area.label);
     else if (state.mode === "add") setLabel("");
     setError("");
   }, [state]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

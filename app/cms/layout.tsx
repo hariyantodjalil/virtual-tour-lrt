@@ -74,12 +74,10 @@ function getPageMeta(pathname: string) {
 export default function CmsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true"
+  );
   const [currentUser, setCurrentUser] = useState<CmsUser | null>(null);
-
-  useEffect(() => {
-    setCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
-  }, []);
 
   useEffect(() => {
     let active = true;

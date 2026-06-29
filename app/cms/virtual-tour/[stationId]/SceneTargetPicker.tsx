@@ -46,6 +46,7 @@ export function SceneTargetPicker({
   const [levelId, setLevelId] = useState("");
   const [areaId, setAreaId] = useState("");
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (value) {
       const target = scenes.find((s) => s.sceneId === value);
@@ -62,6 +63,7 @@ export function SceneTargetPicker({
     // Hanya reset saat ganti hotspot — biarkan user bebas ubah level/area tanpa reset
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncKey]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const selectedLevel = levels.find((l) => l.id === levelId);
   const areas = selectedLevel?.areas ?? [];

@@ -49,7 +49,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   const body = await request.json();
 
   let levelId = body.levelId as string | undefined;
-  let areaId = body.areaId as string | undefined;
+  const areaId = body.areaId as string | undefined;
   let levelSlug = body.level ?? "concourse";
 
   if (areaId) {

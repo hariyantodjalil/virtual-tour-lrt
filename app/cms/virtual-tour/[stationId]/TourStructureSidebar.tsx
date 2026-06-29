@@ -109,6 +109,7 @@ export function TourStructureSidebar({
   }, [selectedScene, levels]);
 
   // Restore expanded state + buka path scene aktif
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const saved = loadExpanded();
     const levelIds = new Set(saved?.levels ?? []);
@@ -127,6 +128,7 @@ export function TourStructureSidebar({
     setExpandedAreas(areaIds);
     setHydrated(true);
   }, [levels, scenes, selectedSceneIndex]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!hydrated) return;

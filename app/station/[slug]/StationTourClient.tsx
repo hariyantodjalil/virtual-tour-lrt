@@ -107,12 +107,14 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
   const showTourNav = !unitsOpen && !selectedSpace && !routeOpen;
 
   // Sinkronkan tab level/area saat pindah scene lewat hotspot
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const placement = findScenePlacement(stationInfo.levels, activeSceneId);
     if (!placement) return;
     setActiveLevelId(placement.level.id);
     setActiveAreaId(placement.area?.id ?? placement.level.areas[0]?.id ?? null);
   }, [activeSceneId, stationInfo.levels]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function clearCameraFocus() {
     setCameraFocus(null);
@@ -157,7 +159,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
       pitch: placement.pitch,
       hfov: 78,
     });
-    setFocusToken(Date.now());
+    setFocusToken((token) => token + 1);
   }
 
   const openSpaceFromList = (space: Space) => {

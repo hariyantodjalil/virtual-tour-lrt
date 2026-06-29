@@ -99,11 +99,13 @@ export default function VirtualTourViewer({
   const externalNavRef = useRef(false);
   const overlayRef = useRef<DiveOverlayState>(ZERO_OVERLAY);
 
-  onSpaceClickRef.current = onSpaceClick;
-  onInfoClickRef.current = onInfoClick;
-  onSceneChangeRef.current = onSceneChange;
-  scenesRef.current = scenes;
-  spacesRef.current = spaces;
+  useEffect(() => {
+    onSpaceClickRef.current = onSpaceClick;
+    onInfoClickRef.current = onInfoClick;
+    onSceneChangeRef.current = onSceneChange;
+    scenesRef.current = scenes;
+    spacesRef.current = spaces;
+  }, [onSpaceClick, onInfoClick, onSceneChange, scenes, spaces]);
 
   const [panoramaVisible, setPanoramaVisible] = useState(false);
   const [overlay, setOverlay] = useState<DiveOverlayState>(ZERO_OVERLAY);
@@ -115,12 +117,17 @@ export default function VirtualTourViewer({
 
   const focusCameraRef = useRef(focusCamera);
   const focusTokenRef = useRef(focusToken);
-  focusCameraRef.current = focusCamera;
-  focusTokenRef.current = focusToken;
+
+  useEffect(() => {
+    focusCameraRef.current = focusCamera;
+    focusTokenRef.current = focusToken;
+  }, [focusCamera, focusToken]);
 
   const activeSceneId = selectedSceneId ?? internalSceneId ?? scenes[0]?.id;
   const activeSceneIdRef = useRef(activeSceneId);
-  activeSceneIdRef.current = activeSceneId;
+  useEffect(() => {
+    activeSceneIdRef.current = activeSceneId;
+  }, [activeSceneId]);
   const currentSceneIdx = Math.max(0, scenes.findIndex((scene) => scene.id === activeSceneId));
   const scenesSig = useMemo(() => scenes.map((s) => s.id).join("|"), [scenes]);
 
@@ -212,7 +219,9 @@ export default function VirtualTourViewer({
   );
 
   const handleSceneHotspotRef = useRef(handleSceneHotspotClick);
-  handleSceneHotspotRef.current = handleSceneHotspotClick;
+  useEffect(() => {
+    handleSceneHotspotRef.current = handleSceneHotspotClick;
+  }, [handleSceneHotspotClick]);
 
   const initTourViewer = useCallback(async () => {
     if (!containerRef.current || scenes.length === 0) return;
