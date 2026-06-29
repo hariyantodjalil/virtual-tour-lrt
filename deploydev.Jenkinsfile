@@ -17,7 +17,8 @@ pipeline {
         HARBOR_REGISTRY = 'hub.kai.id/lrt'
         DEPLOY_PATH     = "/opt/${APP_NAME}"
         COMPOSE_FILE    = 'docker-compose.dev.yml'
-        PROJECT_NAME    = 'lrt-dev-virtualtour'
+        STACK_NAME      = "${APP_NAME}"
+        LEGACY_COMPOSE_PROJECT = 'lrt-dev-virtualtour'
     }
 
     stages {
@@ -124,11 +125,29 @@ pipeline {
                                 fi
                                 set -a && . ./.env && set +a
                                 echo "${PASSWORD_HARBOR}" | sudo docker login -u "${USERNAME_HARBOR}" --password-stdin hub.kai.id
-                                sudo docker compose --project-name ${PROJECT_NAME} --env-file .env -f ${COMPOSE_FILE} pull virtualtour
-                                sudo docker compose --project-name ${PROJECT_NAME} --env-file .env -f ${COMPOSE_FILE} up -d postgres
-                                sudo docker compose --project-name ${PROJECT_NAME} --env-file .env -f ${COMPOSE_FILE} run --rm virtualtour npx prisma migrate deploy
-                                sudo docker compose --project-name ${PROJECT_NAME} --env-file .env -f ${COMPOSE_FILE} up -d --remove-orphans virtualtour
-                                sudo docker compose --project-name ${PROJECT_NAME} --env-file .env -f ${COMPOSE_FILE} ps
+                                sudo docker compose --project-name ${LEGACY_COMPOSE_PROJECT} -f ${COMPOSE_FILE} down --remove-orphans 2>/dev/null || true
+                                sudo docker stack deploy --resolve-image=always --with-registry-auth -c ${COMPOSE_FILE} ${STACK_NAME}
+                                echo "Waiting for postgres..."
+                                ready=0
+                                for i in \$(seq 1 30); do
+                                    if sudo docker run --rm --network "\${VIRTUALTOUR_NETWORK_NAME:-lrt-dev-virtualtour-network}" \\
+                                        -e PGPASSWORD="\${POSTGRES_PASSWORD}" postgres:17-alpine \\
+                                        pg_isready -h postgres -U "\${POSTGRES_USER}" -d "\${POSTGRES_DB}" >/dev/null 2>&1; then
+                                        ready=1
+                                        break
+                                    fi
+                                    sleep 5
+                                done
+                                if [ "\$ready" -ne 1 ]; then
+                                    echo "Postgres did not become ready in time" >&2
+                                    exit 1
+                                fi
+                                sudo docker run --rm --network "\${VIRTUALTOUR_NETWORK_NAME:-lrt-dev-virtualtour-network}" \\
+                                    -e DATABASE_URL="\${DATABASE_URL}" \\
+                                    ${imageRef} \\
+                                    npx prisma migrate deploy
+                                sudo docker service update --force ${STACK_NAME}_virtualtour
+                                sudo docker stack services ${STACK_NAME}
                             '
                         """
                     }
