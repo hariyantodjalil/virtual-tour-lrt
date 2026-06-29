@@ -110,9 +110,19 @@ body {
   0%, 100% { box-shadow: 0 3px 14px rgba(0,0,0,0.55); }
   50%       { box-shadow: 0 3px 20px rgba(0,0,0,0.7), 0 0 0 6px rgba(255,255,255,0.12); }
 }
+
 .lrt-editor-hs {
   /* Pannellum renders hotspot wrapper — align our content */
   display: flex !important;
   align-items: center;
   justify-content: center;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
