@@ -5,6 +5,8 @@ import { formatNumber } from "@/lib/utils";
 import StationGrid from "./StationGrid";
 import Navbar from "@/components/Navbar";
 
+export const dynamic = "force-dynamic";
+
 async function getStationsWithStats() {
   try {
     const stations = await prisma.station.findMany({
