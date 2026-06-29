@@ -39,6 +39,7 @@ COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/.next ./.next
 COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/prisma ./prisma
+COPY --from=builder --chown=node:node /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder --chown=node:node /app/next.config.ts ./next.config.ts
 
 USER node
