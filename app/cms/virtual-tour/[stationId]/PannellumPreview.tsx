@@ -7,6 +7,7 @@ import type { PrivacyBlurItem } from "@/lib/privacy-blur-types";
 import { setupHotspotElement } from "@/lib/pannellum-hotspot";
 import { findSpaceStatus } from "@/lib/space-availability";
 import { buildViewPrivacyBlurHotSpot } from "@/lib/pannellum-privacy-blur";
+import { PANNELLUM_INTERACTION } from "@/lib/pannellum-viewer-defaults";
 import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
 import InTourInfoPopup from "@/components/tour/InTourInfoPopup";
 
@@ -167,6 +168,7 @@ export function PannellumPreview({
           hfov: 100,
           minHfov: 50,
           maxHfov: 120,
+          ...PANNELLUM_INTERACTION,
           hotSpots: [...blurSpots, ...hotSpots],
         });
       } catch (e) {

@@ -16,6 +16,7 @@ import {
   setPrivacyBlurSelected,
   setPrivacyBlurDimensions,
 } from "@/lib/pannellum-privacy-blur";
+import { PANNELLUM_INTERACTION } from "@/lib/pannellum-viewer-defaults";
 
 declare global {
   interface Window {
@@ -347,6 +348,7 @@ export function PannellumEditor({
           hfov: 100,
           minHfov: 40,
           maxHfov: 120,
+          ...PANNELLUM_INTERACTION,
           hotSpots: [],
         });
 

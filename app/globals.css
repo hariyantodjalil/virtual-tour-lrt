@@ -345,6 +345,11 @@ body {
   background: #0a0f18 !important;
 }
 
+.lrt-vt-viewer {
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 5px;

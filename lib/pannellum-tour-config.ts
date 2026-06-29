@@ -4,6 +4,7 @@ import { setupHotspotElement } from "@/lib/pannellum-hotspot";
 import { setupPrivacyBlurElement } from "@/lib/pannellum-privacy-blur";
 import { findSpaceStatus, type SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { SCENE_FADE_MS } from "@/lib/pannellum-tour-dive";
+import { PANNELLUM_INTERACTION } from "@/lib/pannellum-viewer-defaults";
 import { preloadPanoramaUrl, preloadPanoramaUrls } from "@/lib/panorama-preload";
 
 type SceneHandlers = {
@@ -127,6 +128,7 @@ export function buildPannellumTourConfig(
       hfov: 100,
       minHfov: 50,
       maxHfov: 120,
+      ...PANNELLUM_INTERACTION,
     },
     scenes: sceneMap,
   };
