@@ -90,6 +90,7 @@ export default function CmsUsersPage() {
                 <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-sm">
                   <option value="EDITOR">EDITOR</option>
                   <option value="ADMIN">ADMIN</option>
+                  <option value="MITRA">MITRA</option>
                 </select>
               </div>
               <Button type="submit" className="bg-emerald-600 hover:bg-emerald-500">Buat User</Button>

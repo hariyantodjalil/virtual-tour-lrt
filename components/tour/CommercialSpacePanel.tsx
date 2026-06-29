@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   X, Building2, MapPin, Zap, Droplets, Wind, Users,
   MessageCircle, Download, CheckCircle, XCircle, AlertCircle, ArrowRight,
-  Store, WalletCards, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +17,6 @@ type CommercialSpace = {
   type: string;
   status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
   area: number;
-  monthlyRent: number;
   deposit: number;
   floor: string;
   location: string;
@@ -39,26 +37,18 @@ const TYPE_LABELS: Record<string, string> = {
   AREA_PROMOSI: "Area Promosi",
 };
 
-const WA_NUMBER = "628118012012";
-
 type Props = {
   space: CommercialSpace;
   stationName: string;
+  contactPhone?: string;
   onClose: () => void;
 };
 
-export default function CommercialSpacePanel({ space, stationName, onClose }: Props) {
+export default function CommercialSpacePanel({ space, stationName, contactPhone = "628118012012", onClose }: Props) {
   const [showForm, setShowForm] = useState(false);
 
   const waMessage = `Halo, saya tertarik dengan unit komersial ${space.code} (${space.name}) di Stasiun ${stationName}. Mohon informasi lebih lanjut.`;
-  const waUrl = getWhatsAppUrl(WA_NUMBER, waMessage);
-  const fitScore = useMemo(() => {
-    const exposureScore = Math.min(42, Math.round(space.exposure / 900));
-    const facilityScore = [space.powerSupply, space.waterAccess, space.airConditioning].filter(Boolean).length * 12;
-    const statusScore = space.status === "TERSEDIA" ? 18 : space.status === "MAINTENANCE" ? 8 : 0;
-    return Math.min(96, 28 + exposureScore + facilityScore + statusScore);
-  }, [space]);
-
+  const waUrl = getWhatsAppUrl(contactPhone, waMessage);
   const statusConfig = {
     TERSEDIA: {
       label: "Tersedia",
@@ -126,7 +116,6 @@ export default function CommercialSpacePanel({ space, stationName, onClose }: Pr
           <div class="grid">
             <div class="box"><div class="label">Status</div><div class="value">${statusConfig.label}</div></div>
             <div class="box"><div class="label">Luas</div><div class="value">${space.area} m2</div></div>
-            <div class="box"><div class="label">Sewa per Bulan</div><div class="value">${formatRupiah(space.monthlyRent)}</div></div>
             <div class="box"><div class="label">Eksposur</div><div class="value">${formatNumber(Math.round(space.exposure))} orang/hari</div></div>
           </div>
           <table>
@@ -140,7 +129,7 @@ export default function CommercialSpacePanel({ space, stationName, onClose }: Pr
             <tr><td>Catatan</td><td>${space.description ?? "Unit siap dievaluasi melalui virtual tour 360."}</td></tr>
           </table>
           <div class="cta">
-            Hubungi tim komersial: +62 811-8012-012. Ringkasan ini dibuat otomatis dari data aset virtual tour.
+            Hubungi tim komersial: ${contactPhone}. Ringkasan ini dibuat otomatis dari data aset virtual tour.
           </div>
           <script>window.onload = () => setTimeout(() => window.print(), 250);</script>
         </body>
@@ -174,36 +163,6 @@ export default function CommercialSpacePanel({ space, stationName, onClose }: Pr
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-5 space-y-5">
-        <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Tenant Readiness</p>
-              <p className="text-sm font-bold text-gray-900">Skor kelayakan komersial</p>
-            </div>
-            <div className="text-right">
-              <p className="text-3xl font-black text-[#17355f]">{fitScore}</p>
-              <p className="text-[10px] font-semibold text-gray-400">/ 100</p>
-            </div>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-gray-200">
-            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${fitScore}%` }} />
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-lg bg-white p-2 shadow-sm">
-              <Eye className="mx-auto mb-1 h-3.5 w-3.5 text-[#E31E2D]" />
-              <p className="text-[10px] font-semibold text-gray-500">Eksposur</p>
-            </div>
-            <div className="rounded-lg bg-white p-2 shadow-sm">
-              <Store className="mx-auto mb-1 h-3.5 w-3.5 text-[#17355f]" />
-              <p className="text-[10px] font-semibold text-gray-500">Transit</p>
-            </div>
-            <div className="rounded-lg bg-white p-2 shadow-sm">
-              <WalletCards className="mx-auto mb-1 h-3.5 w-3.5 text-emerald-600" />
-              <p className="text-[10px] font-semibold text-gray-500">Siap Sewa</p>
-            </div>
-          </div>
-        </div>
-
         {/* Description */}
         {space.description && (
           <p className="text-sm text-gray-600 leading-relaxed">{space.description}</p>
@@ -219,11 +178,12 @@ export default function CommercialSpacePanel({ space, stationName, onClose }: Pr
             <p className="text-xs text-gray-500 mb-1">Lantai</p>
             <p className="text-lg font-bold text-gray-900">Lantai {space.floor}</p>
           </div>
-          <div className="rounded-lg bg-blue-50 p-3 col-span-2">
-            <p className="text-xs text-blue-600 mb-1">Sewa per Bulan</p>
-            <p className="text-xl font-black text-blue-900">{formatRupiah(space.monthlyRent)}</p>
-            <p className="text-xs text-blue-500 mt-0.5">Deposit: {formatRupiah(space.deposit)}</p>
-          </div>
+          {space.deposit > 0 && (
+            <div className="rounded-lg bg-gray-50 p-3 col-span-2">
+              <p className="text-xs text-gray-500 mb-1">Deposit</p>
+              <p className="text-lg font-bold text-gray-900">{formatRupiah(space.deposit)}</p>
+            </div>
+          )}
         </div>
 
         {/* Details */}

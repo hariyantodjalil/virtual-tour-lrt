@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { cmsFetch } from "@/lib/cms-fetch";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -42,6 +44,17 @@ export default function CmsLeadsPage() {
     load();
   }
 
+  async function deleteLead(lead: Lead) {
+    if (!confirm(`Hapus lead "${lead.companyName}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+    const res = await cmsFetch(`/api/cms/leads/${lead.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? "Gagal menghapus lead.");
+      return;
+    }
+    await load();
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Leads Tenant</h1>
@@ -70,6 +83,15 @@ export default function CmsLeadsPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-red-400 hover:bg-red-950/40"
+                    onClick={() => deleteLead(lead)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Hapus
+                  </Button>
                 </div>
               </div>
             </CardContent>

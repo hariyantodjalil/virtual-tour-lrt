@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sortScenesByTourOrder } from "@/lib/virtual-tour-structure";
 
 type Params = { params: Promise<{ stationId: string }> };
 
@@ -10,6 +11,8 @@ const sceneSelect = {
   sceneId: true,
   title: true,
   level: true,
+  levelId: true,
+  areaId: true,
   panoramaUrl: true,
   thumbnailUrl: true,
   order: true,
@@ -25,11 +28,16 @@ export async function GET(request: NextRequest, { params }: Params) {
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { stationId } = await params;
-  const scenes = await prisma.virtualTourScene.findMany({
+  const rawScenes = await prisma.virtualTourScene.findMany({
     where: { stationId },
     orderBy: { order: "asc" },
-    select: sceneSelect,
+    select: {
+      ...sceneSelect,
+      levelRef: { select: { order: true } },
+      areaRef: { select: { order: true } },
+    },
   });
+  const scenes = sortScenesByTourOrder(rawScenes).map(({ levelRef: _l, areaRef: _a, ...scene }) => scene);
   return NextResponse.json(scenes);
 }
 
@@ -40,12 +48,29 @@ export async function POST(request: NextRequest, { params }: Params) {
   const { stationId } = await params;
   const body = await request.json();
 
+  let levelId = body.levelId as string | undefined;
+  let areaId = body.areaId as string | undefined;
+  let levelSlug = body.level ?? "concourse";
+
+  if (areaId) {
+    const area = await prisma.virtualTourArea.findFirst({
+      where: { id: areaId, stationId },
+      include: { level: true },
+    });
+    if (area) {
+      levelId = area.levelId;
+      levelSlug = area.level.slug;
+    }
+  }
+
   const scene = await prisma.virtualTourScene.create({
     data: {
       stationId,
       sceneId: body.sceneId,
       title: body.title,
-      level: body.level ?? "CONCOURSE",
+      level: levelSlug,
+      levelId: levelId ?? null,
+      areaId: areaId ?? null,
       panoramaUrl: body.panoramaUrl || "",
       order: body.order ?? 0,
       hotspots: body.hotspots ?? [],
