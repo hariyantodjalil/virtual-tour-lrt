@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { MapPin, BarChart3, Sun, Moon } from "lucide-react";
 

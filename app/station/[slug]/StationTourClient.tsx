@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Building2, CheckCircle2, ChevronDown, ChevronRight,
@@ -9,8 +9,16 @@ import {
 import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
 import InTourInfoPopup from "@/components/tour/InTourInfoPopup";
 import VirtualTourViewer from "@/components/tour/VirtualTourViewer";
-import { formatNumber, formatRupiah } from "@/lib/utils";
+import { TourNavigationBar } from "@/components/tour/TourNavigationBar";
+import { formatNumber, getWhatsAppUrl } from "@/lib/utils";
 import type { StationInfo } from "@/lib/stations-data";
+import {
+  findScenePlacement,
+  firstSceneIdInLevel,
+  scenesForNav,
+  defaultAreaForLevel,
+} from "@/lib/public-tour-structure";
+import { findSpaceHotspotPlacement } from "@/lib/space-hotspot-locate";
 
 type Space = {
   id: string;
@@ -19,7 +27,6 @@ type Space = {
   type: string;
   status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
   area: number;
-  monthlyRent: number;
   deposit: number;
   floor: string;
   location: string;
@@ -51,12 +58,23 @@ function buildRoute(sceneIds: string[], from: string, to: string) {
 }
 
 export default function StationTourClient({ stationInfo, spaces }: Props) {
-  const firstScene = stationInfo.scenes[0]?.id ?? "concourse";
+  const initialPlacement = findScenePlacement(stationInfo.levels, stationInfo.scenes[0]?.id ?? "");
+  const firstLevel = initialPlacement?.level ?? stationInfo.levels[0];
+  const firstScene =
+    stationInfo.scenes[0]?.id ??
+    (firstLevel ? firstSceneIdInLevel(firstLevel) : undefined) ??
+    "concourse";
   const lastScene = stationInfo.scenes.at(-1)?.id ?? firstScene;
 
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
   const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
   const [activeSceneId, setActiveSceneId] = useState(firstScene);
+  const [activeLevelId, setActiveLevelId] = useState(
+    initialPlacement?.level.id ?? firstLevel?.id ?? ""
+  );
+  const [activeAreaId, setActiveAreaId] = useState<string | null>(
+    initialPlacement?.area?.id ?? firstLevel?.areas[0]?.id ?? null
+  );
   const [routeFrom, setRouteFrom] = useState(firstScene);
   const [routeTo, setRouteTo] = useState(lastScene);
 
@@ -65,32 +83,110 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
   const [unitsOpen, setUnitsOpen] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
   const [openedFromUnitsList, setOpenedFromUnitsList] = useState(false);
+  const [cameraFocus, setCameraFocus] = useState<{
+    yaw: number;
+    pitch: number;
+    hfov?: number;
+  } | null>(null);
+  const [focusToken, setFocusToken] = useState(0);
 
   const availableCount = spaces.filter((s) => s.status === "TERSEDIA").length;
   const occupiedCount = spaces.filter((s) => s.status === "TERISI").length;
+  const commercialContactPhone = stationInfo.commercialContactPhone ?? "628118012012";
+  const stationWaUrl = getWhatsAppUrl(
+    commercialContactPhone,
+    `Halo, saya tertarik dengan ruang komersial di Stasiun ${stationInfo.name}. Mohon informasi lebih lanjut.`
+  );
   const sceneIds = stationInfo.scenes.map((s) => s.id);
+  const navSceneIds = scenesForNav(
+    stationInfo.levels,
+    sceneIds,
+    activeLevelId || stationInfo.levels[0]?.id,
+    activeAreaId
+  );
+  const showTourNav = !unitsOpen && !selectedSpace && !routeOpen;
+
+  // Sinkronkan tab level/area saat pindah scene lewat hotspot
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const placement = findScenePlacement(stationInfo.levels, activeSceneId);
+    if (!placement) return;
+    setActiveLevelId(placement.level.id);
+    setActiveAreaId(placement.area?.id ?? placement.level.areas[0]?.id ?? null);
+  }, [activeSceneId, stationInfo.levels]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  function clearCameraFocus() {
+    setCameraFocus(null);
+    setFocusToken(0);
+  }
+
+  function selectLevel(levelId: string) {
+    clearCameraFocus();
+    const level = stationInfo.levels.find((l) => l.id === levelId);
+    if (!level) return;
+    const area = defaultAreaForLevel(level);
+    const sceneId = area?.sceneIds[0] ?? firstSceneIdInLevel(level);
+    setActiveLevelId(levelId);
+    setActiveAreaId(area?.id ?? null);
+    if (sceneId) setActiveSceneId(sceneId);
+  }
+
+  function selectArea(areaId: string) {
+    clearCameraFocus();
+    const level = stationInfo.levels.find((l) => l.id === activeLevelId);
+    const area = level?.areas.find((a) => a.id === areaId);
+    const sceneId = area?.sceneIds[0];
+    setActiveAreaId(areaId);
+    if (sceneId) setActiveSceneId(sceneId);
+  }
+
   const selectedRoute = buildRoute(sceneIds, routeFrom, routeTo);
   const routeIdx = selectedRoute.indexOf(activeSceneId);
   const nextStep = routeIdx >= 0 ? selectedRoute[routeIdx + 1] : undefined;
 
+  function handleSceneChange(sceneId: string) {
+    clearCameraFocus();
+    setActiveSceneId(sceneId);
+  }
+
+  function focusOnSpaceHotspot(spaceCode: string) {
+    const placement = findSpaceHotspotPlacement(stationInfo.scenes, spaceCode);
+    if (!placement) return;
+    setActiveSceneId(placement.sceneId);
+    setCameraFocus({
+      yaw: placement.yaw,
+      pitch: placement.pitch,
+      hfov: 78,
+    });
+    setFocusToken((token) => token + 1);
+  }
+
   const openSpaceFromList = (space: Space) => {
+    focusOnSpaceHotspot(space.code);
     setOpenedFromUnitsList(true);
     setSelectedSpace(space);
     setInfoOpen(false);
     setRouteOpen(false);
+    setUnitsOpen(false);
   };
 
-  const openSpaceFromHotspot = (spaceCode: string) => {
+  const openSpaceFromHotspot = useCallback((spaceCode: string) => {
     const space = spaces.find((s) => s.code === spaceCode);
     if (space) {
       setOpenedFromUnitsList(false);
       setSelectedSpace(space);
     }
-  };
+  }, [spaces]);
+
+  const handleInfoClick = useCallback((title: string, description: string) => {
+    setInfoPopup({ title, description });
+  }, []);
 
   const closeSpaceDetail = () => {
     setSelectedSpace(null);
     if (openedFromUnitsList) {
+      clearCameraFocus();
       setUnitsOpen(true);
       setOpenedFromUnitsList(false);
     }
@@ -101,13 +197,30 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
       {/* ── 360° Viewer (full-bleed) ── */}
       <VirtualTourViewer
         scenes={stationInfo.scenes}
+        spaces={spaces.map((s) => ({ code: s.code, status: s.status }))}
         onSpaceClick={openSpaceFromHotspot}
-        onInfoClick={(title, description) => setInfoPopup({ title, description })}
-        onSceneChange={setActiveSceneId}
+        onInfoClick={handleInfoClick}
+        onSceneChange={handleSceneChange}
         selectedSceneId={activeSceneId}
+        focusCamera={cameraFocus}
+        focusToken={focusToken}
         stationName={stationInfo.name}
-        hideSceneBar={unitsOpen || !!selectedSpace || routeOpen}
+        hideSceneBar
       />
+
+      {showTourNav && stationInfo.levels.length > 0 && (
+        <TourNavigationBar
+          levels={stationInfo.levels}
+          scenes={stationInfo.scenes}
+          activeLevelId={activeLevelId || stationInfo.levels[0].id}
+          activeAreaId={activeAreaId}
+          activeSceneId={activeSceneId}
+          visibleSceneIds={navSceneIds}
+          onSelectLevel={selectLevel}
+          onSelectArea={selectArea}
+          onSelectScene={handleSceneChange}
+        />
+      )}
 
       {/* subtle gradient overlay for text legibility */}
       <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(to_bottom,rgba(0,0,0,.45)_0%,transparent_30%,transparent_65%,rgba(0,0,0,.5)_100%)]" />
@@ -220,7 +333,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
               </div>
             </div>
             <a
-              href={`https://wa.me/628118012012?text=Halo%2C+saya+tertarik+dengan+ruang+komersial+di+Stasiun+${encodeURIComponent(stationInfo.name)}`}
+              href={stationWaUrl}
               target="_blank" rel="noopener noreferrer"
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] py-2.5 text-xs font-black text-white hover:bg-[#1DA851] transition-colors"
             >
@@ -251,8 +364,22 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
                   onChange={(e) => setRouteFrom(e.target.value)}
                   className="w-full h-9 rounded-lg border border-white/10 bg-white/10 px-3 text-xs font-semibold text-white outline-none"
                 >
-                  {stationInfo.scenes.map((s) => (
-                    <option key={s.id} value={s.id} className="bg-[#17355f]">{s.title}</option>
+                  {stationInfo.levels.map((level) => (
+                    <optgroup key={level.id} label={level.label}>
+                      {(level.areas.length > 0
+                        ? level.areas.flatMap((a) =>
+                            a.sceneIds.map((id) => ({ id, title: stationInfo.scenes.find((s) => s.id === id)?.title ?? id }))
+                          )
+                        : level.sceneIds.map((id) => ({
+                            id,
+                            title: stationInfo.scenes.find((s) => s.id === id)?.title ?? id,
+                          }))
+                      ).map((s) => (
+                        <option key={s.id} value={s.id} className="bg-[#17355f]">
+                          {s.title}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>
@@ -263,14 +390,28 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
                   onChange={(e) => setRouteTo(e.target.value)}
                   className="w-full h-9 rounded-lg border border-white/10 bg-white/10 px-3 text-xs font-semibold text-white outline-none"
                 >
-                  {stationInfo.scenes.map((s) => (
-                    <option key={s.id} value={s.id} className="bg-[#17355f]">{s.title}</option>
+                  {stationInfo.levels.map((level) => (
+                    <optgroup key={level.id} label={level.label}>
+                      {(level.areas.length > 0
+                        ? level.areas.flatMap((a) =>
+                            a.sceneIds.map((id) => ({ id, title: stationInfo.scenes.find((s) => s.id === id)?.title ?? id }))
+                          )
+                        : level.sceneIds.map((id) => ({
+                            id,
+                            title: stationInfo.scenes.find((s) => s.id === id)?.title ?? id,
+                          }))
+                      ).map((s) => (
+                        <option key={s.id} value={s.id} className="bg-[#17355f]">
+                          {s.title}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>
             </div>
             <button
-              onClick={() => { setActiveSceneId(routeFrom); setSelectedSpace(null); }}
+              onClick={() => { handleSceneChange(routeFrom); setSelectedSpace(null); }}
               className="flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 text-xs font-black text-[#0d1f3c] hover:bg-emerald-300 transition-colors"
             >
               <Play className="h-3.5 w-3.5" />
@@ -283,7 +424,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
                 return (
                   <button
                     key={sceneId}
-                    onClick={() => setActiveSceneId(sceneId)}
+                    onClick={() => handleSceneChange(sceneId)}
                     className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs transition-colors ${
                       isActive ? "bg-white text-[#17355f] font-bold" : "bg-white/8 text-white/70 hover:bg-white/12"
                     }`}
@@ -300,7 +441,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
 
             {nextStep && (
               <button
-                onClick={() => setActiveSceneId(nextStep)}
+                onClick={() => handleSceneChange(nextStep)}
                 className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-emerald-300/40 bg-emerald-400 text-xs font-black text-[#0d1f3c] transition-colors hover:bg-emerald-300"
               >
                 Lanjut ke {stationInfo.scenes.find((s) => s.id === nextStep)?.title}
@@ -349,7 +490,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
                       <span>·</span>
                       <span>{space.area} m²</span>
                     </div>
-                    <p className="mt-1.5 text-xs font-bold text-emerald-300">{formatRupiah(space.monthlyRent)}/bln</p>
+                    <p className="mt-1.5 text-xs text-white/50">{space.area} m²</p>
                   </button>
                 ))}
               </div>
@@ -365,6 +506,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
           key={selectedSpace.id}
           space={selectedSpace}
           stationName={stationInfo.name}
+          contactPhone={commercialContactPhone}
           returnToList={openedFromUnitsList}
           onClose={closeSpaceDetail}
         />

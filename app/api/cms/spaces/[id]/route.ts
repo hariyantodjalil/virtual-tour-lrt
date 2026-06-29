@@ -6,13 +6,34 @@ import { processSpacePhoto } from "@/lib/image-processor";
 
 type Params = { params: Promise<{ id: string }> };
 
+function spacePayload(body: Record<string, unknown>) {
+  return {
+    code: String(body.code ?? "").trim(),
+    name: String(body.name ?? "").trim(),
+    type: body.type as never,
+    status: body.status as never,
+    area: Number(body.area ?? 0),
+    monthlyRent: Number(body.monthlyRent ?? 0),
+    deposit: Number(body.deposit ?? 0),
+    floor: String(body.floor ?? "G").trim(),
+    location: String(body.location ?? "").trim(),
+    nearestExit: body.nearestExit ? String(body.nearestExit).trim() : null,
+    exposure: Number(body.exposure ?? 0),
+    powerSupply: body.powerSupply ? String(body.powerSupply).trim() : null,
+    waterAccess: Boolean(body.waterAccess),
+    airConditioning: Boolean(body.airConditioning),
+    description: body.description ? String(body.description).trim() : null,
+    panoramaUrl: body.panoramaUrl ? String(body.panoramaUrl).trim() : null,
+  };
+}
+
 export async function PUT(request: NextRequest, { params }: Params) {
   const auth = requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { id } = await params;
   const body = await request.json();
-  const space = await prisma.commercialSpace.update({ where: { id }, data: body });
+  const space = await prisma.commercialSpace.update({ where: { id }, data: spacePayload(body) });
   return NextResponse.json(space);
 }
 

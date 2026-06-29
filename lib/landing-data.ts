@@ -133,6 +133,28 @@ function makeScenes(station: StationSeed, index: number): StationInfo["scenes"] 
   ];
 }
 
+function makeLevels(scenes: StationInfo["scenes"]): StationInfo["levels"] {
+  return [
+    {
+      id: "fallback-level-concourse",
+      slug: "concourse",
+      label: "Concourse",
+      color: "#E31E2D",
+      order: 1,
+      areas: [
+        {
+          id: "fallback-area-main",
+          slug: "main",
+          label: "Area Utama",
+          order: 1,
+          sceneIds: scenes.map((scene) => scene.id),
+        },
+      ],
+      sceneIds: [],
+    },
+  ];
+}
+
 export function getFallbackLandingStations(): LandingStation[] {
   return STATIONS.map((station) => ({
     id: station.slug,
@@ -146,18 +168,22 @@ export function getFallbackLandingStations(): LandingStation[] {
 
 export function getFallbackTourDataMap(): Record<string, StationInfo> {
   return Object.fromEntries(
-    STATIONS.map((station, index) => [
-      station.slug,
-      {
-        slug: station.slug,
-        name: station.name,
-        code: station.code,
-        line: station.line,
-        order: station.order,
-        dailyPassengers: station.dailyPassengers,
-        address: station.address,
-        scenes: makeScenes(station, index),
-      },
-    ]),
+    STATIONS.map((station, index) => {
+      const scenes = makeScenes(station, index);
+      return [
+        station.slug,
+        {
+          slug: station.slug,
+          name: station.name,
+          code: station.code,
+          line: station.line,
+          order: station.order,
+          dailyPassengers: station.dailyPassengers,
+          address: station.address,
+          levels: makeLevels(scenes),
+          scenes,
+        },
+      ];
+    }),
   );
 }

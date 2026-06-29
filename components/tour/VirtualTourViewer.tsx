@@ -1,12 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Navigation, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PanoramaScene } from "@/lib/tour-types";
-import { getS3ProxyUrl } from "@/lib/s3-utils";
-import { applyHotspotBaseStyle, attachHotspotTooltip } from "@/lib/pannellum-hotspot";
-import type { HotspotType } from "@/lib/hotspot-types";
+import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
+import { findSpaceStatus } from "@/lib/space-availability";
+import {
+  buildPannellumTourConfig,
+  panoramaUrlForScene,
+  preloadLinkedScenes,
+  preloadPanoramaUrl,
+  preloadTourPanoramas,
+} from "@/lib/pannellum-tour-config";
+import {
+  diveIntoScene,
+  softCrossfadeScene,
+  type DiveOverlayState,
+} from "@/lib/pannellum-tour-dive";
 
 declare global {
   interface Window {
@@ -15,15 +26,24 @@ declare global {
   }
 }
 
+const ZERO_OVERLAY: DiveOverlayState = { blur: 0, fade: 0, vignette: 0 };
+
+type SpaceStatusRef = {
+  code: string;
+  status: SpaceAvailabilityStatus;
+};
+
 type Props = {
   scenes: PanoramaScene[];
+  spaces?: SpaceStatusRef[];
   onSpaceClick?: (spaceCode: string) => void;
   onInfoClick?: (title: string, description: string) => void;
   onSceneChange?: (sceneId: string) => void;
   initialScene?: string;
   selectedSceneId?: string;
+  focusCamera?: { yaw: number; pitch: number; hfov?: number } | null;
+  focusToken?: number;
   stationName: string;
-  /** Sembunyikan tab level bawah saat drawer/popup unit terbuka */
   hideSceneBar?: boolean;
 };
 
@@ -31,7 +51,6 @@ function loadPannellum(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (window.pannellum) { resolve(); return; }
 
-    // CSS
     if (!document.getElementById("pannellum-css")) {
       const link = document.createElement("link");
       link.id = "pannellum-css";
@@ -40,7 +59,6 @@ function loadPannellum(): Promise<void> {
       document.head.appendChild(link);
     }
 
-    // JS
     if (!document.getElementById("pannellum-js")) {
       const script = document.createElement("script");
       script.id = "pannellum-js";
@@ -49,7 +67,6 @@ function loadPannellum(): Promise<void> {
       script.onerror = () => reject(new Error("Gagal memuat Pannellum dari CDN"));
       document.body.appendChild(script);
     } else {
-      // Script sudah ada di DOM, tunggu sampai pannellum tersedia
       let attempts = 0;
       const check = setInterval(() => {
         if (window.pannellum) { clearInterval(check); resolve(); }
@@ -59,128 +76,217 @@ function loadPannellum(): Promise<void> {
   });
 }
 
-// ─── Shared: custom hotspot visual builder ────────────────────────────────
-function buildHotspotElement(div: HTMLDivElement, hotspotType: HotspotType, label: string) {
-  applyHotspotBaseStyle(div, { type: hotspotType, label, pulse: true });
-  attachHotspotTooltip(div, label);
-}
-
 export default function VirtualTourViewer({
-  scenes, onSpaceClick, onInfoClick, onSceneChange, initialScene, selectedSceneId, stationName, hideSceneBar = false,
+  scenes,
+  spaces = [],
+  onSpaceClick,
+  onInfoClick,
+  onSceneChange,
+  initialScene,
+  selectedSceneId,
+  focusCamera,
+  focusToken = 0,
+  hideSceneBar = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const viewerRef = useRef<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const viewerRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const onSpaceClickRef = useRef(onSpaceClick);
+  const onInfoClickRef = useRef(onInfoClick);
+  const onSceneChangeRef = useRef(onSceneChange);
+  const scenesRef = useRef(scenes);
+  const spacesRef = useRef(spaces);
+  const divingRef = useRef(false);
+  const externalNavRef = useRef(false);
+  const overlayRef = useRef<DiveOverlayState>(ZERO_OVERLAY);
+
+  useEffect(() => {
+    onSpaceClickRef.current = onSpaceClick;
+    onInfoClickRef.current = onInfoClick;
+    onSceneChangeRef.current = onSceneChange;
+    scenesRef.current = scenes;
+    spacesRef.current = spaces;
+  }, [onSpaceClick, onInfoClick, onSceneChange, scenes, spaces]);
+
+  const [panoramaVisible, setPanoramaVisible] = useState(false);
+  const [overlay, setOverlay] = useState<DiveOverlayState>(ZERO_OVERLAY);
   const [error, setError] = useState<string | null>(null);
+  const [viewerReady, setViewerReady] = useState(false);
   const [internalSceneId, setInternalSceneId] = useState(initialScene ?? scenes[0]?.id);
   const [autoRotate, setAutoRotate] = useState(false);
   const isMounted = useRef(true);
 
+  const focusCameraRef = useRef(focusCamera);
+  const focusTokenRef = useRef(focusToken);
+
+  useEffect(() => {
+    focusCameraRef.current = focusCamera;
+    focusTokenRef.current = focusToken;
+  }, [focusCamera, focusToken]);
+
   const activeSceneId = selectedSceneId ?? internalSceneId ?? scenes[0]?.id;
+  const activeSceneIdRef = useRef(activeSceneId);
+  useEffect(() => {
+    activeSceneIdRef.current = activeSceneId;
+  }, [activeSceneId]);
   const currentSceneIdx = Math.max(0, scenes.findIndex((scene) => scene.id === activeSceneId));
-  const currentScene = scenes[currentSceneIdx];
+  const scenesSig = useMemo(() => scenes.map((s) => s.id).join("|"), [scenes]);
 
-  const switchScene = useCallback((idx: number) => {
-    const scene = scenes[idx];
-    if (!scene) return;
-    setInternalSceneId(scene.id);
-    onSceneChange?.(scene.id);
-  }, [onSceneChange, scenes]);
+  const overlayController = useMemo(
+    () => ({
+      update: (state: DiveOverlayState) => {
+        overlayRef.current = state;
+        if (isMounted.current) setOverlay(state);
+      },
+      reset: () => {
+        overlayRef.current = ZERO_OVERLAY;
+        if (isMounted.current) setOverlay(ZERO_OVERLAY);
+      },
+    }),
+    []
+  );
 
-  const initViewer = useCallback(async () => {
-    if (!containerRef.current || !currentScene) return;
+  const resumeDefaultCamera = useCallback((viewer: typeof viewerRef.current) => {
+    if (!viewer || divingRef.current) return;
+    try {
+      viewer.setAutoRotate(-2);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
-    // Bersihkan viewer lama
+  const applyCameraFocus = useCallback((viewer: typeof viewerRef.current) => {
+    const target = focusCameraRef.current;
+    const token = focusTokenRef.current;
+    if (!target || !token || !viewer) return;
+    try {
+      viewer.stopAutoRotate?.();
+      setAutoRotate(false);
+      viewer.lookAt(target.pitch, target.yaw, target.hfov ?? 82, 900);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const ensureSceneReady = useCallback(
+    (sceneId: string) => preloadPanoramaUrl(panoramaUrlForScene(scenesRef.current, sceneId)),
+    []
+  );
+
+  const preloadSceneById = useCallback((sceneId: string) => {
+    void ensureSceneReady(sceneId);
+  }, [ensureSceneReady]);
+
+  const handleSceneHotspotClick = useCallback(
+    async (targetSceneId: string, pitch: number, yaw: number) => {
+      const viewer = viewerRef.current;
+      if (!viewer || divingRef.current) return;
+
+      divingRef.current = true;
+      externalNavRef.current = false;
+
+      const transitionOpts = { ensureReady: () => ensureSceneReady(targetSceneId) };
+
+      try {
+        await diveIntoScene(
+          viewer,
+          targetSceneId,
+          pitch,
+          yaw,
+          overlayController,
+          transitionOpts,
+          (sceneId) => {
+            setInternalSceneId(sceneId);
+            onSceneChangeRef.current?.(sceneId);
+            preloadLinkedScenes(scenesRef.current, sceneId);
+          }
+        );
+      } catch (e) {
+        console.error("Dive transition error:", e);
+        overlayController.reset();
+        try {
+          await ensureSceneReady(targetSceneId);
+          viewer.loadScene(targetSceneId);
+          setInternalSceneId(targetSceneId);
+          onSceneChangeRef.current?.(targetSceneId);
+        } catch {
+          /* ignore */
+        }
+      } finally {
+        divingRef.current = false;
+      }
+    },
+    [overlayController, ensureSceneReady]
+  );
+
+  const handleSceneHotspotRef = useRef(handleSceneHotspotClick);
+  useEffect(() => {
+    handleSceneHotspotRef.current = handleSceneHotspotClick;
+  }, [handleSceneHotspotClick]);
+
+  const initTourViewer = useCallback(async () => {
+    if (!containerRef.current || scenes.length === 0) return;
+
     if (viewerRef.current) {
       try { viewerRef.current.destroy(); } catch { /* ignore */ }
       viewerRef.current = null;
     }
-
-    // Bersihkan isi container
     containerRef.current.innerHTML = "";
 
-    setIsLoading(true);
+    setPanoramaVisible(false);
+    setViewerReady(false);
     setError(null);
+    overlayController.reset();
+    preloadTourPanoramas(scenes);
 
     try {
       await loadPannellum();
       if (!isMounted.current || !containerRef.current) return;
 
-      const hotSpots = currentScene.hotspots.map((h) => {
-        const label = h.text;
-
-        const hs: Record<string, unknown> = {
-          pitch: h.pitch,
-          yaw: h.yaw,
-          type: "custom",
-          cssClass: `lrt-${h.type}-hotspot`,
-          createTooltipFunc: (div: HTMLDivElement) => {
-            buildHotspotElement(div, h.type, label);
-          },
-        };
-
-        if (h.type === "scene" && h.sceneId) {
-          const sceneId = h.sceneId;
-          hs.clickHandlerFunc = () => {
-            const idx = scenes.findIndex((scene) => scene.id === sceneId);
-            if (idx >= 0) switchScene(idx);
-          };
-        } else if (h.type === "space" && onSpaceClick && h.spaceCode) {
-          const code = h.spaceCode;
-          hs.clickHandlerFunc = () => onSpaceClick(code);
-        } else if (h.type === "info" && onInfoClick) {
-          const title = h.text;
-          const description = h.description ?? "";
-          hs.clickHandlerFunc = () => onInfoClick(title, description);
-        }
-        return hs;
+      const firstId = activeSceneIdRef.current ?? scenes[0]?.id;
+      const config = buildPannellumTourConfig(scenes, firstId, {
+        onSceneHotspot: (id, pitch, yaw) => handleSceneHotspotRef.current(id, pitch, yaw),
+        onScenePreload: (id) => preloadSceneById(id),
+        onSpaceClick: (code) => onSpaceClickRef.current?.(code),
+        onInfoClick: (title, desc) => onInfoClickRef.current?.(title, desc),
+        getSpaceStatus: (code) => findSpaceStatus(spacesRef.current, code),
       });
 
-      const viewer = window.pannellum.viewer(containerRef.current, {
-        type: "equirectangular",
-        panorama: getS3ProxyUrl(currentScene.panoramaUrl),
-        autoLoad: true,
-        autoRotate: -2,
-        showControls: false,
-        showFullscreenCtrl: false,
-        hfov: 100,
-        minHfov: 50,
-        maxHfov: 120,
-        hotSpots,
-      });
+      const viewer = window.pannellum.viewer(containerRef.current, config);
 
       viewer.on("load", () => {
-        if (isMounted.current) setIsLoading(false);
+        if (!isMounted.current) return;
+        setViewerReady(true);
+        requestAnimationFrame(() => setPanoramaVisible(true));
+        try {
+          const sceneId = viewer.getScene?.();
+          if (sceneId) preloadLinkedScenes(scenesRef.current, sceneId);
+        } catch {
+          /* ignore */
+        }
+        if (focusCameraRef.current && focusTokenRef.current) {
+          applyCameraFocus(viewer);
+        }
       });
 
       viewer.on("error", (err: string) => {
         console.error("Pannellum error:", err);
         if (isMounted.current) {
           setError("Gagal memuat panorama. Periksa koneksi internet.");
-          setIsLoading(false);
         }
       });
 
       viewerRef.current = viewer;
-
-      // Fallback timeout 10 detik
-      setTimeout(() => {
-        if (isMounted.current) setIsLoading(false);
-      }, 10000);
-
     } catch (e) {
       console.error("Viewer init error:", e);
       if (isMounted.current) {
         setError(e instanceof Error ? e.message : "Gagal menginisialisasi viewer 360°");
-        setIsLoading(false);
       }
     }
-  }, [currentScene, onSpaceClick, onInfoClick, scenes, switchScene]);
+  }, [scenesSig, applyCameraFocus, overlayController, preloadSceneById]);
 
   useEffect(() => {
     isMounted.current = true;
-    initViewer();
+    initTourViewer();
     return () => {
       isMounted.current = false;
       if (viewerRef.current) {
@@ -188,7 +294,54 @@ export default function VirtualTourViewer({
         viewerRef.current = null;
       }
     };
-  }, [initViewer]);
+  }, [initTourViewer]);
+
+  // Navigasi eksternal (tab level/area) — crossfade + blur ringan
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !viewerReady || divingRef.current) return;
+
+    try {
+      const current = viewer.getScene?.();
+      if (current && current !== activeSceneId) {
+        if (externalNavRef.current) return;
+        externalNavRef.current = true;
+        divingRef.current = true;
+
+        softCrossfadeScene(viewer, activeSceneId, overlayController, {
+          ensureReady: () => ensureSceneReady(activeSceneId),
+        })
+          .catch(() => {
+            try { viewer.loadScene(activeSceneId); } catch { /* ignore */ }
+          })
+          .finally(() => {
+            divingRef.current = false;
+            externalNavRef.current = false;
+            setInternalSceneId(activeSceneId);
+          });
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [activeSceneId, viewerReady, overlayController, ensureSceneReady]);
+
+  useEffect(() => {
+    if (!viewerRef.current || !viewerReady || divingRef.current) return;
+    if (focusCamera && focusToken) {
+      applyCameraFocus(viewerRef.current);
+    } else {
+      resumeDefaultCamera(viewerRef.current);
+    }
+  }, [focusToken, focusCamera, viewerReady, applyCameraFocus, resumeDefaultCamera]);
+
+  const switchScene = useCallback(
+    (idx: number) => {
+      const scene = scenesRef.current[idx];
+      if (!scene || divingRef.current) return;
+      onSceneChangeRef.current?.(scene.id);
+    },
+    []
+  );
 
   const toggleAutoRotate = () => {
     if (!viewerRef.current) return;
@@ -201,42 +354,39 @@ export default function VirtualTourViewer({
   };
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-gray-900">
-      {/* Pannellum container */}
-      <div ref={containerRef} className="absolute inset-0" />
+    <div className="lrt-vt-viewer relative h-full w-full overflow-hidden bg-[#0a0f18]">
+      <div
+        className={`lrt-vt-panorama-wrap absolute inset-0 transition-opacity duration-700 ease-out ${
+          panoramaVisible ? "opacity-100" : "opacity-0"
+        }`}
+        style={{
+          filter: overlay.blur > 0 ? `blur(${overlay.blur}px)` : undefined,
+          transform: overlay.vignette > 0 ? `scale(${1 + overlay.vignette * 0.06})` : undefined,
+          transition: "opacity 700ms ease-out, filter 80ms linear, transform 80ms linear",
+        }}
+      >
+        <div ref={containerRef} className="absolute inset-0" />
+      </div>
 
-      {/* Loading overlay */}
-      {isLoading && !error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-[#1B3A6B] to-black z-20 pointer-events-none">
-          <div className="mb-4">
-            <div className="h-12 w-12 rounded-full border-2 border-white/20 border-t-[#E31E2D] animate-spin" />
-          </div>
-          <p className="text-sm font-semibold text-white mb-1">Memuat Virtual Tour</p>
-          <p className="text-xs text-white/60">{stationName} · {currentScene?.title}</p>
-          <div className="mt-6 flex gap-1.5">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="h-1.5 w-1.5 rounded-full bg-white/40 animate-pulse"
-                style={{ animationDelay: `${i * 200}ms` }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Fade putih + vignette — sinkron dengan crossfade Pannellum */}
+      <div
+        className="pointer-events-none absolute inset-0 z-[14]"
+        style={{
+          opacity: overlay.fade,
+          background: `radial-gradient(circle at 50% 50%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.12) 35%, rgba(0,0,0,${0.25 + overlay.vignette * 0.5}) 100%)`,
+          transition: "opacity 60ms linear",
+        }}
+        aria-hidden
+      />
 
-      {/* Error state */}
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 z-20 gap-4 p-6">
           <div className="text-center">
             <p className="text-white font-semibold mb-2">{error}</p>
-            <p className="text-white/50 text-sm mb-4">
-              Panorama: {currentScene?.title}
-            </p>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => initViewer()}
+              onClick={() => initTourViewer()}
               className="text-white border-white/30 hover:bg-white/10"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -246,7 +396,6 @@ export default function VirtualTourViewer({
         </div>
       )}
 
-      {/* Scene selector */}
       {!error && scenes.length > 1 && !hideSceneBar && (
         <div className="absolute bottom-4 left-1/2 z-10 flex w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 items-center justify-center gap-2">
           <div className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-full border border-white/15 bg-black/65 px-3 py-2 shadow-2xl backdrop-blur-md">
@@ -267,8 +416,7 @@ export default function VirtualTourViewer({
         </div>
       )}
 
-      {/* Controls */}
-      {!error && !isLoading && (
+      {panoramaVisible && !error && (
         <div className="absolute right-4 top-4 z-10">
           <button
             onClick={toggleAutoRotate}
@@ -282,9 +430,17 @@ export default function VirtualTourViewer({
         </div>
       )}
 
-      {/* Pannellum container background — styling hotspot kini sepenuhnya via buildHotspotElement */}
       <style>{`
-        .pnlm-container { background: #111827 !important; }
+        .pnlm-container { background: #0a0f18 !important; }
+        .lrt-vt-viewer .pnlm-load-box,
+        .lrt-vt-viewer .pnlm-lbox,
+        .lrt-vt-viewer .pnlm-loading,
+        .lrt-vt-viewer .pnlm-load-button {
+          display: none !important;
+          opacity: 0 !important;
+          visibility: hidden !important;
+          pointer-events: none !important;
+        }
       `}</style>
     </div>
   );
