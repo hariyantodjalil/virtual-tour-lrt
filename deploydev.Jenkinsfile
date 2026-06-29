@@ -75,6 +75,7 @@ pipeline {
                 script {
                     sh """
                         cp /var/filebrowser/root/${ENV}/${APP_NAME}/.env ${WORKSPACE}/
+                        sed -i 's/\\r\$//' ${WORKSPACE}/.env
                         sudo chmod 777 -R ${WORKSPACE}
                         sudo docker build -t ${HARBOR_REGISTRY}/${APP_NAME}:${TAG} .
                     """
@@ -110,6 +111,7 @@ pipeline {
                             ssh ${SSH_USER}@${APP_SERVER} '
                                 set -eu
                                 cd ${DEPLOY_PATH}
+                                sed -i "s/\\r\$//" .env
                                 if grep -q "^LRT_VIRTUALTOUR_IMAGE=" .env; then
                                     sed -i "s|^LRT_VIRTUALTOUR_IMAGE=.*|LRT_VIRTUALTOUR_IMAGE=${imageRef}|" .env
                                 else
