@@ -13,7 +13,7 @@ pipeline {
         CONT_PORT       = '5011'
         SSH_USER        = 'devops-lrt'
         GIT_URL         = 'https://gitdev.kai.id/divisi-lrt/lrt-virtualtour.git'
-        GIT_BRANCH      = 'dev'
+        GIT_BRANCH      = 'dev-jenkins'
         HARBOR_REGISTRY = 'hub.kai.id/lrt'
         DEPLOY_PATH     = "/opt/${APP_NAME}"
         COMPOSE_FILE    = 'docker-compose.dev.yml'
