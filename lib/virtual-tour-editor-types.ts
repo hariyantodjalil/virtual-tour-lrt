@@ -1,13 +1,12 @@
 /**
  * Tipe data editor virtual tour — diselaraskan dengan pola floorplan editor portal-lrt.
+ *
  * Mapping portal-lrt → virtual-tour-lrt:
  *   floorPlans / svgFiles  → virtual_tour_scenes (panoramaUrl ≈ svgPath)
  *   placedAssets           → virtual_tour_scenes.hotspots (JSONB per scene)
  *   youAreHerePosition     → virtual_tour_scenes.canvasData.initialView
  *   station_floorplans.data → station_virtual_tours.data (konfigurasi agregat)
  */
-
-import type { PrivacyBlur } from "./privacy-blur-types";
 
 /** Hotspot pada panorama — paralel PlacedAsset di floorplan editor */
 export type VirtualTourHotspot = {
@@ -26,8 +25,6 @@ export type SceneCanvasData = {
     pitch: number;
     hfov?: number;
   };
-  /** Area blur privasi (wajah, dll.) — pitch/yaw + ukuran */
-  privacyBlurs?: PrivacyBlur[];
 };
 
 /** Konfigurasi agregat virtual tour per stasiun — disimpan di station_virtual_tours.data */

@@ -38,7 +38,7 @@ docker build -t lrt-virtualtour:dev .
 docker compose --env-file .env.dev.example -f docker-compose.dev.yml up -d
 ```
 
-The dev stack publishes the app on port `5011` and Postgres on port `6010` by default. The prod stack is configured to publish only host port `80`.
+The dev stack publishes the app on port `18082` by default. The prod stack is configured to publish only host port `80`.
 
 ## Scripts
 

@@ -31,8 +31,7 @@ type CmsUser = {
   role: string;
 };
 
-const SIDEBAR_STORAGE_KEY = "cms-sidebar-collapsed";
-
+// Halaman yang butuh konten full-width tanpa padding dan max-width
 function isFullWidthPage(pathname: string) {
   return (
     pathname.startsWith("/cms/virtual-tour/") &&
@@ -74,12 +73,11 @@ function getPageMeta(pathname: string) {
 export default function CmsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("cms-sidebar-collapsed") === "true";
+  });
   const [currentUser, setCurrentUser] = useState<CmsUser | null>(null);
-
-  useEffect(() => {
-    setCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -100,10 +98,9 @@ export default function CmsLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   function toggleSidebar() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
-      return next;
+    setCollapsed((c) => {
+      localStorage.setItem("cms-sidebar-collapsed", String(!c));
+      return !c;
     });
   }
 

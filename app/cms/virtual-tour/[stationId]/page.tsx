@@ -32,34 +32,11 @@ import {
   Check,
   Info,
 } from "lucide-react";
-import { hotspotColor, HOTSPOT_SCALE_MIN, HOTSPOT_SCALE_MAX, HOTSPOT_SCALE_DEFAULT } from "@/lib/hotspot-types";
-import { findSpaceStatus, spaceStatusColor } from "@/lib/space-availability";
-import { normalizeHotspots } from "@/lib/hotspot-normalize";
-import {
-  BLUR_HEIGHT_DEFAULT,
-  BLUR_INTENSITY_DEFAULT,
-  BLUR_INTENSITY_MAX,
-  BLUR_INTENSITY_MIN,
-  BLUR_SCALE_DEFAULT,
-  BLUR_SCALE_MAX,
-  BLUR_SCALE_MIN,
-  BLUR_WIDTH_DEFAULT,
-  type PrivacyBlurItem,
-} from "@/lib/privacy-blur-types";
-import {
-  extractPrivacyBlursFromCanvasData,
-  mergePrivacyBlursIntoCanvasData,
-} from "@/lib/privacy-blur-normalize";
-import { buildWalkPathHotspots } from "@/lib/walk-path";
-import type { TourLevel, TourArea } from "@/lib/virtual-tour-structure";
+import { hotspotColor } from "@/lib/hotspot-types";
 
 import { PanoramaCanvas, type AddMode, type HotspotItem } from "./PanoramaCanvas";
 import { PannellumPreview } from "./PannellumPreview";
 import { PannellumEditor } from "./PannellumEditor";
-import { TourStructureSidebar } from "./TourStructureSidebar";
-import { ManageLevelsDialog } from "./ManageLevelsDialog";
-import { ManageAreaDialog, type AreaDialogState } from "./ManageAreaDialog";
-import { SceneTargetPicker } from "./SceneTargetPicker";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -68,13 +45,10 @@ type Scene = {
   sceneId: string;
   title: string;
   level: string;
-  levelId?: string | null;
-  areaId?: string | null;
   panoramaUrl: string;
   thumbnailUrl?: string | null;
   order: number;
   hotspots: Omit<HotspotItem, "_id">[];
-  canvasData?: unknown;
   isActive: boolean;
 };
 
@@ -103,19 +77,16 @@ type CommercialSpace = {
   description: string | null;
 };
 
-function getLevelConfig(levelSlug: string | undefined, levels: TourLevel[]) {
-  const slug = (levelSlug ?? "concourse").toLowerCase();
-  const found = levels.find((l) => l.slug === slug || l.slug === levelSlug);
-  if (found) return { label: found.label, color: found.color, hint: found.hint ?? "", slug: found.slug };
-  return { label: levelSlug ?? "Level", color: "#10b981", hint: "", slug };
-}
+const SCENE_LEVELS = [
+  { value: "CONCOURSE", label: "Concourse", color: "#10b981", hint: "Area unpaid/paid concourse, gate, hall" },
+  { value: "PLATFORM", label: "Peron", color: "#3b82f6", hint: "Area platform dan boarding" },
+  { value: "OUTDOOR", label: "Outdoor", color: "#f59e0b", hint: "Akses luar, drop-off, entrance" },
+  { value: "TRANSFER", label: "Transfer", color: "#8b5cf6", hint: "Koridor koneksi dan interchange" },
+  { value: "COMMERCIAL", label: "Komersial", color: "#ef4444", hint: "Area tenant, retail, media" },
+];
 
-function findArea(levels: TourLevel[], areaId: string): { area: TourArea; level: TourLevel } | null {
-  for (const level of levels) {
-    const area = level.areas.find((a) => a.id === areaId);
-    if (area) return { area, level };
-  }
-  return null;
+function getLevelConfig(level?: string) {
+  return SCENE_LEVELS.find((l) => l.value === level) ?? SCENE_LEVELS[0];
 }
 
 let _tempId = 0;
@@ -123,37 +94,12 @@ function tempId() {
   return `hs-${Date.now()}-${++_tempId}`;
 }
 
-function tempBlurId() {
-  return `blur-${Date.now()}-${++_tempId}`;
-}
-
 function sceneToHotspots(scene: Scene): HotspotItem[] {
-  return normalizeHotspots(scene.hotspots).map((h, i) => ({
+  return (scene.hotspots || []).map((h, i) => ({
     ...h,
+    type: h.type ?? "scene",
     _id: `hs-${scene.sceneId}-${i}`,
   }));
-}
-
-function sceneToPrivacyBlurs(scene: Scene): PrivacyBlurItem[] {
-  return extractPrivacyBlursFromCanvasData(scene.canvasData).map((b, i) => ({
-    ...b,
-    _id: `blur-${scene.sceneId}-${i}`,
-  }));
-}
-
-function blursToSave(blurs: PrivacyBlurItem[]) {
-  return blurs.map(({ pitch, yaw, width, height, intensity, scale }) => ({
-    pitch,
-    yaw,
-    width,
-    height,
-    intensity,
-    scale,
-  }));
-}
-
-function sceneCanvasWithBlurs(scene: Scene, blurs: PrivacyBlurItem[]) {
-  return mergePrivacyBlursIntoCanvasData(scene.canvasData, blursToSave(blurs));
 }
 
 function hotspotsToSave(hs: HotspotItem[]): Omit<HotspotItem, "_id">[] {
@@ -164,11 +110,10 @@ function hotspotsToSave(hs: HotspotItem[]): Omit<HotspotItem, "_id">[] {
   });
 }
 
-/** Saran sceneId otomatis berdasarkan area */
-function suggestSceneId(areaId: string, levelSlug: string, levels: TourLevel[], existingScenes: Scene[]): string {
-  const found = findArea(levels, areaId);
-  const prefix = found?.area.slug ?? levelSlug;
-  const count = existingScenes.filter((s) => s.areaId === areaId).length + 1;
+/** Saran sceneId otomatis berdasarkan level + jumlah scene yang sudah ada di level itu */
+function suggestSceneId(level: string, existingScenes: Scene[]): string {
+  const prefix = level.toLowerCase();
+  const count = existingScenes.filter((s) => (s.level ?? "CONCOURSE") === level).length + 1;
   return `${prefix}-${String(count).padStart(2, "0")}`;
 }
 
@@ -186,8 +131,7 @@ type BulkRow = {
   file: File;
   sceneId: string;
   title: string;
-  areaId: string;
-  levelSlug: string;
+  level: string;
   status: "pending" | "creating" | "uploading" | "done" | "error";
   error?: string;
 };
@@ -198,14 +142,11 @@ export default function VirtualTourEditorPage() {
   const { stationId } = useParams<{ stationId: string }>();
 
   const [station, setStation] = useState<Station | null>(null);
-  const [levels, setLevels] = useState<TourLevel[]>([]);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [stationSpaces, setStationSpaces] = useState<CommercialSpace[]>([]);
   const [selectedSceneIndex, setSelectedSceneIndex] = useState(0);
   const [hotspots, setHotspots] = useState<HotspotItem[]>([]);
-  const [privacyBlurs, setPrivacyBlurs] = useState<PrivacyBlurItem[]>([]);
   const [selectedHotspotId, setSelectedHotspotId] = useState<string | null>(null);
-  const [selectedBlurId, setSelectedBlurId] = useState<string | null>(null);
   const [addMode, setAddMode] = useState<AddMode>("none");
   const [isPreview, setIsPreview] = useState(false);
   const [hasUnsaved, setHasUnsaved] = useState(false);
@@ -217,12 +158,7 @@ export default function VirtualTourEditorPage() {
   const [showAddScene, setShowAddScene] = useState(false);
   const [newSceneId, setNewSceneId] = useState("");
   const [newSceneTitle, setNewSceneTitle] = useState("");
-  const [newSceneLevel, setNewSceneLevel] = useState("concourse");
-  const [newSceneAreaId, setNewSceneAreaId] = useState("");
-
-  const [showManageLevels, setShowManageLevels] = useState(false);
-  const [areaDialog, setAreaDialog] = useState<AreaDialogState>(null);
-  const [bulkDefaultAreaId, setBulkDefaultAreaId] = useState("");
+  const [newSceneLevel, setNewSceneLevel] = useState("CONCOURSE");
 
   // ─── Bulk Import dialog ───
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -235,7 +171,7 @@ export default function VirtualTourEditorPage() {
   // ─── Derived ─────────────────────────────────────────────────────────────
   const currentScene = scenes[selectedSceneIndex] ?? null;
   const selectedHotspot = hotspots.find((h) => h._id === selectedHotspotId) ?? null;
-  const selectedBlur = privacyBlurs.find((b) => b._id === selectedBlurId) ?? null;
+  const otherScenes = scenes.filter((_, i) => i !== selectedSceneIndex);
 
   // Incoming connections: berapa banyak scene lain yang menautkan ke tiap sceneId
   const incomingMap = new Map<string, number>();
@@ -255,41 +191,23 @@ export default function VirtualTourEditorPage() {
 
   // ─── Load data ───────────────────────────────────────────────────────────
   async function load(keepIndex?: number) {
-    const [stRes, structRes, spRes] = await Promise.all([
+    const [stRes, scRes, spRes] = await Promise.all([
       cmsFetch(`/api/cms/stations/${stationId}`),
-      cmsFetch(`/api/cms/virtual-tour/${stationId}/structure`),
+      cmsFetch(`/api/cms/virtual-tour/${stationId}`),
       cmsFetch(`/api/cms/spaces/station/${stationId}`),
     ]);
-
-    if (!structRes.ok) {
-      const err = await structRes.json().catch(() => ({}));
-      showToast("err", err.error ?? "Gagal memuat struktur tur");
-      return;
-    }
-
-    const stData = stRes.ok ? await stRes.json() : null;
-    const structData = await structRes.json();
-    const scData: Scene[] = structData.scenes ?? [];
-    const lvData: TourLevel[] = structData.levels ?? [];
+    const stData = await stRes.json();
+    const scData: Scene[] = await scRes.json();
     const spData: CommercialSpace[] = spRes.ok ? await spRes.json() : [];
-
-    if (stData) {
-      setStation({ id: stData.id, name: stData.name, slug: stData.slug });
-    }
-    setLevels(lvData);
+    setStation({ id: stData.id, name: stData.name, slug: stData.slug });
     setScenes(scData);
     setStationSpaces(spData);
-    if (!bulkDefaultAreaId && lvData[0]?.areas[0]?.id) {
-      setBulkDefaultAreaId(lvData[0].areas[0].id);
-    }
     if (scData.length > 0) {
       const idx = keepIndex !== undefined && keepIndex < scData.length ? keepIndex : 0;
       setSelectedSceneIndex(idx);
       setHotspots(sceneToHotspots(scData[idx]));
-      setPrivacyBlurs(sceneToPrivacyBlurs(scData[idx]));
     } else {
       setHotspots([]);
-      setPrivacyBlurs([]);
     }
     setHasUnsaved(false);
   }
@@ -307,34 +225,24 @@ export default function VirtualTourEditorPage() {
     }
     setSelectedSceneIndex(index);
     setHotspots(sceneToHotspots(scenes[index]));
-    setPrivacyBlurs(sceneToPrivacyBlurs(scenes[index]));
     setSelectedHotspotId(null);
-    setSelectedBlurId(null);
     setAddMode("none");
     setHasUnsaved(false);
   }
 
   // ─── Scene reorder ────────────────────────────────────────────────────────
   async function moveScene(index: number, dir: "up" | "down") {
-    const scene = scenes[index];
-    if (!scene?.areaId) return;
+    const swapIdx = dir === "up" ? index - 1 : index + 1;
+    if (swapIdx < 0 || swapIdx >= scenes.length) return;
 
-    const areaScenes = scenes
-      .map((s, i) => ({ s, i }))
-      .filter(({ s }) => s.areaId === scene.areaId)
-      .sort((a, b) => a.s.order - b.s.order);
-
-    const posInArea = areaScenes.findIndex(({ i }) => i === index);
-    const swapPos = dir === "up" ? posInArea - 1 : posInArea + 1;
-    if (swapPos < 0 || swapPos >= areaScenes.length) return;
-
-    const a = areaScenes[posInArea];
-    const b = areaScenes[swapPos];
+    const a = scenes[index];
+    const b = scenes[swapIdx];
     const activeSceneId = scenes[selectedSceneIndex]?.sceneId;
 
+    // Swap order values
     const orders = [
-      { sceneId: a.s.sceneId, order: b.s.order },
-      { sceneId: b.s.sceneId, order: a.s.order },
+      { sceneId: a.sceneId, order: b.order },
+      { sceneId: b.sceneId, order: a.order },
     ];
 
     try {
@@ -345,20 +253,21 @@ export default function VirtualTourEditorPage() {
       });
       if (!res.ok) return;
 
-      const structRes = await cmsFetch(`/api/cms/virtual-tour/${stationId}/structure`);
-      const structData = await structRes.json();
-      const scData: Scene[] = structData.scenes ?? [];
-      setLevels(structData.levels ?? []);
+      // Reload dan restore index scene yang sedang aktif
+      const [stRes, scRes] = await Promise.all([
+        cmsFetch(`/api/cms/stations/${stationId}`),
+        cmsFetch(`/api/cms/virtual-tour/${stationId}`),
+      ]);
+      const stData = await stRes.json();
+      const scData: Scene[] = await scRes.json();
+      setStation({ id: stData.id, name: stData.name, slug: stData.slug });
       setScenes(scData);
       setHasUnsaved(false);
 
       const newIdx = scData.findIndex((s) => s.sceneId === activeSceneId);
       const finalIdx = Math.max(0, newIdx);
       setSelectedSceneIndex(finalIdx);
-      if (scData[finalIdx]) {
-        setHotspots(sceneToHotspots(scData[finalIdx]));
-        setPrivacyBlurs(sceneToPrivacyBlurs(scData[finalIdx]));
-      }
+      if (scData[finalIdx]) setHotspots(sceneToHotspots(scData[finalIdx]));
     } catch {
       showToast("err", "Gagal mengubah urutan");
     }
@@ -367,7 +276,6 @@ export default function VirtualTourEditorPage() {
   // ─── Canvas handlers ─────────────────────────────────────────────────────
   const handleHotspotAdd = useCallback(
     (yaw: number, pitch: number) => {
-      if (addMode === "blur") return;
       const type = addMode === "scene" ? "scene" : addMode === "space" ? "space" : "info";
       const newH: HotspotItem = {
         _id: tempId(),
@@ -376,53 +284,26 @@ export default function VirtualTourEditorPage() {
         type,
         text:
           type === "scene" ? "Scene baru" : type === "space" ? "Unit baru" : "Info baru",
-        scale: HOTSPOT_SCALE_DEFAULT,
         ...(type === "info" ? { description: "" } : {}),
       };
       setHotspots((prev) => [...prev, newH]);
       setSelectedHotspotId(newH._id);
-      setSelectedBlurId(null);
       setAddMode("none");
       setHasUnsaved(true);
     },
     [addMode]
   );
 
-  const handleBlurAdd = useCallback((yaw: number, pitch: number) => {
-    const newBlur: PrivacyBlurItem = {
-      _id: tempBlurId(),
-      yaw,
-      pitch,
-      width: BLUR_WIDTH_DEFAULT,
-      height: BLUR_HEIGHT_DEFAULT,
-      intensity: BLUR_INTENSITY_DEFAULT,
-      scale: BLUR_SCALE_DEFAULT,
-    };
-    setPrivacyBlurs((prev) => [...prev, newBlur]);
-    setSelectedBlurId(newBlur._id);
-    setSelectedHotspotId(null);
-    setAddMode("none");
-    setHasUnsaved(true);
-  }, []);
-
   function previewNavigateScene(sceneId: string) {
     const updatedScenes = scenes.map((s, i) =>
-      i === selectedSceneIndex
-        ? {
-            ...s,
-            hotspots: hotspotsToSave(hotspots),
-            canvasData: sceneCanvasWithBlurs(s, privacyBlurs),
-          }
-        : s
+      i === selectedSceneIndex ? { ...s, hotspots: hotspotsToSave(hotspots) } : s
     );
     const idx = updatedScenes.findIndex((s) => s.sceneId === sceneId);
     if (idx < 0) return;
     setScenes(updatedScenes);
     setSelectedSceneIndex(idx);
     setHotspots(sceneToHotspots(updatedScenes[idx]));
-    setPrivacyBlurs(sceneToPrivacyBlurs(updatedScenes[idx]));
     setSelectedHotspotId(null);
-    setSelectedBlurId(null);
   }
 
   const handleHotspotMove = useCallback((id: string, yaw: number, pitch: number) => {
@@ -434,30 +315,11 @@ export default function VirtualTourEditorPage() {
 
   const handleHotspotSelect = useCallback((id: string | null) => {
     setSelectedHotspotId(id);
-    if (id) setSelectedBlurId(null);
   }, []);
 
   const handleHotspotDelete = useCallback((id: string) => {
     setHotspots((prev) => prev.filter((h) => h._id !== id));
     setSelectedHotspotId((sel) => (sel === id ? null : sel));
-    setHasUnsaved(true);
-  }, []);
-
-  const handleBlurMove = useCallback((id: string, yaw: number, pitch: number) => {
-    setPrivacyBlurs((prev) =>
-      prev.map((b) => (b._id === id ? { ...b, yaw, pitch } : b))
-    );
-    setHasUnsaved(true);
-  }, []);
-
-  const handleBlurSelect = useCallback((id: string | null) => {
-    setSelectedBlurId(id);
-    if (id) setSelectedHotspotId(null);
-  }, []);
-
-  const handleBlurDelete = useCallback((id: string) => {
-    setPrivacyBlurs((prev) => prev.filter((b) => b._id !== id));
-    setSelectedBlurId((sel) => (sel === id ? null : sel));
     setHasUnsaved(true);
   }, []);
 
@@ -474,12 +336,9 @@ export default function VirtualTourEditorPage() {
           body: JSON.stringify({
             title: currentScene.title,
             level: currentScene.level,
-            levelId: currentScene.levelId,
-            areaId: currentScene.areaId,
             order: currentScene.order,
             isActive: currentScene.isActive,
             hotspots: hotspotsToSave(hotspots),
-            canvasData: sceneCanvasWithBlurs(currentScene, privacyBlurs),
           }),
         }
       );
@@ -525,24 +384,16 @@ export default function VirtualTourEditorPage() {
   }
 
   // ─── Add scene ───────────────────────────────────────────────────────────
-  function openAddScene(areaId: string, levelSlug: string) {
-    setNewSceneAreaId(areaId);
-    setNewSceneLevel(levelSlug);
-    setNewSceneId(suggestSceneId(areaId, levelSlug, levels, scenes));
-    setNewSceneTitle("");
-    setShowAddScene(true);
-  }
-
   async function addScene(e: React.FormEvent) {
     e.preventDefault();
-    if (!newSceneId.trim() || !newSceneTitle.trim() || !newSceneAreaId) return;
+    if (!newSceneId.trim() || !newSceneTitle.trim()) return;
 
+    // Pastikan sceneId tidak duplikat
     if (scenes.some((s) => s.sceneId === newSceneId.trim())) {
       showToast("err", `Scene ID "${newSceneId}" sudah ada`);
       return;
     }
 
-    const areaScenes = scenes.filter((s) => s.areaId === newSceneAreaId);
     const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -550,14 +401,14 @@ export default function VirtualTourEditorPage() {
         sceneId: newSceneId.trim(),
         title: newSceneTitle.trim(),
         level: newSceneLevel,
-        areaId: newSceneAreaId,
-        order: areaScenes.length,
+        order: scenes.length,
       }),
     });
     if (res.ok) {
       setShowAddScene(false);
       setNewSceneId("");
       setNewSceneTitle("");
+      setNewSceneLevel("CONCOURSE");
       showToast("ok", "Scene ditambahkan");
       load();
     } else {
@@ -565,167 +416,21 @@ export default function VirtualTourEditorPage() {
     }
   }
 
-  function handleNewSceneAreaChange(areaId: string) {
-    const found = findArea(levels, areaId);
-    if (!found) return;
-    setNewSceneAreaId(areaId);
-    setNewSceneLevel(found.level.slug);
-    setNewSceneId(suggestSceneId(areaId, found.level.slug, levels, scenes));
+  // ─── Add scene dialog: auto-generate sceneId ─────────────────────────────
+  function handleNewSceneLevelChange(level: string) {
+    setNewSceneLevel(level);
+    // Hanya auto-generate jika belum diisi manual atau masih hasil auto
+    const suggestedId = suggestSceneId(level, scenes);
+    setNewSceneId(suggestedId);
   }
 
   function handleNewSceneTitleChange(title: string) {
     setNewSceneTitle(title);
-    if (title && newSceneAreaId) {
-      const base = titleToId(title) || suggestSceneId(newSceneAreaId, newSceneLevel, levels, scenes);
+    // Auto-generate sceneId dari judul jika belum pernah diisi
+    if (title) {
+      const base = titleToId(title) || suggestSceneId(newSceneLevel, scenes);
       setNewSceneId(base.substring(0, 40));
     }
-  }
-
-  function handleSceneAreaChange(areaId: string) {
-    const found = findArea(levels, areaId);
-    if (!found) return;
-    setScenes((prev) =>
-      prev.map((s, i) =>
-        i === selectedSceneIndex
-          ? { ...s, areaId, levelId: found.level.id, level: found.level.slug }
-          : s
-      )
-    );
-    setHasUnsaved(true);
-  }
-
-  function openAddArea(levelId: string, levelLabel: string) {
-    setAreaDialog({ mode: "add", levelId, levelLabel });
-  }
-
-  function openEditArea(area: TourArea, levelLabel: string) {
-    setAreaDialog({ mode: "edit", area, levelLabel });
-  }
-
-  function openDeleteArea(area: TourArea, levelLabel: string) {
-    setAreaDialog({ mode: "delete", area, levelLabel });
-  }
-
-  async function submitAreaAdd(levelId: string, label: string) {
-    const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}/areas`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ levelId, label }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error ?? "Gagal tambah area");
-    }
-    showToast("ok", "Area ditambahkan");
-    load(selectedSceneIndex);
-  }
-
-  async function submitAreaEdit(areaId: string, label: string) {
-    const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}/areas/${areaId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error ?? "Gagal memperbarui area");
-    }
-    showToast("ok", "Area diperbarui");
-    load(selectedSceneIndex);
-  }
-
-  async function submitAreaDelete(areaId: string) {
-    const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}/areas/${areaId}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error ?? "Gagal hapus area");
-    }
-    showToast("ok", "Area dihapus");
-    load(selectedSceneIndex);
-  }
-
-  async function autoWalkPath(areaId: string) {
-    const areaScenes = scenes
-      .filter((s) => s.areaId === areaId)
-      .sort((a, b) => a.order - b.order);
-    if (areaScenes.length < 2) return;
-
-    const found = findArea(levels, areaId);
-    if (!confirm(`Tautkan ${areaScenes.length} scene di "${found?.area.label ?? "area"}" dengan hotspot →/← otomatis? Hotspot jalan lama di area ini akan diganti.`)) {
-      return;
-    }
-
-    const pathMap = buildWalkPathHotspots(
-      areaScenes.map((s) => ({
-        sceneId: s.sceneId,
-        title: s.title,
-        order: s.order,
-        hotspots: s.hotspots,
-      }))
-    );
-
-    try {
-      for (const scene of areaScenes) {
-        const newHotspots = pathMap.get(scene.sceneId);
-        if (!newHotspots) continue;
-        await cmsFetch(`/api/cms/virtual-tour/${stationId}/${scene.sceneId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: scene.title,
-            level: scene.level,
-            levelId: scene.levelId,
-            areaId: scene.areaId,
-            order: scene.order,
-            isActive: scene.isActive,
-            hotspots: newHotspots,
-          }),
-        });
-      }
-      showToast("ok", "Jalur jalan otomatis ditautkan");
-      load(selectedSceneIndex);
-    } catch {
-      showToast("err", "Gagal menautkan jalur jalan");
-    }
-  }
-
-  async function createLevel(data: { label: string; color: string; hint?: string }) {
-    const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}/levels`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (res.ok) {
-      showToast("ok", "Level ditambahkan");
-      load(selectedSceneIndex);
-    } else {
-      const err = await res.json().catch(() => ({}));
-      showToast("err", err.error ?? "Gagal tambah level");
-    }
-  }
-
-  async function updateLevel(levelId: string, data: { label?: string; color?: string; hint?: string; order?: number }) {
-    const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}/levels/${levelId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (res.ok) load(selectedSceneIndex);
-  }
-
-  async function deleteLevel(levelId: string): Promise<{ ok: boolean; error?: string }> {
-    const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}/levels/${levelId}`, {
-      method: "DELETE",
-    });
-    if (res.ok) {
-      showToast("ok", "Level dihapus");
-      load(selectedSceneIndex);
-      return { ok: true };
-    }
-    const data = await res.json().catch(() => ({}));
-    return { ok: false, error: data.error ?? "Gagal hapus level" };
   }
 
   // ─── Delete scene ─────────────────────────────────────────────────────────
@@ -753,14 +458,6 @@ export default function VirtualTourEditorPage() {
     setHasUnsaved(true);
   }
 
-  function updateBlur(field: keyof PrivacyBlurItem, value: number) {
-    if (!selectedBlurId) return;
-    setPrivacyBlurs((prev) =>
-      prev.map((b) => (b._id === selectedBlurId ? { ...b, [field]: value } : b))
-    );
-    setHasUnsaved(true);
-  }
-
   function updateSelectedScene(field: keyof Scene, value: string | number | boolean) {
     setScenes((prev) =>
       prev.map((s, i) => (i === selectedSceneIndex ? { ...s, [field]: value } : s))
@@ -773,23 +470,17 @@ export default function VirtualTourEditorPage() {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
 
-    const defaultArea = bulkDefaultAreaId || levels[0]?.areas[0]?.id || "";
-    const defaultLevel = findArea(levels, defaultArea)?.level.slug ?? levels[0]?.slug ?? "concourse";
-
     const rows: BulkRow[] = files.map((file, i) => {
-      const areaId = defaultArea;
-      const levelSlug = defaultLevel;
-      const baseCount = scenes.filter((s) => s.areaId === areaId).length + i + 1;
-      const areaSlug = findArea(levels, areaId)?.area.slug ?? levelSlug;
-      const sceneId = `${areaSlug}-${String(baseCount).padStart(2, "0")}`;
+      const level = "CONCOURSE";
+      const baseCount = scenes.length + i + 1;
+      const sceneId = `${level.toLowerCase()}-${String(baseCount).padStart(2, "0")}`;
       const title = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ");
       return {
         key: `${file.name}-${i}`,
         file,
         sceneId,
         title,
-        areaId,
-        levelSlug,
+        level,
         status: "pending",
       };
     });
@@ -798,14 +489,7 @@ export default function VirtualTourEditorPage() {
 
   function updateBulkRow(key: string, field: keyof BulkRow, value: string) {
     setBulkRows((prev) =>
-      prev.map((r) => {
-        if (r.key !== key) return r;
-        if (field === "areaId") {
-          const found = findArea(levels, value);
-          return { ...r, areaId: value, levelSlug: found?.level.slug ?? r.levelSlug };
-        }
-        return { ...r, [field]: value };
-      })
+      prev.map((r) => (r.key === key ? { ...r, [field]: value } : r))
     );
   }
 
@@ -829,9 +513,8 @@ export default function VirtualTourEditorPage() {
         body: JSON.stringify({
           sceneId: row.sceneId,
           title: row.title,
-          level: row.levelSlug,
-          areaId: row.areaId,
-          order: scenes.filter((s) => s.areaId === row.areaId).length + bulkRows.indexOf(row),
+          level: row.level,
+          order: scenes.length + bulkRows.indexOf(row),
         }),
       });
 
@@ -883,6 +566,26 @@ export default function VirtualTourEditorPage() {
     }
   }
 
+  // ─── Group scenes by level ─────────────────────────────────────────────────
+  const scenesByLevel = SCENE_LEVELS.map((level) => ({
+    ...level,
+    scenes: scenes
+      .map((scene, index) => ({ scene, index }))
+      .filter(({ scene }) => (scene.level ?? "CONCOURSE") === level.value),
+  })).filter((group) => group.scenes.length > 0);
+
+  // ─── Scene list sorted within level by order ───────────────────────────────
+  const scenesByLevelSorted = scenesByLevel.map((group) => ({
+    ...group,
+    scenes: [...group.scenes].sort((a, b) => a.scene.order - b.scene.order),
+  }));
+
+  // ─── Other scenes grouped by level for hotspot picker ─────────────────────
+  const otherScenesByLevel = SCENE_LEVELS.map((level) => ({
+    ...level,
+    scenes: otherScenes.filter((s) => (s.level ?? "CONCOURSE") === level.value),
+  })).filter((group) => group.scenes.length > 0);
+
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="cms-vt-editor flex h-full min-h-0 w-full flex-col overflow-hidden">
@@ -907,7 +610,7 @@ export default function VirtualTourEditorPage() {
               <span className="text-slate-600">›</span>
               <span
                 className="text-sm font-medium truncate"
-                style={{ color: getLevelConfig(currentScene.level, levels).color }}
+                style={{ color: getLevelConfig(currentScene.level).color }}
               >
                 {currentScene.title}
               </span>
@@ -954,15 +657,6 @@ export default function VirtualTourEditorPage() {
             title="Tambah hotspot info"
           >
             <Info className="h-3.5 w-3.5" /> + Info
-          </button>
-          <button
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "blur" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-slate-200"
-            }`}
-            onClick={() => setAddMode((m) => (m === "blur" ? "none" : "blur"))}
-            title="Tambah blur privasi (wajah, dll.)"
-          >
-            <EyeOff className="h-3.5 w-3.5" /> + Blur
           </button>
         </div>
 
@@ -1011,35 +705,195 @@ export default function VirtualTourEditorPage() {
       {/* ── Main Editor Area ─────────────────────────────────────────────── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        <TourStructureSidebar
-          levels={levels}
-          scenes={scenes}
-          selectedSceneIndex={selectedSceneIndex}
-          incomingMap={incomingMap}
-          onSelectScene={selectScene}
-          onMoveScene={moveScene}
-          onDeleteScene={deleteScene}
-          onAddScene={openAddScene}
-          onBulkImport={() => {
-            setBulkRows([]);
-            setShowBulkImport(true);
-          }}
-          onManageLevels={() => setShowManageLevels(true)}
-          onAddArea={openAddArea}
-          onEditArea={openEditArea}
-          onDeleteArea={openDeleteArea}
-          onAutoWalkPath={autoWalkPath}
-        />
+        {/* ── Left: Scene List ─────────────────────────────────── */}
+        <aside className="w-60 bg-slate-900 border-r border-slate-800 flex flex-col flex-none overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Scenes</span>
+              <span className="text-xs text-slate-600">({scenes.length})</span>
+            </div>
+            <div className="flex items-center gap-1">
+              {/* Bulk import */}
+              <button
+                onClick={() => {
+                  setBulkRows([]);
+                  setShowBulkImport(true);
+                }}
+                className="text-slate-500 hover:text-sky-400 transition-colors p-0.5"
+                title="Bulk import panorama"
+              >
+                <Package className="h-3.5 w-3.5" />
+              </button>
+              {/* Add single scene */}
+              <button
+                onClick={() => {
+                  setNewSceneLevel("CONCOURSE");
+                  setNewSceneId(suggestSceneId("CONCOURSE", scenes));
+                  setNewSceneTitle("");
+                  setShowAddScene(true);
+                }}
+                className="text-emerald-400 hover:text-emerald-300 transition-colors p-0.5"
+                title="Tambah scene"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-2 space-y-4">
+            {scenesByLevelSorted.map((group) => (
+              <section key={group.value}>
+                <div className="mb-1.5 flex items-center gap-2 px-1">
+                  <span
+                    className="w-2 h-2 rounded-full flex-none"
+                    style={{ background: group.color }}
+                  />
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: group.color }}>
+                      {group.label}
+                    </p>
+                    <p className="text-[10px] text-slate-500">{group.scenes.length} scene</p>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  {group.scenes.map(({ scene, index }, posInGroup) => {
+                    const isSelected = index === selectedSceneIndex;
+                    const incomingCount = incomingMap.get(scene.sceneId) ?? 0;
+                    const outgoingCount = (scene.hotspots ?? []).filter((h) => h.type === "scene").length;
+                    const firstInLevel = posInGroup === 0;
+                    const lastInLevel = posInGroup === group.scenes.length - 1;
+
+                    return (
+                      <div
+                        key={scene.id}
+                        className={`group relative rounded-lg cursor-pointer border transition-all ${
+                          isSelected
+                            ? "border-emerald-500/50 bg-emerald-600/10 text-white"
+                            : "border-slate-700/50 hover:bg-slate-800 text-slate-300"
+                        }`}
+                        onClick={() => selectScene(index)}
+                      >
+                        {/* Thumbnail — pakai thumbnailUrl (ringan) jika ada, fallback panoramaUrl */}
+                        {(scene.thumbnailUrl || scene.panoramaUrl) ? (
+                          <div className="relative h-14 rounded-t-lg overflow-hidden bg-slate-800">
+                            <Image
+                              src={getS3ProxyUrl(scene.thumbnailUrl || scene.panoramaUrl)}
+                              alt={scene.title}
+                              fill
+                              className="object-cover opacity-70"
+                              unoptimized
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                          </div>
+                        ) : (
+                          <div className="h-9 rounded-t-lg bg-slate-800/60 flex items-center justify-center">
+                            <ImageIcon className="h-3.5 w-3.5 text-slate-600" />
+                          </div>
+                        )}
+
+                        <div className="px-2.5 py-2">
+                          <p className="font-medium text-xs leading-tight">{scene.title}</p>
+                          <p className="text-slate-500 text-[10px] font-mono mt-0.5">{scene.sceneId}</p>
+
+                          {/* Connection stats */}
+                          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-500">
+                            <span className="flex items-center gap-0.5" title="Hotspot keluar (outgoing)">
+                              <ArrowRightLeft className="h-2.5 w-2.5" />
+                              {outgoingCount}
+                            </span>
+                            <span className="flex items-center gap-0.5" title="Ditautkan dari scene lain (incoming)">
+                              <Link2 className="h-2.5 w-2.5" />
+                              {incomingCount}
+                            </span>
+                            {!scene.isActive && (
+                              <span className="ml-auto text-orange-400 font-medium">Off</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Reorder & delete buttons */}
+                        <div className="absolute right-1 top-1 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveScene(index, "up");
+                            }}
+                            disabled={firstInLevel}
+                            className="p-0.5 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed"
+                            title="Pindah ke atas"
+                          >
+                            <ChevronUp className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveScene(index, "down");
+                            }}
+                            disabled={lastInLevel}
+                            className="p-0.5 rounded bg-slate-800/90 hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed"
+                            title="Pindah ke bawah"
+                          >
+                            <ChevronDown className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteScene(scene);
+                            }}
+                            className="p-0.5 rounded bg-red-900/80 hover:bg-red-600 text-red-300 mt-0.5"
+                            title="Hapus scene"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Quick add button per level */}
+                  <button
+                    onClick={() => {
+                      setNewSceneLevel(group.value);
+                      setNewSceneId(suggestSceneId(group.value, scenes));
+                      setNewSceneTitle("");
+                      setShowAddScene(true);
+                    }}
+                    className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] text-slate-600 hover:text-emerald-400 hover:bg-slate-800/50 transition-colors border border-dashed border-slate-800 hover:border-emerald-800"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Tambah scene {group.label}
+                  </button>
+                </div>
+              </section>
+            ))}
+
+            {scenes.length === 0 && (
+              <div className="py-8 text-center text-slate-600 text-xs">
+                <p>Belum ada scene.</p>
+                <button
+                  onClick={() => {
+                    setNewSceneLevel("CONCOURSE");
+                    setNewSceneId(suggestSceneId("CONCOURSE", scenes));
+                    setNewSceneTitle("");
+                    setShowAddScene(true);
+                  }}
+                  className="mt-2 text-emerald-400 hover:underline"
+                >
+                  + Tambah scene
+                </button>
+              </div>
+            )}
+          </div>
+        </aside>
 
         {/* ── Center: Canvas / Preview ─────────────────────────────── */}
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {currentScene ? (
             isPreview ? (
               <PannellumPreview
-                key={`preview-${currentScene.sceneId}-${hotspots.length}-${privacyBlurs.length}`}
+                key={`preview-${currentScene.sceneId}-${hotspots.length}`}
                 panoramaUrl={currentScene.panoramaUrl}
                 hotspots={hotspots}
-                privacyBlurs={privacyBlurs}
                 sceneName={currentScene.title}
                 scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
                 spaces={stationSpaces}
@@ -1052,19 +906,12 @@ export default function VirtualTourEditorPage() {
                 key={`editor-${currentScene.sceneId}`}
                 panoramaUrl={currentScene.panoramaUrl}
                 hotspots={hotspots}
-                privacyBlurs={privacyBlurs}
                 selectedId={selectedHotspotId}
-                selectedBlurId={selectedBlurId}
                 addMode={addMode}
                 onHotspotAdd={handleHotspotAdd}
-                onBlurAdd={handleBlurAdd}
                 onHotspotMove={handleHotspotMove}
-                onBlurMove={handleBlurMove}
                 onHotspotSelect={handleHotspotSelect}
-                onBlurSelect={handleBlurSelect}
                 onHotspotDelete={handleHotspotDelete}
-                onBlurDelete={handleBlurDelete}
-                spaces={stationSpaces.map((s) => ({ code: s.code, status: s.status }))}
               />
             )
           ) : (
@@ -1103,30 +950,16 @@ export default function VirtualTourEditorPage() {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Level</Label>
-                    <p
-                      className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm font-medium"
-                      style={{ color: getLevelConfig(currentScene.level, levels).color }}
-                    >
-                      {getLevelConfig(currentScene.level, levels).label}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Area</Label>
+                    <Label className="text-xs text-slate-500 mb-1.5 block">Level Area</Label>
                     <select
-                      value={currentScene.areaId ?? ""}
-                      onChange={(e) => handleSceneAreaChange(e.target.value)}
+                      value={currentScene.level ?? "CONCOURSE"}
+                      onChange={(e) => updateSelectedScene("level", e.target.value)}
                       className="w-full bg-slate-800 border border-slate-700 rounded-md h-8 px-2 text-sm text-slate-100"
                     >
-                      <option value="">— pilih area —</option>
-                      {levels.map((level) => (
-                        <optgroup key={level.id} label={level.label}>
-                          {level.areas.map((area) => (
-                            <option key={area.id} value={area.id}>
-                              {area.label}
-                            </option>
-                          ))}
-                        </optgroup>
+                      {SCENE_LEVELS.map((level) => (
+                        <option key={level.value} value={level.value}>
+                          {level.label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -1228,117 +1061,6 @@ export default function VirtualTourEditorPage() {
               </section>
             )}
 
-            {/* Blur privasi */}
-            {selectedBlur && (
-              <section>
-                <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
-                  <h3 className="text-xs font-semibold text-purple-400 uppercase tracking-wider">
-                    Blur Privasi
-                  </h3>
-                  <button
-                    onClick={() => handleBlurDelete(selectedBlur._id)}
-                    className="text-red-400 hover:text-red-300 transition-colors"
-                    title="Hapus blur"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Area ini akan diburamkan di preview dan virtual tour publik untuk melindungi privasi (mis. wajah).
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Lebar (px)</Label>
-                      <Input
-                        type="number"
-                        min={24}
-                        max={320}
-                        value={selectedBlur.width ?? BLUR_WIDTH_DEFAULT}
-                        onChange={(e) => updateBlur("width", Number(e.target.value))}
-                        className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Tinggi (px)</Label>
-                      <Input
-                        type="number"
-                        min={24}
-                        max={320}
-                        value={selectedBlur.height ?? BLUR_HEIGHT_DEFAULT}
-                        onChange={(e) => updateBlur("height", Number(e.target.value))}
-                        className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <Label className="text-xs text-slate-500">Intensitas Blur</Label>
-                      <span className="text-xs font-mono text-slate-400">
-                        {selectedBlur.intensity ?? BLUR_INTENSITY_DEFAULT}px
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={BLUR_INTENSITY_MIN}
-                      max={BLUR_INTENSITY_MAX}
-                      step={1}
-                      value={selectedBlur.intensity ?? BLUR_INTENSITY_DEFAULT}
-                      onChange={(e) => updateBlur("intensity", Number(e.target.value))}
-                      className="w-full accent-purple-500"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <Label className="text-xs text-slate-500">Skala</Label>
-                      <span className="text-xs font-mono text-slate-400">
-                        {Math.round((selectedBlur.scale ?? BLUR_SCALE_DEFAULT) * 100)}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={BLUR_SCALE_MIN}
-                      max={BLUR_SCALE_MAX}
-                      step={0.05}
-                      value={selectedBlur.scale ?? BLUR_SCALE_DEFAULT}
-                      onChange={(e) => updateBlur("scale", Number(e.target.value))}
-                      className="w-full accent-purple-500"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Yaw (°)</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        min="-180"
-                        max="180"
-                        value={selectedBlur.yaw}
-                        onChange={(e) => updateBlur("yaw", Number(e.target.value))}
-                        className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Pitch (°)</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        min="-90"
-                        max="90"
-                        value={selectedBlur.pitch}
-                        onChange={(e) => updateBlur("pitch", Number(e.target.value))}
-                        className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </section>
-            )}
-
             {/* Hotspot Properties */}
             {selectedHotspot && (
               <section>
@@ -1391,17 +1113,26 @@ export default function VirtualTourEditorPage() {
                   {selectedHotspot.type === "scene" ? (
                     <div>
                       <Label className="text-xs text-slate-500 mb-1.5 block">Target Scene</Label>
-                      {currentScene && (
-                        <SceneTargetPicker
-                          levels={levels}
-                          scenes={scenes}
-                          currentSceneId={currentScene.sceneId}
-                          value={selectedHotspot.sceneId}
-                          defaultLevelId={currentScene.levelId}
-                          defaultAreaId={currentScene.areaId}
-                          syncKey={selectedHotspot._id}
-                          onChange={(sceneId) => updateHotspot("sceneId", sceneId)}
-                        />
+                      <select
+                        value={selectedHotspot.sceneId ?? ""}
+                        onChange={(e) => updateHotspot("sceneId", e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-md h-8 px-2 text-sm text-slate-100"
+                      >
+                        <option value="">— pilih scene —</option>
+                        {otherScenesByLevel.map((group) => (
+                          <optgroup key={group.value} label={`── ${group.label} ──`}>
+                            {group.scenes.map((s) => (
+                              <option key={s.sceneId} value={s.sceneId}>
+                                {s.title}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                      {selectedHotspot.sceneId && (
+                        <p className="text-[10px] text-slate-600 font-mono mt-1">
+                          → {selectedHotspot.sceneId}
+                        </p>
                       )}
                     </div>
                   ) : selectedHotspot.type === "space" ? (
@@ -1435,29 +1166,6 @@ export default function VirtualTourEditorPage() {
                     </div>
                   )}
 
-                  <div>
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <Label className="text-xs text-slate-500">Ukuran Hotspot</Label>
-                      <span className="text-xs font-mono text-slate-400">
-                        {Math.round((selectedHotspot.scale ?? HOTSPOT_SCALE_DEFAULT) * 100)}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={HOTSPOT_SCALE_MIN}
-                      max={HOTSPOT_SCALE_MAX}
-                      step={0.05}
-                      value={selectedHotspot.scale ?? HOTSPOT_SCALE_DEFAULT}
-                      onChange={(e) => updateHotspot("scale", Number(e.target.value))}
-                      className="w-full accent-emerald-500"
-                    />
-                    <div className="mt-1 flex justify-between text-[10px] text-slate-600">
-                      <span>Kecil (50%)</span>
-                      <span>Normal</span>
-                      <span>Besar (200%)</span>
-                    </div>
-                  </div>
-
                   {/* Coordinates */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -1489,44 +1197,6 @@ export default function VirtualTourEditorPage() {
               </section>
             )}
 
-            {currentScene && privacyBlurs.length > 0 && (
-              <section>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 pb-2 border-b border-slate-800">
-                  Blur Privasi ({privacyBlurs.length})
-                </h3>
-                <div className="space-y-1">
-                  {privacyBlurs.map((b, index) => (
-                    <div
-                      key={b._id}
-                      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-colors ${
-                        b._id === selectedBlurId
-                          ? "bg-purple-950/50 border-purple-700"
-                          : "border-transparent hover:bg-slate-800"
-                      }`}
-                      onClick={() => handleBlurSelect(b._id)}
-                    >
-                      <span className="w-4 h-4 rounded-md flex-none bg-purple-600/40 border border-purple-500/60 backdrop-blur-sm" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-slate-200 truncate">Blur #{index + 1}</p>
-                        <p className="text-xs text-slate-500 font-mono">
-                          {b.yaw.toFixed(1)}°, {b.pitch.toFixed(1)}°
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleBlurDelete(b._id);
-                        }}
-                        className="text-slate-600 hover:text-red-400 transition-colors"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
             {/* Hotspot list */}
             {currentScene && hotspots.length > 0 && (
               <section>
@@ -1546,32 +1216,15 @@ export default function VirtualTourEditorPage() {
                     >
                       <span
                         className="w-4 h-4 rounded-full flex-none flex items-center justify-center text-white text-xs"
-                        style={{
-                          background:
-                            h.type === "space" && h.spaceCode
-                              ? spaceStatusColor(findSpaceStatus(stationSpaces, h.spaceCode))
-                              : hotspotColor(h.type),
-                        }}
+                        style={{ background: hotspotColor(h.type) }}
                       >
-                        {h.type === "scene" ? "○" : h.type === "space" ? "●" : "i"}
+                        {h.type === "scene" ? "→" : h.type === "space" ? "●" : "i"}
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-slate-200 truncate">{h.text}</p>
-                        {h.type === "scene" && h.sceneId && (() => {
-                          const tgt = scenes.find((s) => s.sceneId === h.sceneId);
-                          const loc = tgt?.areaId ? findArea(levels, tgt.areaId) : null;
-                          return (
-                            <p className="text-[10px] text-slate-500 truncate">
-                              → {tgt?.title ?? h.sceneId}
-                              {loc && (
-                                <span className="text-slate-600">
-                                  {" "}
-                                  · {loc.level.label} › {loc.area.label}
-                                </span>
-                              )}
-                            </p>
-                          );
-                        })()}
+                        {h.type === "scene" && h.sceneId && (
+                          <p className="text-[10px] text-slate-500 font-mono truncate">→ {h.sceneId}</p>
+                        )}
                         <p className="text-xs text-slate-500 font-mono">
                           {h.yaw.toFixed(1)}°, {h.pitch.toFixed(1)}°
                         </p>
@@ -1602,30 +1255,17 @@ export default function VirtualTourEditorPage() {
                   Hotspot scene — pindah ke scene lain
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full bg-green-500 flex-none" />
-                  Unit tersedia — hijau
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full bg-red-500 flex-none" />
-                  Unit terisi — merah
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full bg-gray-400 flex-none" />
-                  Unit maintenance — abu-abu
+                  <span className="w-4 h-4 rounded-full bg-amber-500 flex-none" />
+                  Hotspot unit — buka detail unit
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="w-4 h-4 rounded-full bg-blue-500 flex-none" />
                   Hotspot info — modal deskripsi spot
                 </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-md bg-purple-600/50 border border-purple-500/60 flex-none" />
-                  Blur privasi — sembunyikan wajah/objek sensitif
-                </li>
-                <li className="flex items-center gap-2"><span>🖱️</span> Klik tanpa drag = pasang hotspot/blur</li>
-                <li className="flex items-center gap-2"><span>🖱️</span> Drag = pindah posisi</li>
-                <li className="flex items-center gap-2"><span>⚙️</span> Klik kanan = hapus blur/hotspot</li>
-                <li className="flex items-center gap-2"><span>▲▼</span> Reorder scene dalam satu area</li>
-                <li className="flex items-center gap-2"><span>🛤️</span> Icon rute = tautkan jalur jalan otomatis</li>
+                <li className="flex items-center gap-2"><span>🖱️</span> Klik tanpa drag = pasang hotspot</li>
+                <li className="flex items-center gap-2"><span>🖱️</span> Drag pin = pindah posisi</li>
+                <li className="flex items-center gap-2"><span>⚙️</span> Klik kanan pin = edit/hapus</li>
+                <li className="flex items-center gap-2"><span>▲▼</span> Hover scene = reorder</li>
                 <li className="flex items-center gap-2"><span>📦</span> Icon kotak = bulk import</li>
               </ul>
             </section>
@@ -1642,22 +1282,16 @@ export default function VirtualTourEditorPage() {
             </h2>
             <form onSubmit={addScene} className="space-y-4">
               <div>
-                <Label className="text-xs text-slate-400 mb-1.5 block">Area</Label>
+                <Label className="text-xs text-slate-400 mb-1.5 block">Level Area</Label>
                 <select
-                  value={newSceneAreaId}
-                  onChange={(e) => handleNewSceneAreaChange(e.target.value)}
+                  value={newSceneLevel}
+                  onChange={(e) => handleNewSceneLevelChange(e.target.value)}
                   className="w-full bg-slate-800 border border-slate-700 rounded-md h-10 px-3 text-sm text-slate-100"
-                  required
                 >
-                  <option value="">— pilih area —</option>
-                  {levels.map((level) => (
-                    <optgroup key={level.id} label={level.label}>
-                      {level.areas.map((area) => (
-                        <option key={area.id} value={area.id}>
-                          {area.label}
-                        </option>
-                      ))}
-                    </optgroup>
+                  {SCENE_LEVELS.map((level) => (
+                    <option key={level.value} value={level.value}>
+                      {level.label} — {level.hint}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1749,7 +1383,7 @@ export default function VirtualTourEditorPage() {
                   <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 text-[10px] text-slate-500 uppercase tracking-wider px-1">
                     <span>Judul Scene</span>
                     <span>Scene ID</span>
-                    <span>Area</span>
+                    <span>Level</span>
                     <span>Status</span>
                   </div>
                   {bulkRows.map((row) => (
@@ -1784,19 +1418,13 @@ export default function VirtualTourEditorPage() {
                         placeholder="scene-id"
                       />
                       <select
-                        value={row.areaId}
-                        onChange={(e) => updateBulkRow(row.key, "areaId", e.target.value)}
+                        value={row.level}
+                        onChange={(e) => updateBulkRow(row.key, "level", e.target.value)}
                         disabled={row.status !== "pending"}
-                        className="bg-slate-900 border border-slate-700 rounded h-7 px-1.5 text-xs text-slate-100 min-w-[110px]"
+                        className="bg-slate-900 border border-slate-700 rounded h-7 px-1.5 text-xs text-slate-100 min-w-[90px]"
                       >
-                        {levels.map((level) => (
-                          <optgroup key={level.id} label={level.label}>
-                            {level.areas.map((area) => (
-                              <option key={area.id} value={area.id}>
-                                {area.label}
-                              </option>
-                            ))}
-                          </optgroup>
+                        {SCENE_LEVELS.map((l) => (
+                          <option key={l.value} value={l.value}>{l.label}</option>
                         ))}
                       </select>
                       <span className="flex items-center justify-center w-7 h-7" title={row.error}>
@@ -1855,23 +1483,6 @@ export default function VirtualTourEditorPage() {
           </div>
         </div>
       )}
-
-      <ManageAreaDialog
-        state={areaDialog}
-        onClose={() => setAreaDialog(null)}
-        onSubmitAdd={submitAreaAdd}
-        onSubmitEdit={submitAreaEdit}
-        onConfirmDelete={submitAreaDelete}
-      />
-
-      <ManageLevelsDialog
-        open={showManageLevels}
-        levels={levels}
-        onClose={() => setShowManageLevels(false)}
-        onCreate={createLevel}
-        onUpdate={updateLevel}
-        onDelete={deleteLevel}
-      />
 
       {/* ── Toast ───────────────────────────────────────────────────────── */}
       {toast && (

@@ -1,125 +1,92 @@
 import type { HotspotType } from "./hotspot-types";
-import type { SpaceAvailabilityStatus } from "./space-availability";
-import { spaceStatusPinClass } from "./space-availability";
-import { clampHotspotScale, hotspotColor } from "./hotspot-types";
+import { hotspotColor } from "./hotspot-types";
 
-/** Ikon SVG per tipe (space & info) — scene memakai floor ring. */
+/** Ikon SVG per tipe — jangan set div.style.transform (dipakai Pannellum matrix3d). */
 export function hotspotIconSvg(type: HotspotType): string {
-  if (type === "scene") return "";
-  if (type === "space") {
-    return '<svg width="22" height="22" viewBox="0 0 24 24" fill="white" aria-hidden="true"><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="8" fill="none" stroke="white" stroke-width="2.8"/></svg>';
+  if (type === "scene") {
+    return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
   }
-  return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 10.5v5.5M12 7.5h.01" stroke-width="3.5"/></svg>';
+  if (type === "space") {
+    return '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="8.5" fill="none" stroke="white" stroke-width="2"/></svg>';
+  }
+  return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>';
 }
 
 export type HotspotVisualOptions = {
   type: HotspotType;
+  label: string;
   selected?: boolean;
-  scale?: number;
-  onClick?: () => void;
-  /** Warna pin unit — dari status retail */
-  spaceStatus?: SpaceAvailabilityStatus;
+  pulse?: boolean;
 };
 
-export const FLOOR_RING_DISC_CLASS = "lrt-floor-ring__disc";
-export const PIN_MARKER_DISC_CLASS = "lrt-pin-marker__disc";
-
-function hotspotTypeClass(type: HotspotType) {
-  return `lrt-hotspot--${type}`;
-}
-
-export function applyHotspotScale(div: HTMLDivElement, scale?: number) {
-  div.style.setProperty("--lrt-hotspot-scale", String(clampHotspotScale(scale)));
-}
-
-/** Shell luar transparan — sama untuk scene, unit, dan info (Pannellum pakai matrix3d di sini). */
-function applyHotspotOuterShell(div: HTMLDivElement, opts: HotspotVisualOptions) {
-  const scale = clampHotspotScale(opts.scale);
+/** Style dasar hotspot Pannellum — aman untuk matrix3d positioning. */
+export function applyHotspotBaseStyle(div: HTMLDivElement, opts: HotspotVisualOptions) {
+  const color = hotspotColor(opts.type);
+  const selected = opts.selected ?? false;
+  const pulse = opts.pulse ?? !selected;
 
   Object.assign(div.style, {
-    width: "88px",
-    height: "88px",
-    minWidth: "88px",
-    minHeight: "88px",
-    background: "transparent",
-    border: "none",
-    borderRadius: "0",
-    cursor: opts.onClick ? "pointer" : "default",
-    boxShadow: "none",
+    width: "44px",
+    height: "44px",
+    borderRadius: "50%",
+    border: `3px solid ${selected ? "#fff" : "rgba(255,255,255,0.85)"}`,
+    backgroundColor: color,
+    cursor: "pointer",
+    boxShadow: selected
+      ? `0 0 0 4px ${color}55, 0 4px 16px rgba(0,0,0,0.6)`
+      : "0 3px 14px rgba(0,0,0,0.55)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     overflow: "visible",
-    boxSizing: "border-box",
-    backgroundImage: "none",
+    transition: "scale 0.12s ease, box-shadow 0.12s ease",
+    animation: pulse ? "lrt-hotspot-pulse 2.8s ease-in-out infinite" : "none",
   });
-  applyHotspotScale(div, scale);
+  div.style.setProperty("scale", selected ? "1.15" : "1");
+  div.innerHTML = hotspotIconSvg(opts.type);
 }
 
-function buildSceneFloorRingHtml(selected: boolean): string {
-  const sel = selected ? " is-selected" : "";
-  return `<div class="lrt-floor-ring"><div class="lrt-floor-ring__pulse" aria-hidden="true"></div><div class="${FLOOR_RING_DISC_CLASS}${sel}"></div></div>`;
-}
+export function attachHotspotTooltip(div: HTMLDivElement, label: string) {
+  const existing = div.querySelector("[data-lrt-tooltip]");
+  if (existing) existing.remove();
 
-function buildPinMarkerHtml(
-  type: HotspotType,
-  selected: boolean,
-  spaceStatus?: SpaceAvailabilityStatus
-): string {
-  const sel = selected ? " is-selected" : "";
-  if (type === "space") {
-    const variant = spaceStatusPinClass(spaceStatus);
-    return `<div class="lrt-pin-marker lrt-pin-marker--space ${variant}"><div class="lrt-pin-marker__pulse" aria-hidden="true"></div><div class="${PIN_MARKER_DISC_CLASS}${sel}">${hotspotIconSvg(type)}</div></div>`;
-  }
-  return `<div class="lrt-pin-marker lrt-pin-marker--info"><div class="lrt-pin-marker__pulse" aria-hidden="true"></div><div class="${PIN_MARKER_DISC_CLASS}${sel}">${hotspotIconSvg(type)}</div></div>`;
-}
+  const tooltip = document.createElement("div");
+  tooltip.dataset.lrtTooltip = "1";
+  tooltip.textContent = label;
+  Object.assign(tooltip.style, {
+    position: "absolute",
+    bottom: "calc(100% + 10px)",
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: "rgba(15,23,42,0.95)",
+    color: "#f1f5f9",
+    padding: "5px 12px",
+    borderRadius: "8px",
+    fontSize: "12px",
+    fontWeight: "600",
+    whiteSpace: "nowrap",
+    pointerEvents: "none",
+    display: "none",
+    border: "1px solid rgba(255,255,255,0.15)",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+    zIndex: "10",
+  });
+  div.appendChild(tooltip);
 
-function applySceneHotspotStyle(div: HTMLDivElement, opts: HotspotVisualOptions) {
-  applyHotspotOuterShell(div, opts);
-  div.innerHTML = buildSceneFloorRingHtml(opts.selected ?? false);
-}
-
-function applyPinHotspotStyle(div: HTMLDivElement, opts: HotspotVisualOptions) {
-  applyHotspotOuterShell(div, opts);
-  div.innerHTML = buildPinMarkerHtml(opts.type, opts.selected ?? false, opts.spaceStatus);
-}
-
-/** Style dasar hotspot Pannellum — pola seragam: shell transparan + marker di child. */
-export function applyHotspotBaseStyle(div: HTMLDivElement, opts: HotspotVisualOptions) {
-  div.classList.remove("lrt-hotspot--scene", "lrt-hotspot--space", "lrt-hotspot--info");
-  div.classList.add(hotspotTypeClass(opts.type));
-
-  if (opts.type === "scene") {
-    applySceneHotspotStyle(div, opts);
-    return;
-  }
-  applyPinHotspotStyle(div, opts);
-}
-
-/** Pasang hotspot visual + handler klik langsung di elemen. */
-export function setupHotspotElement(div: HTMLDivElement, opts: HotspotVisualOptions) {
-  applyHotspotBaseStyle(div, opts);
-
-  if (opts.onClick) {
-    div.addEventListener("click", (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      opts.onClick?.();
-    });
-  }
+  div.addEventListener("mouseenter", () => {
+    tooltip.style.display = "block";
+    div.style.setProperty("scale", "1.2");
+    div.style.animationPlayState = "paused";
+  });
+  div.addEventListener("mouseleave", () => {
+    tooltip.style.display = "none";
+    const selected = div.dataset.lrtSelected === "1";
+    div.style.setProperty("scale", selected ? "1.15" : "1");
+    div.style.animationPlayState = selected ? "paused" : "running";
+  });
 }
 
 export function setHotspotSelected(div: HTMLDivElement, type: HotspotType, selected: boolean) {
   div.dataset.lrtSelected = selected ? "1" : "0";
-
-  const discClass = type === "scene" ? FLOOR_RING_DISC_CLASS : PIN_MARKER_DISC_CLASS;
-  const disc = div.querySelector(`.${discClass}`);
-  disc?.classList.toggle("is-selected", selected);
+  applyHotspotBaseStyle(div, { type, label: "", selected, pulse: !selected });
 }
-
-/** Update ukuran tanpa re-mount hotspot (slider CMS). */
-export function setHotspotScale(div: HTMLDivElement, scale?: number) {
-  applyHotspotScale(div, scale);
-}
-
-export { hotspotColor };

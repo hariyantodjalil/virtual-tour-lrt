@@ -36,7 +36,7 @@ http_port=\$(awk -F= '/^VIRTUALTOUR_HTTP_PORT=/{print \$2}' \"\$render_env_file\
 [ -n \"\$container_name\" ] || container_name=\"lrt-\$environment-virtualtour-web\"
 [ -n \"\$http_bind\" ] || http_bind='0.0.0.0'
 if [ -z \"\$http_port\" ]; then
-  if [ \"\$environment\" = prod ]; then http_port=80; else http_port=5011; fi
+  if [ \"\$environment\" = prod ]; then http_port=80; else http_port=18082; fi
 fi
 if [ \"\$environment\" = prod ] && [ \"\$http_port\" != 80 ]; then
   echo \"Production must publish only port 80; got \$http_port\" >&2
