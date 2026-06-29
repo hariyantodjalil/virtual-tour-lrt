@@ -2,7 +2,7 @@ name: ${VIRTUALTOUR_STACK_NAME:-lrt-dev-virtualtour}
 
 services:
   postgres:
-    image: hub.kai.id/library/postgres:15-alpine
+    image: hub.kai.id/library/postgres:17-alpine
     container_name: ${VIRTUALTOUR_DB_CONTAINER_NAME:-lrt-dev-virtualtour-db}
     restart: unless-stopped
     environment:
