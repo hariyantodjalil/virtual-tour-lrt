@@ -1,50 +1,49 @@
 import { prisma } from "@/lib/prisma";
-import type { StationInfo } from "@/lib/tour-types";
-import { normalizeHotspots } from "@/lib/hotspot-normalize";
-import { extractPrivacyBlursFromCanvasData } from "@/lib/privacy-blur-normalize";
-import { ensureTourStructure, sortScenesByTourOrder } from "@/lib/virtual-tour-structure";
-import { buildPublicTourLevels } from "@/lib/public-tour-structure";
+import type { Hotspot, PanoramaScene, StationInfo } from "@/lib/tour-types";
 
-export type { Hotspot, PanoramaScene, StationInfo, TourLevelPublic, TourAreaPublic } from "@/lib/tour-types";
-export type { PrivacyBlur } from "@/lib/privacy-blur-types";
+export type { Hotspot, PanoramaScene, StationInfo } from "@/lib/tour-types";
 
-type StationRow = {
-  id: string;
-  slug: string;
-  name: string;
-  code: string | null;
-  line: string;
-  order: number;
-  dailyPassengers: number;
-  address: string;
-  commercialContactPhone: string | null;
-};
-
-async function mapStationToInfo(station: StationRow): Promise<StationInfo> {
-  // Migrasi scene lama ke level/area — harus sebelum baca scene
-  await ensureTourStructure(station.id);
-
-  const [levels, areas, freshScenes] = await Promise.all([
-    prisma.virtualTourLevel.findMany({
-      where: { stationId: station.id, isActive: true },
-      orderBy: { order: "asc" },
-    }),
-    prisma.virtualTourArea.findMany({
-      where: { stationId: station.id, isActive: true },
-      orderBy: { order: "asc" },
-    }),
-    prisma.virtualTourScene.findMany({
-      where: { stationId: station.id, isActive: true },
-      include: {
-        levelRef: { select: { order: true } },
-        areaRef: { select: { order: true } },
+export async function getAllStationsData(): Promise<StationInfo[]> {
+  const stations = await prisma.station.findMany({
+    orderBy: { order: "asc" },
+    include: {
+      virtualTourScenes: {
+        where: { isActive: true },
+        orderBy: { order: "asc" },
       },
-      orderBy: { order: "asc" },
-    }),
-  ]);
+    },
+  });
 
-  const sortedScenes = sortScenesByTourOrder(freshScenes);
-  const publicLevels = buildPublicTourLevels(levels, areas, sortedScenes);
+  return stations.map((station) => ({
+    slug: station.slug,
+    name: station.name,
+    code: station.code ?? undefined,
+    line: station.line,
+    order: station.order,
+    dailyPassengers: station.dailyPassengers,
+    address: station.address,
+    scenes: station.virtualTourScenes.map((scene) => ({
+      id: scene.sceneId,
+      title: scene.title,
+      panoramaUrl: scene.panoramaUrl,
+      thumbnailUrl: scene.thumbnailUrl ?? undefined,
+      hotspots: (scene.hotspots as Hotspot[]) ?? [],
+    })),
+  }));
+}
+
+export async function getStationBySlug(slug: string): Promise<StationInfo | null> {
+  const station = await prisma.station.findUnique({
+    where: { slug },
+    include: {
+      virtualTourScenes: {
+        where: { isActive: true },
+        orderBy: { order: "asc" },
+      },
+    },
+  });
+
+  if (!station) return null;
 
   return {
     slug: station.slug,
@@ -54,59 +53,17 @@ async function mapStationToInfo(station: StationRow): Promise<StationInfo> {
     order: station.order,
     dailyPassengers: station.dailyPassengers,
     address: station.address,
-    commercialContactPhone: station.commercialContactPhone ?? undefined,
-    levels: publicLevels,
-    scenes: sortedScenes.map((scene) => ({
+    scenes: station.virtualTourScenes.map((scene) => ({
       id: scene.sceneId,
       title: scene.title,
       panoramaUrl: scene.panoramaUrl,
       thumbnailUrl: scene.thumbnailUrl ?? undefined,
-      levelId: scene.levelId,
-      areaId: scene.areaId,
-      levelSlug: scene.level,
-      hotspots: normalizeHotspots(scene.hotspots),
-      privacyBlurs: extractPrivacyBlursFromCanvasData(scene.canvasData),
+      hotspots: (scene.hotspots as Hotspot[]) ?? [],
     })),
   };
 }
 
-export async function getAllStationsData(): Promise<StationInfo[]> {
-  const stations = await prisma.station.findMany({
-    orderBy: { order: "asc" },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      code: true,
-      line: true,
-      order: true,
-      dailyPassengers: true,
-      address: true,
-      commercialContactPhone: true,
-    },
-  });
-  return Promise.all(stations.map((station) => mapStationToInfo(station)));
-}
-
-export async function getStationBySlug(slug: string): Promise<StationInfo | null> {
-  const station = await prisma.station.findUnique({
-    where: { slug },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      code: true,
-      line: true,
-      order: true,
-      dailyPassengers: true,
-      address: true,
-      commercialContactPhone: true,
-    },
-  });
-  if (!station) return null;
-  return mapStationToInfo(station);
-}
-
+// Backward compat sync helper for generateStaticParams
 export async function getStationSlugs(): Promise<string[]> {
   const stations = await prisma.station.findMany({ select: { slug: true }, orderBy: { order: "asc" } });
   return stations.map((s) => s.slug);

@@ -299,43 +299,35 @@ export function PanoramaCanvas({
               onContextMenu={(e) => handleHotspotContextMenu(e, h)}
             >
               {/* Glow when selected */}
-              {isSelected && !isScene && (
+              {isSelected && (
                 <circle r={36} fill={fill} opacity={0.2} />
               )}
 
+              {/* Pulsing ring for selected */}
               {isSelected && (
-                <ellipse
-                  rx={isScene ? 34 : 28}
-                  ry={isScene ? 14 : 28}
-                  fill="none"
-                  stroke={isScene ? "#fff" : fill}
-                  strokeWidth={3}
-                  opacity={0.7}
-                  strokeDasharray="10 5"
-                />
+                <circle r={28} fill="none" stroke={fill} strokeWidth={3} opacity={0.7} strokeDasharray="10 5" />
               )}
 
+              {/* Shadow */}
+              <circle r={20} fill="rgba(0,0,0,0.5)" transform="translate(3,4)" />
+
+              {/* Main pin circle */}
+              <circle r={20} fill={fill} stroke={strokeColor} strokeWidth={isSelected ? 3 : 2} />
+
+              {/* Icon */}
               {isScene ? (
-                <>
-                  <ellipse rx={32} ry={13} fill="rgba(0,0,0,0.45)" transform="translate(2,4)" />
-                  <ellipse
-                    rx={30}
-                    ry={12}
-                    fill="rgba(255,255,255,0.1)"
-                    stroke={strokeColor}
-                    strokeWidth={isSelected ? 5 : 4}
-                  />
-                </>
+                <path
+                  d="M-7 0 L5 0 M1 -6 L7 0 L1 6"
+                  stroke="white"
+                  strokeWidth={4}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              ) : isInfo ? (
+                <text y={5} textAnchor="middle" fontSize={16} fill="white" fontWeight="700">i</text>
               ) : (
-                <>
-                  <circle r={24} fill="rgba(0,0,0,0.5)" transform="translate(3,4)" />
-                  <circle r={24} fill={fill} stroke={strokeColor} strokeWidth={isSelected ? 4 : 3.5} />
-                  {isInfo ? (
-                    <text y={6} textAnchor="middle" fontSize={18} fill="white" fontWeight="800">i</text>
-                  ) : (
-                    <circle r={8} fill="white" />
-                  )}
-                </>
+                <circle r={7} fill="white" />
               )}
 
               {/* Label background */}

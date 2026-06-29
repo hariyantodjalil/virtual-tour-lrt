@@ -3,10 +3,6 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 
-function defaultRedirectForRole(role: string) {
-  return role === "MITRA" ? "/partner" : "/cms/dashboard";
-}
-
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
@@ -34,18 +30,11 @@ export async function POST(request: NextRequest) {
       { expiresIn: "24h" }
     );
 
-    const userWithoutPassword = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      isActive: user.isActive,
-    };
+    const { password: _, ...userWithoutPassword } = user;
     const response = NextResponse.json({
       message: "Login berhasil",
       token,
       user: userWithoutPassword,
-      redirectTo: defaultRedirectForRole(user.role),
     });
 
     response.cookies.set("cms-token", token, {

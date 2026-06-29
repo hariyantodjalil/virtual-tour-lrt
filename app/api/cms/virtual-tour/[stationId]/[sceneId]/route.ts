@@ -12,8 +12,6 @@ const sceneSelect = {
   sceneId: true,
   title: true,
   level: true,
-  levelId: true,
-  areaId: true,
   panoramaUrl: true,
   thumbnailUrl: true,
   order: true,
@@ -39,8 +37,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
     hotspots: body.hotspots,
     isActive: body.isActive,
   };
-  if (body.levelId !== undefined) updateData.levelId = body.levelId;
-  if (body.areaId !== undefined) updateData.areaId = body.areaId;
   if (body.panoramaUrl !== undefined) updateData.panoramaUrl = body.panoramaUrl;
   if (body.thumbnailUrl !== undefined) updateData.thumbnailUrl = body.thumbnailUrl;
   if (body.canvasData !== undefined) updateData.canvasData = body.canvasData;

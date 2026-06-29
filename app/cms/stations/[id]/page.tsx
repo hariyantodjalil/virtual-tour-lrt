@@ -21,7 +21,6 @@ type Station = {
   address: string;
   dailyPassengers: number;
   description: string | null;
-  commercialContactPhone: string | null;
   imageUrl: string | null;
   order: number;
 };
@@ -52,7 +51,6 @@ export default function CmsStationEditPage() {
         address: station.address,
         dailyPassengers: station.dailyPassengers,
         description: station.description,
-        commercialContactPhone: station.commercialContactPhone,
         order: station.order,
       }),
     });
@@ -90,7 +88,6 @@ export default function CmsStationEditPage() {
               <div><Label>Slug</Label><Input value={station.slug} onChange={(e) => setStation({ ...station, slug: e.target.value })} className="bg-slate-800 border-slate-700" /></div>
               <div><Label>Alamat</Label><Input value={station.address} onChange={(e) => setStation({ ...station, address: e.target.value })} className="bg-slate-800 border-slate-700" /></div>
               <div><Label>Penumpang/hari</Label><Input type="number" value={station.dailyPassengers} onChange={(e) => setStation({ ...station, dailyPassengers: Number(e.target.value) })} className="bg-slate-800 border-slate-700" /></div>
-              <div><Label>WhatsApp Tim Komersial</Label><Input value={station.commercialContactPhone ?? ""} onChange={(e) => setStation({ ...station, commercialContactPhone: e.target.value })} placeholder="628118012012" className="bg-slate-800 border-slate-700" /></div>
               <div><Label>Deskripsi</Label><Textarea value={station.description ?? ""} onChange={(e) => setStation({ ...station, description: e.target.value })} className="bg-slate-800 border-slate-700" rows={4} /></div>
               <Button type="submit" disabled={saving} className="bg-emerald-600 hover:bg-emerald-500">{saving ? "Menyimpan..." : "Simpan"}</Button>
               {message && <p className="text-sm text-emerald-400">{message}</p>}

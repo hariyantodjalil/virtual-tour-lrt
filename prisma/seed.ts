@@ -145,7 +145,6 @@ async function main() {
         latitude: stationData.latitude,
         longitude: stationData.longitude,
         isActive: true,
-        commercialContactPhone: "628118012012",
         description: `Stasiun ${stationData.name} merupakan bagian dari jaringan LRT Jabodebek yang melayani kawasan strategis di ${stationData.location}.`,
       },
     });

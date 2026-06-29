@@ -36,12 +36,7 @@ export default function CmsLoginForm() {
       return;
     }
 
-    if (data.user?.role === "MITRA") {
-      router.push("/partner");
-      return;
-    }
-
-    const redirect = searchParams.get("redirect") || data.redirectTo || "/cms/dashboard";
+    const redirect = searchParams.get("redirect") || "/cms/dashboard";
     router.push(redirect);
   }
 

@@ -1,6 +1,3 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MapPin, BarChart3, Sun, Moon } from "lucide-react";
 
@@ -11,14 +8,6 @@ type NavbarProps = {
 
 export default function Navbar({ variant = "light", onToggleTheme }: NavbarProps) {
   const isDark = variant === "dark";
-  const panelHref = user?.role === "MITRA" ? "/partner" : "/cms/dashboard";
-
-  useEffect(() => {
-    fetch("/api/auth/verify")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setUser(data?.authenticated ? data.user : null))
-      .catch(() => setUser(null));
-  }, []);
 
   return (
     <header className={`sticky top-4 mx-auto w-[calc(100%-2rem)] max-w-7xl h-14 rounded-2xl border backdrop-blur-md z-50 flex items-center justify-between px-6 shadow-xl transition-all duration-300 ${

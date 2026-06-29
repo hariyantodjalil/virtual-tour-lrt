@@ -13,7 +13,6 @@ model User {
   name      String
   role      UserRole @default(EDITOR)
   isActive  Boolean  @default(true)
-  tenantLeads TenantLead[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -34,14 +33,11 @@ model Station {
   longitude         Float?
   imageUrl          String?
   description       String?
-  commercialContactPhone String?        @default("628118012012")
   order             Int                 @default(0)
   isActive          Boolean             @default(true)
   commercialSpaces  CommercialSpace[]
   visitEvents       VisitEvent[]
   virtualTourScenes VirtualTourScene[]
-  virtualTourLevels VirtualTourLevel[]
-  virtualTourAreas  VirtualTourArea[]
   virtualTour       StationVirtualTour?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
@@ -63,64 +59,21 @@ model StationVirtualTour {
   @@map("station_virtual_tours")
 }
 
-// Level tur per stasiun: Concourse, Peron, Outdoor, dll.
-model VirtualTourLevel {
-  id        String             @id @default(cuid())
-  stationId String
-  station   Station            @relation(fields: [stationId], references: [id], onDelete: Cascade)
-  slug      String
-  label     String
-  color     String             @default("#10b981")
-  hint      String?
-  order     Int                @default(0)
-  isActive  Boolean            @default(true)
-  areas     VirtualTourArea[]
-  scenes    VirtualTourScene[]
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-
-  @@unique([stationId, slug])
-  @@map("virtual_tour_levels")
-}
-
-// Area dalam level: Paid Concourse, Unpaid Concourse, koridor A, dll.
-model VirtualTourArea {
-  id        String             @id @default(cuid())
-  stationId String
-  station   Station            @relation(fields: [stationId], references: [id], onDelete: Cascade)
-  levelId   String
-  level     VirtualTourLevel   @relation(fields: [levelId], references: [id], onDelete: Cascade)
-  slug      String
-  label     String
-  order     Int                @default(0)
-  isActive  Boolean            @default(true)
-  scenes    VirtualTourScene[]
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-
-  @@unique([stationId, slug])
-  @@map("virtual_tour_areas")
-}
-
 model VirtualTourScene {
-  id           String            @id @default(cuid())
+  id           String   @id @default(cuid())
   stationId    String
-  station      Station           @relation(fields: [stationId], references: [id], onDelete: Cascade)
-  levelId      String?
-  levelRef     VirtualTourLevel? @relation(fields: [levelId], references: [id], onDelete: SetNull)
-  areaId       String?
-  areaRef      VirtualTourArea?  @relation(fields: [areaId], references: [id], onDelete: SetNull)
-  sceneId      String            // slug scene: concourse, gate-area, platform
+  station      Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  sceneId      String   // slug scene: concourse, gate-area, platform
   title        String
-  panoramaUrl  String            // path S3 equirectangular — paralel svgPath di floorplan
-  level        String            @default("CONCOURSE") // legacy slug level (concourse/platform)
-  thumbnailUrl String?           // thumbnail preview scene
-  order        Int               @default(0) // urutan jalur jalan dalam area
-  hotspots     Json              @default("[]") // array hotspot — paralel placedAssets di floorplan
-  canvasData   Json?             // initialView {yaw,pitch,hfov}, editor viewport state
-  isActive     Boolean           @default(true)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  panoramaUrl  String   // path S3 equirectangular — paralel svgPath di floorplan
+  level        String   @default("CONCOURSE") // CONCOURSE, PLATFORM, OUTDOOR, TRANSFER, COMMERCIAL
+  thumbnailUrl String?  // thumbnail preview scene
+  order        Int      @default(0)
+  hotspots     Json     @default("[]") // array hotspot — paralel placedAssets di floorplan
+  canvasData   Json?    // initialView {yaw,pitch,hfov}, editor viewport state
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([stationId, sceneId])
   @@map("virtual_tour_scenes")
@@ -157,8 +110,6 @@ model CommercialSpace {
 
 model TenantLead {
   id               String           @id @default(cuid())
-  userId           String?
-  user             User?            @relation(fields: [userId], references: [id])
   spaceId          String?
   space            CommercialSpace? @relation(fields: [spaceId], references: [id])
   companyName      String
@@ -194,7 +145,6 @@ model VisitEvent {
 enum UserRole {
   ADMIN
   EDITOR
-  MITRA
 }
 
 enum SpaceType {

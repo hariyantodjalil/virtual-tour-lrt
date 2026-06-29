@@ -2,98 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { cmsFetch } from "@/lib/cms-fetch";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
-
-type SpaceStatus = "TERSEDIA" | "TERISI" | "MAINTENANCE";
+import { ArrowLeft } from "lucide-react";
 
 type Space = {
   id: string;
   code: string;
   name: string;
   type: string;
-  status: SpaceStatus;
+  status: string;
   area: number;
   monthlyRent: number;
-  deposit: number;
   floor: string;
   location: string;
-  nearestExit: string | null;
-  exposure: number;
-  powerSupply: string | null;
-  waterAccess: boolean;
-  airConditioning: boolean;
-  description: string | null;
-  panoramaUrl: string | null;
 };
-
-const SPACE_TYPES = [
-  { value: "KIOS", label: "Kios" },
-  { value: "RUKO", label: "Ruko" },
-  { value: "ATM", label: "ATM" },
-  { value: "VENDING", label: "Vending Machine" },
-  { value: "MEDIA_IKLAN", label: "Media Iklan" },
-  { value: "AREA_PROMOSI", label: "Area Promosi" },
-];
-
-const STATUSES: SpaceStatus[] = ["TERSEDIA", "TERISI", "MAINTENANCE"];
-
-function createDraft(): Space {
-  return {
-    id: "",
-    code: "",
-    name: "",
-    type: "KIOS",
-    status: "TERSEDIA",
-    area: 12,
-    monthlyRent: 0,
-    deposit: 0,
-    floor: "G",
-    location: "Concourse",
-    nearestExit: "",
-    exposure: 0,
-    powerSupply: "",
-    waterAccess: false,
-    airConditioning: false,
-    description: "",
-    panoramaUrl: "",
-  };
-}
-
-function toPayload(space: Space) {
-  return {
-    code: space.code.trim(),
-    name: space.name.trim(),
-    type: space.type,
-    status: space.status,
-    area: Number(space.area) || 0,
-    monthlyRent: Number(space.monthlyRent) || 0,
-    deposit: Number(space.deposit) || 0,
-    floor: space.floor.trim() || "G",
-    location: space.location.trim(),
-    nearestExit: space.nearestExit?.trim() || null,
-    exposure: Number(space.exposure) || 0,
-    powerSupply: space.powerSupply?.trim() || null,
-    waterAccess: Boolean(space.waterAccess),
-    airConditioning: Boolean(space.airConditioning),
-    description: space.description?.trim() || null,
-    panoramaUrl: space.panoramaUrl?.trim() || null,
-  };
-}
 
 export default function CmsSpacesStationPage() {
   const { stationId } = useParams<{ stationId: string }>();
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [editing, setEditing] = useState<Space | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
 
   async function load() {
     const res = await cmsFetch(`/api/cms/spaces/station/${stationId}`);
@@ -108,52 +41,40 @@ export default function CmsSpacesStationPage() {
 
   async function saveSpace() {
     if (!editing) return;
-    setSaving(true);
-    setMessage("");
-
-    const isEdit = Boolean(editing.id);
-    const res = await cmsFetch(
-      isEdit ? `/api/cms/spaces/${editing.id}` : `/api/cms/spaces/station/${stationId}`,
-      {
-        method: isEdit ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(toPayload(editing)),
-      }
-    );
-
-    setSaving(false);
-    if (!res.ok) {
-      setMessage("Gagal menyimpan unit. Periksa kode unit dan field wajib.");
-      return;
-    }
-
+    await cmsFetch(`/api/cms/spaces/${editing.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editing),
+    });
     setEditing(null);
-    await load();
-  }
-
-  async function uploadSpacePhoto(file: File) {
-    if (!editing?.id) {
-      setMessage("Simpan unit terlebih dahulu sebelum upload foto.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await cmsFetch(`/api/cms/spaces/${editing.id}`, { method: "POST", body: formData });
-    const data = await res.json();
-    if (res.ok) {
-      setEditing(data.space);
-      setMessage("Foto unit berhasil diupload.");
-      await load();
-    } else {
-      setMessage(data.error ?? "Upload foto gagal.");
-    }
+    load();
   }
 
   async function deleteSpace(id: string) {
     if (!confirm("Hapus unit ini?")) return;
     await cmsFetch(`/api/cms/spaces/${id}`, { method: "DELETE" });
-    await load();
+    load();
+  }
+
+  async function addSpace() {
+    const code = prompt("Kode unit:");
+    const name = prompt("Nama unit:");
+    if (!code || !name) return;
+    await cmsFetch(`/api/cms/spaces/station/${stationId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code,
+        name,
+        type: "KIOS",
+        status: "TERSEDIA",
+        area: 12,
+        monthlyRent: 8000000,
+        floor: "G",
+        location: "Concourse",
+      }),
+    });
+    load();
   }
 
   return (
@@ -161,155 +82,47 @@ export default function CmsSpacesStationPage() {
       <Button asChild variant="ghost" className="mb-4 text-slate-300">
         <Link href="/cms/spaces"><ArrowLeft className="h-4 w-4 mr-1" /> Kembali</Link>
       </Button>
-
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Ruang Komersial</h1>
-          <p className="mt-1 text-sm text-slate-400">Kelola semua field yang muncul di virtual tour publik.</p>
-        </div>
-        <Button onClick={() => { setMessage(""); setEditing(createDraft()); }} className="bg-emerald-600 hover:bg-emerald-500">
-          <Plus className="h-4 w-4" />
-          Tambah Unit
-        </Button>
+      <div className="flex justify-between mb-6">
+        <h1 className="text-2xl font-bold">Ruang Komersial</h1>
+        <Button onClick={addSpace} className="bg-emerald-600 hover:bg-emerald-500">Tambah Unit</Button>
       </div>
-
-      <div className="grid gap-3">
+      <div className="space-y-3">
         {spaces.map((space) => (
           <Card key={space.id} className="bg-slate-900 border-slate-800">
-            <CardContent className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-              <div className="min-w-0">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-white">{space.code} - {space.name}</p>
-                  <Badge variant="outline" className="border-slate-700 text-slate-300">{space.status}</Badge>
-                  <Badge variant="outline" className="border-slate-700 text-slate-300">{SPACE_TYPES.find((t) => t.value === space.type)?.label ?? space.type}</Badge>
-                </div>
-                <p className="text-sm text-slate-400">
-                  {space.floor} · {space.location} · {space.area} m²
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Exposure {Number(space.exposure).toLocaleString("id-ID")} orang/hari
-                  {space.nearestExit ? ` · ${space.nearestExit}` : ""}
-                  {space.powerSupply ? ` · ${space.powerSupply}` : ""}
-                </p>
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="font-medium">{space.code} — {space.name}</p>
+                <p className="text-sm text-slate-400">{space.type} · {space.floor} · {space.location}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" className="border-slate-700" onClick={() => { setMessage(""); setEditing(space); }}>
-                  <Pencil className="h-3.5 w-3.5" />
-                  Edit
-                </Button>
-                <Button size="sm" variant="ghost" className="text-red-400 hover:bg-red-950/40" onClick={() => deleteSpace(space.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Hapus
-                </Button>
+                <Badge variant="outline">{space.status}</Badge>
+                <Button size="sm" variant="outline" className="border-slate-700" onClick={() => setEditing(space)}>Edit</Button>
+                <Button size="sm" variant="ghost" className="text-red-400" onClick={() => deleteSpace(space.id)}>Hapus</Button>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
-
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[calc(100vh-32px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-800 px-6 py-4">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-300">
-                  {editing.id ? "Edit Unit" : "Tambah Unit"}
-                </p>
-                <h2 className="mt-1 text-xl font-black text-white">{editing.code || "Unit Baru"}</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditing(null)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white"
-                aria-label="Tutup form"
-              >
-                <X className="h-5 w-5" />
-              </button>
+        <Card className="fixed inset-x-4 bottom-4 md:inset-auto md:right-8 md:bottom-8 md:w-96 bg-slate-900 border-slate-700 shadow-xl z-50">
+          <CardHeader><CardTitle>Edit {editing.code}</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div><Label>Nama</Label><Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="bg-slate-800 border-slate-700" /></div>
+            <div><Label>Status</Label>
+              <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-sm">
+                <option value="TERSEDIA">TERSEDIA</option>
+                <option value="TERISI">TERISI</option>
+                <option value="MAINTENANCE">MAINTENANCE</option>
+              </select>
             </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto p-6">
-              <div className="grid gap-5 md:grid-cols-2">
-                <Field label="Kode Unit">
-                  <Input value={editing.code} onChange={(e) => setEditing({ ...editing, code: e.target.value })} className="bg-slate-900 border-slate-700" />
-                </Field>
-                <Field label="Nama Unit">
-                  <Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="bg-slate-900 border-slate-700" />
-                </Field>
-                <Field label="Tipe">
-                  <select value={editing.type} onChange={(e) => setEditing({ ...editing, type: e.target.value })} className="h-10 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white">
-                    {SPACE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
-                  </select>
-                </Field>
-                <Field label="Status">
-                  <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value as SpaceStatus })} className="h-10 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white">
-                    {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
-                  </select>
-                </Field>
-                <Field label="Luas (m2)">
-                  <Input type="number" value={editing.area} onChange={(e) => setEditing({ ...editing, area: Number(e.target.value) })} className="bg-slate-900 border-slate-700" />
-                </Field>
-                <Field label="Deposit">
-                  <Input type="number" value={editing.deposit} onChange={(e) => setEditing({ ...editing, deposit: Number(e.target.value) })} className="bg-slate-900 border-slate-700" />
-                </Field>
-                <Field label="Eksposur Penumpang / Hari">
-                  <Input type="number" value={editing.exposure} onChange={(e) => setEditing({ ...editing, exposure: Number(e.target.value) })} className="bg-slate-900 border-slate-700" />
-                </Field>
-                <Field label="Lantai">
-                  <Input value={editing.floor} onChange={(e) => setEditing({ ...editing, floor: e.target.value })} className="bg-slate-900 border-slate-700" />
-                </Field>
-                <Field label="Lokasi">
-                  <Input value={editing.location} onChange={(e) => setEditing({ ...editing, location: e.target.value })} className="bg-slate-900 border-slate-700" />
-                </Field>
-                <Field label="Exit Terdekat">
-                  <Input value={editing.nearestExit ?? ""} onChange={(e) => setEditing({ ...editing, nearestExit: e.target.value })} className="bg-slate-900 border-slate-700" />
-                </Field>
-                <Field label="Daya Listrik">
-                  <Input value={editing.powerSupply ?? ""} onChange={(e) => setEditing({ ...editing, powerSupply: e.target.value })} placeholder="contoh: 2200 VA" className="bg-slate-900 border-slate-700" />
-                </Field>
-                <Field label="URL Foto/Panorama Unit">
-                  <Input value={editing.panoramaUrl ?? ""} onChange={(e) => setEditing({ ...editing, panoramaUrl: e.target.value })} className="bg-slate-900 border-slate-700" />
-                </Field>
-                <div className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 md:col-span-2 md:grid-cols-3">
-                  <label className="flex items-center gap-3 text-sm text-slate-200">
-                    <input type="checkbox" checked={editing.waterAccess} onChange={(e) => setEditing({ ...editing, waterAccess: e.target.checked })} />
-                    Air bersih tersedia
-                  </label>
-                  <label className="flex items-center gap-3 text-sm text-slate-200">
-                    <input type="checkbox" checked={editing.airConditioning} onChange={(e) => setEditing({ ...editing, airConditioning: e.target.checked })} />
-                    AC tersedia
-                  </label>
-                  <Label className="flex cursor-pointer items-center gap-3 text-sm text-slate-200">
-                    <Upload className="h-4 w-4" />
-                    Upload foto unit
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadSpacePhoto(e.target.files[0])} />
-                  </Label>
-                </div>
-                <div className="md:col-span-2">
-                  <Label>Deskripsi</Label>
-                  <Textarea value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} className="mt-2 min-h-28 bg-slate-900 border-slate-700" />
-                </div>
-              </div>
-              {message && <p className="mt-4 text-sm text-amber-300">{message}</p>}
-            </div>
-
-            <div className="flex items-center justify-end gap-2 border-t border-slate-800 px-6 py-4">
+            <div><Label>Sewa/bulan</Label><Input type="number" value={editing.monthlyRent} onChange={(e) => setEditing({ ...editing, monthlyRent: Number(e.target.value) })} className="bg-slate-800 border-slate-700" /></div>
+            <div className="flex gap-2">
+              <Button onClick={saveSpace} className="bg-emerald-600">Simpan</Button>
               <Button variant="ghost" onClick={() => setEditing(null)}>Batal</Button>
-              <Button onClick={saveSpace} disabled={saving} className="bg-emerald-600 hover:bg-emerald-500">
-                {saving ? "Menyimpan..." : "Simpan Unit"}
-              </Button>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <Label>{label}</Label>
-      <div className="mt-2">{children}</div>
     </div>
   );
 }

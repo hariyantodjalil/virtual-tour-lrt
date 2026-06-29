@@ -25,4 +25,4 @@ This version has breaking changes - APIs, conventions, and file structure may al
 - For code changes, prefer `npm run lint` and `npm run build` when dependencies and environment are available.
 - Use Prisma commands from `package.json` for schema generation, migrations, seed data, and database inspection.
 - Validate Docker deployment config with `docker compose --env-file .env.dev.example -f docker-compose.dev.yml config` and `docker compose --env-file .env.prod.example -f docker-compose.prod.yml config`.
-- Production HTTP exposure must stay on host port `80`; development Jenkins deploy uses app port `5011` and Postgres port `6010`.
+- Production HTTP exposure must stay on host port `80`; development should use an explicit high port such as `18082`.

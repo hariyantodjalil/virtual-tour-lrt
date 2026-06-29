@@ -3,10 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { HotspotItem } from "@/lib/hotspot-types";
-import type { PrivacyBlurItem } from "@/lib/privacy-blur-types";
-import { setupHotspotElement } from "@/lib/pannellum-hotspot";
-import { findSpaceStatus } from "@/lib/space-availability";
-import { buildViewPrivacyBlurHotSpot } from "@/lib/pannellum-privacy-blur";
+import { applyHotspotBaseStyle, attachHotspotTooltip } from "@/lib/pannellum-hotspot";
 import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
 import InTourInfoPopup from "@/components/tour/InTourInfoPopup";
 
@@ -37,7 +34,6 @@ type PreviewScene = {
 interface Props {
   panoramaUrl: string;
   hotspots: HotspotItem[];
-  privacyBlurs?: PrivacyBlurItem[];
   sceneName: string;
   scenes?: PreviewScene[];
   spaces?: CommercialSpace[];
@@ -82,7 +78,6 @@ function loadPannellum(): Promise<void> {
 export function PannellumPreview({
   panoramaUrl,
   hotspots,
-  privacyBlurs = [],
   sceneName,
   scenes = [],
   spaces = [],
@@ -121,39 +116,34 @@ export function PannellumPreview({
           viewerRef.current = null;
         }
 
-        const blurSpots = privacyBlurs.map((blur) => buildViewPrivacyBlurHotSpot(blur));
-
         const hotSpots = hotspots.map((h) => {
-          let onClick: (() => void) | undefined;
+          const hs: Record<string, unknown> = {
+            pitch: h.pitch,
+            yaw: h.yaw,
+            type: "custom",
+            cssClass: `lrt-${h.type}-hotspot`,
+            createTooltipFunc: (div: HTMLDivElement) => {
+              applyHotspotBaseStyle(div, { type: h.type, label: h.text, pulse: true });
+              attachHotspotTooltip(div, h.text);
+            },
+          };
 
           if (h.type === "scene" && h.sceneId) {
             const sceneId = h.sceneId;
-            onClick = () => onSceneNavigateRef.current?.(sceneId);
+            hs.clickHandlerFunc = () => onSceneNavigateRef.current?.(sceneId);
           } else if (h.type === "space" && h.spaceCode) {
             const code = h.spaceCode;
-            onClick = () => {
+            hs.clickHandlerFunc = () => {
               const space = spacesRef.current.find((s) => s.code === code);
               if (space) setSelectedSpace(space);
             };
           } else if (h.type === "info") {
             const title = h.text;
             const description = h.description ?? "";
-            onClick = () => setInfoPopup({ title, description });
+            hs.clickHandlerFunc = () => setInfoPopup({ title, description });
           }
 
-          return {
-            pitch: h.pitch,
-            yaw: h.yaw,
-            type: "custom" as const,
-            cssClass: `lrt-${h.type}-hotspot`,
-            createTooltipFunc: (div: HTMLDivElement) => {
-              const spaceStatus =
-                h.type === "space" && h.spaceCode
-                  ? findSpaceStatus(spacesRef.current, h.spaceCode)
-                  : undefined;
-              setupHotspotElement(div, { type: h.type, onClick, scale: h.scale, spaceStatus });
-            },
-          };
+          return hs;
         });
 
         viewerRef.current = window.pannellum.viewer(containerRef.current, {
@@ -167,7 +157,7 @@ export function PannellumPreview({
           hfov: 100,
           minHfov: 50,
           maxHfov: 120,
-          hotSpots: [...blurSpots, ...hotSpots],
+          hotSpots,
         });
       } catch (e) {
         console.error("Pannellum preview error:", e);
@@ -183,7 +173,7 @@ export function PannellumPreview({
         viewerRef.current = null;
       }
     };
-  }, [panoramaUrl, hotspots, privacyBlurs]);
+  }, [panoramaUrl, hotspots]);
 
   if (!panoramaUrl) {
     return (
@@ -203,7 +193,7 @@ export function PannellumPreview({
         Preview — {sceneName}
       </div>
       <div className="absolute top-3 right-3 bg-slate-900/90 backdrop-blur text-slate-400 text-xs px-3 py-1.5 rounded-full border border-slate-700 pointer-events-none z-10">
-        {hotspots.length} hotspot · {privacyBlurs.length} blur · klik untuk interaksi
+        {hotspots.length} hotspot · klik untuk interaksi
       </div>
 
       {selectedSpace && (

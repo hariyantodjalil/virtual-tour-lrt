@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,7 +15,6 @@ const schema = z.object({
   contactName: z.string().min(2, "Nama kontak minimal 2 karakter"),
   phone: z.string().min(10, "Nomor telepon tidak valid").regex(/^\+?[\d\s-]+$/, "Format nomor tidak valid"),
   email: z.string().email("Format email tidak valid"),
-  password: z.string().min(8, "Password minimal 8 karakter"),
   businessType: z.string().min(3, "Jenis usaha wajib diisi"),
   message: z.string().optional(),
 });
@@ -46,13 +44,9 @@ export default function TenantInterestForm({ spaceId, spaceCode, stationName, on
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, spaceId }),
       });
-
       if (res.ok) {
         setSubmitted(true);
         onSuccess?.();
-      } else {
-        const error = await res.json().catch(() => null);
-        alert(error?.error ?? "Gagal mengirim formulir. Coba lagi.");
       }
     } catch {
       alert("Gagal mengirim formulir. Coba lagi.");
@@ -67,13 +61,10 @@ export default function TenantInterestForm({ spaceId, spaceCode, stationName, on
         <CheckCircle className="h-10 w-10 text-emerald-500" />
         <div>
           <p className="font-bold text-gray-900">Minat Anda Tercatat!</p>
-          <p className="mt-1 text-sm text-gray-500">
-            Akun mitra sudah disiapkan dari email Anda untuk memantau status unit {spaceCode} di Stasiun {stationName}.
+          <p className="text-sm text-gray-500 mt-1">
+            Tim komersial LRT Jabodebek akan menghubungi Anda dalam 1×24 jam untuk unit {spaceCode} di Stasiun {stationName}.
           </p>
         </div>
-        <Button asChild className="mt-2">
-          <Link href="/partner">Buka Panel Mitra</Link>
-        </Button>
       </div>
     );
   }
@@ -106,13 +97,6 @@ export default function TenantInterestForm({ spaceId, spaceCode, stationName, on
           <Input id="email" type="email" placeholder="budi@perusahaan.com" className="h-12 text-base" {...register("email")} />
           {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
         </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="password" className="text-sm font-semibold text-gray-800">Password Akun Mitra *</Label>
-        <Input id="password" type="password" placeholder="Minimal 8 karakter" className="h-12 text-base" {...register("password")} />
-        <p className="text-xs text-gray-500">Password ini dipakai untuk login dan memantau status pengajuan Anda.</p>
-        {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
       </div>
 
       <div className="space-y-2">
