@@ -67,7 +67,6 @@ export default async function StationPage({ params }: Props) {
           type: s.type,
           status: s.status as "TERSEDIA" | "TERISI" | "MAINTENANCE",
           area: s.area,
-          monthlyRent: s.monthlyRent,
           deposit: s.deposit,
           floor: s.floor,
           location: s.location,

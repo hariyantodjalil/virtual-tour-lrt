@@ -1,13 +1,32 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { MapPin, BarChart3, Phone } from "lucide-react";
+import { LogIn, Phone, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type NavbarProps = {
   variant?: "light" | "dark";
 };
 
+type AuthUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+};
+
 export default function Navbar({ variant = "light" }: NavbarProps) {
+  const [user, setUser] = useState<AuthUser | null>(null);
   const isDark = variant === "dark";
+  const panelHref = user?.role === "MITRA" ? "/partner" : "/cms/dashboard";
+
+  useEffect(() => {
+    fetch("/api/auth/verify")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setUser(data?.authenticated ? data.user : null))
+      .catch(() => setUser(null));
+  }, []);
 
   return (
     <header
@@ -32,33 +51,21 @@ export default function Navbar({ variant = "light" }: NavbarProps) {
           </div>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-1">
-          <Link
-            href="/"
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              isDark ? "text-white/65 hover:bg-white/10 hover:text-white" : "text-gray-600 hover:bg-gray-100 hover:text-[#1B3A6B]"
-            }`}
-          >
-            <MapPin className="h-4 w-4" />
-            18 Stasiun
-          </Link>
-          <Link
-            href="/dashboard"
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              isDark ? "text-white/65 hover:bg-white/10 hover:text-white" : "text-gray-600 hover:bg-gray-100 hover:text-[#1B3A6B]"
-            }`}
-          >
-            <BarChart3 className="h-4 w-4" />
-            Dashboard
-          </Link>
-        </nav>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant={isDark ? "outline" : "default"} asChild>
+            <Link href="tel:+622180800000" className="flex items-center gap-2">
+              <Phone className="h-4 w-4" />
+              <span className="hidden sm:inline">Hubungi Tim</span>
+            </Link>
+          </Button>
 
-        <Button size="sm" variant="default" asChild>
-          <Link href="tel:+622180800000" className="flex items-center gap-2">
-            <Phone className="h-4 w-4" />
-            <span className="hidden sm:inline">Hubungi Tim</span>
-          </Link>
-        </Button>
+          <Button size="sm" variant={user ? "secondary" : "outline"} asChild>
+            <Link href={user ? panelHref : "/login"} className="flex items-center gap-2">
+              {user ? <UserCircle className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
+              <span className="hidden sm:inline">{user ? "Panel" : "Login"}</span>
+            </Link>
+          </Button>
+        </div>
       </div>
     </header>
   );

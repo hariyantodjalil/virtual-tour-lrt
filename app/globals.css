@@ -48,6 +48,30 @@ body {
   cursor: pointer;
 }
 
+/* Pannellum default hotspot 26×26 — semua custom hotspot pakai shell transparan + child */
+.pnlm-hotspot.lrt-scene-hotspot,
+.pnlm-hotspot.lrt-space-hotspot,
+.pnlm-hotspot.lrt-info-hotspot,
+.pnlm-hotspot.lrt-hotspot--scene,
+.pnlm-hotspot.lrt-hotspot--space,
+.pnlm-hotspot.lrt-hotspot--info,
+.pnlm-hotspot.lrt-editor-hs,
+.pnlm-hotspot.lrt-privacy-blur-hs {
+  width: auto !important;
+  height: auto !important;
+  overflow: visible !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.lrt-pin-marker__disc svg {
+  display: block;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
 /* ── LRT Virtual Tour – Custom Hotspot Styles ─────────────────────────── */
 /*
  * Hotspot visual dikendalikan via createTooltipFunc (inline styles).
@@ -55,19 +79,270 @@ body {
  */
 .lrt-scene-hotspot,
 .lrt-space-hotspot,
-.lrt-info-hotspot {
-  /* Reset sprite bawaan Pannellum agar createTooltipFunc yang berlaku */
+.lrt-info-hotspot,
+.lrt-editor-hs {
   background-image: none !important;
   overflow: visible !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
 }
 
-@keyframes lrt-hotspot-pulse {
+/* Scene hotspot — ring putih di lantai */
+.lrt-floor-ring {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  transform: rotateX(82deg) scale(var(--lrt-hotspot-scale, 1));
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.lrt-floor-ring__disc {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 5px solid #fff;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 0 0 3px rgba(0, 0, 0, 0.45),
+    0 0 18px rgba(255, 255, 255, 0.45),
+    0 4px 14px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.lrt-floor-ring__pulse {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.75);
+  pointer-events: none;
+}
+
+.lrt-floor-ring__disc.is-selected {
+  border-width: 6px;
+  border-color: #fff;
+  box-shadow:
+    0 0 0 3px rgba(16, 185, 129, 0.55),
+    0 0 0 6px rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(255, 255, 255, 0.5),
+    0 4px 14px rgba(0, 0, 0, 0.55);
+}
+
+/* ── Emphasize: scene (floor ring) ── */
+.lrt-scene-hotspot .lrt-floor-ring__disc,
+.lrt-hotspot--scene .lrt-floor-ring__disc {
+  animation: lrt-floor-ring-breathe 2.4s ease-in-out infinite;
+}
+
+.lrt-scene-hotspot .lrt-floor-ring__pulse,
+.lrt-hotspot--scene .lrt-floor-ring__pulse {
+  animation: lrt-floor-ring-ripple 2.4s ease-out infinite;
+}
+
+@keyframes lrt-floor-ring-breathe {
   0%, 100% {
-    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.55), 0 0 0 0 rgba(255, 255, 255, 0.45);
+    transform: scale(1);
+    opacity: 0.9;
   }
   50% {
-    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.55), 0 0 0 10px rgba(255, 255, 255, 0);
+    transform: scale(1.07);
+    opacity: 1;
   }
+}
+
+@keyframes lrt-floor-ring-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  75%, 100% {
+    transform: scale(1.75);
+    opacity: 0;
+  }
+}
+
+/* Unit & info — pola sama dengan scene: marker di child, shell transparan */
+.lrt-pin-marker {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  transform: scale(var(--lrt-hotspot-scale, 1));
+  pointer-events: none;
+}
+
+.lrt-pin-marker__disc {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 0 0 3px rgba(0, 0, 0, 0.4),
+    0 4px 14px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.lrt-pin-marker--space-available .lrt-pin-marker__disc {
+  background: #22c55e;
+}
+
+.lrt-pin-marker--space-occupied .lrt-pin-marker__disc {
+  background: #ef4444;
+}
+
+.lrt-pin-marker--space-maintenance .lrt-pin-marker__disc,
+.lrt-pin-marker--space-unknown .lrt-pin-marker__disc {
+  background: #9ca3af;
+}
+
+.lrt-pin-marker--info .lrt-pin-marker__disc {
+  background: #3b82f6;
+}
+
+.lrt-pin-marker__pulse {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+
+.lrt-pin-marker--space-available .lrt-pin-marker__pulse {
+  border-color: rgba(34, 197, 94, 0.85);
+}
+
+.lrt-pin-marker--space-occupied .lrt-pin-marker__pulse {
+  border-color: rgba(239, 68, 68, 0.85);
+}
+
+.lrt-pin-marker--space-maintenance .lrt-pin-marker__pulse,
+.lrt-pin-marker--space-unknown .lrt-pin-marker__pulse {
+  border-color: rgba(156, 163, 175, 0.85);
+}
+
+.lrt-pin-marker--info .lrt-pin-marker__pulse {
+  border-color: rgba(59, 130, 246, 0.85);
+}
+
+.lrt-pin-marker__disc.is-selected {
+  border-color: #fff;
+  border-width: 5px;
+}
+
+.lrt-pin-marker--space-available .lrt-pin-marker__disc.is-selected {
+  box-shadow:
+    0 0 0 3px rgba(34, 197, 94, 0.55),
+    0 0 0 6px rgba(0, 0, 0, 0.4),
+    0 4px 14px rgba(0, 0, 0, 0.55);
+}
+
+.lrt-pin-marker--space-occupied .lrt-pin-marker__disc.is-selected {
+  box-shadow:
+    0 0 0 3px rgba(239, 68, 68, 0.55),
+    0 0 0 6px rgba(0, 0, 0, 0.4),
+    0 4px 14px rgba(0, 0, 0, 0.55);
+}
+
+.lrt-pin-marker--space-maintenance .lrt-pin-marker__disc.is-selected,
+.lrt-pin-marker--space-unknown .lrt-pin-marker__disc.is-selected {
+  box-shadow:
+    0 0 0 3px rgba(156, 163, 175, 0.55),
+    0 0 0 6px rgba(0, 0, 0, 0.4),
+    0 4px 14px rgba(0, 0, 0, 0.55);
+}
+
+.lrt-pin-marker--info .lrt-pin-marker__disc.is-selected {
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.55),
+    0 0 0 6px rgba(0, 0, 0, 0.4),
+    0 4px 14px rgba(0, 0, 0, 0.55);
+}
+
+.lrt-hotspot--space .lrt-pin-marker__disc,
+.lrt-space-hotspot .lrt-pin-marker__disc {
+  animation: lrt-pin-emphasize 2.2s ease-in-out infinite;
+}
+
+.lrt-hotspot--info .lrt-pin-marker__disc,
+.lrt-info-hotspot .lrt-pin-marker__disc {
+  animation: lrt-pin-emphasize 2.5s ease-in-out infinite;
+}
+
+.lrt-hotspot--space .lrt-pin-marker__pulse,
+.lrt-space-hotspot .lrt-pin-marker__pulse {
+  animation: lrt-pin-ripple 2.2s ease-out infinite;
+}
+
+.lrt-hotspot--info .lrt-pin-marker__pulse,
+.lrt-info-hotspot .lrt-pin-marker__pulse {
+  animation: lrt-pin-ripple 2.5s ease-out infinite;
+}
+
+@keyframes lrt-pin-emphasize {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes lrt-pin-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+  70%, 100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+/* ── Privacy blur overlay ── */
+.lrt-privacy-blur {
+  isolation: isolate;
+  -webkit-backdrop-filter: blur(var(--lrt-blur-intensity, 14px));
+  backdrop-filter: blur(var(--lrt-blur-intensity, 14px));
+  pointer-events: none;
+}
+
+.lrt-privacy-blur--editor {
+  pointer-events: auto;
+}
+
+.pnlm-hotspot.lrt-privacy-blur-hs {
+  z-index: 1 !important;
+}
+
+.pnlm-hotspot.lrt-editor-hs,
+.pnlm-hotspot.lrt-scene-hotspot,
+.pnlm-hotspot.lrt-space-hotspot,
+.pnlm-hotspot.lrt-info-hotspot {
+  z-index: 2 !important;
+}
+
+/* Sembunyikan loading bawaan Pannellum di VT publik */
+.lrt-vt-viewer .pnlm-load-box,
+.lrt-vt-viewer .pnlm-lbox,
+.lrt-vt-viewer .pnlm-loading,
+.lrt-vt-viewer .pnlm-load-button {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.lrt-vt-viewer .pnlm-container {
+  background: #0a0f18 !important;
 }
 
 /* Custom scrollbar */
@@ -103,16 +378,4 @@ body {
 @keyframes slideUpIn {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
-}
-
-/* Hotspot pulse animation (PannellumEditor) */
-@keyframes lrt-hotspot-pulse {
-  0%, 100% { box-shadow: 0 3px 14px rgba(0,0,0,0.55); }
-  50%       { box-shadow: 0 3px 20px rgba(0,0,0,0.7), 0 0 0 6px rgba(255,255,255,0.12); }
-}
-.lrt-editor-hs {
-  /* Pannellum renders hotspot wrapper — align our content */
-  display: flex !important;
-  align-items: center;
-  justify-content: center;
 }

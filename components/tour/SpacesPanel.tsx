@@ -2,7 +2,7 @@
 
 import { AlertCircle, CheckCircle, ChevronRight, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { formatRupiah, formatNumber } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
 
 type Space = {
   id: string;
@@ -11,7 +11,6 @@ type Space = {
   type: string;
   status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
   area: number;
-  monthlyRent: number;
   exposure: number;
   floor: string;
 };
@@ -86,7 +85,6 @@ export default function SpacesPanel({ spaces, onSpaceSelect, selectedCode }: Pro
                   </div>
                   <p className="text-xs text-gray-500 truncate">{space.name}</p>
                   <div className="flex items-center gap-3 mt-0.5">
-                    <span className="text-xs font-semibold text-[#1B3A6B]">{formatRupiah(space.monthlyRent)}/bln</span>
                     <span className="text-xs text-gray-400">{space.area} m²</span>
                     <span className="text-xs text-gray-400">{formatNumber(Math.round(space.exposure))} org/hr</span>
                   </div>
