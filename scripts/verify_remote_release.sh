@@ -27,12 +27,13 @@ environment='$environment_name'
 compose_file=\"\$release_dir/docker-compose.\$environment.yml\"
 render_env_file=\"\$release_dir/compose.env\"
 project_name=\"lrt-\$environment-virtualtour\"
+carriage_return=\$(awk 'BEGIN { printf \"%c\", 13 }')
 [ -f \"\$compose_file\" ] || { echo \"Compose file not found: \$compose_file\" >&2; exit 1; }
 [ -f \"\$render_env_file\" ] || { echo \"Rendered env file not found: \$render_env_file\" >&2; exit 1; }
 docker compose --project-name \"\$project_name\" --env-file \"\$render_env_file\" -f \"\$compose_file\" ps
-container_name=\$(awk -F= '/^VIRTUALTOUR_CONTAINER_NAME=/{print \$2}' \"\$render_env_file\" | tail -n 1)
-http_bind=\$(awk -F= '/^VIRTUALTOUR_HTTP_BIND=/{print \$2}' \"\$render_env_file\" | tail -n 1)
-http_port=\$(awk -F= '/^VIRTUALTOUR_HTTP_PORT=/{print \$2}' \"\$render_env_file\" | tail -n 1)
+container_name=\$(awk -F= '/^VIRTUALTOUR_CONTAINER_NAME=/{print \$2}' \"\$render_env_file\" | tail -n 1 | tr -d \"\$carriage_return\")
+http_bind=\$(awk -F= '/^VIRTUALTOUR_HTTP_BIND=/{print \$2}' \"\$render_env_file\" | tail -n 1 | tr -d \"\$carriage_return\")
+http_port=\$(awk -F= '/^VIRTUALTOUR_HTTP_PORT=/{print \$2}' \"\$render_env_file\" | tail -n 1 | tr -d \"\$carriage_return\")
 [ -n \"\$container_name\" ] || container_name=\"lrt-\$environment-virtualtour-web\"
 [ -n \"\$http_bind\" ] || http_bind='0.0.0.0'
 if [ -z \"\$http_port\" ]; then
