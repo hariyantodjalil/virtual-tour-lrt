@@ -126,7 +126,7 @@ pipeline {
                                 set -a && . ./.env && set +a
                                 echo "${PASSWORD_HARBOR}" | sudo docker login -u "${USERNAME_HARBOR}" --password-stdin hub.kai.id
                                 sudo docker compose --project-name ${LEGACY_COMPOSE_PROJECT} -f ${COMPOSE_FILE} down --remove-orphans 2>/dev/null || true
-                                sudo docker stack deploy --resolve-image=always --with-registry-auth -c ${COMPOSE_FILE} ${STACK_NAME}
+                                sudo -E docker stack deploy --resolve-image=always --with-registry-auth -c ${COMPOSE_FILE} ${STACK_NAME}
                                 echo "Waiting for postgres..."
                                 ready=0
                                 for i in \$(seq 1 30); do
@@ -146,7 +146,7 @@ pipeline {
                                     -e DATABASE_URL="\${DATABASE_URL}" \\
                                     ${imageRef} \\
                                     npx prisma migrate deploy
-                                sudo docker service update --force ${STACK_NAME}_virtualtour
+                                sudo -E docker stack deploy --resolve-image=always --with-registry-auth -c ${COMPOSE_FILE} ${STACK_NAME}
                                 sudo docker stack services ${STACK_NAME}
                             '
                         """

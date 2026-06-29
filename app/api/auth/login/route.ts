@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
+import { cmsTokenCookieOptions } from "@/lib/auth-cookie";
 
 function defaultRedirectForRole(role: string) {
   return role === "MITRA" ? "/partner" : "/cms/dashboard";
@@ -48,12 +49,7 @@ export async function POST(request: NextRequest) {
       redirectTo: defaultRedirectForRole(user.role),
     });
 
-    response.cookies.set("cms-token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24,
-    });
+    response.cookies.set("cms-token", token, cmsTokenCookieOptions());
 
     return response;
   } catch (error) {
