@@ -135,6 +135,8 @@ app-checks:
   image: node:22-alpine
   rules:
     - !reference [.skip-release-tag-rules, rules]
+  before_script:
+    - apk add --no-cache libc6-compat openssl
   script:
     - npm ci
     - npm run db:generate
