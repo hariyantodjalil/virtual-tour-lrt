@@ -56,13 +56,34 @@ include:
 
 .prod-release-rules:
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $REGISTRY_IMAGE_ROOT && $REGISTRY_HOST && $REGISTRY_USERNAME && $REGISTRY_PASSWORD'
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ && $REGISTRY_IMAGE_ROOT && $REGISTRY_HOST && $REGISTRY_USERNAME && $REGISTRY_PASSWORD'
     - when: never
 
 .prod-deploy-rules:
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $REGISTRY_IMAGE_ROOT && $REGISTRY_HOST && $REGISTRY_USERNAME && $REGISTRY_PASSWORD && $PROD_DEPLOY_HOST && $PROD_DEPLOY_USER && $PROD_DEPLOY_ENV_FILE && $PROD_DEPLOY_RELEASE_ROOT && $PROD_SSH_PRIVATE_KEY && $PROD_SSH_KNOWN_HOSTS'
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ && $REGISTRY_IMAGE_ROOT && $REGISTRY_HOST && $REGISTRY_USERNAME && $REGISTRY_PASSWORD && $PROD_DEPLOY_HOST && $PROD_DEPLOY_USER && $PROD_DEPLOY_ENV_FILE && $PROD_DEPLOY_RELEASE_ROOT && $PROD_SSH_PRIVATE_KEY && $PROD_SSH_KNOWN_HOSTS'
+      when: manual
+      allow_failure: false
     - when: never
+
+.prod-verify-rules:
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/ && $REGISTRY_IMAGE_ROOT && $REGISTRY_HOST && $REGISTRY_USERNAME && $REGISTRY_PASSWORD && $PROD_DEPLOY_HOST && $PROD_DEPLOY_USER && $PROD_DEPLOY_ENV_FILE && $PROD_DEPLOY_RELEASE_ROOT && $PROD_SSH_PRIVATE_KEY && $PROD_SSH_KNOWN_HOSTS'
+    - when: never
+
+release:tag-policy:
+  stage: validate
+  image: alpine:3.20
+  variables:
+    GIT_DEPTH: "0"
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+  before_script:
+    - apk add --no-cache git
+  script:
+    - test "v$(cat VERSION)" = "$CI_COMMIT_TAG"
+    - git fetch origin main --no-tags
+    - git merge-base --is-ancestor "$CI_COMMIT_SHA" origin/main
 
 .node-runtime-env:
   variables:
@@ -310,7 +331,7 @@ verify:prod:
         touch "$HOME/.ssh/known_hosts"
       fi
   rules:
-    - !reference [.prod-deploy-rules, rules]
+    - !reference [.prod-verify-rules, rules]
   needs:
     - deploy:prod
     - job: release:prod
@@ -330,7 +351,9 @@ release:gitlab:
   stage: release
   image: registry.gitlab.com/gitlab-org/cli:latest
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+    - !reference [.prod-verify-rules, rules]
+  needs:
+    - job: verify:prod
   script:
     - test "v$(cat VERSION)" = "$CI_COMMIT_TAG"
   release:
