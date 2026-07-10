@@ -98,7 +98,7 @@ release:tag-policy:
 
 validate:metadata:
   stage: validate
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/node:22-alpine
+  image: node:22-alpine
   rules:
     - !reference [.skip-release-tag-rules, rules]
   script:
@@ -132,7 +132,7 @@ validate:compose:
 app-checks:
   extends: .node-runtime-env
   stage: test
-  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/node:22-alpine
+  image: node:22-alpine
   rules:
     - !reference [.skip-release-tag-rules, rules]
   script:
