@@ -1,7 +1,6 @@
 import type { Hotspot, PanoramaScene } from "@/lib/tour-types";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import { setupHotspotElement } from "@/lib/pannellum-hotspot";
-import { setupPrivacyBlurElement } from "@/lib/pannellum-privacy-blur";
 import { findSpaceStatus, type SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { SCENE_FADE_MS } from "@/lib/pannellum-tour-dive";
 import { PANNELLUM_INTERACTION } from "@/lib/pannellum-viewer-defaults";
@@ -18,22 +17,8 @@ type SceneHandlers = {
 export { findSpaceStatus };
 
 function buildHotSpots(scene: PanoramaScene, handlers: SceneHandlers) {
-  const blurSpots = (scene.privacyBlurs ?? []).map((blur, index) => ({
-    id: `blur-${scene.id}-${index}`,
-    pitch: blur.pitch,
-    yaw: blur.yaw,
-    type: "custom" as const,
-    cssClass: "lrt-privacy-blur-hs",
-    createTooltipFunc: (div: HTMLDivElement) => {
-      setupPrivacyBlurElement(div, {
-        editor: false,
-        width: blur.width,
-        height: blur.height,
-        intensity: blur.intensity,
-        scale: blur.scale,
-      });
-    },
-  }));
+  // Blur privasi dibake ke piksel panorama — tidak pakai overlay CSS di tour publik.
+  const blurSpots: never[] = [];
 
   const hotSpots = scene.hotspots.map((h: Hotspot) => {
     let onClick: (() => void) | undefined;

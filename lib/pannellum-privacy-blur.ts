@@ -4,16 +4,21 @@ import {
   BLUR_INTENSITY_DEFAULT,
   BLUR_WIDTH_DEFAULT,
   clampBlurIntensity,
+  clampBlurRadius,
   clampBlurScale,
   clampBlurSize,
 } from "./privacy-blur-types";
+import { blurCornerRadiusScreenPx } from "./privacy-blur-shape";
 
 export type PrivacyBlurVisualOptions = {
   selected?: boolean;
   editor?: boolean;
+  /** Setelah dibake: tampilkan kotak panduan saja (tanpa backdrop blur). */
+  guideOnly?: boolean;
   width?: number;
   height?: number;
   intensity?: number;
+  radius?: number;
   scale?: number;
 };
 
@@ -27,21 +32,38 @@ function blurDimensions(opts: PrivacyBlurVisualOptions) {
 
 export function applyPrivacyBlurStyle(div: HTMLDivElement, opts: PrivacyBlurVisualOptions) {
   const { width, height, intensity } = blurDimensions(opts);
+  const guideOnly = opts.guideOnly ?? false;
+  const cornerPx = blurCornerRadiusScreenPx({
+    width: opts.width,
+    height: opts.height,
+    scale: opts.scale,
+    radius: opts.radius,
+    pitch: 0,
+    yaw: 0,
+  });
 
   div.classList.toggle("lrt-privacy-blur--editor", opts.editor ?? false);
+  div.classList.toggle("lrt-privacy-blur--guide", guideOnly);
   div.classList.toggle("is-selected", opts.selected ?? false);
   div.style.setProperty("--lrt-blur-intensity", `${intensity}px`);
+
+  const backdrop =
+    guideOnly || !opts.editor
+      ? { backdropFilter: "none", WebkitBackdropFilter: "none" }
+      : {
+          backdropFilter: `blur(${intensity}px)`,
+          WebkitBackdropFilter: `blur(${intensity}px)`,
+        };
 
   Object.assign(div.style, {
     width: `${width}px`,
     height: `${height}px`,
     minWidth: `${width}px`,
     minHeight: `${height}px`,
-    background: "rgba(255, 255, 255, 0.03)",
-    borderRadius: "10px",
+    background: guideOnly ? "rgba(168, 85, 247, 0.12)" : "rgba(255, 255, 255, 0.03)",
+    borderRadius: `${cornerPx}px`,
     overflow: "hidden",
-    backdropFilter: `blur(${intensity}px)`,
-    WebkitBackdropFilter: `blur(${intensity}px)`,
+    ...backdrop,
     pointerEvents: opts.editor ? "auto" : "none",
     cursor: opts.editor ? "grab" : "default",
     boxSizing: "border-box",
@@ -69,13 +91,20 @@ export function setPrivacyBlurSelected(div: HTMLDivElement, selected: boolean, e
   div.style.boxShadow = selected ? "0 0 0 3px rgba(168, 85, 247, 0.25)" : "none";
 }
 
-export function setPrivacyBlurDimensions(div: HTMLDivElement, blur: PrivacyBlurItem, editor = true) {
+export function setPrivacyBlurDimensions(
+  div: HTMLDivElement,
+  blur: PrivacyBlurItem,
+  editor = true,
+  guideOnly = false
+) {
   applyPrivacyBlurStyle(div, {
     editor,
+    guideOnly,
     selected: div.classList.contains("is-selected"),
     width: blur.width,
     height: blur.height,
     intensity: blur.intensity,
+    radius: blur.radius,
     scale: blur.scale,
   });
 }
@@ -94,6 +123,7 @@ export function buildViewPrivacyBlurHotSpot(blur: PrivacyBlurItem) {
         width: blur.width,
         height: blur.height,
         intensity: blur.intensity,
+        radius: blur.radius,
         scale: blur.scale,
       });
     },

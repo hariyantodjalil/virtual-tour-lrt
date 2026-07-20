@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
+import type { ViewerBakeContext } from "@/lib/panorama-privacy-blur-geometry";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { AddMode, HotspotItem } from "@/lib/hotspot-types";
 import type { PrivacyBlurItem } from "@/lib/privacy-blur-types";
@@ -88,15 +89,18 @@ function buildEditorBlurEl(
   div: HTMLDivElement,
   blur: PrivacyBlurItem,
   isSelected: boolean,
+  guideOnly: boolean,
   onPointerDownRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string, e: PointerEvent) => void>,
   onDeleteRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string) => void>
 ) {
   setupPrivacyBlurElement(div, {
     editor: true,
+    guideOnly,
     selected: isSelected,
     width: blur.width,
     height: blur.height,
     intensity: blur.intensity,
+    radius: blur.radius,
     scale: blur.scale,
   });
   div.style.cursor = "grab";
@@ -130,9 +134,15 @@ interface Props {
   onHotspotDelete: (id: string) => void;
   onBlurDelete: (id: string) => void;
   spaces?: { code: string; status: SpaceAvailabilityStatus }[];
+  /** Setelah pernah dibake: overlay tanpa backdrop (hindari double blur). */
+  privacyBlurGuideOnly?: boolean;
 }
 
-export function PannellumEditor({
+export type PannellumEditorHandle = {
+  getViewerBakeContext: () => ViewerBakeContext | null;
+};
+
+export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function PannellumEditor({
   panoramaUrl,
   hotspots,
   privacyBlurs,
@@ -148,7 +158,8 @@ export function PannellumEditor({
   onHotspotDelete,
   onBlurDelete,
   spaces = [],
-}: Props) {
+  privacyBlurGuideOnly = false,
+}, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewerRef = useRef<any>(null);
@@ -172,6 +183,26 @@ export function PannellumEditor({
   const onMoveRef = useRef(onHotspotMove);
   const onBlurMoveRef = useRef(onBlurMove);
   const addModeRef = useRef(addMode);
+  const privacyBlurGuideOnlyRef = useRef(privacyBlurGuideOnly);
+
+  useImperativeHandle(ref, () => ({
+    getViewerBakeContext: () => {
+      if (!containerRef.current || !viewerRef.current) return null;
+      const rect = containerRef.current.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return null;
+      const hfov =
+        typeof viewerRef.current.getHfov === "function" ? viewerRef.current.getHfov() : 100;
+      return {
+        viewerWidth: rect.width,
+        viewerHeight: rect.height,
+        hfov: Number.isFinite(hfov) ? hfov : 100,
+      };
+    },
+  }));
+
+  useEffect(() => {
+    privacyBlurGuideOnlyRef.current = privacyBlurGuideOnly;
+  }, [privacyBlurGuideOnly]);
 
   useEffect(() => {
     hotspotsRef.current = hotspots;
@@ -260,6 +291,7 @@ export function PannellumEditor({
                 div,
                 blur,
                 blur._id === selectedBlurIdRef.current,
+                privacyBlurGuideOnlyRef.current,
                 onPointerDownItemRef,
                 onDeleteItemRef
               );
@@ -383,7 +415,7 @@ export function PannellumEditor({
   );
   const spacesSig = spaces.map((s) => `${s.code}:${s.status}`).join("|");
   const blursSig = JSON.stringify(
-    privacyBlurs.map((b) => [b._id, b.pitch, b.yaw, b.width, b.height, b.intensity, b.scale ?? 1])
+    privacyBlurs.map((b) => [b._id, b.pitch, b.yaw, b.width, b.height, b.intensity, b.radius, b.scale ?? 1])
   );
 
   useEffect(() => {
@@ -402,15 +434,16 @@ export function PannellumEditor({
   }, [scaleSig, hotspots]);
 
   const blurDimSig = privacyBlurs
-    .map((b) => `${b._id}:${b.width}:${b.height}:${b.intensity}:${b.scale ?? 1}`)
+    .map((b) => `${b._id}:${b.width}:${b.height}:${b.intensity}:${b.radius}:${b.scale ?? 1}`)
     .join("|");
+  const guideSig = privacyBlurGuideOnly ? "1" : "0";
   useEffect(() => {
     if (!viewerReadyRef.current) return;
     for (const b of privacyBlurs) {
       const div = blurDomRef.current.get(b._id);
-      if (div) setPrivacyBlurDimensions(div, b, true);
+      if (div) setPrivacyBlurDimensions(div, b, true, privacyBlurGuideOnly);
     }
-  }, [blurDimSig, privacyBlurs]);
+  }, [blurDimSig, privacyBlurs, guideSig, privacyBlurGuideOnly]);
 
   useEffect(() => {
     hotspotDomRef.current.forEach((div, id) => {
@@ -551,4 +584,4 @@ export function PannellumEditor({
       )}
     </div>
   );
-}
+});
