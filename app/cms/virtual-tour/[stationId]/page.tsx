@@ -26,6 +26,7 @@ import {
   ChevronDown,
   Package,
   Link2,
+  Unlink,
   ImageIcon,
   Loader2,
   X,
@@ -47,15 +48,23 @@ import {
   BLUR_INTENSITY_DEFAULT,
   BLUR_INTENSITY_MAX,
   BLUR_INTENSITY_MIN,
+  BLUR_RADIUS_DEFAULT,
+  BLUR_RADIUS_MAX,
+  BLUR_RADIUS_MIN,
   BLUR_SCALE_DEFAULT,
   BLUR_SCALE_MAX,
   BLUR_SCALE_MIN,
   BLUR_WIDTH_DEFAULT,
+  clampBlurSize,
+  clampBlurIntensity,
+  clampBlurRadius,
+  clampBlurScale,
   type PrivacyBlurItem,
 } from "@/lib/privacy-blur-types";
 import {
   extractPrivacyBlursFromCanvasData,
   mergePrivacyBlursIntoCanvasData,
+  isPrivacyBlurBakedInPanorama,
 } from "@/lib/privacy-blur-normalize";
 import {
   extractInitialViewFromCanvasData,
@@ -157,12 +166,13 @@ function sceneToPrivacyBlurs(scene: Scene): PrivacyBlurItem[] {
 }
 
 function blursToSave(blurs: PrivacyBlurItem[]) {
-  return blurs.map(({ pitch, yaw, width, height, intensity, scale }) => ({
+  return blurs.map(({ pitch, yaw, width, height, intensity, radius, scale }) => ({
     pitch,
     yaw,
     width,
     height,
     intensity,
+    radius,
     scale,
   }));
 }
@@ -240,6 +250,9 @@ export default function VirtualTourEditorPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [bakingPrivacyBlur, setBakingPrivacyBlur] = useState(false);
+  /** Proporsi lebar:tinggi blur — seperti link di Figma */
+  const [blurSizeLinked, setBlurSizeLinked] = useState(true);
 
   // ─── Add Scene dialog ───
   const [showAddScene, setShowAddScene] = useState(false);
@@ -387,6 +400,21 @@ export default function VirtualTourEditorPage() {
     setHasUnsaved(false);
     clearHistory();
   }
+
+  const privacyBlurGuideOnly = currentScene
+    ? isPrivacyBlurBakedInPanorama(currentScene.canvasData)
+    : false;
+  const selectedBlurRadiusMax = selectedBlur
+    ? Math.min(
+        BLUR_RADIUS_MAX,
+        Math.floor(
+          Math.min(
+            selectedBlur.width ?? BLUR_WIDTH_DEFAULT,
+            selectedBlur.height ?? BLUR_HEIGHT_DEFAULT
+          ) / 2
+        )
+      )
+    : BLUR_RADIUS_MAX;
 
   // Incoming connections: berapa banyak scene lain yang menautkan ke tiap sceneId
   const incomingMap = new Map<string, number>();
@@ -610,6 +638,7 @@ export default function VirtualTourEditorPage() {
       width: BLUR_WIDTH_DEFAULT,
       height: BLUR_HEIGHT_DEFAULT,
       intensity: BLUR_INTENSITY_DEFAULT,
+      radius: BLUR_RADIUS_DEFAULT,
       scale: BLUR_SCALE_DEFAULT,
     };
     setPrivacyBlurs((prev) => [...prev, newBlur]);
@@ -723,6 +752,57 @@ export default function VirtualTourEditorPage() {
       showToast("err", "Error jaringan");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // ─── Bake blur ke piksel panorama lalu upload ─────────────────────────────
+  async function bakePrivacyBlursToPanorama() {
+    if (!currentScene?.panoramaUrl || privacyBlurs.length === 0) return;
+    if (
+      !window.confirm(
+        privacyBlurGuideOnly
+          ? "Perubahan blur akan dibake ulang ke panorama dari file master (tanpa blur). Metadata blur tetap bisa diedit setelahnya. Lanjutkan?"
+          : "Blur akan dibake permanen ke file panorama lalu diupload. Anda tetap bisa mengedit posisi/ukuran blur setelah ini; klik bake lagi setelah mengubah. Lanjutkan?"
+      )
+    ) {
+      return;
+    }
+
+    const viewerCtx = editorRef.current?.getViewerBakeContext();
+    setBakingPrivacyBlur(true);
+    try {
+      const res = await cmsFetch(
+        `/api/cms/virtual-tour/${stationId}/${currentScene.sceneId}/bake-privacy-blur`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            privacyBlurs: blursToSave(privacyBlurs),
+            viewerWidth: viewerCtx?.viewerWidth,
+            viewerHeight: viewerCtx?.viewerHeight,
+            hfov: viewerCtx?.hfov,
+          }),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const opt = data.optimization as { panorama?: string; dimensions?: string } | undefined;
+        showToast(
+          "ok",
+          opt?.panorama
+            ? `Blur dibake ke panorama (${opt.panorama}, ${opt.dimensions ?? ""})`
+            : "Blur dibake ke panorama"
+        );
+        setHasUnsaved(false);
+        load(selectedSceneIndex);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast("err", data.error ?? "Gagal bake blur ke panorama");
+      }
+    } catch {
+      showToast("err", "Error jaringan saat bake blur");
+    } finally {
+      setBakingPrivacyBlur(false);
     }
   }
 
@@ -1170,9 +1250,47 @@ export default function VirtualTourEditorPage() {
 
   function updateBlur(field: keyof PrivacyBlurItem, value: number) {
     if (!selectedBlurId) return;
+    let next = value;
+    if (field === "intensity") next = clampBlurIntensity(value);
+    if (field === "radius") next = clampBlurRadius(value);
+    if (field === "scale") next = clampBlurScale(value);
+    if (field === "width" || field === "height") {
+      next = clampBlurSize(value, field === "width" ? BLUR_WIDTH_DEFAULT : BLUR_HEIGHT_DEFAULT);
+    }
     setPrivacyBlurs((prev) =>
-      prev.map((b) => (b._id === selectedBlurId ? { ...b, [field]: value } : b))
+      prev.map((b) => (b._id === selectedBlurId ? { ...b, [field]: next } : b))
     );
+    setHasUnsaved(true);
+  }
+
+  function updateBlurSize(field: "width" | "height", rawValue: number) {
+    if (!selectedBlurId || !selectedBlur) return;
+    const w0 = selectedBlur.width ?? BLUR_WIDTH_DEFAULT;
+    const h0 = selectedBlur.height ?? BLUR_HEIGHT_DEFAULT;
+    const v = clampBlurSize(
+      rawValue,
+      field === "width" ? BLUR_WIDTH_DEFAULT : BLUR_HEIGHT_DEFAULT
+    );
+
+    if (!blurSizeLinked) {
+      updateBlur(field, v);
+      return;
+    }
+
+    const ratio = w0 / Math.max(1, h0);
+    if (field === "width") {
+      const width = v;
+      const height = clampBlurSize(Math.round(width / ratio), BLUR_HEIGHT_DEFAULT);
+      setPrivacyBlurs((prev) =>
+        prev.map((b) => (b._id === selectedBlurId ? { ...b, width, height } : b))
+      );
+    } else {
+      const height = v;
+      const width = clampBlurSize(Math.round(height * ratio), BLUR_WIDTH_DEFAULT);
+      setPrivacyBlurs((prev) =>
+        prev.map((b) => (b._id === selectedBlurId ? { ...b, width, height } : b))
+      );
+    }
     setHasUnsaved(true);
   }
 
@@ -1553,6 +1671,7 @@ export default function VirtualTourEditorPage() {
                 spaces={stationSpaces.map((s) => ({ code: s.code, status: s.status }))}
                 scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
                 initialView={extractInitialViewFromCanvasData(currentScene.canvasData) ?? null}
+                privacyBlurGuideOnly={privacyBlurGuideOnly}
               />
             )
           ) : (
@@ -1743,40 +1862,76 @@ export default function VirtualTourEditorPage() {
                 </div>
                 <div className="space-y-3">
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Area ini akan diburamkan di preview dan virtual tour publik untuk melindungi privasi (mis. wajah).
+                    {privacyBlurGuideOnly
+                      ? "Panorama sudah pernah dibake. Kotak ungu = area edit; blur asli ada di gambar. Setelah ubah posisi/ukuran/skala, simpan scene lalu klik «Bake ke panorama» lagi."
+                      : "Preview overlay CSS di editor. Klik «Bake ke panorama» agar blur permanen di gambar (tetap bisa diedit & re-bake)."}
                   </p>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Lebar (px)</Label>
-                      <Input
-                        type="number"
-                        min={24}
-                        max={320}
-                        value={selectedBlur.width ?? BLUR_WIDTH_DEFAULT}
-                        onChange={(e) => updateBlur("width", Number(e.target.value))}
-                        className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
-                      />
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <Label className="text-xs text-slate-500">Ukuran (px)</Label>
+                      <button
+                        type="button"
+                        onClick={() => setBlurSizeLinked((v) => !v)}
+                        className={`p-1 rounded transition-colors ${
+                          blurSizeLinked
+                            ? "text-purple-400 hover:text-purple-300"
+                            : "text-slate-500 hover:text-slate-400"
+                        }`}
+                        title={
+                          blurSizeLinked
+                            ? "Proporsi terkunci — lebar & tinggi ikut berubah"
+                            : "Proporsi bebas — lebar & tinggi independen"
+                        }
+                      >
+                        {blurSizeLinked ? (
+                          <Link2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <Unlink className="h-3.5 w-3.5" />
+                        )}
+                      </button>
                     </div>
-                    <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Tinggi (px)</Label>
-                      <Input
-                        type="number"
-                        min={24}
-                        max={320}
-                        value={selectedBlur.height ?? BLUR_HEIGHT_DEFAULT}
-                        onChange={(e) => updateBlur("height", Number(e.target.value))}
-                        className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
-                      />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs text-slate-500 mb-1.5 block">Lebar</Label>
+                        <Input
+                          type="number"
+                          min={24}
+                          max={320}
+                          value={selectedBlur.width ?? BLUR_WIDTH_DEFAULT}
+                          onChange={(e) => updateBlurSize("width", Number(e.target.value))}
+                          className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-slate-500 mb-1.5 block">Tinggi</Label>
+                        <Input
+                          type="number"
+                          min={24}
+                          max={320}
+                          value={selectedBlur.height ?? BLUR_HEIGHT_DEFAULT}
+                          onChange={(e) => updateBlurSize("height", Number(e.target.value))}
+                          className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
+                        />
+                      </div>
                     </div>
                   </div>
 
                   <div>
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <Label className="text-xs text-slate-500">Intensitas Blur</Label>
-                      <span className="text-xs font-mono text-slate-400">
-                        {selectedBlur.intensity ?? BLUR_INTENSITY_DEFAULT}px
-                      </span>
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <Label className="text-xs text-slate-500 shrink-0">Intensitas Blur</Label>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          min={BLUR_INTENSITY_MIN}
+                          max={BLUR_INTENSITY_MAX}
+                          step={1}
+                          value={selectedBlur.intensity ?? BLUR_INTENSITY_DEFAULT}
+                          onChange={(e) => updateBlur("intensity", Number(e.target.value))}
+                          className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-7 w-14 font-mono px-2"
+                        />
+                        <span className="text-xs text-slate-500">px</span>
+                      </div>
                     </div>
                     <input
                       type="range"
@@ -1790,11 +1945,56 @@ export default function VirtualTourEditorPage() {
                   </div>
 
                   <div>
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <Label className="text-xs text-slate-500">Skala</Label>
-                      <span className="text-xs font-mono text-slate-400">
-                        {Math.round((selectedBlur.scale ?? BLUR_SCALE_DEFAULT) * 100)}%
-                      </span>
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <Label className="text-xs text-slate-500 shrink-0">Radius Sudut</Label>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          min={BLUR_RADIUS_MIN}
+                          max={selectedBlurRadiusMax}
+                          step={1}
+                          value={selectedBlur.radius ?? BLUR_RADIUS_DEFAULT}
+                          onChange={(e) => updateBlur("radius", Number(e.target.value))}
+                          className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-7 w-14 font-mono px-2"
+                        />
+                        <span className="text-xs text-slate-500">px</span>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min={BLUR_RADIUS_MIN}
+                      max={selectedBlurRadiusMax}
+                      step={1}
+                      value={Math.min(
+                        selectedBlur.radius ?? BLUR_RADIUS_DEFAULT,
+                        selectedBlurRadiusMax
+                      )}
+                      onChange={(e) => updateBlur("radius", Number(e.target.value))}
+                      className="w-full accent-purple-500"
+                    />
+                    <p className="text-[10px] text-slate-600 mt-1 leading-snug">
+                      Membulatkan sudut area blur. Naikkan hingga maks (½ sisi terpendek) untuk bentuk
+                      lingkaran atau kapsul.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <Label className="text-xs text-slate-500 shrink-0">Skala</Label>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          min={Math.round(BLUR_SCALE_MIN * 100)}
+                          max={Math.round(BLUR_SCALE_MAX * 100)}
+                          step={1}
+                          value={Math.round((selectedBlur.scale ?? BLUR_SCALE_DEFAULT) * 100)}
+                          onChange={(e) =>
+                            updateBlur("scale", Number(e.target.value) / 100)
+                          }
+                          className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-7 w-14 font-mono px-2"
+                        />
+                        <span className="text-xs text-slate-500">%</span>
+                      </div>
                     </div>
                     <input
                       type="range"
@@ -2127,13 +2327,31 @@ export default function VirtualTourEditorPage() {
 
             {currentScene && privacyBlurs.length > 0 && (
               <section>
-                <h3 className="mb-2 flex items-center gap-2 border-b border-slate-800 pb-2 text-xs font-semibold uppercase tracking-wider text-purple-400/90">
-                  <span className="h-2 w-2 rounded-sm bg-purple-500" />
-                  Blur Privasi
-                  <span className="ml-auto rounded-full bg-purple-950 px-1.5 py-0.5 text-[10px] font-mono text-purple-300">
-                    {privacyBlurs.length}
-                  </span>
-                </h3>
+                <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-800 gap-2">
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Blur Privasi ({privacyBlurs.length})
+                  </h3>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[10px] px-2 border-purple-600/60 text-purple-300 hover:bg-purple-950/50"
+                    disabled={bakingPrivacyBlur || !currentScene.panoramaUrl}
+                    onClick={() => void bakePrivacyBlursToPanorama()}
+                  >
+                    {bakingPrivacyBlur ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        Baking…
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon className="h-3 w-3 mr-1" />
+                        {privacyBlurGuideOnly ? "Re-bake panorama" : "Bake ke panorama"}
+                      </>
+                    )}
+                  </Button>
+                </div>
                 <div className="space-y-1">
                   {privacyBlurs.map((b, index) => (
                     <div
@@ -2314,7 +2532,7 @@ export default function VirtualTourEditorPage() {
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="w-4 h-4 rounded-md bg-purple-600/50 border border-purple-500/60 flex-none" />
-                  Blur privasi — sembunyikan wajah/objek sensitif
+                  Blur privasi — atur area, bake ke panorama; edit & re-bake kapan saja
                 </li>
                 <li className="flex items-center gap-2"><span>🖱️</span> Klik tanpa drag = pasang hotspot/blur</li>
                 <li className="flex items-center gap-2"><span>🖱️</span> Drag = pindah posisi</li>

@@ -1,4 +1,9 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
 
 export type S3AssetType =
   | "panoramas"       // virtual-tour/panoramas/{station-slug}/
@@ -110,6 +115,20 @@ export async function uploadToS3(
     key,
     bucket,
   };
+}
+
+export async function downloadFromS3(key: string): Promise<Buffer> {
+  const s3Client = getS3Client();
+  const bucket = getBucketName();
+  const res = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const body = res.Body;
+  if (!body) throw new Error("S3 object kosong");
+
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of body as AsyncIterable<Uint8Array>) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 export async function deleteFromS3(key: string): Promise<void> {

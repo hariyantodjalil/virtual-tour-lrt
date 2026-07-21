@@ -3,6 +3,8 @@ import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateS3Key, uploadToS3 } from "@/lib/s3";
 import { processPanorama, generatePanoramaThumbnail, formatBytes } from "@/lib/image-processor";
+import { resetPrivacyBlurForNewPanorama } from "@/lib/privacy-blur-normalize";
+import { Prisma } from "@prisma/client";
 
 type Params = { params: Promise<{ stationId: string; sceneId: string }> };
 
@@ -153,9 +155,18 @@ export async function POST(request: NextRequest, { params }: Params) {
   const originalPanoramaUrl = `/${originalKey}`;
   const thumbnailUrl = `/${thumbKey}`;
 
+  const existing = await prisma.virtualTourScene.findUnique({
+    where: { stationId_sceneId: { stationId, sceneId } },
+    select: { canvasData: true },
+  });
+  const canvasData = resetPrivacyBlurForNewPanorama(
+    existing?.canvasData,
+    panoramaUrl
+  ) as Prisma.InputJsonValue;
+
   const scene = await prisma.virtualTourScene.update({
     where: { stationId_sceneId: { stationId, sceneId } },
-    data: { panoramaUrl, originalPanoramaUrl, thumbnailUrl },
+    data: { panoramaUrl, originalPanoramaUrl, thumbnailUrl, canvasData },
     select: sceneSelect,
   });
   const displayDelta = originalSize - panoramaResult.sizeBytes;

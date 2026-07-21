@@ -14,7 +14,7 @@ import sharp from "sharp";
 
 export interface ProcessResult {
   buffer: Buffer;
-  contentType: "image/webp" | "image/jpeg";
+  contentType: "image/webp" | "image/jpeg" | "image/png";
   width: number;
   height: number;
   sizeBytes: number;
@@ -38,6 +38,70 @@ export async function processPanorama(input: Buffer): Promise<ProcessResult> {
     height: out.height ?? 0,
     sizeBytes: buffer.length,
   };
+}
+
+/**
+ * Encode hasil bake: dimensi identik dengan master, tanpa resize.
+ * Format & kualitas mengikuti sumber (JPEG q100 / WebP lossless).
+ */
+export async function encodeBakedPanoramaFromSource(
+  bakedLossless: Buffer,
+  sourceBuffer: Buffer
+): Promise<ProcessResult> {
+  const srcMeta = await sharp(sourceBuffer, { limitInputPixels: false }).metadata();
+  const srcW = srcMeta.width ?? 0;
+  const srcH = srcMeta.height ?? 0;
+  if (!srcW || !srcH) {
+    throw new Error("Metadata master panorama tidak valid");
+  }
+
+  const bakedMeta = await sharp(bakedLossless, { limitInputPixels: false }).metadata();
+  if (bakedMeta.width !== srcW || bakedMeta.height !== srcH) {
+    throw new Error(
+      `Resolusi bake (${bakedMeta.width}×${bakedMeta.height}) ≠ master (${srcW}×${srcH})`
+    );
+  }
+
+  const image = sharp(bakedLossless, { limitInputPixels: false });
+  const fmt = (srcMeta.format ?? "webp").toLowerCase();
+
+  let buffer: Buffer;
+  let contentType: ProcessResult["contentType"];
+
+  if (fmt === "jpeg" || fmt === "jpg") {
+    buffer = await image
+      .jpeg({ quality: 100, mozjpeg: true, chromaSubsampling: "4:4:4" })
+      .toBuffer();
+    contentType = "image/jpeg";
+  } else if (fmt === "png") {
+    buffer = await image.png({ compressionLevel: 6, adaptiveFiltering: false }).toBuffer();
+    contentType = "image/png";
+  } else {
+    buffer = await image.webp({ lossless: true, effort: 6, smartSubsample: false }).toBuffer();
+    contentType = "image/webp";
+  }
+
+  const out = await sharp(buffer, { limitInputPixels: false }).metadata();
+  if (out.width !== srcW || out.height !== srcH) {
+    throw new Error(
+      `Resolusi berubah saat encode (${srcW}×${srcH} → ${out.width}×${out.height})`
+    );
+  }
+
+  return {
+    buffer,
+    contentType,
+    width: srcW,
+    height: srcH,
+    sizeBytes: buffer.length,
+  };
+}
+
+/**
+ * @deprecated Prefer encodeBakedPanoramaFromSource — tetap ada untuk kompatibilitas.
+ */
+export async function processPanoramaPreserveResolution(input: Buffer): Promise<ProcessResult> {
+  return encodeBakedPanoramaFromSource(input, input);
 }
 
 // ─── Thumbnail scene (preview di sidebar CMS dan list scene) ─────────────────

@@ -8,7 +8,6 @@ import type { PrivacyBlurItem } from "@/lib/privacy-blur-types";
 import type { PanoramaScene, TourLevelPublic } from "@/lib/tour-types";
 import { setupHotspotElement, resolveSceneHotspotTitle } from "@/lib/pannellum-hotspot";
 import { findSpaceStatus } from "@/lib/space-availability";
-import { bindPrivacyBlursInContainer, buildViewPrivacyBlurHotSpot } from "@/lib/pannellum-privacy-blur";
 import { PANNELLUM_HFOV, PANNELLUM_INTERACTION, PANNELLUM_PITCH_LIMITS } from "@/lib/pannellum-viewer-defaults";
 import { formatNumber } from "@/lib/utils";
 import { TourNavigationBar } from "@/components/tour/TourNavigationBar";
@@ -170,8 +169,6 @@ export function PannellumPreview({
           viewerRef.current = null;
         }
 
-        const blurSpots = privacyBlurs.map((blur) => buildViewPrivacyBlurHotSpot(blur));
-
         const hotSpots = hotspots.map((h) => {
           let onClick: (() => void) | undefined;
 
@@ -249,13 +246,7 @@ export function PannellumPreview({
             : {}),
           ...PANNELLUM_PITCH_LIMITS,
           ...PANNELLUM_INTERACTION,
-          hotSpots: [...blurSpots, ...hotSpots],
-        });
-
-        viewerRef.current.on("load", () => {
-          requestAnimationFrame(() => {
-            bindPrivacyBlursInContainer(viewerRef.current, containerRef.current);
-          });
+          hotSpots: hotSpots,
         });
       } catch (e) {
         console.error("Pannellum preview error:", e);
@@ -275,7 +266,7 @@ export function PannellumPreview({
         viewerRef.current = null;
       }
     };
-  }, [panoramaUrl, hotspots, privacyBlurs, scenes]);
+  }, [panoramaUrl, hotspots, scenes, initialView]);
 
   if (!panoramaUrl) {
     return (
@@ -428,7 +419,8 @@ export function PannellumPreview({
         Preview - {sceneName}
       </div>
       <div className="absolute top-3 right-3 bg-slate-900/90 backdrop-blur text-slate-400 text-xs px-3 py-1.5 rounded-full border border-slate-700 pointer-events-none z-20">
-        {hotspots.length} hotspot / {privacyBlurs.length} blur / klik untuk interaksi
+        {hotspots.length} hotspot
+        {privacyBlurs.length > 0 ? ` · ${privacyBlurs.length} blur (bake)` : ""} · klik untuk interaksi
       </div>
 
       {selectedSpace && (
