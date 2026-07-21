@@ -27,6 +27,13 @@ async function getStationData(slug: string) {
       include: {
         commercialSpaces: {
           orderBy: [{ floor: "asc" }, { code: "asc" }],
+          include: {
+            occupancy: {
+              include: {
+                tenant: { select: { brandName: true, logoUrl: true, isActive: true } },
+              },
+            },
+          },
         },
       },
     });
@@ -76,6 +83,10 @@ export default async function StationPage({ params }: Props) {
           waterAccess: s.waterAccess,
           airConditioning: s.airConditioning,
           description: s.description,
+          tenantBrand:
+            s.occupancy?.tenant?.isActive !== false
+              ? s.occupancy?.tenant?.brandName ?? null
+              : null,
         }))}
       />
     </div>

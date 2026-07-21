@@ -2,10 +2,12 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client
 
 export type S3AssetType =
   | "panoramas"       // virtual-tour/panoramas/{station-slug}/
+  | "originals"       // virtual-tour/originals/{station-slug}/
   | "floorplans"      // virtual-tour/floorplans/{station-slug}/
   | "stations"        // stations/covers/
   | "spaces"          // spaces/photos/
   | "thumbnails"      // virtual-tour/thumbnails/{station-slug}/
+  | "ad-creatives"    // virtual-tour/ad-creatives/{station-slug}/
   | "misc";           // misc/
 
 function getS3Client() {
@@ -66,10 +68,14 @@ export function generateS3Key(
   switch (type) {
     case "panoramas":
       return `virtual-tour/panoramas/${slug}/panorama_${timestamp}_${randomId}.${extension}`;
+    case "originals":
+      return `virtual-tour/originals/${slug}/original_${timestamp}_${randomId}.${extension}`;
     case "floorplans":
       return `virtual-tour/floorplans/${slug}/floorplan_${timestamp}_${randomId}.${extension}`;
     case "thumbnails":
       return `virtual-tour/thumbnails/${slug}/thumb_${timestamp}_${randomId}.${extension}`;
+    case "ad-creatives":
+      return `virtual-tour/ad-creatives/${slug}/creative_${timestamp}_${randomId}.${extension}`;
     case "stations":
       return `stations/covers/station_${timestamp}_${randomId}.${extension}`;
     case "spaces":

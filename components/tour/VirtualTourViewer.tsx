@@ -18,6 +18,7 @@ import {
   softCrossfadeScene,
   type DiveOverlayState,
 } from "@/lib/pannellum-tour-dive";
+import { bindPrivacyBlursInContainer } from "@/lib/pannellum-privacy-blur";
 
 declare global {
   interface Window {
@@ -37,6 +38,7 @@ type Props = {
   scenes: PanoramaScene[];
   spaces?: SpaceStatusRef[];
   onSpaceClick?: (spaceCode: string) => void;
+  onAdClick?: (payload: import("@/lib/pannellum-tour-config").AdHotspotPayload) => void;
   onInfoClick?: (title: string, description: string) => void;
   onSceneChange?: (sceneId: string) => void;
   initialScene?: string;
@@ -76,10 +78,34 @@ function loadPannellum(): Promise<void> {
   });
 }
 
+function startViewerAutoRotate(viewer: unknown, speed = -2) {
+  const api = viewer as {
+    startAutoRotate?: (speed?: number) => void;
+    setAutoRotate?: (speed: number) => void;
+  };
+  if (typeof api.startAutoRotate === "function") {
+    api.startAutoRotate(speed);
+    return true;
+  }
+  if (typeof api.setAutoRotate === "function") {
+    api.setAutoRotate(speed);
+    return true;
+  }
+  return false;
+}
+
+function stopViewerAutoRotate(viewer: unknown) {
+  const api = viewer as { stopAutoRotate?: () => void };
+  if (typeof api.stopAutoRotate === "function") {
+    api.stopAutoRotate();
+  }
+}
+
 export default function VirtualTourViewer({
   scenes,
   spaces = [],
   onSpaceClick,
+  onAdClick,
   onInfoClick,
   onSceneChange,
   initialScene,
@@ -91,6 +117,7 @@ export default function VirtualTourViewer({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const onSpaceClickRef = useRef(onSpaceClick);
+  const onAdClickRef = useRef(onAdClick);
   const onInfoClickRef = useRef(onInfoClick);
   const onSceneChangeRef = useRef(onSceneChange);
   const scenesRef = useRef(scenes);
@@ -100,6 +127,7 @@ export default function VirtualTourViewer({
   const overlayRef = useRef<DiveOverlayState>(ZERO_OVERLAY);
 
   onSpaceClickRef.current = onSpaceClick;
+  onAdClickRef.current = onAdClick;
   onInfoClickRef.current = onInfoClick;
   onSceneChangeRef.current = onSceneChange;
   scenesRef.current = scenes;
@@ -141,7 +169,8 @@ export default function VirtualTourViewer({
   const resumeDefaultCamera = useCallback((viewer: typeof viewerRef.current) => {
     if (!viewer || divingRef.current) return;
     try {
-      viewer.setAutoRotate(-2);
+      stopViewerAutoRotate(viewer);
+      setAutoRotate(false);
     } catch {
       /* ignore */
     }
@@ -152,7 +181,7 @@ export default function VirtualTourViewer({
     const token = focusTokenRef.current;
     if (!target || !token || !viewer) return;
     try {
-      viewer.stopAutoRotate?.();
+      stopViewerAutoRotate(viewer);
       setAutoRotate(false);
       viewer.lookAt(target.pitch, target.yaw, target.hfov ?? 82, 900);
     } catch {
@@ -238,6 +267,7 @@ export default function VirtualTourViewer({
         onSceneHotspot: (id, pitch, yaw) => handleSceneHotspotRef.current(id, pitch, yaw),
         onScenePreload: (id) => preloadSceneById(id),
         onSpaceClick: (code) => onSpaceClickRef.current?.(code),
+        onAdClick: (payload) => onAdClickRef.current?.(payload),
         onInfoClick: (title, desc) => onInfoClickRef.current?.(title, desc),
         getSpaceStatus: (code) => findSpaceStatus(spacesRef.current, code),
       });
@@ -248,6 +278,9 @@ export default function VirtualTourViewer({
         if (!isMounted.current) return;
         setViewerReady(true);
         requestAnimationFrame(() => setPanoramaVisible(true));
+        requestAnimationFrame(() => {
+          bindPrivacyBlursInContainer(viewer, containerRef.current);
+        });
         try {
           const sceneId = viewer.getScene?.();
           if (sceneId) preloadLinkedScenes(scenesRef.current, sceneId);
@@ -336,12 +369,16 @@ export default function VirtualTourViewer({
 
   const toggleAutoRotate = () => {
     if (!viewerRef.current) return;
-    if (autoRotate) {
-      viewerRef.current.stopAutoRotate();
-    } else {
-      viewerRef.current.setAutoRotate(-2);
+    try {
+      if (autoRotate) {
+        stopViewerAutoRotate(viewerRef.current);
+        setAutoRotate(false);
+        return;
+      }
+      setAutoRotate(startViewerAutoRotate(viewerRef.current, -2));
+    } catch {
+      setAutoRotate(false);
     }
-    setAutoRotate(!autoRotate);
   };
 
   return (

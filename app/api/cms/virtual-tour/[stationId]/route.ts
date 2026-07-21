@@ -14,6 +14,7 @@ const sceneSelect = {
   levelId: true,
   areaId: true,
   panoramaUrl: true,
+  originalPanoramaUrl: true,
   thumbnailUrl: true,
   order: true,
   hotspots: true,

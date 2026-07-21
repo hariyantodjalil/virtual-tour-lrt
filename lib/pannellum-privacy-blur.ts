@@ -15,14 +15,33 @@ export type PrivacyBlurVisualOptions = {
   height?: number;
   intensity?: number;
   scale?: number;
+  currentHfov?: number;
 };
+
+const PRIVACY_BLUR_REFERENCE_HFOV = 100;
+const blurViewerBindings = new WeakMap<HTMLDivElement, () => void>();
 
 function blurDimensions(opts: PrivacyBlurVisualOptions) {
   const scale = clampBlurScale(opts.scale);
-  const width = clampBlurSize(opts.width, BLUR_WIDTH_DEFAULT) * scale;
-  const height = clampBlurSize(opts.height, BLUR_HEIGHT_DEFAULT) * scale;
+  const hfov = Number(opts.currentHfov);
+  const hfovScale = Number.isFinite(hfov)
+    ? Math.min(3, Math.max(0.5, PRIVACY_BLUR_REFERENCE_HFOV / Math.max(1, hfov)))
+    : 1;
+  const width = clampBlurSize(opts.width, BLUR_WIDTH_DEFAULT) * scale * hfovScale;
+  const height = clampBlurSize(opts.height, BLUR_HEIGHT_DEFAULT) * scale * hfovScale;
   const intensity = clampBlurIntensity(opts.intensity);
   return { width, height, intensity, scale };
+}
+
+function setPrivacyBlurRenderedSize(div: HTMLDivElement, opts: PrivacyBlurVisualOptions) {
+  const { width, height } = blurDimensions(opts);
+
+  Object.assign(div.style, {
+    width: `${width}px`,
+    height: `${height}px`,
+    minWidth: `${width}px`,
+    minHeight: `${height}px`,
+  });
 }
 
 export function applyPrivacyBlurStyle(div: HTMLDivElement, opts: PrivacyBlurVisualOptions) {
@@ -31,6 +50,10 @@ export function applyPrivacyBlurStyle(div: HTMLDivElement, opts: PrivacyBlurVisu
   div.classList.toggle("lrt-privacy-blur--editor", opts.editor ?? false);
   div.classList.toggle("is-selected", opts.selected ?? false);
   div.style.setProperty("--lrt-blur-intensity", `${intensity}px`);
+  div.dataset.lrtBlurWidth = String(clampBlurSize(opts.width, BLUR_WIDTH_DEFAULT));
+  div.dataset.lrtBlurHeight = String(clampBlurSize(opts.height, BLUR_HEIGHT_DEFAULT));
+  div.dataset.lrtBlurScale = String(clampBlurScale(opts.scale));
+  div.dataset.lrtBlurIntensity = String(intensity);
 
   Object.assign(div.style, {
     width: `${width}px`,
@@ -78,6 +101,64 @@ export function setPrivacyBlurDimensions(div: HTMLDivElement, blur: PrivacyBlurI
     intensity: blur.intensity,
     scale: blur.scale,
   });
+}
+
+export function bindPrivacyBlurToViewer(
+  div: HTMLDivElement,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  viewer: any
+) {
+  blurViewerBindings.get(div)?.();
+
+  let frame = 0;
+  let active = true;
+  let lastHfov = Number.NaN;
+
+  const render = () => {
+    if (!active || !div.isConnected) {
+      active = false;
+      return;
+    }
+
+    try {
+      const hfov = Number(viewer?.getHfov?.());
+      if (Number.isFinite(hfov) && Math.abs(hfov - lastHfov) > 0.05) {
+        lastHfov = hfov;
+        setPrivacyBlurRenderedSize(div, {
+          width: Number(div.dataset.lrtBlurWidth),
+          height: Number(div.dataset.lrtBlurHeight),
+          scale: Number(div.dataset.lrtBlurScale),
+          intensity: Number(div.dataset.lrtBlurIntensity),
+          currentHfov: hfov,
+        });
+      }
+    } catch {
+      /* ignore viewer teardown */
+    }
+
+    frame = requestAnimationFrame(render);
+  };
+
+  frame = requestAnimationFrame(render);
+
+  const dispose = () => {
+    active = false;
+    if (frame) cancelAnimationFrame(frame);
+  };
+
+  blurViewerBindings.set(div, dispose);
+  return dispose;
+}
+
+export function bindPrivacyBlursInContainer(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  viewer: any,
+  container: HTMLElement | null
+) {
+  if (!viewer || !container) return;
+  container
+    .querySelectorAll<HTMLDivElement>(".lrt-privacy-blur")
+    .forEach((div) => bindPrivacyBlurToViewer(div, viewer));
 }
 
 /** Konfigurasi hotspot Pannellum untuk area blur (non-interaktif di publik). */

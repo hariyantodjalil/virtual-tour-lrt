@@ -15,6 +15,7 @@ const sceneSelect = {
   levelId: true,
   areaId: true,
   panoramaUrl: true,
+  originalPanoramaUrl: true,
   thumbnailUrl: true,
   order: true,
   hotspots: true,
@@ -23,6 +24,20 @@ const sceneSelect = {
   createdAt: true,
   updatedAt: true,
 };
+
+function panoramaExtension(file: File) {
+  const fromName = file.name.split(".").pop()?.toLowerCase();
+  if (fromName && ["jpg", "jpeg", "png", "webp"].includes(fromName)) {
+    return fromName === "jpeg" ? "jpg" : fromName;
+  }
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
+  return "jpg";
+}
+
+function normalizedImageContentType(file: File) {
+  return file.type === "image/jpg" ? "image/jpeg" : file.type;
+}
 
 export async function PUT(request: NextRequest, { params }: Params) {
   const auth = requireAuth(request);
@@ -42,6 +57,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (body.levelId !== undefined) updateData.levelId = body.levelId;
   if (body.areaId !== undefined) updateData.areaId = body.areaId;
   if (body.panoramaUrl !== undefined) updateData.panoramaUrl = body.panoramaUrl;
+  if (body.originalPanoramaUrl !== undefined) updateData.originalPanoramaUrl = body.originalPanoramaUrl;
   if (body.thumbnailUrl !== undefined) updateData.thumbnailUrl = body.thumbnailUrl;
   if (body.canvasData !== undefined) updateData.canvasData = body.canvasData;
 
@@ -95,15 +111,30 @@ export async function POST(request: NextRequest, { params }: Params) {
   const originalSize = originalBuffer.length;
 
   // ── Konversi panorama ke WebP (resize max 6000×3000, q82) ─────────────────
-  const panoramaResult = await processPanorama(originalBuffer);
+  const extension = panoramaExtension(file);
+  const contentType = normalizedImageContentType(file);
 
-  const panoramaKey = generateS3Key("panoramas", `${sceneId}.webp`, { stationSlug });
-  await uploadToS3(panoramaResult.buffer, panoramaKey, "image/webp", {
+  const originalKey = generateS3Key("originals", `${sceneId}.${extension}`, { stationSlug });
+  await uploadToS3(originalBuffer, originalKey, contentType, {
     "station-id": stationId,
     "scene-id": sceneId,
     "station-slug": stationSlug,
     "original-size": String(originalSize),
-    "optimized-size": String(panoramaResult.sizeBytes),
+    "stored-size": String(originalSize),
+    "storage-mode": "master-original",
+  });
+
+  const panoramaResult = await processPanorama(originalBuffer);
+
+  const panoramaKey = generateS3Key("panoramas", `${sceneId}.webp`, { stationSlug });
+  await uploadToS3(panoramaResult.buffer, panoramaKey, panoramaResult.contentType, {
+    "station-id": stationId,
+    "scene-id": sceneId,
+    "station-slug": stationSlug,
+    "original-size": String(originalSize),
+    "display-size": String(panoramaResult.sizeBytes),
+    "display-format": "webp",
+    "display-quality": "92",
     "dimensions": `${panoramaResult.width}x${panoramaResult.height}`,
   });
 
@@ -119,28 +150,32 @@ export async function POST(request: NextRequest, { params }: Params) {
   });
 
   const panoramaUrl = `/${panoramaKey}`;
+  const originalPanoramaUrl = `/${originalKey}`;
   const thumbnailUrl = `/${thumbKey}`;
 
   const scene = await prisma.virtualTourScene.update({
     where: { stationId_sceneId: { stationId, sceneId } },
-    data: { panoramaUrl, thumbnailUrl },
+    data: { panoramaUrl, originalPanoramaUrl, thumbnailUrl },
     select: sceneSelect,
   });
-
-  const savedBytes = originalSize - panoramaResult.sizeBytes;
-  const savedPercent = Math.round((savedBytes / originalSize) * 100);
+  const displayDelta = originalSize - panoramaResult.sizeBytes;
 
   return NextResponse.json({
-    message: "Panorama diupload & dioptimasi",
+    message: "Panorama original disimpan dan display WebP full-res dibuat",
     scene,
     panoramaUrl,
+    originalPanoramaUrl,
     thumbnailUrl,
     optimization: {
       original: formatBytes(originalSize),
       panorama: formatBytes(panoramaResult.sizeBytes),
       thumbnail: formatBytes(thumbResult.sizeBytes),
-      saved: `${formatBytes(savedBytes)} (${savedPercent}%)`,
-      dimensions: `${panoramaResult.width}×${panoramaResult.height}`,
+      saved:
+        displayDelta >= 0
+          ? `${formatBytes(displayDelta)} lebih kecil dari original`
+          : `${formatBytes(Math.abs(displayDelta))} lebih besar dari original`,
+      format: "WEBP",
+      dimensions: `${panoramaResult.width}x${panoramaResult.height}`,
     },
   });
 }

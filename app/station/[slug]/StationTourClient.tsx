@@ -7,11 +7,13 @@ import {
   Grid3X3, Info, MapPin, Play, Route, Users, X,
 } from "lucide-react";
 import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
+import InTourAdPopup from "@/components/tour/InTourAdPopup";
 import InTourInfoPopup from "@/components/tour/InTourInfoPopup";
 import VirtualTourViewer from "@/components/tour/VirtualTourViewer";
 import { TourNavigationBar } from "@/components/tour/TourNavigationBar";
 import { formatNumber, getWhatsAppUrl } from "@/lib/utils";
 import type { StationInfo } from "@/lib/stations-data";
+import type { AdHotspotPayload } from "@/lib/pannellum-tour-config";
 import {
   findScenePlacement,
   firstSceneIdInLevel,
@@ -36,6 +38,7 @@ type Space = {
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;
+  tenantBrand?: string | null;
 };
 
 type Props = { stationInfo: StationInfo; spaces: Space[] };
@@ -67,6 +70,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
   const lastScene = stationInfo.scenes.at(-1)?.id ?? firstScene;
 
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
+  const [selectedAd, setSelectedAd] = useState<AdHotspotPayload | null>(null);
   const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
   const [activeSceneId, setActiveSceneId] = useState(firstScene);
   const [activeLevelId, setActiveLevelId] = useState(
@@ -173,9 +177,15 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
     const space = spaces.find((s) => s.code === spaceCode);
     if (space) {
       setOpenedFromUnitsList(false);
+      setSelectedAd(null);
       setSelectedSpace(space);
     }
   }, [spaces]);
+
+  const openAdFromHotspot = useCallback((payload: AdHotspotPayload) => {
+    setSelectedSpace(null);
+    setSelectedAd(payload);
+  }, []);
 
   const handleInfoClick = useCallback((title: string, description: string) => {
     setInfoPopup({ title, description });
@@ -197,6 +207,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
         scenes={stationInfo.scenes}
         spaces={spaces.map((s) => ({ code: s.code, status: s.status }))}
         onSpaceClick={openSpaceFromHotspot}
+        onAdClick={openAdFromHotspot}
         onInfoClick={handleInfoClick}
         onSceneChange={handleSceneChange}
         selectedSceneId={activeSceneId}
@@ -507,6 +518,20 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
           contactPhone={commercialContactPhone}
           returnToList={openedFromUnitsList}
           onClose={closeSpaceDetail}
+        />
+      )}
+
+      {selectedAd && (
+        <InTourAdPopup
+          title={selectedAd.text}
+          creativeTitle={selectedAd.creativeTitle}
+          creativeUrl={selectedAd.creativeUrl}
+          spaceCode={selectedAd.spaceCode}
+          spaceName={spaces.find((s) => s.code === selectedAd.spaceCode)?.name}
+          brandName={spaces.find((s) => s.code === selectedAd.spaceCode)?.tenantBrand ?? undefined}
+          stationName={stationInfo.name}
+          contactPhone={commercialContactPhone}
+          onClose={() => setSelectedAd(null)}
         />
       )}
 

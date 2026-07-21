@@ -19,6 +19,37 @@ export async function GET(request: NextRequest, { params }: Params) {
   return NextResponse.json(levels);
 }
 
+/** Bulk reorder: { orders: [{ levelId, order }] } */
+export async function PATCH(request: NextRequest, { params }: Params) {
+  const auth = requireAuth(request);
+  if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  const { stationId } = await params;
+  const body = await request.json();
+  const orders = body.orders as { levelId: string; order: number }[] | undefined;
+
+  if (!Array.isArray(orders) || orders.length === 0) {
+    return NextResponse.json({ error: "orders harus array" }, { status: 400 });
+  }
+
+  await prisma.$transaction(
+    orders.map((item) =>
+      prisma.virtualTourLevel.updateMany({
+        where: { id: item.levelId, stationId },
+        data: { order: Number(item.order) },
+      })
+    )
+  );
+
+  const levels = await prisma.virtualTourLevel.findMany({
+    where: { stationId },
+    orderBy: { order: "asc" },
+    include: { areas: { orderBy: { order: "asc" } } },
+  });
+
+  return NextResponse.json({ message: "Urutan level diperbarui", levels });
+}
+
 export async function POST(request: NextRequest, { params }: Params) {
   const auth = requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });

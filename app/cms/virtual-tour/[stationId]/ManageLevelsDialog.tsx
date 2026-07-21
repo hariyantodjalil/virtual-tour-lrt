@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Trash2, ChevronUp, ChevronDown, Layers } from "lucide-react";
+import { useState, type DragEvent } from "react";
+import { Plus, Trash2, ChevronUp, ChevronDown, Layers, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,16 +23,27 @@ type Props = {
   onClose: () => void;
   onCreate: (data: { label: string; color: string; hint?: string }) => Promise<void>;
   onUpdate: (levelId: string, data: { label?: string; color?: string; hint?: string; order?: number }) => Promise<void>;
+  onReorder: (orderedLevelIds: string[]) => Promise<void>;
   onDelete: (levelId: string) => Promise<{ ok: boolean; error?: string }>;
 };
 
-export function ManageLevelsDialog({ open, levels, onClose, onCreate, onUpdate, onDelete }: Props) {
+export function ManageLevelsDialog({
+  open,
+  levels,
+  onClose,
+  onCreate,
+  onUpdate,
+  onReorder,
+  onDelete,
+}: Props) {
   const [newLabel, setNewLabel] = useState("");
   const [newColor, setNewColor] = useState(PRESET_COLORS[0]);
   const [newHint, setNewHint] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<TourLevel | null>(null);
   const [deleteError, setDeleteError] = useState("");
+  const [dragLevelId, setDragLevelId] = useState<string | null>(null);
+  const [dropLevelId, setDropLevelId] = useState<string | null>(null);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -47,20 +58,52 @@ export function ManageLevelsDialog({ open, levels, onClose, onCreate, onUpdate, 
     }
   }
 
+  async function applyReorder(orderedIds: string[]) {
+    setBusy(true);
+    try {
+      await onReorder(orderedIds);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function moveLevel(level: TourLevel, dir: "up" | "down") {
     const idx = levels.findIndex((l) => l.id === level.id);
     const swap = dir === "up" ? idx - 1 : idx + 1;
     if (swap < 0 || swap >= levels.length) return;
-    const other = levels[swap];
-    setBusy(true);
-    try {
-      await Promise.all([
-        onUpdate(level.id, { order: other.order }),
-        onUpdate(other.id, { order: level.order }),
-      ]);
-    } finally {
-      setBusy(false);
+    const ids = levels.map((l) => l.id);
+    const next = [...ids];
+    const [removed] = next.splice(idx, 1);
+    next.splice(swap, 0, removed);
+    await applyReorder(next);
+  }
+
+  function handleDragOver(e: DragEvent, levelId: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragLevelId && dragLevelId !== levelId) setDropLevelId(levelId);
+  }
+
+  async function handleDrop(targetLevelId: string) {
+    if (!dragLevelId || dragLevelId === targetLevelId) {
+      setDragLevelId(null);
+      setDropLevelId(null);
+      return;
     }
+    const ids = levels.map((l) => l.id);
+    const from = ids.indexOf(dragLevelId);
+    const to = ids.indexOf(targetLevelId);
+    if (from < 0 || to < 0) {
+      setDragLevelId(null);
+      setDropLevelId(null);
+      return;
+    }
+    const next = [...ids];
+    next.splice(from, 1);
+    next.splice(to, 0, dragLevelId);
+    setDragLevelId(null);
+    setDropLevelId(null);
+    await applyReorder(next);
   }
 
   async function confirmDelete() {
@@ -86,7 +129,7 @@ export function ManageLevelsDialog({ open, levels, onClose, onCreate, onUpdate, 
               Kelola Level
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Tambah, edit, urutkan, atau hapus level tur (Concourse, Peron, dll.). Level hanya bisa dihapus jika tidak ada scene.
+              Drag level untuk mengubah urutan tab di virtual tour publik. Level paling atas = tab pertama.
             </DialogDescription>
           </DialogHeader>
 
@@ -100,8 +143,34 @@ export function ManageLevelsDialog({ open, levels, onClose, onCreate, onUpdate, 
             {levels.map((level, idx) => (
               <div
                 key={level.id}
-                className="flex items-start gap-2 rounded-lg border border-slate-800 bg-slate-800/40 p-3"
+                onDragOver={(e) => handleDragOver(e, level.id)}
+                onDrop={() => handleDrop(level.id)}
+                className={`flex items-start gap-2 rounded-lg border bg-slate-800/40 p-3 transition-colors ${
+                  dragLevelId === level.id ? "opacity-40 border-slate-700" : "border-slate-800"
+                } ${
+                  dropLevelId === level.id
+                    ? "border-emerald-500/70 bg-emerald-950/30 ring-1 ring-emerald-500/50"
+                    : ""
+                }`}
               >
+                <button
+                  type="button"
+                  draggable={!busy}
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", level.id);
+                    setDragLevelId(level.id);
+                  }}
+                  onDragEnd={() => {
+                    setDragLevelId(null);
+                    setDropLevelId(null);
+                  }}
+                  className="mt-1 shrink-0 cursor-grab rounded p-1 text-slate-500 active:cursor-grabbing hover:bg-slate-700 hover:text-slate-200"
+                  title="Drag untuk ubah urutan"
+                  aria-label={`Geser urutan level ${level.label}`}
+                >
+                  <GripVertical className="h-4 w-4" />
+                </button>
                 <input
                   type="color"
                   value={level.color}
@@ -122,7 +191,7 @@ export function ManageLevelsDialog({ open, levels, onClose, onCreate, onUpdate, 
                     className="h-7 border-slate-700 bg-slate-900 text-xs text-slate-400"
                   />
                   <p className="font-mono text-[10px] text-slate-600">
-                    {level.slug} · {level.areas.length} area
+                    #{idx + 1} · {level.slug} · {level.areas.length} area
                   </p>
                 </div>
                 <div className="flex flex-col gap-0.5">
@@ -217,7 +286,6 @@ export function ManageLevelsDialog({ open, levels, onClose, onCreate, onUpdate, 
         </DialogContent>
       </Dialog>
 
-      {/* Konfirmasi hapus level */}
       <Dialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
         <DialogContent className="max-w-sm border-slate-700 bg-slate-900 text-slate-100 [&>button]:text-slate-400">
           <DialogHeader>

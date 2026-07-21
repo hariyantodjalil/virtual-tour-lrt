@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { StationInfo } from "@/lib/tour-types";
 import { normalizeHotspots } from "@/lib/hotspot-normalize";
 import { extractPrivacyBlursFromCanvasData } from "@/lib/privacy-blur-normalize";
+import { extractInitialViewFromCanvasData } from "@/lib/scene-initial-view";
 import { ensureTourStructure, sortScenesByTourOrder } from "@/lib/virtual-tour-structure";
 import { buildPublicTourLevels } from "@/lib/public-tour-structure";
 
@@ -66,6 +67,7 @@ async function mapStationToInfo(station: StationRow): Promise<StationInfo> {
       levelSlug: scene.level,
       hotspots: normalizeHotspots(scene.hotspots),
       privacyBlurs: extractPrivacyBlursFromCanvasData(scene.canvasData),
+      initialView: extractInitialViewFromCanvasData(scene.canvasData),
     })),
   };
 }

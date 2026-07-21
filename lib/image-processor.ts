@@ -24,26 +24,9 @@ export interface ProcessResult {
 // Target: max 6000×3000px WebP q82 → biasanya 2–5 MB dari file 15–22 MB asli
 export async function processPanorama(input: Buffer): Promise<ProcessResult> {
   const image = sharp(input, { limitInputPixels: false });
-  const meta = await image.metadata();
 
-  const maxWidth = 6000;
-  const maxHeight = 3000;
-
-  // Resize hanya jika lebih besar dari target
-  const needsResize =
-    (meta.width && meta.width > maxWidth) ||
-    (meta.height && meta.height > maxHeight);
-
-  const pipeline = needsResize
-    ? image.resize(maxWidth, maxHeight, {
-        fit: "inside",
-        withoutEnlargement: true,
-        kernel: sharp.kernel.lanczos3,
-      })
-    : image;
-
-  const buffer = await pipeline
-    .webp({ quality: 82, effort: 4 })
+  const buffer = await image
+    .webp({ quality: 92, effort: 5 })
     .toBuffer();
 
   const out = await sharp(buffer, { limitInputPixels: false }).metadata();

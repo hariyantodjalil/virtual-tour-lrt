@@ -13,6 +13,7 @@ import {
   Train,
   PanelLeftClose,
   PanelLeft,
+  Building2,
 } from "lucide-react";
 
 const navItems = [
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/cms/stations", label: "Stasiun", icon: Train },
   { href: "/cms/virtual-tour", label: "Virtual Tour", icon: Map },
   { href: "/cms/spaces", label: "Ruang Komersial", icon: Store },
+  { href: "/cms/tenants", label: "Tenant", icon: Building2 },
   { href: "/cms/leads", label: "Leads", icon: UserCircle },
   { href: "/cms/users", label: "Users", icon: Users, adminOnly: true },
 ];
@@ -61,6 +63,9 @@ function getPageMeta(pathname: string) {
   }
   if (pathname.startsWith("/cms/spaces")) {
     return { title: "Ruang Komersial", subtitle: "Inventori tenant, kios, media, dan area promosi" };
+  }
+  if (pathname.startsWith("/cms/tenants")) {
+    return { title: "Tenant", subtitle: "Tenant aktif yang mengisi unit komersial" };
   }
   if (pathname.startsWith("/cms/leads")) {
     return { title: "Leads", subtitle: "Pipeline calon tenant dari public virtual tour" };

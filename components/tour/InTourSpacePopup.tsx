@@ -38,6 +38,7 @@ type CommercialSpace = {
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;
+  tenantBrand?: string | null;
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -168,6 +169,11 @@ export default function InTourSpacePopup({ space, stationName, contactPhone = "6
               <span className="font-mono text-xs text-white/60">{space.code}</span>
             </div>
             <h3 className="text-xl font-black leading-tight">{space.name}</h3>
+            {space.tenantBrand && space.status === "TERISI" && (
+              <p className="mt-1 text-sm font-semibold text-[#E31E2D]">
+                Tenant: {space.tenantBrand}
+              </p>
+            )}
             <p className="text-sm text-white/70">{stationName}</p>
           </div>
           <button
@@ -298,6 +304,11 @@ export default function InTourSpacePopup({ space, stationName, contactPhone = "6
               </div>
               <p className="text-xs font-black uppercase tracking-[0.2em] text-white/45">Formulir Tenant</p>
               <h2 className="mt-3 text-4xl font-black leading-tight">{space.name}</h2>
+              {space.tenantBrand && space.status === "TERISI" && (
+                <p className="mt-2 text-lg font-semibold text-[#E31E2D]">
+                  Tenant: {space.tenantBrand}
+                </p>
+              )}
               <p className="mt-4 text-lg leading-relaxed text-white/68">
                 {space.code} - Stasiun {stationName}
               </p>

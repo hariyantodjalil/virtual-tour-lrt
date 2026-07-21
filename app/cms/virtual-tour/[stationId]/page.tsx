@@ -31,8 +31,15 @@ import {
   X,
   Check,
   Info,
+  RotateCcw,
+  Crosshair,
+  Copy,
+  Undo2,
+  Redo2,
+  Network,
+  Megaphone,
 } from "lucide-react";
-import { hotspotColor, HOTSPOT_SCALE_MIN, HOTSPOT_SCALE_MAX, HOTSPOT_SCALE_DEFAULT } from "@/lib/hotspot-types";
+import { hotspotColor, hotspotLabel, HOTSPOT_SCALE_MIN, HOTSPOT_SCALE_MAX, HOTSPOT_SCALE_DEFAULT, DIRECTION_COMPASS, DIRECTION_LABELS, DIRECTION_ROTATE_DEG, type HotspotDirection } from "@/lib/hotspot-types";
 import { findSpaceStatus, spaceStatusColor } from "@/lib/space-availability";
 import { normalizeHotspots } from "@/lib/hotspot-normalize";
 import {
@@ -50,12 +57,20 @@ import {
   extractPrivacyBlursFromCanvasData,
   mergePrivacyBlursIntoCanvasData,
 } from "@/lib/privacy-blur-normalize";
+import {
+  extractInitialViewFromCanvasData,
+  mergeInitialViewIntoCanvasData,
+} from "@/lib/scene-initial-view";
 import { buildWalkPathHotspots } from "@/lib/walk-path";
 import type { TourLevel, TourArea } from "@/lib/virtual-tour-structure";
+import type { TourLevelPublic } from "@/lib/tour-types";
 
 import { PanoramaCanvas, type AddMode, type HotspotItem } from "./PanoramaCanvas";
 import { PannellumPreview } from "./PannellumPreview";
-import { PannellumEditor } from "./PannellumEditor";
+import { PannellumEditor, type PannellumEditorHandle } from "./PannellumEditor";
+import { UnitPicker } from "./UnitPicker";
+import { CoveragePanel } from "./CoveragePanel";
+import { ConnectionMapDialog } from "./ConnectionMapDialog";
 import { TourStructureSidebar } from "./TourStructureSidebar";
 import { ManageLevelsDialog } from "./ManageLevelsDialog";
 import { ManageAreaDialog, type AreaDialogState } from "./ManageAreaDialog";
@@ -164,6 +179,19 @@ function hotspotsToSave(hs: HotspotItem[]): Omit<HotspotItem, "_id">[] {
   });
 }
 
+function wrapYaw(yaw: number): number {
+  let y = yaw;
+  while (y > 180) y -= 360;
+  while (y <= -180) y += 360;
+  return y;
+}
+
+type EditorSnapshot = {
+  hotspots: HotspotItem[];
+  privacyBlurs: PrivacyBlurItem[];
+  canvasData: unknown;
+};
+
 /** Saran sceneId otomatis berdasarkan area */
 function suggestSceneId(areaId: string, levelSlug: string, levels: TourLevel[], existingScenes: Scene[]): string {
   const found = findArea(levels, areaId);
@@ -231,11 +259,134 @@ export default function VirtualTourEditorPage() {
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const creativeInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<PannellumEditorHandle>(null);
+  /** Snapshot scene terakhir tersimpan — untuk reset perubahan lokal. */
+  const savedSceneRef = useRef<Scene | null>(null);
+  const historyPast = useRef<EditorSnapshot[]>([]);
+  const historyFuture = useRef<EditorSnapshot[]>([]);
+  const moveHistoryPushed = useRef(false);
+  const hotspotsRef = useRef(hotspots);
+  const privacyBlursRef = useRef(privacyBlurs);
+  const currentSceneRef = useRef<Scene | null>(null);
+  const [historyTick, setHistoryTick] = useState(0);
+  const [showConnectionMap, setShowConnectionMap] = useState(false);
+  const [uploadingCreative, setUploadingCreative] = useState(false);
 
   // ─── Derived ─────────────────────────────────────────────────────────────
   const currentScene = scenes[selectedSceneIndex] ?? null;
   const selectedHotspot = hotspots.find((h) => h._id === selectedHotspotId) ?? null;
   const selectedBlur = privacyBlurs.find((b) => b._id === selectedBlurId) ?? null;
+  const previewLevels: TourLevelPublic[] = levels
+    .filter((level) => level.isActive)
+    .map((level) => ({
+      id: level.id,
+      slug: level.slug,
+      label: level.label,
+      color: level.color,
+      order: level.order,
+      areas: level.areas
+        .filter((area) => area.isActive)
+        .map((area) => ({
+          id: area.id,
+          slug: area.slug,
+          label: area.label,
+          order: area.order,
+          sceneIds: scenes
+            .filter((scene) => scene.isActive && scene.areaId === area.id)
+            .map((scene) => scene.sceneId),
+        }))
+        .filter((area) => area.sceneIds.length > 0),
+      sceneIds: scenes
+        .filter((scene) => scene.isActive && scene.levelId === level.id && !scene.areaId)
+        .map((scene) => scene.sceneId),
+    }))
+    .filter((level) => level.areas.length > 0 || level.sceneIds.length > 0);
+
+  function rememberSavedScene(scene: Scene | null) {
+    savedSceneRef.current = scene
+      ? (JSON.parse(JSON.stringify(scene)) as Scene)
+      : null;
+  }
+
+  useEffect(() => {
+    hotspotsRef.current = hotspots;
+  }, [hotspots]);
+
+  useEffect(() => {
+    privacyBlursRef.current = privacyBlurs;
+  }, [privacyBlurs]);
+
+  useEffect(() => {
+    currentSceneRef.current = currentScene;
+  }, [currentScene]);
+
+  useEffect(() => {
+    moveHistoryPushed.current = false;
+  }, [selectedHotspotId, selectedBlurId]);
+
+  function clearHistory() {
+    historyPast.current = [];
+    historyFuture.current = [];
+    setHistoryTick((t) => t + 1);
+  }
+
+  function captureSnapshot(): EditorSnapshot {
+    return {
+      hotspots: JSON.parse(JSON.stringify(hotspotsRef.current)) as HotspotItem[],
+      privacyBlurs: JSON.parse(JSON.stringify(privacyBlursRef.current)) as PrivacyBlurItem[],
+      canvasData: currentSceneRef.current?.canvasData
+        ? JSON.parse(JSON.stringify(currentSceneRef.current.canvasData))
+        : undefined,
+    };
+  }
+
+  function applySnapshot(snap: EditorSnapshot) {
+    setHotspots(snap.hotspots);
+    setPrivacyBlurs(snap.privacyBlurs);
+    setScenes((prev) =>
+      prev.map((s, i) =>
+        i === selectedSceneIndex ? { ...s, canvasData: snap.canvasData } : s
+      )
+    );
+    setHasUnsaved(true);
+  }
+
+  function pushHistory() {
+    historyPast.current.push(captureSnapshot());
+    if (historyPast.current.length > 50) historyPast.current.shift();
+    historyFuture.current = [];
+    setHistoryTick((t) => t + 1);
+  }
+
+  function undo() {
+    if (historyPast.current.length === 0) return;
+    historyFuture.current.push(captureSnapshot());
+    const snap = historyPast.current.pop();
+    if (snap) applySnapshot(snap);
+    setHistoryTick((t) => t + 1);
+  }
+
+  function redo() {
+    if (historyFuture.current.length === 0) return;
+    historyPast.current.push(captureSnapshot());
+    const snap = historyFuture.current.pop();
+    if (snap) applySnapshot(snap);
+    setHistoryTick((t) => t + 1);
+  }
+
+  const canUndo = historyTick >= 0 && historyPast.current.length > 0;
+  const canRedo = historyTick >= 0 && historyFuture.current.length > 0;
+
+  function restoreSceneState(scene: Scene) {
+    setHotspots(sceneToHotspots(scene));
+    setPrivacyBlurs(sceneToPrivacyBlurs(scene));
+    setSelectedHotspotId(null);
+    setSelectedBlurId(null);
+    setAddMode("none");
+    setHasUnsaved(false);
+    clearHistory();
+  }
 
   // Incoming connections: berapa banyak scene lain yang menautkan ke tiap sceneId
   const incomingMap = new Map<string, number>();
@@ -285,9 +436,11 @@ export default function VirtualTourEditorPage() {
     if (scData.length > 0) {
       const idx = keepIndex !== undefined && keepIndex < scData.length ? keepIndex : 0;
       setSelectedSceneIndex(idx);
+      rememberSavedScene(scData[idx]);
       setHotspots(sceneToHotspots(scData[idx]));
       setPrivacyBlurs(sceneToPrivacyBlurs(scData[idx]));
     } else {
+      rememberSavedScene(null);
       setHotspots([]);
       setPrivacyBlurs([]);
     }
@@ -300,18 +453,63 @@ export default function VirtualTourEditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stationId]);
 
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.ctrlKey && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if (e.ctrlKey && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+        e.preventDefault();
+        redo();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSceneIndex]);
+
   // ─── Scene selection ─────────────────────────────────────────────────────
   function selectScene(index: number) {
     if (hasUnsaved) {
       if (!confirm("Ada perubahan yang belum disimpan. Pindah scene?")) return;
+      // Kembalikan scene lama ke snapshot tersimpan sebelum pindah
+      const saved = savedSceneRef.current;
+      if (saved) {
+        setScenes((prev) =>
+          prev.map((s) => (s.sceneId === saved.sceneId ? { ...saved } : s))
+        );
+      }
     }
+    const next = scenes[index];
+    if (!next) return;
     setSelectedSceneIndex(index);
-    setHotspots(sceneToHotspots(scenes[index]));
-    setPrivacyBlurs(sceneToPrivacyBlurs(scenes[index]));
-    setSelectedHotspotId(null);
-    setSelectedBlurId(null);
-    setAddMode("none");
-    setHasUnsaved(false);
+    rememberSavedScene(next);
+    restoreSceneState(next);
+  }
+
+  /** Buang perubahan lokal scene aktif → kembalikan ke versi terakhir tersimpan. */
+  function resetChanges() {
+    if (!hasUnsaved || !currentScene) return;
+    if (!confirm("Buang semua perubahan yang belum disimpan pada scene ini?")) return;
+
+    const saved = savedSceneRef.current;
+    if (saved && saved.sceneId === currentScene.sceneId) {
+      setScenes((prev) =>
+        prev.map((s, i) => (i === selectedSceneIndex ? { ...saved } : s))
+      );
+      restoreSceneState(saved);
+      showToast("ok", "Perubahan dibatalkan");
+      return;
+    }
+
+    void load(selectedSceneIndex).then(() => {
+      setSelectedHotspotId(null);
+      setSelectedBlurId(null);
+      setAddMode("none");
+      showToast("ok", "Perubahan dibatalkan");
+    });
   }
 
   // ─── Scene reorder ────────────────────────────────────────────────────────
@@ -356,6 +554,7 @@ export default function VirtualTourEditorPage() {
       const finalIdx = Math.max(0, newIdx);
       setSelectedSceneIndex(finalIdx);
       if (scData[finalIdx]) {
+        rememberSavedScene(scData[finalIdx]);
         setHotspots(sceneToHotspots(scData[finalIdx]));
         setPrivacyBlurs(sceneToPrivacyBlurs(scData[finalIdx]));
       }
@@ -368,14 +567,28 @@ export default function VirtualTourEditorPage() {
   const handleHotspotAdd = useCallback(
     (yaw: number, pitch: number) => {
       if (addMode === "blur") return;
-      const type = addMode === "scene" ? "scene" : addMode === "space" ? "space" : "info";
+      pushHistory();
+      const type =
+        addMode === "scene"
+          ? "scene"
+          : addMode === "space"
+            ? "space"
+            : addMode === "ad"
+              ? "ad"
+              : "info";
       const newH: HotspotItem = {
         _id: tempId(),
         yaw,
         pitch,
         type,
         text:
-          type === "scene" ? "Scene baru" : type === "space" ? "Unit baru" : "Info baru",
+          type === "scene"
+            ? "Scene baru"
+            : type === "space"
+              ? "Unit baru"
+              : type === "ad"
+                ? "Iklan baru"
+                : "Info baru",
         scale: HOTSPOT_SCALE_DEFAULT,
         ...(type === "info" ? { description: "" } : {}),
       };
@@ -389,6 +602,7 @@ export default function VirtualTourEditorPage() {
   );
 
   const handleBlurAdd = useCallback((yaw: number, pitch: number) => {
+    pushHistory();
     const newBlur: PrivacyBlurItem = {
       _id: tempBlurId(),
       yaw,
@@ -426,6 +640,10 @@ export default function VirtualTourEditorPage() {
   }
 
   const handleHotspotMove = useCallback((id: string, yaw: number, pitch: number) => {
+    if (!moveHistoryPushed.current) {
+      pushHistory();
+      moveHistoryPushed.current = true;
+    }
     setHotspots((prev) =>
       prev.map((h) => (h._id === id ? { ...h, yaw, pitch } : h))
     );
@@ -438,12 +656,17 @@ export default function VirtualTourEditorPage() {
   }, []);
 
   const handleHotspotDelete = useCallback((id: string) => {
+    pushHistory();
     setHotspots((prev) => prev.filter((h) => h._id !== id));
     setSelectedHotspotId((sel) => (sel === id ? null : sel));
     setHasUnsaved(true);
   }, []);
 
   const handleBlurMove = useCallback((id: string, yaw: number, pitch: number) => {
+    if (!moveHistoryPushed.current) {
+      pushHistory();
+      moveHistoryPushed.current = true;
+    }
     setPrivacyBlurs((prev) =>
       prev.map((b) => (b._id === id ? { ...b, yaw, pitch } : b))
     );
@@ -456,6 +679,7 @@ export default function VirtualTourEditorPage() {
   }, []);
 
   const handleBlurDelete = useCallback((id: string) => {
+    pushHistory();
     setPrivacyBlurs((prev) => prev.filter((b) => b._id !== id));
     setSelectedBlurId((sel) => (sel === id ? null : sel));
     setHasUnsaved(true);
@@ -486,6 +710,11 @@ export default function VirtualTourEditorPage() {
       if (res.ok) {
         showToast("ok", "Scene disimpan");
         setHasUnsaved(false);
+        rememberSavedScene({
+          ...currentScene,
+          hotspots: hotspotsToSave(hotspots),
+          canvasData: sceneCanvasWithBlurs(currentScene, privacyBlurs),
+        });
         load(selectedSceneIndex);
       } else {
         showToast("err", "Gagal menyimpan scene");
@@ -691,6 +920,42 @@ export default function VirtualTourEditorPage() {
     }
   }
 
+  async function reorderLevels(orderedLevelIds: string[]) {
+    if (orderedLevelIds.length !== levels.length) return;
+    const prev = levels;
+    const reordered = orderedLevelIds
+      .map((id, order) => {
+        const level = levels.find((l) => l.id === id);
+        return level ? { ...level, order } : null;
+      })
+      .filter((l): l is TourLevel => l != null);
+
+    if (reordered.length !== levels.length) return;
+
+    setLevels(reordered);
+
+    try {
+      const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}/levels`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orders: reordered.map((l) => ({ levelId: l.id, order: l.order })),
+        }),
+      });
+      if (!res.ok) {
+        setLevels(prev);
+        const err = await res.json().catch(() => ({}));
+        showToast("err", err.error ?? "Gagal mengubah urutan level");
+        return;
+      }
+      showToast("ok", "Urutan level diperbarui");
+      load(selectedSceneIndex);
+    } catch {
+      setLevels(prev);
+      showToast("err", "Gagal mengubah urutan level");
+    }
+  }
+
   async function createLevel(data: { label: string; color: string; hint?: string }) {
     const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}/levels`, {
       method: "POST",
@@ -743,14 +1008,164 @@ export default function VirtualTourEditorPage() {
   }
 
   // ─── Hotspot property update ─────────────────────────────────────────────
-  function updateHotspot(field: keyof HotspotItem, value: string | number) {
+  function updateHotspot(field: keyof HotspotItem, value: string | number | undefined) {
     if (!selectedHotspotId) return;
+    if (field === "type") {
+      pushHistory();
+      const newType = value as HotspotItem["type"];
+      setHotspots((prev) =>
+        prev.map((h) => {
+          if (h._id !== selectedHotspotId) return h;
+          const next: HotspotItem = { ...h, type: newType };
+          if (newType === "scene") {
+            delete next.spaceCode;
+            delete next.description;
+            delete next.creativeUrl;
+            delete next.creativeTitle;
+          } else if (newType === "space") {
+            delete next.sceneId;
+            delete next.direction;
+            delete next.description;
+            delete next.creativeUrl;
+            delete next.creativeTitle;
+          } else if (newType === "info") {
+            delete next.sceneId;
+            delete next.direction;
+            delete next.spaceCode;
+            delete next.creativeUrl;
+            delete next.creativeTitle;
+            if (!next.description) next.description = "";
+          } else if (newType === "ad") {
+            delete next.sceneId;
+            delete next.direction;
+            delete next.description;
+          }
+          return next;
+        })
+      );
+    } else {
+      setHotspots((prev) =>
+        prev.map((h) =>
+          h._id === selectedHotspotId ? { ...h, [field]: value } : h
+        )
+      );
+    }
+    setHasUnsaved(true);
+  }
+
+  function assignHotspotSpace(code: string, name: string) {
+    if (!selectedHotspotId) return;
+    pushHistory();
     setHotspots((prev) =>
       prev.map((h) =>
-        h._id === selectedHotspotId ? { ...h, [field]: value } : h
+        h._id === selectedHotspotId
+          ? {
+              ...h,
+              spaceCode: code,
+              text: h.text === "Unit baru" || h.text === "Iklan baru" || !h.text.trim() ? name : h.text,
+            }
+          : h
       )
     );
     setHasUnsaved(true);
+  }
+
+  function handleSetInitialView() {
+    const view = editorRef.current?.getView();
+    if (!view || !currentScene) return;
+    pushHistory();
+    const canvasData = mergeInitialViewIntoCanvasData(currentScene.canvasData, view);
+    setScenes((prev) =>
+      prev.map((s, i) => (i === selectedSceneIndex ? { ...s, canvasData } : s))
+    );
+    setHasUnsaved(true);
+    showToast("ok", "View awal diset dari posisi kamera saat ini");
+  }
+
+  function duplicateSelected() {
+    if (selectedHotspot) {
+      pushHistory();
+      const clone: HotspotItem = {
+        ...selectedHotspot,
+        _id: tempId(),
+        yaw: wrapYaw(selectedHotspot.yaw + 8),
+      };
+      setHotspots((prev) => [...prev, clone]);
+      setSelectedHotspotId(clone._id);
+      setSelectedBlurId(null);
+      setHasUnsaved(true);
+      return;
+    }
+    if (selectedBlur) {
+      pushHistory();
+      const clone: PrivacyBlurItem = {
+        ...selectedBlur,
+        _id: tempBlurId(),
+        yaw: wrapYaw(selectedBlur.yaw + 8),
+      };
+      setPrivacyBlurs((prev) => [...prev, clone]);
+      setSelectedBlurId(clone._id);
+      setSelectedHotspotId(null);
+      setHasUnsaved(true);
+    }
+  }
+
+  function jumpToHotspot(sceneId: string, hotspotIndex: number) {
+    const idx = scenes.findIndex((s) => s.sceneId === sceneId);
+    if (idx < 0) return;
+    const scene = scenes[idx];
+    const hs = sceneToHotspots(scene);
+    const target = hs[hotspotIndex];
+    if (!target) return;
+
+    if (idx !== selectedSceneIndex) {
+      if (hasUnsaved) {
+        if (!confirm("Ada perubahan yang belum disimpan. Pindah scene?")) return;
+        const saved = savedSceneRef.current;
+        if (saved) {
+          setScenes((prev) =>
+            prev.map((s) => (s.sceneId === saved.sceneId ? { ...saved } : s))
+          );
+        }
+      }
+      setSelectedSceneIndex(idx);
+      rememberSavedScene(scene);
+      setHotspots(hs);
+      setPrivacyBlurs(sceneToPrivacyBlurs(scene));
+      setHasUnsaved(false);
+      clearHistory();
+    }
+    setSelectedHotspotId(target._id);
+    setSelectedBlurId(null);
+    setAddMode("none");
+  }
+
+  async function uploadAdCreative(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !selectedHotspotId) return;
+    setUploadingCreative(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}/ad-creative`, {
+        method: "POST",
+        body: fd,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        pushHistory();
+        updateHotspot("creativeUrl", data.creativeUrl as string);
+        showToast("ok", "Kreatif iklan diupload");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast("err", data.error ?? "Upload kreatif gagal");
+      }
+    } catch {
+      showToast("err", "Error upload kreatif");
+    } finally {
+      setUploadingCreative(false);
+      if (creativeInputRef.current) creativeInputRef.current.value = "";
+    }
   }
 
   function updateBlur(field: keyof PrivacyBlurItem, value: number) {
@@ -957,12 +1372,65 @@ export default function VirtualTourEditorPage() {
           </button>
           <button
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "blur" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-slate-200"
+              addMode === "ad" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-slate-200"
+            }`}
+            onClick={() => setAddMode((m) => (m === "ad" ? "none" : "ad"))}
+            title="Tambah hotspot iklan"
+          >
+            <Megaphone className="h-3.5 w-3.5" /> + Iklan
+          </button>
+          <button
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              addMode === "blur" ? "bg-slate-600 text-white ring-1 ring-purple-500/50" : "text-slate-400 hover:text-slate-200"
             }`}
             onClick={() => setAddMode((m) => (m === "blur" ? "none" : "blur"))}
             title="Tambah blur privasi (wajah, dll.)"
           >
             <EyeOff className="h-3.5 w-3.5" /> + Blur
+          </button>
+        </div>
+
+        <div className="h-5 w-px bg-slate-700" />
+
+        <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+          <button
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none"
+            onClick={undo}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none"
+            onClick={redo}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Y)"
+          >
+            <Redo2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none"
+            onClick={duplicateSelected}
+            disabled={!selectedHotspot && !selectedBlur}
+            title="Duplikat hotspot/blur terpilih"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+          <button
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none"
+            onClick={handleSetInitialView}
+            disabled={!currentScene || isPreview}
+            title="Set view awal dari posisi kamera"
+          >
+            <Crosshair className="h-3.5 w-3.5" />
+          </button>
+          <button
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200"
+            onClick={() => setShowConnectionMap(true)}
+            title="Peta koneksi antar scene"
+          >
+            <Network className="h-3.5 w-3.5" />
           </button>
         </div>
 
@@ -989,6 +1457,19 @@ export default function VirtualTourEditorPage() {
             <AlertCircle className="h-3.5 w-3.5" /> Belum disimpan
           </span>
         )}
+
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={resetChanges}
+          disabled={!hasUnsaved || saving || !currentScene}
+          className="border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white shrink-0 disabled:opacity-40"
+          title="Buang perubahan yang belum disimpan"
+        >
+          <span className="flex items-center gap-1.5">
+            <RotateCcw className="h-3.5 w-3.5" /> Reset
+          </span>
+        </Button>
 
         <Button
           size="sm"
@@ -1025,6 +1506,7 @@ export default function VirtualTourEditorPage() {
             setShowBulkImport(true);
           }}
           onManageLevels={() => setShowManageLevels(true)}
+          onReorderLevels={reorderLevels}
           onAddArea={openAddArea}
           onEditArea={openEditArea}
           onDeleteArea={openDeleteArea}
@@ -1040,15 +1522,19 @@ export default function VirtualTourEditorPage() {
                 panoramaUrl={currentScene.panoramaUrl}
                 hotspots={hotspots}
                 privacyBlurs={privacyBlurs}
+                sceneId={currentScene.sceneId}
                 sceneName={currentScene.title}
                 scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
+                levels={previewLevels}
                 spaces={stationSpaces}
                 stationName={station?.name ?? ""}
                 onSceneNavigate={previewNavigateScene}
+                initialView={extractInitialViewFromCanvasData(currentScene.canvasData)}
               />
             ) : (
               /* Edit — Pannellum 3D statis (no auto-rotate), klik untuk pasang hotspot */
               <PannellumEditor
+                ref={editorRef}
                 key={`editor-${currentScene.sceneId}`}
                 panoramaUrl={currentScene.panoramaUrl}
                 hotspots={hotspots}
@@ -1065,6 +1551,8 @@ export default function VirtualTourEditorPage() {
                 onHotspotDelete={handleHotspotDelete}
                 onBlurDelete={handleBlurDelete}
                 spaces={stationSpaces.map((s) => ({ code: s.code, status: s.status }))}
+                scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
+                initialView={extractInitialViewFromCanvasData(currentScene.canvasData) ?? null}
               />
             )
           ) : (
@@ -1157,6 +1645,16 @@ export default function VirtualTourEditorPage() {
 
                   {/* Connection info */}
                   <div className="bg-slate-800/60 rounded-lg px-3 py-2 text-xs text-slate-500 space-y-1">
+                    {(() => {
+                      const iv = extractInitialViewFromCanvasData(currentScene.canvasData);
+                      if (!iv) return null;
+                      return (
+                        <div className="mb-1 border-b border-slate-700/60 pb-1 text-[11px] text-slate-400">
+                          View awal: yaw {iv.yaw.toFixed(1)}°, pitch {iv.pitch.toFixed(1)}°, hfov{" "}
+                          {(iv.hfov ?? 0).toFixed(0)}°
+                        </div>
+                      );
+                    })()}
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
                         <ArrowRightLeft className="h-3 w-3" /> Mengarah ke
@@ -1357,8 +1855,8 @@ export default function VirtualTourEditorPage() {
                 <div className="space-y-3">
                   <div>
                     <Label className="text-xs text-slate-500 mb-1.5 block">Tipe</Label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {(["scene", "space", "info"] as const).map((t) => (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(["scene", "space", "info", "ad"] as const).map((t) => (
                         <button
                           key={t}
                           onClick={() => updateHotspot("type", t)}
@@ -1368,11 +1866,19 @@ export default function VirtualTourEditorPage() {
                                 ? "bg-emerald-600 border-emerald-500 text-white"
                                 : t === "space"
                                   ? "bg-amber-600 border-amber-500 text-white"
-                                  : "bg-blue-600 border-blue-500 text-white"
+                                  : t === "ad"
+                                    ? "bg-purple-600 border-purple-500 text-white"
+                                    : "bg-blue-600 border-blue-500 text-white"
                               : "border-slate-700 text-slate-400 hover:bg-slate-800"
                           }`}
                         >
-                          {t === "scene" ? "🔀 Scene" : t === "space" ? "🏪 Unit" : "ℹ️ Info"}
+                          {t === "scene"
+                            ? "🔀 Scene"
+                            : t === "space"
+                              ? "🏪 Unit"
+                              : t === "ad"
+                                ? "📢 Iklan"
+                                : "ℹ️ Info"}
                         </button>
                       ))}
                     </div>
@@ -1389,39 +1895,169 @@ export default function VirtualTourEditorPage() {
                   </div>
 
                   {selectedHotspot.type === "scene" ? (
-                    <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Target Scene</Label>
-                      {currentScene && (
-                        <SceneTargetPicker
-                          levels={levels}
-                          scenes={scenes}
-                          currentSceneId={currentScene.sceneId}
-                          value={selectedHotspot.sceneId}
-                          defaultLevelId={currentScene.levelId}
-                          defaultAreaId={currentScene.areaId}
-                          syncKey={selectedHotspot._id}
-                          onChange={(sceneId) => updateHotspot("sceneId", sceneId)}
-                        />
-                      )}
-                    </div>
+                    <>
+                      <div>
+                        <Label className="text-xs text-slate-500 mb-1.5 block">Target Scene</Label>
+                        {currentScene && (
+                          <SceneTargetPicker
+                            levels={levels}
+                            scenes={scenes}
+                            currentSceneId={currentScene.sceneId}
+                            value={selectedHotspot.sceneId}
+                            defaultLevelId={currentScene.levelId}
+                            defaultAreaId={currentScene.areaId}
+                            syncKey={selectedHotspot._id}
+                            onChange={(sceneId) => updateHotspot("sceneId", sceneId)}
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                          <Label className="text-xs text-slate-500">Arah Panah</Label>
+                          <span className="text-[10px] text-slate-400">
+                            {DIRECTION_LABELS[(selectedHotspot.direction ?? "right") as HotspotDirection]}
+                          </span>
+                        </div>
+                        <div className="inline-grid grid-cols-3 gap-1 rounded-xl border border-slate-700 bg-slate-900/60 p-1.5">
+                          {DIRECTION_COMPASS.map((d, i) => {
+                            if (!d) {
+                              return (
+                                <div
+                                  key={`center-${i}`}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800/80"
+                                  aria-hidden
+                                >
+                                  <span
+                                    className="block h-0 w-0 border-y-[5px] border-l-[8px] border-y-transparent border-l-red-500/80"
+                                    style={{
+                                      transform: `rotate(${DIRECTION_ROTATE_DEG[(selectedHotspot.direction ?? "right") as HotspotDirection]}deg)`,
+                                    }}
+                                  />
+                                </div>
+                              );
+                            }
+                            const active = (selectedHotspot.direction ?? "right") === d;
+                            return (
+                              <button
+                                key={d}
+                                type="button"
+                                title={DIRECTION_LABELS[d]}
+                                onClick={() => updateHotspot("direction", d)}
+                                className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
+                                  active
+                                    ? "border-red-700 bg-red-950 text-white"
+                                    : "border-transparent text-slate-500 hover:border-slate-600 hover:bg-slate-800 hover:text-slate-200"
+                                }`}
+                              >
+                                <span
+                                  className="block h-0 w-0 border-y-[4px] border-l-[7px] border-y-transparent border-l-current"
+                                  style={{ transform: `rotate(${DIRECTION_ROTATE_DEG[d]}deg)` }}
+                                />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
                   ) : selectedHotspot.type === "space" ? (
                     <div>
                       <Label className="text-xs text-slate-500 mb-1.5 block">Kode Unit</Label>
-                      <Input
-                        value={selectedHotspot.spaceCode ?? ""}
-                        onChange={(e) => updateHotspot("spaceCode", e.target.value)}
-                        className="bg-slate-800 border-slate-700 text-slate-100 text-sm h-8 font-mono"
-                        placeholder="mis. DUK-01"
-                        list="space-codes-list"
+                      <UnitPicker
+                        spaces={stationSpaces}
+                        value={selectedHotspot.spaceCode}
+                        mode="retail"
+                        placeholder="Cari unit retail…"
+                        onChange={(code, space) => assignHotspotSpace(code, space.name)}
                       />
-                      <datalist id="space-codes-list">
-                        {stationSpaces.map((s) => (
-                          <option key={s.id} value={s.code}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </datalist>
+                      {selectedHotspot.spaceCode &&
+                        !stationSpaces.some((s) => s.code === selectedHotspot.spaceCode) && (
+                          <p className="mt-2 flex items-center gap-1 text-xs text-amber-400">
+                            <AlertCircle className="h-3 w-3 shrink-0" />
+                            Kode unit tidak ditemukan di stasiun ini
+                          </p>
+                        )}
                     </div>
+                  ) : selectedHotspot.type === "ad" ? (
+                    <>
+                      <div>
+                        <Label className="text-xs text-slate-500 mb-1.5 block">Unit Media</Label>
+                        <UnitPicker
+                          spaces={stationSpaces}
+                          value={selectedHotspot.spaceCode}
+                          mode="media"
+                          placeholder="Cari slot media iklan…"
+                          onChange={(code, space) => assignHotspotSpace(code, space.name)}
+                        />
+                        {selectedHotspot.spaceCode &&
+                          !stationSpaces.some((s) => s.code === selectedHotspot.spaceCode) && (
+                            <p className="mt-2 flex items-center gap-1 text-xs text-amber-400">
+                              <AlertCircle className="h-3 w-3 shrink-0" />
+                              Kode unit tidak ditemukan di stasiun ini
+                            </p>
+                          )}
+                      </div>
+                      <div>
+                        <Label className="text-xs text-slate-500 mb-1.5 block">Judul Kreatif</Label>
+                        <Input
+                          value={selectedHotspot.creativeTitle ?? ""}
+                          onChange={(e) => updateHotspot("creativeTitle", e.target.value)}
+                          className="bg-slate-800 border-slate-700 text-slate-100 text-sm h-8"
+                          placeholder="Judul iklan / kampanye"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-slate-500 mb-1.5 block">Aset Kreatif</Label>
+                        {selectedHotspot.creativeUrl && (
+                          <div className="relative mb-2 h-24 overflow-hidden rounded-lg bg-slate-800">
+                            <Image
+                              src={getS3ProxyUrl(selectedHotspot.creativeUrl)}
+                              alt="Kreatif iklan"
+                              fill
+                              className="object-contain"
+                              unoptimized
+                            />
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <label
+                            className={`flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed p-2 text-xs transition-colors ${
+                              uploadingCreative
+                                ? "border-slate-700 text-slate-600"
+                                : "border-slate-600 text-slate-400 hover:border-purple-500 hover:text-purple-400"
+                            }`}
+                          >
+                            {uploadingCreative ? (
+                              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                            ) : (
+                              <Upload className="h-3.5 w-3.5 shrink-0" />
+                            )}
+                            {uploadingCreative ? "Mengupload…" : selectedHotspot.creativeUrl ? "Ganti kreatif" : "Upload kreatif"}
+                            <input
+                              ref={creativeInputRef}
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="hidden"
+                              onChange={uploadAdCreative}
+                              disabled={uploadingCreative}
+                            />
+                          </label>
+                          {selectedHotspot.creativeUrl && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-auto border-slate-600 px-2 text-xs text-slate-400"
+                              onClick={() => {
+                                pushHistory();
+                                updateHotspot("creativeUrl", undefined);
+                              }}
+                            >
+                              Hapus
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </>
                   ) : (
                     <div>
                       <Label className="text-xs text-slate-500 mb-1.5 block">Deskripsi Info</Label>
@@ -1491,8 +2127,12 @@ export default function VirtualTourEditorPage() {
 
             {currentScene && privacyBlurs.length > 0 && (
               <section>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 pb-2 border-b border-slate-800">
-                  Blur Privasi ({privacyBlurs.length})
+                <h3 className="mb-2 flex items-center gap-2 border-b border-slate-800 pb-2 text-xs font-semibold uppercase tracking-wider text-purple-400/90">
+                  <span className="h-2 w-2 rounded-sm bg-purple-500" />
+                  Blur Privasi
+                  <span className="ml-auto rounded-full bg-purple-950 px-1.5 py-0.5 text-[10px] font-mono text-purple-300">
+                    {privacyBlurs.length}
+                  </span>
                 </h3>
                 <div className="space-y-1">
                   {privacyBlurs.map((b, index) => (
@@ -1527,72 +2167,127 @@ export default function VirtualTourEditorPage() {
               </section>
             )}
 
-            {/* Hotspot list */}
+            {currentScene && (
+              <CoveragePanel
+                spaces={stationSpaces}
+                scenes={scenes.map((s) => ({
+                  sceneId: s.sceneId,
+                  title: s.title,
+                  hotspots: s.sceneId === currentScene.sceneId ? hotspotsToSave(hotspots) : s.hotspots,
+                }))}
+                currentHotspots={hotspots}
+                currentSceneId={currentScene.sceneId}
+                onJumpTo={jumpToHotspot}
+              />
+            )}
+
+            {/* Hotspot list — dikategorikan per tipe */}
             {currentScene && hotspots.length > 0 && (
-              <section>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 pb-2 border-b border-slate-800">
-                  Semua Hotspot ({hotspots.length})
+              <section className="space-y-4">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-800">
+                  Hotspot ({hotspots.length})
                 </h3>
-                <div className="space-y-1">
-                  {hotspots.map((h) => (
-                    <div
-                      key={h._id}
-                      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-colors ${
-                        h._id === selectedHotspotId
-                          ? "bg-slate-700 border-slate-600"
-                          : "border-transparent hover:bg-slate-800"
-                      }`}
-                      onClick={() => setSelectedHotspotId(h._id)}
-                    >
-                      <span
-                        className="w-4 h-4 rounded-full flex-none flex items-center justify-center text-white text-xs"
-                        style={{
-                          background:
-                            h.type === "space" && h.spaceCode
-                              ? spaceStatusColor(findSpaceStatus(stationSpaces, h.spaceCode))
-                              : hotspotColor(h.type),
-                        }}
-                      >
-                        {h.type === "scene" ? "○" : h.type === "space" ? "●" : "i"}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-slate-200 truncate">{h.text}</p>
-                        {h.type === "scene" && h.sceneId && (() => {
-                          const tgt = scenes.find((s) => s.sceneId === h.sceneId);
-                          const loc = tgt?.areaId ? findArea(levels, tgt.areaId) : null;
-                          return (
-                            <p className="text-[10px] text-slate-500 truncate">
-                              → {tgt?.title ?? h.sceneId}
-                              {loc && (
-                                <span className="text-slate-600">
-                                  {" "}
-                                  · {loc.level.label} › {loc.area.label}
-                                </span>
-                              )}
-                            </p>
-                          );
-                        })()}
-                        <p className="text-xs text-slate-500 font-mono">
-                          {h.yaw.toFixed(1)}°, {h.pitch.toFixed(1)}°
-                        </p>
+
+                {(
+                  [
+                    { type: "scene" as const, color: "#E31E2D", accent: "text-red-400", badge: "bg-red-950 text-red-300" },
+                    { type: "space" as const, color: "#f59e0b", accent: "text-amber-400", badge: "bg-amber-950 text-amber-300" },
+                    { type: "ad" as const, color: "#a855f7", accent: "text-purple-400", badge: "bg-purple-950 text-purple-300" },
+                    { type: "info" as const, color: "#3b82f6", accent: "text-blue-400", badge: "bg-blue-950 text-blue-300" },
+                  ] as const
+                ).map((group) => {
+                  const items = hotspots.filter((h) => h.type === group.type);
+                  if (items.length === 0) return null;
+
+                  return (
+                    <div key={group.type}>
+                      <div className={`mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider ${group.accent}`}>
+                        <span
+                          className="h-2 w-2 rounded-full"
+                          style={{ background: group.color }}
+                        />
+                        {hotspotLabel(group.type)}
+                        <span className={`ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-mono ${group.badge}`}>
+                          {items.length}
+                        </span>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleHotspotDelete(h._id);
-                        }}
-                        className="text-slate-600 hover:text-red-400 transition-colors"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      <div className="space-y-1">
+                        {items.map((h) => (
+                          <div
+                            key={h._id}
+                            className={`flex items-center gap-2 rounded-lg border p-2 cursor-pointer transition-colors ${
+                              h._id === selectedHotspotId
+                                ? "border-slate-600 bg-slate-700"
+                                : "border-transparent hover:bg-slate-800"
+                            }`}
+                            onClick={() => {
+                              setSelectedHotspotId(h._id);
+                              setSelectedBlurId(null);
+                            }}
+                          >
+                            <span
+                              className="flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] text-white"
+                              style={{
+                                background:
+                                  h.type === "space" && h.spaceCode
+                                    ? spaceStatusColor(findSpaceStatus(stationSpaces, h.spaceCode))
+                                    : hotspotColor(h.type),
+                              }}
+                            >
+                              {h.type === "scene" ? "›" : h.type === "space" ? "●" : h.type === "ad" ? "📢" : "i"}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs text-slate-200">{h.text}</p>
+                              {h.type === "scene" && h.sceneId && (() => {
+                                const tgt = scenes.find((s) => s.sceneId === h.sceneId);
+                                const loc = tgt?.areaId ? findArea(levels, tgt.areaId) : null;
+                                return (
+                                  <p className="truncate text-[10px] text-slate-500">
+                                    → {tgt?.title ?? h.sceneId}
+                                    {loc && (
+                                      <span className="text-slate-600">
+                                        {" "}
+                                        · {loc.level.label} › {loc.area.label}
+                                      </span>
+                                    )}
+                                  </p>
+                                );
+                              })()}
+                              {h.type === "space" && h.spaceCode && (
+                                <p className="truncate text-[10px] text-slate-500 font-mono">
+                                  {h.spaceCode}
+                                </p>
+                              )}
+                              {h.type === "ad" && h.spaceCode && (
+                                <p className="truncate text-[10px] text-slate-500 font-mono">
+                                  {h.spaceCode}
+                                  {h.creativeTitle ? ` · ${h.creativeTitle}` : ""}
+                                </p>
+                              )}
+                              <p className="font-mono text-[10px] text-slate-500">
+                                {h.yaw.toFixed(1)}°, {h.pitch.toFixed(1)}°
+                              </p>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleHotspotDelete(h._id);
+                              }}
+                              className="text-slate-600 transition-colors hover:text-red-400"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </section>
             )}
 
             {/* Legend */}
-            <section className="border-t border-slate-800 pt-4">
+            <section className="hidden border-t border-slate-800 pt-4">
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                 Panduan
               </h3>
@@ -1624,6 +2319,7 @@ export default function VirtualTourEditorPage() {
                 <li className="flex items-center gap-2"><span>🖱️</span> Klik tanpa drag = pasang hotspot/blur</li>
                 <li className="flex items-center gap-2"><span>🖱️</span> Drag = pindah posisi</li>
                 <li className="flex items-center gap-2"><span>⚙️</span> Klik kanan = hapus blur/hotspot</li>
+                <li className="flex items-center gap-2"><span>⋮⋮</span> Drag level untuk ubah urutan tab publik</li>
                 <li className="flex items-center gap-2"><span>▲▼</span> Reorder scene dalam satu area</li>
                 <li className="flex items-center gap-2"><span>🛤️</span> Icon rute = tautkan jalur jalan otomatis</li>
                 <li className="flex items-center gap-2"><span>📦</span> Icon kotak = bulk import</li>
@@ -1870,7 +2566,25 @@ export default function VirtualTourEditorPage() {
         onClose={() => setShowManageLevels(false)}
         onCreate={createLevel}
         onUpdate={updateLevel}
+        onReorder={reorderLevels}
         onDelete={deleteLevel}
+      />
+
+      <ConnectionMapDialog
+        open={showConnectionMap}
+        onClose={() => setShowConnectionMap(false)}
+        scenes={scenes.map((s) => ({
+          sceneId: s.sceneId,
+          title: s.title,
+          hotspots: s.sceneId === currentScene?.sceneId ? hotspotsToSave(hotspots) : s.hotspots,
+        }))}
+        currentHotspots={hotspots}
+        currentSceneId={currentScene?.sceneId ?? null}
+        activeSceneId={currentScene?.sceneId ?? null}
+        onSelectScene={(sceneId) => {
+          const idx = scenes.findIndex((s) => s.sceneId === sceneId);
+          if (idx >= 0) selectScene(idx);
+        }}
       />
 
       {/* ── Toast ───────────────────────────────────────────────────────── */}

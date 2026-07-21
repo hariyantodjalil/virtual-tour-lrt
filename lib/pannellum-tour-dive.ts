@@ -1,11 +1,9 @@
-/** Transisi scene — preload dulu, lalu dive + crossfade (tanpa loading UI). */
+/** Transisi scene — preload dulu, lalu crossfade ringan (tanpa loading UI). */
 
 export const SCENE_FADE_MS = 1600;
-export const DIVE_ZOOM_MS = 1000;
-export const DIVE_SWAP_MS = 820;
-export const DIVE_ZOOM_HFOV = 28;
-export const DIVE_ENTRY_HFOV = 88;
-export const DIVE_SETTLE_MS = 600;
+export const SCENE_SWAP_MS = 260;
+/** Masuk scene baru di zoom out maksimal (sama dengan PANNELLUM_HFOV.hfov). */
+export const SCENE_ENTRY_HFOV = 120;
 
 export type DiveOverlayState = {
   blur: number;
@@ -102,19 +100,16 @@ export async function diveIntoScene(
   viewer.stopAutoRotate?.();
 
   const entryPitch = Math.max(-8, Math.min(8, hotspotPitch * 0.12));
-  const totalOverlayMs = DIVE_ZOOM_MS + SCENE_FADE_MS * 0.35;
+  const totalOverlayMs = SCENE_FADE_MS * 0.55;
   let swapped = false;
-
-  // 2) Baru mulai dive setelah panorama siap
-  viewer.lookAt(hotspotPitch, hotspotYaw, DIVE_ZOOM_HFOV, DIVE_ZOOM_MS);
 
   const loadDone = waitPanoramaLoaded(viewer, SCENE_FADE_MS + 800);
 
   const overlayPromise = runOverlayAnimation(overlay, totalOverlayMs, (t) => {
     const elapsedMs = t * totalOverlayMs;
-    if (!swapped && elapsedMs >= DIVE_SWAP_MS) {
+    if (!swapped && elapsedMs >= SCENE_SWAP_MS) {
       swapped = true;
-      viewer.loadScene(targetSceneId, entryPitch, hotspotYaw, DIVE_ENTRY_HFOV);
+      viewer.loadScene(targetSceneId, entryPitch, hotspotYaw, SCENE_ENTRY_HFOV);
       onSceneChange?.(targetSceneId);
     }
   });
@@ -122,9 +117,7 @@ export async function diveIntoScene(
   await Promise.all([overlayPromise, loadDone]);
 
   overlay.reset();
-  viewer.lookAt(0, hotspotYaw, 100, DIVE_SETTLE_MS);
-  await sleep(DIVE_SETTLE_MS * 0.8);
-  viewer.setAutoRotate?.(-2);
+  viewer.stopAutoRotate?.();
 }
 
 export async function softCrossfadeScene(
