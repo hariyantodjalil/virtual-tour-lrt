@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
-  const auth = requireRole(request, ["MITRA"]);
+  const auth = await requireRole(request, ["MITRA"]);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const leads = await prisma.tenantLead.findMany({

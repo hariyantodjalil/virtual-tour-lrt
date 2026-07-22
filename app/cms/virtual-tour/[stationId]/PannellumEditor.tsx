@@ -395,10 +395,12 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
     [syncHotspots, syncPrivacyBlurs]
   );
 
-  // Init viewer
+  // Init viewer — sengaja hanya re-init saat panoramaUrl berubah
   useEffect(() => {
     if (!containerRef.current || !panoramaUrl) return;
     const isMounted = { current: true };
+    const hotspotDom = hotspotDomRef.current;
+    const blurDom = blurDomRef.current;
 
     async function init() {
       try {
@@ -449,13 +451,14 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
       viewerReadyRef.current = false;
       mountedHotspotIdsRef.current = [];
       mountedBlurIdsRef.current = [];
-      hotspotDomRef.current.clear();
-      blurDomRef.current.clear();
+      hotspotDom.clear();
+      blurDom.clear();
       if (viewerRef.current) {
         try { viewerRef.current.destroy(); } catch { /* ignore */ }
         viewerRef.current = null;
       }
     };
+    // panoramaUrl is the intentional init key; overlays sync in a separate effect
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panoramaUrl]);
 
@@ -470,7 +473,6 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
   useEffect(() => {
     if (!viewerReadyRef.current || !viewerRef.current) return;
     syncAllOverlays(viewerRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hotspotsSig, blursSig, spacesSig, syncAllOverlays]);
 
   const scaleSig = hotspots.map((h) => `${h._id}:${h.scale ?? 1}`).join("|");

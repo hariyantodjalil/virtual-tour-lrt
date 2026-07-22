@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sortScenesByTourOrder } from "@/lib/virtual-tour-structure";
+import { Prisma } from "@prisma/client";
+import { parseJsonRequest } from "@/lib/api-validation";
+import { sceneCreateSchema, sceneOrderSchema } from "@/lib/api-schemas";
 
 type Params = { params: Promise<{ stationId: string }> };
 
@@ -25,7 +28,7 @@ const sceneSelect = {
 };
 
 export async function GET(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { stationId } = await params;
@@ -38,19 +41,26 @@ export async function GET(request: NextRequest, { params }: Params) {
       areaRef: { select: { order: true } },
     },
   });
-  const scenes = sortScenesByTourOrder(rawScenes).map(({ levelRef: _l, areaRef: _a, ...scene }) => scene);
+  const scenes = sortScenesByTourOrder(rawScenes).map((row) => {
+    const { levelRef, areaRef, ...scene } = row;
+    void levelRef;
+    void areaRef;
+    return scene;
+  });
   return NextResponse.json(scenes);
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { stationId } = await params;
-  const body = await request.json();
+  const parsed = await parseJsonRequest(request, sceneCreateSchema);
+  if (!parsed.success) return parsed.response;
+  const body = parsed.data;
 
   let levelId = body.levelId as string | undefined;
-  let areaId = body.areaId as string | undefined;
+  const areaId = body.areaId as string | undefined;
   let levelSlug = body.level ?? "concourse";
 
   if (areaId) {
@@ -74,7 +84,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       areaId: areaId ?? null,
       panoramaUrl: body.panoramaUrl || "",
       order: body.order ?? 0,
-      hotspots: body.hotspots ?? [],
+      hotspots: (body.hotspots ?? []) as Prisma.InputJsonValue,
       isActive: body.isActive ?? true,
     },
     select: sceneSelect,
@@ -85,18 +95,16 @@ export async function POST(request: NextRequest, { params }: Params) {
 
 // PATCH — batch update urutan scene (reorder)
 export async function PATCH(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { stationId } = await params;
-  const body = await request.json(); // { orders: [{ sceneId, order }] }
-
-  if (!Array.isArray(body.orders)) {
-    return NextResponse.json({ error: "orders harus array" }, { status: 400 });
-  }
+  const parsed = await parseJsonRequest(request, sceneOrderSchema);
+  if (!parsed.success) return parsed.response;
+  const { orders } = parsed.data;
 
   await prisma.$transaction(
-    body.orders.map(({ sceneId, order }: { sceneId: string; order: number }) =>
+    orders.map(({ sceneId, order }) =>
       prisma.virtualTourScene.update({
         where: { stationId_sceneId: { stationId, sceneId } },
         data: { order },

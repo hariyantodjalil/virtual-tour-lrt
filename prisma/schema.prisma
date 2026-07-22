@@ -47,6 +47,7 @@ model Station {
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
 
+  @@index([isActive, order])
   @@map("stations")
 }
 
@@ -213,6 +214,10 @@ model TenantLead {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([createdAt])
   @@map("tenant_leads")
 }
 
@@ -227,6 +232,8 @@ model VisitEvent {
   userAgent String?
   createdAt DateTime         @default(now())
 
+  @@index([eventType, createdAt])
+  @@index([stationId, eventType])
   @@map("visit_events")
 }
 

@@ -70,7 +70,7 @@ async function applyBlurRect(
     );
   }
 
-  return out;
+  return Buffer.from(out);
 }
 
 /**
@@ -102,7 +102,9 @@ export async function bakePrivacyBlursIntoPanoramaBuffer(
     hfov: viewerContext?.hfov ?? defaultViewerBakeContext().hfov,
   };
 
-  let buffer = await sharp(input, { limitInputPixels: false }).png().toBuffer();
+  let buffer: Buffer = Buffer.from(
+    await sharp(input, { limitInputPixels: false }).png().toBuffer()
+  );
 
   for (const blur of blurs) {
     const rects = blurRegionRects(blur, panoW, panoH, viewer);

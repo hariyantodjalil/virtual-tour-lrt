@@ -1,6 +1,7 @@
+import { after } from "next/server";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getStationBySlug } from "@/lib/stations-data";
+import { getStationBySlug, getStationMetaBySlug } from "@/lib/stations-data";
 import StationTourClient from "./StationTourClient";
 import Navbar from "@/components/Navbar";
 
@@ -12,7 +13,7 @@ type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const station = await getStationBySlug(slug);
+  const station = await getStationMetaBySlug(slug);
   if (!station) return { title: "Stasiun Tidak Ditemukan" };
   return {
     title: `Virtual Tour ${station.name} - LRT Jabodebek`,
@@ -22,8 +23,8 @@ export async function generateMetadata({ params }: Props) {
 
 async function getStationData(slug: string) {
   try {
-    return await prisma.station.findUnique({
-      where: { slug },
+    return await prisma.station.findFirst({
+      where: { slug, isActive: true },
       include: {
         commercialSpaces: {
           orderBy: [{ floor: "asc" }, { code: "asc" }],
@@ -44,20 +45,25 @@ async function getStationData(slug: string) {
 
 export default async function StationPage({ params }: Props) {
   const { slug } = await params;
-  const stationInfo = await getStationBySlug(slug);
+  const [stationInfo, stationData] = await Promise.all([
+    getStationBySlug(slug),
+    getStationData(slug),
+  ]);
+
   if (!stationInfo || stationInfo.scenes.length === 0) notFound();
 
-  const stationData = await getStationData(slug);
-
   if (stationData) {
-    await prisma.visitEvent
-      .create({
-        data: {
-          stationId: stationData.id,
-          eventType: "STATION_VIEW",
-        },
-      })
-      .catch(() => null);
+    const stationId = stationData.id;
+    after(() => {
+      void prisma.visitEvent
+        .create({
+          data: {
+            stationId,
+            eventType: "STATION_VIEW",
+          },
+        })
+        .catch(() => null);
+    });
   }
 
   const spaces = stationData?.commercialSpaces ?? [];

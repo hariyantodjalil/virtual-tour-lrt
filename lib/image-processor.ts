@@ -12,6 +12,8 @@
 
 import sharp from "sharp";
 
+const MAX_INPUT_PIXELS = 80_000_000;
+
 export interface ProcessResult {
   buffer: Buffer;
   contentType: "image/webp" | "image/jpeg" | "image/png";
@@ -23,13 +25,21 @@ export interface ProcessResult {
 // ─── Panorama 360° equirectangular ───────────────────────────────────────────
 // Target: max 6000×3000px WebP q82 → biasanya 2–5 MB dari file 15–22 MB asli
 export async function processPanorama(input: Buffer): Promise<ProcessResult> {
-  const image = sharp(input, { limitInputPixels: false });
+  const image = sharp(input, { limitInputPixels: MAX_INPUT_PIXELS });
+  const source = await image.metadata();
+  const width = source.width ?? 0;
+  const height = source.height ?? 0;
+  const aspectRatio = height > 0 ? width / height : 0;
+  if (!width || !height || aspectRatio < 1.8 || aspectRatio > 2.2) {
+    throw new Error("Panorama harus berupa gambar equirectangular dengan rasio mendekati 2:1");
+  }
 
   const buffer = await image
-    .webp({ quality: 92, effort: 5 })
+    .resize({ width: 6000, height: 3000, fit: "inside", withoutEnlargement: true })
+    .webp({ quality: 82, effort: 5 })
     .toBuffer();
 
-  const out = await sharp(buffer, { limitInputPixels: false }).metadata();
+  const out = await sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
 
   return {
     buffer,
@@ -107,7 +117,7 @@ export async function processPanoramaPreserveResolution(input: Buffer): Promise<
 // ─── Thumbnail scene (preview di sidebar CMS dan list scene) ─────────────────
 // Target: 900×450px WebP q78 → ~40–120 KB
 export async function generatePanoramaThumbnail(input: Buffer): Promise<ProcessResult> {
-  const buffer = await sharp(input, { limitInputPixels: false })
+  const buffer = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
     .resize(900, 450, {
       fit: "cover",
       position: "centre",
@@ -128,7 +138,7 @@ export async function generatePanoramaThumbnail(input: Buffer): Promise<ProcessR
 // ─── Cover stasiun / foto komersial ─────────────────────────────────────────
 // Target: max 1600px wide WebP q85 → biasanya 100–400 KB
 export async function processStationCover(input: Buffer): Promise<ProcessResult> {
-  const image = sharp(input);
+  const image = sharp(input, { limitInputPixels: MAX_INPUT_PIXELS });
   const meta = await image.metadata();
 
   const maxWidth = 1600;
@@ -160,7 +170,7 @@ export async function processStationCover(input: Buffer): Promise<ProcessResult>
 // ─── Foto unit komersial (space) ─────────────────────────────────────────────
 // Target: max 1200px wide WebP q83 → biasanya 80–250 KB
 export async function processSpacePhoto(input: Buffer): Promise<ProcessResult> {
-  const buffer = await sharp(input)
+  const buffer = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
     .resize(1200, undefined, {
       fit: "inside",
       withoutEnlargement: true,

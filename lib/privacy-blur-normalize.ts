@@ -1,7 +1,6 @@
 import type { PrivacyBlur } from "./privacy-blur-types";
 import {
   BLUR_HEIGHT_DEFAULT,
-  BLUR_INTENSITY_DEFAULT,
   BLUR_WIDTH_DEFAULT,
   clampBlurIntensity,
   clampBlurRadius,

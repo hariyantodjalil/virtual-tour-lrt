@@ -113,24 +113,32 @@ export function TourStructureSidebar({
     return { level, area };
   }, [selectedScene, levels]);
 
-  // Restore expanded state + buka path scene aktif
+  // Hydrate expanded tree dari sessionStorage + buka path scene aktif (async agar tidak cascade render)
   useEffect(() => {
-    const saved = loadExpanded();
-    const levelIds = new Set(saved?.levels ?? []);
-    const areaIds = new Set(saved?.areas ?? []);
+    let cancelled = false;
+    const frame = requestAnimationFrame(() => {
+      if (cancelled) return;
+      const saved = loadExpanded();
+      const levelIds = new Set(saved?.levels ?? []);
+      const areaIds = new Set(saved?.areas ?? []);
 
-    if (levelIds.size === 0 && levels[0]) {
-      levelIds.add(levels[0].id);
-      if (levels[0].areas[0]) areaIds.add(levels[0].areas[0].id);
-    }
+      if (levelIds.size === 0 && levels[0]) {
+        levelIds.add(levels[0].id);
+        if (levels[0].areas[0]) areaIds.add(levels[0].areas[0].id);
+      }
 
-    const scene = scenes[selectedSceneIndex];
-    if (scene?.levelId) levelIds.add(scene.levelId);
-    if (scene?.areaId) areaIds.add(scene.areaId);
+      const scene = scenes[selectedSceneIndex];
+      if (scene?.levelId) levelIds.add(scene.levelId);
+      if (scene?.areaId) areaIds.add(scene.areaId);
 
-    setExpandedLevels(levelIds);
-    setExpandedAreas(areaIds);
-    setHydrated(true);
+      setExpandedLevels(levelIds);
+      setExpandedAreas(areaIds);
+      setHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
   }, [levels, scenes, selectedSceneIndex]);
 
   useEffect(() => {
@@ -440,7 +448,7 @@ export function TourStructureSidebar({
                                         alt=""
                                         fill
                                         className="object-cover opacity-80"
-                                        unoptimized
+                                        sizes="40px"
                                       />
                                       <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-center text-[8px] font-mono text-white/90">
                                         {posInArea + 1}

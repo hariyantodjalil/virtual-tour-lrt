@@ -11,7 +11,7 @@ import {
   panoramaUrlForScene,
   preloadLinkedScenes,
   preloadPanoramaUrl,
-  preloadTourPanoramas,
+  preloadInitialPanorama,
 } from "@/lib/pannellum-tour-config";
 import {
   diveIntoScene,
@@ -126,13 +126,6 @@ export default function VirtualTourViewer({
   const externalNavRef = useRef(false);
   const overlayRef = useRef<DiveOverlayState>(ZERO_OVERLAY);
 
-  onSpaceClickRef.current = onSpaceClick;
-  onAdClickRef.current = onAdClick;
-  onInfoClickRef.current = onInfoClick;
-  onSceneChangeRef.current = onSceneChange;
-  scenesRef.current = scenes;
-  spacesRef.current = spaces;
-
   const [panoramaVisible, setPanoramaVisible] = useState(false);
   const [overlay, setOverlay] = useState<DiveOverlayState>(ZERO_OVERLAY);
   const [error, setError] = useState<string | null>(null);
@@ -143,14 +136,23 @@ export default function VirtualTourViewer({
 
   const focusCameraRef = useRef(focusCamera);
   const focusTokenRef = useRef(focusToken);
-  focusCameraRef.current = focusCamera;
-  focusTokenRef.current = focusToken;
 
   const activeSceneId = selectedSceneId ?? internalSceneId ?? scenes[0]?.id;
   const activeSceneIdRef = useRef(activeSceneId);
-  activeSceneIdRef.current = activeSceneId;
   const currentSceneIdx = Math.max(0, scenes.findIndex((scene) => scene.id === activeSceneId));
   const scenesSig = useMemo(() => scenes.map((s) => s.id).join("|"), [scenes]);
+
+  useEffect(() => {
+    onSpaceClickRef.current = onSpaceClick;
+    onAdClickRef.current = onAdClick;
+    onInfoClickRef.current = onInfoClick;
+    onSceneChangeRef.current = onSceneChange;
+    scenesRef.current = scenes;
+    spacesRef.current = spaces;
+    focusCameraRef.current = focusCamera;
+    focusTokenRef.current = focusToken;
+    activeSceneIdRef.current = activeSceneId;
+  });
 
   const overlayController = useMemo(
     () => ({
@@ -241,10 +243,14 @@ export default function VirtualTourViewer({
   );
 
   const handleSceneHotspotRef = useRef(handleSceneHotspotClick);
-  handleSceneHotspotRef.current = handleSceneHotspotClick;
+
+  useEffect(() => {
+    handleSceneHotspotRef.current = handleSceneHotspotClick;
+  });
 
   const initTourViewer = useCallback(async () => {
-    if (!containerRef.current || scenes.length === 0) return;
+    const currentScenes = scenesRef.current;
+    if (!containerRef.current || currentScenes.length === 0) return;
 
     if (viewerRef.current) {
       try { viewerRef.current.destroy(); } catch { /* ignore */ }
@@ -256,14 +262,14 @@ export default function VirtualTourViewer({
     setViewerReady(false);
     setError(null);
     overlayController.reset();
-    preloadTourPanoramas(scenes);
+    preloadInitialPanorama(currentScenes, activeSceneIdRef.current);
 
     try {
       await loadPannellum();
       if (!isMounted.current || !containerRef.current) return;
 
-      const firstId = activeSceneIdRef.current ?? scenes[0]?.id;
-      const config = buildPannellumTourConfig(scenes, firstId, {
+      const firstId = activeSceneIdRef.current ?? currentScenes[0]?.id;
+      const config = buildPannellumTourConfig(currentScenes, firstId, {
         onSceneHotspot: (id, pitch, yaw) => handleSceneHotspotRef.current(id, pitch, yaw),
         onScenePreload: (id) => preloadSceneById(id),
         onSpaceClick: (code) => onSpaceClickRef.current?.(code),
@@ -306,7 +312,7 @@ export default function VirtualTourViewer({
         setError(e instanceof Error ? e.message : "Gagal menginisialisasi viewer 360°");
       }
     }
-  }, [scenesSig, applyCameraFocus, overlayController, preloadSceneById]);
+  }, [applyCameraFocus, overlayController, preloadSceneById]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -318,7 +324,7 @@ export default function VirtualTourViewer({
         viewerRef.current = null;
       }
     };
-  }, [initTourViewer]);
+  }, [initTourViewer, scenesSig]);
 
   // Navigasi eksternal (tab level/area) — crossfade + blur ringan
   useEffect(() => {

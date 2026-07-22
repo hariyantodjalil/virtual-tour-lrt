@@ -1,23 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { parseJsonRequest } from "@/lib/api-validation";
+import { occupancySchema } from "@/lib/api-schemas";
 
 type Params = { params: Promise<{ id: string }> };
 
 /** Assign / ganti unit yang diisi tenant. */
 export async function POST(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { id: tenantId } = await params;
-  const body = await request.json();
-  const { spaceId, startDate, endDate } = body as {
-    spaceId?: string;
-    startDate?: string | null;
-    endDate?: string | null;
-  };
-
-  if (!spaceId) return NextResponse.json({ error: "spaceId wajib" }, { status: 400 });
+  const parsed = await parseJsonRequest(request, occupancySchema);
+  if (!parsed.success) return parsed.response;
+  const { spaceId, startDate, endDate } = parsed.data;
 
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant) return NextResponse.json({ error: "Tenant tidak ditemukan" }, { status: 404 });
@@ -59,7 +56,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
 /** Lepas occupancy unit dari tenant. */
 export async function DELETE(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { id: tenantId } = await params;

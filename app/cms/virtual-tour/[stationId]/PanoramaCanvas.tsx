@@ -81,7 +81,7 @@ export function PanoramaCanvas({
     const ch = PANO_H * (z / 100);
     setZoom(z);
     setPan({ x: (el.clientWidth - cw) / 2, y: (el.clientHeight - ch) / 2 });
-  }, []); // eslint-disable-line
+  }, []);
 
   // getBoundingClientRect() handles CSS transforms correctly,
   // unlike getScreenCTM() which can fail with translate+scale CSS transforms.

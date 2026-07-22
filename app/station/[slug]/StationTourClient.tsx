@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Building2, CheckCircle2, ChevronDown, ChevronRight,
@@ -110,13 +110,15 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
   );
   const showTourNav = !unitsOpen && !selectedSpace && !routeOpen;
 
-  // Sinkronkan tab level/area saat pindah scene lewat hotspot
-  useEffect(() => {
-    const placement = findScenePlacement(stationInfo.levels, activeSceneId);
-    if (!placement) return;
-    setActiveLevelId(placement.level.id);
-    setActiveAreaId(placement.area?.id ?? placement.level.areas[0]?.id ?? null);
-  }, [activeSceneId, stationInfo.levels]);
+  const placement = findScenePlacement(stationInfo.levels, activeSceneId);
+  const [prevSceneId, setPrevSceneId] = useState(activeSceneId);
+  if (activeSceneId !== prevSceneId) {
+    setPrevSceneId(activeSceneId);
+    if (placement) {
+      setActiveLevelId(placement.level.id);
+      setActiveAreaId(placement.area?.id ?? placement.level.areas[0]?.id ?? null);
+    }
+  }
 
   function clearCameraFocus() {
     setCameraFocus(null);
@@ -161,7 +163,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
       pitch: placement.pitch,
       hfov: 78,
     });
-    setFocusToken(Date.now());
+    setFocusToken((token) => token + 1);
   }
 
   const openSpaceFromList = (space: Space) => {

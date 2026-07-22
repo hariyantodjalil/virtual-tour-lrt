@@ -19,6 +19,8 @@ import {
   markPrivacyBlurBaked,
   getPrivacyBlurSourcePanoramaUrl,
 } from "@/lib/privacy-blur-normalize";
+import { parseJsonRequest } from "@/lib/api-validation";
+import { privacyBlurBakeSchema } from "@/lib/api-schemas";
 
 type Params = { params: Promise<{ stationId: string; sceneId: string }> };
 
@@ -44,11 +46,13 @@ const sceneSelect = {
  * POST — bake blur privasi ke piksel panorama, upload ulang, metadata blur tetap (bisa diedit & re-bake).
  */
 export async function POST(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { stationId, sceneId } = await params;
-  const body = await request.json().catch(() => ({}));
+  const parsed = await parseJsonRequest(request, privacyBlurBakeSchema);
+  if (!parsed.success) return parsed.response;
+  const body = parsed.data;
 
   const blurs = normalizePrivacyBlurs(body.privacyBlurs);
   if (blurs.length === 0) {

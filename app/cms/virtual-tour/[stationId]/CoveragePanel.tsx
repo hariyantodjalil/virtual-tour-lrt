@@ -58,7 +58,11 @@ export function CoveragePanel({
     for (const scene of scenes) {
       const list =
         scene.sceneId === currentSceneId
-          ? currentHotspots.map(({ _id: _, ...rest }) => rest)
+          ? currentHotspots.map((h) => {
+              const { _id, ...rest } = h;
+              void _id;
+              return rest;
+            })
           : scene.hotspots;
       list.forEach((h, index) => {
         if ((h.type === "space" || h.type === "ad") && h.spaceCode) {

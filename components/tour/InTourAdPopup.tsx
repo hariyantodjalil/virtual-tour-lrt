@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { createPortal } from "react-dom";
 import { Megaphone, MessageCircle, X } from "lucide-react";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
@@ -47,8 +48,15 @@ export default function InTourAdPopup({
         </button>
 
         {imageSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageSrc} alt={displayTitle} className="h-48 w-full object-cover" />
+          <div className="relative h-48 w-full">
+            <Image
+              src={imageSrc}
+              alt={displayTitle}
+              fill
+              className="object-cover"
+              sizes="(max-width: 448px) 100vw, 448px"
+            />
+          </div>
         ) : (
           <div className="flex h-36 items-center justify-center bg-gradient-to-br from-purple-950 to-slate-900">
             <Megaphone className="h-10 w-10 text-purple-300/80" />

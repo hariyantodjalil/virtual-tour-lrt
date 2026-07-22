@@ -102,14 +102,16 @@ export function linkedSceneIds(scene: PanoramaScene) {
     .map((h) => h.sceneId as string);
 }
 
-export function preloadTourPanoramas(scenes: PanoramaScene[]) {
-  void preloadPanoramaUrls(scenes.map((s) => getS3ProxyUrl(s.panoramaUrl)));
+export function preloadInitialPanorama(scenes: PanoramaScene[], sceneId?: string) {
+  const initial = scenes.find((scene) => scene.id === sceneId) ?? scenes[0];
+  if (initial) void preloadPanoramaUrl(getS3ProxyUrl(initial.panoramaUrl));
 }
 
 export function preloadLinkedScenes(scenes: PanoramaScene[], fromSceneId: string) {
   const scene = scenes.find((s) => s.id === fromSceneId);
   if (!scene) return;
   const urls = linkedSceneIds(scene)
+    .slice(0, 2)
     .map((id) => panoramaUrlForScene(scenes, id))
     .filter(Boolean);
   void preloadPanoramaUrls(urls);

@@ -1,25 +1,29 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { cmsFetch } from "@/lib/cms-fetch";
+import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Map } from "lucide-react";
 
-type Station = {
-  id: string;
-  name: string;
-  slug: string;
-  _count: { virtualTourScenes: number };
-};
+export const dynamic = "force-dynamic";
 
-export default function CmsVirtualTourIndexPage() {
-  const [stations, setStations] = useState<Station[]>([]);
+async function getStations() {
+  try {
+    return await prisma.station.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        _count: { select: { virtualTourScenes: true } },
+      },
+    });
+  } catch {
+    return [];
+  }
+}
 
-  useEffect(() => {
-    cmsFetch("/api/cms/stations").then((r) => r.json()).then(setStations);
-  }, []);
+export default async function CmsVirtualTourIndexPage() {
+  const stations = await getStations();
 
   return (
     <div>
@@ -33,12 +37,15 @@ export default function CmsVirtualTourIndexPage() {
             <CardContent className="flex items-center justify-between">
               <span className="text-sm text-slate-400">{s._count.virtualTourScenes} scene</span>
               <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-500">
-                <Link href={`/cms/virtual-tour/${s.id}`}><Map className="h-3 w-3 mr-1" /> Edit</Link>
+                <Link href={`/cms/virtual-tour/${s.id}`}>
+                  <Map className="h-3 w-3 mr-1" /> Edit
+                </Link>
               </Button>
             </CardContent>
           </Card>
         ))}
       </div>
+      {stations.length === 0 && <p className="text-slate-400">Belum ada stasiun.</p>}
     </div>
   );
 }

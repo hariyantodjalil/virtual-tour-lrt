@@ -1,9 +1,10 @@
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import type { StationInfo } from "@/lib/tour-types";
 import { normalizeHotspots } from "@/lib/hotspot-normalize";
 import { extractPrivacyBlursFromCanvasData } from "@/lib/privacy-blur-normalize";
 import { extractInitialViewFromCanvasData } from "@/lib/scene-initial-view";
-import { ensureTourStructure, sortScenesByTourOrder } from "@/lib/virtual-tour-structure";
+import { sortScenesByTourOrder } from "@/lib/virtual-tour-structure";
 import { buildPublicTourLevels } from "@/lib/public-tour-structure";
 
 export type { Hotspot, PanoramaScene, StationInfo, TourLevelPublic, TourAreaPublic } from "@/lib/tour-types";
@@ -22,9 +23,6 @@ type StationRow = {
 };
 
 async function mapStationToInfo(station: StationRow): Promise<StationInfo> {
-  // Migrasi scene lama ke level/area — harus sebelum baca scene
-  await ensureTourStructure(station.id);
-
   const [levels, areas, freshScenes] = await Promise.all([
     prisma.virtualTourLevel.findMany({
       where: { stationId: station.id, isActive: true },
@@ -74,6 +72,7 @@ async function mapStationToInfo(station: StationRow): Promise<StationInfo> {
 
 export async function getAllStationsData(): Promise<StationInfo[]> {
   const stations = await prisma.station.findMany({
+    where: { isActive: true },
     orderBy: { order: "asc" },
     select: {
       id: true,
@@ -90,9 +89,9 @@ export async function getAllStationsData(): Promise<StationInfo[]> {
   return Promise.all(stations.map((station) => mapStationToInfo(station)));
 }
 
-export async function getStationBySlug(slug: string): Promise<StationInfo | null> {
-  const station = await prisma.station.findUnique({
-    where: { slug },
+export const getStationBySlug = cache(async (slug: string): Promise<StationInfo | null> => {
+  const station = await prisma.station.findFirst({
+    where: { slug, isActive: true },
     select: {
       id: true,
       slug: true,
@@ -107,9 +106,25 @@ export async function getStationBySlug(slug: string): Promise<StationInfo | null
   });
   if (!station) return null;
   return mapStationToInfo(station);
-}
+});
+
+/** Metadata ringan — tanpa load scene/hotspot. */
+export const getStationMetaBySlug = cache(async (slug: string) => {
+  try {
+    return await prisma.station.findFirst({
+      where: { slug, isActive: true },
+      select: { name: true },
+    });
+  } catch {
+    return null;
+  }
+});
 
 export async function getStationSlugs(): Promise<string[]> {
-  const stations = await prisma.station.findMany({ select: { slug: true }, orderBy: { order: "asc" } });
+  const stations = await prisma.station.findMany({
+    where: { isActive: true },
+    select: { slug: true },
+    orderBy: { order: "asc" },
+  });
   return stations.map((s) => s.slug);
 }

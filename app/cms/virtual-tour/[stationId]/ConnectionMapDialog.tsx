@@ -45,7 +45,11 @@ export function ConnectionMapDialog({
     for (const scene of scenes) {
       const list =
         scene.sceneId === currentSceneId
-          ? currentHotspots.map(({ _id: _, ...rest }) => rest)
+          ? currentHotspots.map((h) => {
+              const { _id, ...rest } = h;
+              void _id;
+              return rest;
+            })
           : scene.hotspots;
       for (const h of list) {
         if (h.type !== "scene" || !h.sceneId) continue;

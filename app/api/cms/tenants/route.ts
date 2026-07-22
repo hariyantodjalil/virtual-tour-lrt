@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { parseJsonRequest } from "@/lib/api-validation";
+import { tenantCreateSchema } from "@/lib/api-schemas";
 
 export async function GET(request: NextRequest) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const stationId = request.nextUrl.searchParams.get("stationId");
@@ -25,26 +27,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const body = await request.json();
-  const { stationId, brandName, contactName, phone, email, notes, spaceId, startDate, endDate } =
-    body as {
-      stationId?: string;
-      brandName?: string;
-      contactName?: string;
-      phone?: string;
-      email?: string;
-      notes?: string;
-      spaceId?: string;
-      startDate?: string | null;
-      endDate?: string | null;
-    };
-
-  if (!stationId || !brandName?.trim()) {
-    return NextResponse.json({ error: "stationId dan brandName wajib" }, { status: 400 });
-  }
+  const parsed = await parseJsonRequest(request, tenantCreateSchema);
+  if (!parsed.success) return parsed.response;
+  const { stationId, brandName, contactName, phone, email, notes, spaceId, startDate, endDate } = parsed.data;
 
   const station = await prisma.station.findUnique({ where: { id: stationId } });
   if (!station) return NextResponse.json({ error: "Stasiun tidak ditemukan" }, { status: 404 });
@@ -53,11 +41,11 @@ export async function POST(request: NextRequest) {
     const created = await tx.tenant.create({
       data: {
         stationId,
-        brandName: brandName.trim(),
-        contactName: contactName?.trim() || null,
-        phone: phone?.trim() || null,
-        email: email?.trim() || null,
-        notes: notes?.trim() || null,
+        brandName,
+        contactName: contactName || null,
+        phone: phone || null,
+        email: email || null,
+        notes: notes || null,
       },
     });
 

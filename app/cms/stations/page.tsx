@@ -1,37 +1,26 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { prisma } from "@/lib/prisma";
+import { getS3ProxyUrl } from "@/lib/s3-utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getS3ProxyUrl } from "@/lib/s3-utils";
-import { cmsFetch } from "@/lib/cms-fetch";
 import { Pencil, Map } from "lucide-react";
 
-type Station = {
-  id: string;
-  name: string;
-  slug: string;
-  line: string;
-  address: string;
-  dailyPassengers: number;
-  imageUrl: string | null;
-  _count: { commercialSpaces: number; virtualTourScenes: number };
-};
+export const dynamic = "force-dynamic";
 
-export default function CmsStationsPage() {
-  const [stations, setStations] = useState<Station[]>([]);
-  const [loading, setLoading] = useState(true);
+async function getStations() {
+  try {
+    return await prisma.station.findMany({
+      orderBy: { name: "asc" },
+      include: { _count: { select: { commercialSpaces: true, virtualTourScenes: true } } },
+    });
+  } catch {
+    return [];
+  }
+}
 
-  useEffect(() => {
-    cmsFetch("/api/cms/stations")
-      .then((r) => r.json())
-      .then(setStations)
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <p className="text-slate-400">Memuat stasiun...</p>;
+export default async function CmsStationsPage() {
+  const stations = await getStations();
 
   return (
     <div>
@@ -53,7 +42,7 @@ export default function CmsStationsPage() {
                     alt={station.name}
                     fill
                     className="object-cover"
-                    unoptimized
+                    sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                   />
                 </div>
               )}
@@ -76,6 +65,7 @@ export default function CmsStationsPage() {
           </Card>
         ))}
       </div>
+      {stations.length === 0 && <p className="text-slate-400">Belum ada stasiun.</p>}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import type { TourLevel } from "@/lib/virtual-tour-structure";
 
@@ -30,6 +30,30 @@ function resolveLevelId(scene: SceneRef, levels: TourLevel[]): string {
   return levels.find((l) => l.slug === scene.level)?.id ?? "";
 }
 
+function resolvePickerSelection(
+  levels: TourLevel[],
+  scenes: SceneRef[],
+  value: string | undefined,
+  defaultLevelId: string | null | undefined,
+  defaultAreaId: string | null | undefined
+) {
+  if (value) {
+    const target = scenes.find((s) => s.sceneId === value);
+    if (target) {
+      return {
+        levelId: resolveLevelId(target, levels),
+        areaId: target.areaId ?? "",
+      };
+    }
+  }
+  const lvl = defaultLevelId ?? levels[0]?.id ?? "";
+  const level = levels.find((l) => l.id === lvl);
+  return {
+    levelId: lvl,
+    areaId: defaultAreaId ?? level?.areas[0]?.id ?? "",
+  };
+}
+
 const selectClass =
   "w-full bg-slate-800 border border-slate-700 rounded-md h-8 px-2 text-sm text-slate-100";
 
@@ -43,25 +67,18 @@ export function SceneTargetPicker({
   syncKey,
   onChange,
 }: Props) {
-  const [levelId, setLevelId] = useState("");
-  const [areaId, setAreaId] = useState("");
+  const initial = resolvePickerSelection(levels, scenes, value, defaultLevelId, defaultAreaId);
+  const [levelId, setLevelId] = useState(initial.levelId);
+  const [areaId, setAreaId] = useState(initial.areaId);
+  const [prevSyncKey, setPrevSyncKey] = useState(syncKey);
 
-  useEffect(() => {
-    if (value) {
-      const target = scenes.find((s) => s.sceneId === value);
-      if (target) {
-        setLevelId(resolveLevelId(target, levels));
-        setAreaId(target.areaId ?? "");
-        return;
-      }
-    }
-    const lvl = defaultLevelId ?? levels[0]?.id ?? "";
-    setLevelId(lvl);
-    const level = levels.find((l) => l.id === lvl);
-    setAreaId(defaultAreaId ?? level?.areas[0]?.id ?? "");
-    // Hanya reset saat ganti hotspot — biarkan user bebas ubah level/area tanpa reset
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [syncKey]);
+  // Reset level/area hanya saat ganti hotspot (syncKey), biarkan user ubah filter bebas
+  if (syncKey !== prevSyncKey) {
+    setPrevSyncKey(syncKey);
+    const next = resolvePickerSelection(levels, scenes, value, defaultLevelId, defaultAreaId);
+    setLevelId(next.levelId);
+    setAreaId(next.areaId);
+  }
 
   const selectedLevel = levels.find((l) => l.id === levelId);
   const areas = selectedLevel?.areas ?? [];

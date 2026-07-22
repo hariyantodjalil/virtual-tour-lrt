@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar";
 async function getStationsWithStats() {
   try {
     const stations = await prisma.station.findMany({
+      where: { isActive: true },
       orderBy: { order: "asc" },
       include: {
         commercialSpaces: { select: { status: true } },
@@ -36,10 +37,12 @@ async function getStationsWithStats() {
 async function getSummaryStats() {
   try {
     const [totalSpaces, availableSpaces, totalStations, totalPassengers] = await Promise.all([
-      prisma.commercialSpace.count(),
-      prisma.commercialSpace.count({ where: { status: "TERSEDIA" } }),
-      prisma.station.count(),
-      prisma.station.aggregate({ _sum: { dailyPassengers: true } }),
+      prisma.commercialSpace.count({ where: { station: { isActive: true } } }),
+      prisma.commercialSpace.count({
+        where: { status: "TERSEDIA", station: { isActive: true } },
+      }),
+      prisma.station.count({ where: { isActive: true } }),
+      prisma.station.aggregate({ where: { isActive: true }, _sum: { dailyPassengers: true } }),
     ]);
     return {
       totalSpaces,
@@ -52,9 +55,53 @@ async function getSummaryStats() {
   }
 }
 
-export default async function HomePage() {
-  const [stations, stats] = await Promise.all([getStationsWithStats(), getSummaryStats()]);
+async function HeroStats() {
+  const stats = await getSummaryStats();
 
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
+      {[
+        { icon: MapPin, label: "Stasiun", value: stats.totalStations.toString(), color: "text-blue-300" },
+        { icon: Building2, label: "Unit Komersial", value: stats.totalSpaces.toString(), color: "text-purple-300" },
+        { icon: TrendingUp, label: "Tersedia", value: stats.availableSpaces.toString(), color: "text-emerald-300" },
+        { icon: Users, label: "Penumpang/Hari", value: formatNumber(stats.totalPassengers), color: "text-orange-300" },
+      ].map((item) => (
+        <div key={item.label} className="rounded-xl bg-white/5 border border-white/10 p-4 text-center">
+          <item.icon className={`h-5 w-5 mx-auto mb-2 ${item.color}`} />
+          <p className="text-2xl font-black text-white">{item.value}</p>
+          <p className="text-xs text-white/50 mt-0.5">{item.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+async function StationGridSection() {
+  const stations = await getStationsWithStats();
+  return <StationGrid stations={stations} />;
+}
+
+function StatsSkeleton() {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-[88px] rounded-xl bg-white/5 border border-white/10 animate-pulse" />
+      ))}
+    </div>
+  );
+}
+
+function StationGridSkeleton() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="h-64 rounded-xl bg-gray-200 animate-pulse" />
+      ))}
+    </div>
+  );
+}
+
+export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -81,21 +128,9 @@ export default async function HomePage() {
             dan ajukan minat sewa tanpa harus datang langsung — 24 jam sehari, 7 hari seminggu.
           </p>
 
-          {/* Stats bar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
-            {[
-              { icon: MapPin, label: "Stasiun", value: stats.totalStations.toString(), color: "text-blue-300" },
-              { icon: Building2, label: "Unit Komersial", value: stats.totalSpaces.toString(), color: "text-purple-300" },
-              { icon: TrendingUp, label: "Tersedia", value: stats.availableSpaces.toString(), color: "text-emerald-300" },
-              { icon: Users, label: "Penumpang/Hari", value: formatNumber(stats.totalPassengers), color: "text-orange-300" },
-            ].map((item) => (
-              <div key={item.label} className="rounded-xl bg-white/5 border border-white/10 p-4 text-center">
-                <item.icon className={`h-5 w-5 mx-auto mb-2 ${item.color}`} />
-                <p className="text-2xl font-black text-white">{item.value}</p>
-                <p className="text-xs text-white/50 mt-0.5">{item.label}</p>
-              </div>
-            ))}
-          </div>
+          <Suspense fallback={<StatsSkeleton />}>
+            <HeroStats />
+          </Suspense>
         </div>
       </section>
 
@@ -109,7 +144,7 @@ export default async function HomePage() {
         </div>
 
         <Suspense fallback={<StationGridSkeleton />}>
-          <StationGrid stations={stations} />
+          <StationGridSection />
         </Suspense>
       </main>
 
@@ -131,16 +166,6 @@ export default async function HomePage() {
           </a>
         </div>
       </section>
-    </div>
-  );
-}
-
-function StationGridSkeleton() {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="h-64 rounded-xl bg-gray-200 animate-pulse" />
-      ))}
     </div>
   );
 }

@@ -3,12 +3,13 @@ import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateS3Key, uploadToS3 } from "@/lib/s3";
 import { processStationCover, formatBytes } from "@/lib/image-processor";
+import { MAX_STANDARD_IMAGE_UPLOAD_BYTES, readValidatedImageUpload } from "@/lib/upload-validation";
 
 type Params = { params: Promise<{ stationId: string }> };
 
 /** Upload aset kreatif hotspot iklan ke S3. */
 export async function POST(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { stationId } = await params;
@@ -19,12 +20,9 @@ export async function POST(request: NextRequest, { params }: Params) {
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "File wajib diisi" }, { status: 400 });
 
-  const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-  if (!allowed.includes(file.type)) {
-    return NextResponse.json({ error: "Format file tidak didukung" }, { status: 400 });
-  }
-
-  const originalBuffer = Buffer.from(await file.arrayBuffer());
+  const upload = await readValidatedImageUpload(file, MAX_STANDARD_IMAGE_UPLOAD_BYTES);
+  if ("error" in upload) return NextResponse.json({ error: upload.error }, { status: 400 });
+  const originalBuffer = upload.buffer;
   const originalSize = originalBuffer.length;
   const result = await processStationCover(originalBuffer);
 

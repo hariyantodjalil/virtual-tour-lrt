@@ -84,7 +84,7 @@ export default function CmsUsersPage() {
             <form onSubmit={createUser} className="space-y-3">
               <div><Label>Nama</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-slate-800 border-slate-700" required /></div>
               <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="bg-slate-800 border-slate-700" required /></div>
-              <div><Label>Password</Label><Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="bg-slate-800 border-slate-700" required /></div>
+              <div><Label>Password</Label><Input type="password" minLength={12} maxLength={128} placeholder="Minimal 12 karakter" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="bg-slate-800 border-slate-700" required /></div>
               <div>
                 <Label>Role</Label>
                 <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded-md p-2 text-sm">

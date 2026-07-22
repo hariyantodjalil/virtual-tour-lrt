@@ -22,8 +22,6 @@ import {
   Store,
   AlertCircle,
   CheckCircle2,
-  ChevronUp,
-  ChevronDown,
   Package,
   Link2,
   Unlink,
@@ -74,7 +72,7 @@ import { buildWalkPathHotspots } from "@/lib/walk-path";
 import type { TourLevel, TourArea } from "@/lib/virtual-tour-structure";
 import type { TourLevelPublic } from "@/lib/tour-types";
 
-import { PanoramaCanvas, type AddMode, type HotspotItem } from "./PanoramaCanvas";
+import type { AddMode, HotspotItem } from "@/lib/hotspot-types";
 import { PannellumPreview } from "./PannellumPreview";
 import { PannellumEditor, type PannellumEditorHandle } from "./PannellumEditor";
 import { UnitPicker } from "./UnitPicker";
@@ -282,7 +280,8 @@ export default function VirtualTourEditorPage() {
   const hotspotsRef = useRef(hotspots);
   const privacyBlursRef = useRef(privacyBlurs);
   const currentSceneRef = useRef<Scene | null>(null);
-  const [historyTick, setHistoryTick] = useState(0);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   const [showConnectionMap, setShowConnectionMap] = useState(false);
   const [uploadingCreative, setUploadingCreative] = useState(false);
 
@@ -341,7 +340,8 @@ export default function VirtualTourEditorPage() {
   function clearHistory() {
     historyPast.current = [];
     historyFuture.current = [];
-    setHistoryTick((t) => t + 1);
+    setCanUndo(false);
+    setCanRedo(false);
   }
 
   function captureSnapshot(): EditorSnapshot {
@@ -365,19 +365,21 @@ export default function VirtualTourEditorPage() {
     setHasUnsaved(true);
   }
 
-  function pushHistory() {
+  const pushHistory = useCallback(() => {
     historyPast.current.push(captureSnapshot());
     if (historyPast.current.length > 50) historyPast.current.shift();
     historyFuture.current = [];
-    setHistoryTick((t) => t + 1);
-  }
+    setCanUndo(historyPast.current.length > 0);
+    setCanRedo(false);
+  }, []);
 
   function undo() {
     if (historyPast.current.length === 0) return;
     historyFuture.current.push(captureSnapshot());
     const snap = historyPast.current.pop();
     if (snap) applySnapshot(snap);
-    setHistoryTick((t) => t + 1);
+    setCanUndo(historyPast.current.length > 0);
+    setCanRedo(historyFuture.current.length > 0);
   }
 
   function redo() {
@@ -385,11 +387,9 @@ export default function VirtualTourEditorPage() {
     historyPast.current.push(captureSnapshot());
     const snap = historyFuture.current.pop();
     if (snap) applySnapshot(snap);
-    setHistoryTick((t) => t + 1);
+    setCanUndo(historyPast.current.length > 0);
+    setCanRedo(historyFuture.current.length > 0);
   }
-
-  const canUndo = historyTick >= 0 && historyPast.current.length > 0;
-  const canRedo = historyTick >= 0 && historyFuture.current.length > 0;
 
   function restoreSceneState(scene: Scene) {
     setHotspots(sceneToHotspots(scene));
@@ -626,7 +626,7 @@ export default function VirtualTourEditorPage() {
       setAddMode("none");
       setHasUnsaved(true);
     },
-    [addMode]
+    [addMode, pushHistory]
   );
 
   const handleBlurAdd = useCallback((yaw: number, pitch: number) => {
@@ -646,7 +646,7 @@ export default function VirtualTourEditorPage() {
     setSelectedHotspotId(null);
     setAddMode("none");
     setHasUnsaved(true);
-  }, []);
+  }, [pushHistory]);
 
   function previewNavigateScene(sceneId: string) {
     const updatedScenes = scenes.map((s, i) =>
@@ -677,7 +677,7 @@ export default function VirtualTourEditorPage() {
       prev.map((h) => (h._id === id ? { ...h, yaw, pitch } : h))
     );
     setHasUnsaved(true);
-  }, []);
+  }, [pushHistory]);
 
   const handleHotspotSelect = useCallback((id: string | null) => {
     setSelectedHotspotId(id);
@@ -689,7 +689,7 @@ export default function VirtualTourEditorPage() {
     setHotspots((prev) => prev.filter((h) => h._id !== id));
     setSelectedHotspotId((sel) => (sel === id ? null : sel));
     setHasUnsaved(true);
-  }, []);
+  }, [pushHistory]);
 
   const handleBlurMove = useCallback((id: string, yaw: number, pitch: number) => {
     if (!moveHistoryPushed.current) {
@@ -700,7 +700,7 @@ export default function VirtualTourEditorPage() {
       prev.map((b) => (b._id === id ? { ...b, yaw, pitch } : b))
     );
     setHasUnsaved(true);
-  }, []);
+  }, [pushHistory]);
 
   const handleBlurSelect = useCallback((id: string | null) => {
     setSelectedBlurId(id);
@@ -712,7 +712,7 @@ export default function VirtualTourEditorPage() {
     setPrivacyBlurs((prev) => prev.filter((b) => b._id !== id));
     setSelectedBlurId((sel) => (sel === id ? null : sel));
     setHasUnsaved(true);
-  }, []);
+  }, [pushHistory]);
 
   // ─── Save scene ──────────────────────────────────────────────────────────
   async function saveScene() {
@@ -2214,7 +2214,7 @@ export default function VirtualTourEditorPage() {
                               alt="Kreatif iklan"
                               fill
                               className="object-contain"
-                              unoptimized
+                              sizes="240px"
                             />
                           </div>
                         )}

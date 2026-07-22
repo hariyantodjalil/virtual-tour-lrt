@@ -1,6 +1,13 @@
 /** Cache decode panorama equirectangular sebelum transisi scene. */
 
 const readyCache = new Map<string, Promise<void>>();
+const MAX_CACHE_ENTRIES = 24;
+
+function evictOldestEntry() {
+  if (readyCache.size < MAX_CACHE_ENTRIES) return;
+  const oldestKey = readyCache.keys().next().value;
+  if (oldestKey) readyCache.delete(oldestKey);
+}
 
 export function preloadPanoramaUrl(url: string): Promise<void> {
   if (!url) return Promise.resolve();
@@ -8,6 +15,7 @@ export function preloadPanoramaUrl(url: string): Promise<void> {
   const cached = readyCache.get(url);
   if (cached) return cached;
 
+  evictOldestEntry();
   const task = new Promise<void>((resolve, reject) => {
     const img = new Image();
     img.decoding = "async";
