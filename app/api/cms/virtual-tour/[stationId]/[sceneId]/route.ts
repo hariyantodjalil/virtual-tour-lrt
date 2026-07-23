@@ -60,22 +60,27 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (body.order !== undefined) updateData.order = body.order;
   if (body.hotspots !== undefined) updateData.hotspots = body.hotspots as Prisma.InputJsonValue;
   if (body.isActive !== undefined) updateData.isActive = body.isActive;
-  if (body.areaId) {
-    const area = await prisma.virtualTourArea.findFirst({
-      where: { id: body.areaId, stationId },
-      include: { level: { select: { id: true, slug: true } } },
-    });
-    if (!area) {
-      return NextResponse.json({ error: "Area tidak ditemukan di stasiun ini" }, { status: 400 });
+  if (body.areaId !== undefined) {
+    if (body.areaId === null) {
+      updateData.areaId = null;
+    } else {
+      const area = await prisma.virtualTourArea.findFirst({
+        where: { id: body.areaId, stationId },
+        include: { level: { select: { id: true, slug: true } } },
+      });
+      if (!area) {
+        return NextResponse.json({ error: "Area tidak ditemukan di stasiun ini" }, { status: 400 });
+      }
+      if (body.levelId && body.levelId !== area.levelId) {
+        return NextResponse.json({ error: "Area tidak berada pada level yang dipilih" }, { status: 400 });
+      }
+      updateData.areaId = area.id;
+      updateData.levelId = area.levelId;
+      updateData.level = area.level.slug;
     }
-    if (body.levelId && body.levelId !== area.levelId) {
-      return NextResponse.json({ error: "Area tidak berada pada level yang dipilih" }, { status: 400 });
-    }
-    updateData.areaId = area.id;
-    updateData.levelId = area.levelId;
-    updateData.level = area.level.slug;
-  } else {
-    if (body.areaId === null) updateData.areaId = null;
+  }
+
+  if (body.areaId === undefined || body.areaId === null) {
     if (body.levelId !== undefined) {
       if (body.levelId) {
         const level = await prisma.virtualTourLevel.findFirst({

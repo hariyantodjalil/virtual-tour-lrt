@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getStationBySlug, getStationMetaBySlug } from "@/lib/stations-data";
 import StationTourClient from "./StationTourClient";
-import Navbar from "@/components/Navbar";
 
 // Selalu render fresh dari DB — tidak pakai static generation
 // agar perubahan data di CMS langsung terlihat di halaman publik
@@ -69,8 +68,7 @@ export default async function StationPage({ params }: Props) {
   const spaces = stationData?.commercialSpaces ?? [];
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900">
-      <Navbar />
+    <div className="relative h-dvh overflow-hidden bg-[#1C0A0E]">
       <StationTourClient
         stationInfo={stationInfo}
         spaces={spaces.map((s) => ({

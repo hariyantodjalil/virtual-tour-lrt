@@ -47,6 +47,8 @@ type Props = {
   focusToken?: number;
   stationName: string;
   hideSceneBar?: boolean;
+  /** Tone chrome overlay (auto-rotate / scene bar) — maroon mengikuti Void Portal */
+  chromeTone?: "default" | "maroon";
 };
 
 function loadPannellum(): Promise<void> {
@@ -113,6 +115,7 @@ export default function VirtualTourViewer({
   focusCamera,
   focusToken = 0,
   hideSceneBar = false,
+  chromeTone = "default",
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -125,6 +128,8 @@ export default function VirtualTourViewer({
   const divingRef = useRef(false);
   const externalNavRef = useRef(false);
   const overlayRef = useRef<DiveOverlayState>(ZERO_OVERLAY);
+  /** Epoch init — cegah race double-mount (Strict Mode / remount) yang meninggalkan hotspot orphan. */
+  const initEpochRef = useRef(0);
 
   const [panoramaVisible, setPanoramaVisible] = useState(false);
   const [overlay, setOverlay] = useState<DiveOverlayState>(ZERO_OVERLAY);
@@ -248,15 +253,26 @@ export default function VirtualTourViewer({
     handleSceneHotspotRef.current = handleSceneHotspotClick;
   });
 
+  const destroyViewer = useCallback(() => {
+    if (viewerRef.current) {
+      try {
+        viewerRef.current.destroy();
+      } catch {
+        /* ignore */
+      }
+      viewerRef.current = null;
+    }
+    if (containerRef.current) {
+      containerRef.current.innerHTML = "";
+    }
+  }, []);
+
   const initTourViewer = useCallback(async () => {
     const currentScenes = scenesRef.current;
     if (!containerRef.current || currentScenes.length === 0) return;
 
-    if (viewerRef.current) {
-      try { viewerRef.current.destroy(); } catch { /* ignore */ }
-      viewerRef.current = null;
-    }
-    containerRef.current.innerHTML = "";
+    const epoch = ++initEpochRef.current;
+    destroyViewer();
 
     setPanoramaVisible(false);
     setViewerReady(false);
@@ -266,7 +282,11 @@ export default function VirtualTourViewer({
 
     try {
       await loadPannellum();
-      if (!isMounted.current || !containerRef.current) return;
+      // Stale init (Strict Mode / remount / retry) — jangan buat viewer kedua di kontainer yang sama.
+      if (!isMounted.current || !containerRef.current || epoch !== initEpochRef.current) return;
+
+      destroyViewer();
+      if (!containerRef.current || epoch !== initEpochRef.current) return;
 
       const firstId = activeSceneIdRef.current ?? currentScenes[0]?.id;
       const config = buildPannellumTourConfig(currentScenes, firstId, {
@@ -279,13 +299,25 @@ export default function VirtualTourViewer({
       });
 
       const viewer = window.pannellum.viewer(containerRef.current, config);
+      if (epoch !== initEpochRef.current) {
+        try {
+          viewer.destroy();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
 
       viewer.on("load", () => {
-        if (!isMounted.current) return;
+        if (!isMounted.current || epoch !== initEpochRef.current || viewerRef.current !== viewer) return;
         setViewerReady(true);
-        requestAnimationFrame(() => setPanoramaVisible(true));
         requestAnimationFrame(() => {
-          bindPrivacyBlursInContainer(viewer, containerRef.current);
+          if (epoch === initEpochRef.current) setPanoramaVisible(true);
+        });
+        requestAnimationFrame(() => {
+          if (epoch === initEpochRef.current) {
+            bindPrivacyBlursInContainer(viewer, containerRef.current);
+          }
         });
         try {
           const sceneId = viewer.getScene?.();
@@ -300,7 +332,7 @@ export default function VirtualTourViewer({
 
       viewer.on("error", (err: string) => {
         console.error("Pannellum error:", err);
-        if (isMounted.current) {
+        if (isMounted.current && epoch === initEpochRef.current) {
           setError("Gagal memuat panorama. Periksa koneksi internet.");
         }
       });
@@ -308,23 +340,21 @@ export default function VirtualTourViewer({
       viewerRef.current = viewer;
     } catch (e) {
       console.error("Viewer init error:", e);
-      if (isMounted.current) {
+      if (isMounted.current && epoch === initEpochRef.current) {
         setError(e instanceof Error ? e.message : "Gagal menginisialisasi viewer 360°");
       }
     }
-  }, [applyCameraFocus, overlayController, preloadSceneById]);
+  }, [applyCameraFocus, destroyViewer, overlayController, preloadSceneById]);
 
   useEffect(() => {
     isMounted.current = true;
-    initTourViewer();
+    void initTourViewer();
     return () => {
       isMounted.current = false;
-      if (viewerRef.current) {
-        try { viewerRef.current.destroy(); } catch { /* ignore */ }
-        viewerRef.current = null;
-      }
+      initEpochRef.current += 1;
+      destroyViewer();
     };
-  }, [initTourViewer, scenesSig]);
+  }, [initTourViewer, scenesSig, destroyViewer]);
 
   // Navigasi eksternal (tab level/area) — crossfade + blur ringan
   useEffect(() => {
@@ -432,7 +462,13 @@ export default function VirtualTourViewer({
 
       {!error && scenes.length > 1 && !hideSceneBar && (
         <div className="absolute bottom-4 left-1/2 z-10 flex w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 items-center justify-center gap-2">
-          <div className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-full border border-white/15 bg-black/65 px-3 py-2 shadow-2xl backdrop-blur-md">
+          <div
+            className={`flex max-w-full items-center gap-1.5 overflow-x-auto rounded-full border px-3 py-2 shadow-2xl backdrop-blur-md ${
+              chromeTone === "maroon"
+                ? "border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/78"
+                : "border-white/15 bg-black/65"
+            }`}
+          >
             {scenes.map((scene, idx) => (
               <button
                 key={scene.id}
@@ -440,7 +476,7 @@ export default function VirtualTourViewer({
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
                   currentSceneIdx === idx
                     ? "bg-[#E31E2D] text-white shadow-md"
-                    : "text-white/70 hover:text-white hover:bg-white/10"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 {scene.title}
@@ -451,11 +487,15 @@ export default function VirtualTourViewer({
       )}
 
       {panoramaVisible && !error && (
-        <div className="absolute right-4 top-4 z-10">
+        <div className="absolute bottom-24 right-4 z-[45] sm:bottom-28">
           <button
             onClick={toggleAutoRotate}
-            className={`flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-md transition-colors ${
-              autoRotate ? "bg-[#E31E2D] text-white" : "bg-black/50 text-white hover:bg-black/70"
+            className={`flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition-all duration-300 ${
+              autoRotate
+                ? "bg-[#E31E2D] text-white shadow-[0_10px_24px_rgba(227,30,45,0.35)]"
+                : chromeTone === "maroon"
+                  ? "border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/75 text-[#F8ECEE] hover:bg-[#3A161C]"
+                  : "bg-black/50 text-white hover:bg-black/70"
             }`}
             title="Auto Putar"
           >
@@ -465,7 +505,7 @@ export default function VirtualTourViewer({
       )}
 
       <style>{`
-        .pnlm-container { background: #0a0f18 !important; }
+        .pnlm-container { background: ${chromeTone === "maroon" ? "#1c0a0e" : "#0a0f18"} !important; }
         .lrt-vt-viewer .pnlm-load-box,
         .lrt-vt-viewer .pnlm-lbox,
         .lrt-vt-viewer .pnlm-loading,

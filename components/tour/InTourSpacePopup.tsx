@@ -147,9 +147,9 @@ export default function InTourSpacePopup({ space, stationName, contactPhone = "6
   };
 
   return (
-    <div className="pointer-events-auto absolute inset-x-3 bottom-4 top-20 z-50 overflow-hidden rounded-2xl border border-white/20 bg-white/95 shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:right-6 sm:top-24 sm:bottom-6 sm:w-[410px] lg:w-[420px]">
+    <div className="pointer-events-auto absolute inset-x-3 bottom-4 top-20 z-50 overflow-hidden rounded-2xl border border-[color:rgb(255_214_218_/_0.14)] bg-[#F8ECEE] shadow-[0_24px_60px_rgba(28,10,14,0.5)] backdrop-blur-xl sm:inset-x-auto sm:right-6 sm:top-24 sm:bottom-6 sm:w-[410px] lg:w-[420px]">
       <div className="flex h-full max-h-[inherit] flex-col">
-        <div className="flex items-start justify-between bg-[#17355f] px-5 py-4 text-white">
+        <div className="flex items-start justify-between bg-[#1C0A0E] px-5 py-4 text-[#F8ECEE]">
           <div className="min-w-0 flex-1">
             {returnToList && (
               <button
