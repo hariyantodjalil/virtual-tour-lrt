@@ -107,10 +107,14 @@ pipeline {
                             set -a && . ./.env && set +a
                             sudo docker stack deploy --resolve-image=always -c docker-compose.yml --with-registry-auth ${APP_NAME}
                             sleep 15
+                            # P3009: bersihkan jejak migrasi gagal lalu deploy ulang (SQL sudah idempotent)
                             sudo docker run --rm --network ${APP_NAME}_virtualtour-net \\
                                 -e DATABASE_URL="\$DATABASE_URL" \\
                                 hub.kai.id/lrt/${APP_NAME}:${TAG} \\
-                                npx prisma migrate deploy
+                                sh -c '\
+                                  npx prisma migrate resolve --rolled-back 20260629040000_add_mitra_role_and_lead_user || true; \
+                                  npx prisma migrate deploy \
+                                '
                         '
                     """
                 }
