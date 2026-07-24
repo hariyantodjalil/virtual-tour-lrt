@@ -14,7 +14,7 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL=postgresql://virtualtour:virtualtour@localhost:5432/virtual_tour_lrt?schema=public
-ENV NEXTAUTH_SECRET=build-secret
+ENV NEXTAUTH_SECRET=build-only-secret-at-least-32-characters
 ENV S3_ENDPOINT=http://127.0.0.1:9000
 ENV S3_ACCESS_KEY_ID=build
 ENV S3_SECRET_ACCESS_KEY=build

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const stations = await prisma.station.findMany({
+      where: { isActive: true },
       orderBy: { order: "asc" },
       include: {
         _count: { select: { commercialSpaces: true } },

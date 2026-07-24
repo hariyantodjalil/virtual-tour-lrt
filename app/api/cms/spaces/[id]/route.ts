@@ -3,42 +3,25 @@ import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateS3Key, uploadToS3 } from "@/lib/s3";
 import { processSpacePhoto } from "@/lib/image-processor";
+import { MAX_STANDARD_IMAGE_UPLOAD_BYTES, readValidatedImageUpload } from "@/lib/upload-validation";
+import { parseJsonRequest } from "@/lib/api-validation";
+import { spaceMutationSchema } from "@/lib/api-schemas";
 
 type Params = { params: Promise<{ id: string }> };
 
-function spacePayload(body: Record<string, unknown>) {
-  return {
-    code: String(body.code ?? "").trim(),
-    name: String(body.name ?? "").trim(),
-    type: body.type as never,
-    status: body.status as never,
-    area: Number(body.area ?? 0),
-    monthlyRent: Number(body.monthlyRent ?? 0),
-    deposit: Number(body.deposit ?? 0),
-    floor: String(body.floor ?? "G").trim(),
-    location: String(body.location ?? "").trim(),
-    nearestExit: body.nearestExit ? String(body.nearestExit).trim() : null,
-    exposure: Number(body.exposure ?? 0),
-    powerSupply: body.powerSupply ? String(body.powerSupply).trim() : null,
-    waterAccess: Boolean(body.waterAccess),
-    airConditioning: Boolean(body.airConditioning),
-    description: body.description ? String(body.description).trim() : null,
-    panoramaUrl: body.panoramaUrl ? String(body.panoramaUrl).trim() : null,
-  };
-}
-
 export async function PUT(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { id } = await params;
-  const body = await request.json();
-  const space = await prisma.commercialSpace.update({ where: { id }, data: spacePayload(body) });
+  const parsed = await parseJsonRequest(request, spaceMutationSchema);
+  if (!parsed.success) return parsed.response;
+  const space = await prisma.commercialSpace.update({ where: { id }, data: parsed.data });
   return NextResponse.json(space);
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { id } = await params;
@@ -47,7 +30,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { id } = await params;
@@ -55,7 +38,9 @@ export async function POST(request: NextRequest, { params }: Params) {
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "File wajib diisi" }, { status: 400 });
 
-  const originalBuffer = Buffer.from(await file.arrayBuffer());
+  const upload = await readValidatedImageUpload(file, MAX_STANDARD_IMAGE_UPLOAD_BYTES);
+  if ("error" in upload) return NextResponse.json({ error: upload.error }, { status: 400 });
+  const originalBuffer = upload.buffer;
   const result = await processSpacePhoto(originalBuffer);
 
   const s3Key = generateS3Key("spaces", `${id}.webp`);

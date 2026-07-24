@@ -1,6 +1,13 @@
 /** Cache decode panorama equirectangular sebelum transisi scene. */
 
 const readyCache = new Map<string, Promise<void>>();
+const MAX_CACHE_ENTRIES = 24;
+
+function evictOldestEntry() {
+  if (readyCache.size < MAX_CACHE_ENTRIES) return;
+  const oldestKey = readyCache.keys().next().value;
+  if (oldestKey) readyCache.delete(oldestKey);
+}
 
 export function preloadPanoramaUrl(url: string): Promise<void> {
   if (!url) return Promise.resolve();
@@ -8,14 +15,17 @@ export function preloadPanoramaUrl(url: string): Promise<void> {
   const cached = readyCache.get(url);
   if (cached) return cached;
 
-  const task = new Promise<void>((resolve, reject) => {
+  evictOldestEntry();
+  const task = new Promise<void>((resolve) => {
     const img = new Image();
     img.decoding = "async";
 
     const finish = () => resolve();
     const fail = () => {
+      // Soft-fail: S3/proxy sering down di lokal — jangan unhandledRejection
       readyCache.delete(url);
-      reject(new Error(`Gagal preload panorama: ${url}`));
+      console.warn(`Gagal preload panorama: ${url}`);
+      resolve();
     };
 
     img.onload = () => {

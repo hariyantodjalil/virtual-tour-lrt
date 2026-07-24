@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { MapPin, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,15 +39,14 @@ export function ManageAreaDialog({
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [prevState, setPrevState] = useState(state);
 
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (!state) return;
-    if (state.mode === "edit") setLabel(state.area.label);
-    else if (state.mode === "add") setLabel("");
+  if (state !== prevState) {
+    setPrevState(state);
+    if (state?.mode === "edit") setLabel(state.area.label);
+    else if (state?.mode === "add") setLabel("");
     setError("");
-  }, [state]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

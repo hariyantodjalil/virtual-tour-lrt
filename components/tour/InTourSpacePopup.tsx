@@ -38,6 +38,7 @@ type CommercialSpace = {
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;
+  tenantBrand?: string | null;
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -146,9 +147,9 @@ export default function InTourSpacePopup({ space, stationName, contactPhone = "6
   };
 
   return (
-    <div className="pointer-events-auto absolute inset-x-3 bottom-4 top-20 z-50 overflow-hidden rounded-2xl border border-white/20 bg-white/95 shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:right-6 sm:top-24 sm:bottom-6 sm:w-[410px] lg:w-[420px]">
+    <div className="pointer-events-auto absolute inset-x-3 bottom-4 top-20 z-50 overflow-hidden rounded-2xl border border-[color:rgb(255_214_218_/_0.14)] bg-[#F8ECEE] shadow-[0_24px_60px_rgba(28,10,14,0.5)] backdrop-blur-xl sm:inset-x-auto sm:right-6 sm:top-24 sm:bottom-6 sm:w-[410px] lg:w-[420px]">
       <div className="flex h-full max-h-[inherit] flex-col">
-        <div className="flex items-start justify-between bg-[#17355f] px-5 py-4 text-white">
+        <div className="flex items-start justify-between bg-[#1C0A0E] px-5 py-4 text-[#F8ECEE]">
           <div className="min-w-0 flex-1">
             {returnToList && (
               <button
@@ -168,6 +169,11 @@ export default function InTourSpacePopup({ space, stationName, contactPhone = "6
               <span className="font-mono text-xs text-white/60">{space.code}</span>
             </div>
             <h3 className="text-xl font-black leading-tight">{space.name}</h3>
+            {space.tenantBrand && space.status === "TERISI" && (
+              <p className="mt-1 text-sm font-semibold text-[#E31E2D]">
+                Tenant: {space.tenantBrand}
+              </p>
+            )}
             <p className="text-sm text-white/70">{stationName}</p>
           </div>
           <button
@@ -298,6 +304,11 @@ export default function InTourSpacePopup({ space, stationName, contactPhone = "6
               </div>
               <p className="text-xs font-black uppercase tracking-[0.2em] text-white/45">Formulir Tenant</p>
               <h2 className="mt-3 text-4xl font-black leading-tight">{space.name}</h2>
+              {space.tenantBrand && space.status === "TERISI" && (
+                <p className="mt-2 text-lg font-semibold text-[#E31E2D]">
+                  Tenant: {space.tenantBrand}
+                </p>
+              )}
               <p className="mt-4 text-lg leading-relaxed text-white/68">
                 {space.code} - Stasiun {stationName}
               </p>
