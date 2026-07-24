@@ -1,7 +1,9 @@
 import type { HotspotType, HotspotDirection } from "./hotspot-types";
 import type { SpaceAvailabilityStatus } from "./space-availability";
+import type { FacilityIconId } from "./facility-icons";
 import { spaceStatusPinClass } from "./space-availability";
 import { clampHotspotScale, hotspotColor, DIRECTION_ROTATE_DEG } from "./hotspot-types";
+import { facilityIconSrc } from "./facility-icons";
 
 /** Warna brand LRT Jabodebek */
 export const LRT_MAROON = "#E31E2D";
@@ -32,12 +34,15 @@ export type HotspotVisualOptions = {
   direction?: HotspotDirection;
   /** Warna pin unit — dari status retail */
   spaceStatus?: SpaceAvailabilityStatus;
+  /** Ikon fasilitas untuk hotspot info */
+  facilityIcon?: FacilityIconId;
 };
 
 /** @deprecated Floor ring diganti scene nav pin — tetap diekspor untuk kompatibilitas CMS */
 export const FLOOR_RING_DISC_CLASS = "lrt-scene-nav__disc";
 export const SCENE_NAV_DISC_CLASS = "lrt-scene-nav__disc";
 export const PIN_MARKER_DISC_CLASS = "lrt-pin-marker__disc";
+export const PIN_MARKER_IMG_CLASS = "lrt-pin-marker__img";
 
 type SceneRef = { id?: string; sceneId?: string; title: string };
 
@@ -71,12 +76,13 @@ export function applyHotspotScale(div: HTMLDivElement, scale?: number) {
 /** Shell luar transparan — unit & info (ukuran tetap). */
 function applyPinHotspotOuterShell(div: HTMLDivElement, opts: HotspotVisualOptions) {
   const scale = clampHotspotScale(opts.scale);
+  const isFacility = opts.type === "info" && !!opts.facilityIcon;
 
   Object.assign(div.style, {
-    width: "88px",
-    height: "88px",
-    minWidth: "88px",
-    minHeight: "88px",
+    width: isFacility ? "75px" : "88px",
+    height: isFacility ? "81px" : "88px",
+    minWidth: isFacility ? "75px" : "88px",
+    minHeight: isFacility ? "81px" : "88px",
     background: "transparent",
     border: "none",
     borderRadius: "0",
@@ -127,6 +133,12 @@ function buildSceneNavHtml(selected: boolean, title: string, direction?: Hotspot
   return `<div class="lrt-scene-nav"><div class="lrt-scene-nav__pulse" aria-hidden="true"></div><div class="${SCENE_NAV_DISC_CLASS}${sel}"><span class="lrt-scene-nav__chevron"${chevronStyle}>${SCENE_CHEVRON_SVG}</span></div><div class="lrt-scene-nav__label" title="${safeTitle}"><span class="lrt-scene-nav__label-text">${safeTitle}</span></div></div>`;
 }
 
+function buildFacilityPinHtml(icon: FacilityIconId, selected: boolean): string {
+  const sel = selected ? " is-selected" : "";
+  const src = escapeHtml(facilityIconSrc(icon));
+  return `<div class="lrt-pin-marker lrt-pin-marker--facility"><img class="${PIN_MARKER_IMG_CLASS}${sel}" src="${src}" alt="" width="75" height="81" draggable="false" /></div>`;
+}
+
 function buildPinMarkerHtml(
   type: HotspotType,
   selected: boolean,
@@ -151,6 +163,10 @@ function applySceneHotspotStyle(div: HTMLDivElement, opts: HotspotVisualOptions)
 
 function applyPinHotspotStyle(div: HTMLDivElement, opts: HotspotVisualOptions) {
   applyPinHotspotOuterShell(div, opts);
+  if (opts.type === "info" && opts.facilityIcon) {
+    div.innerHTML = buildFacilityPinHtml(opts.facilityIcon, opts.selected ?? false);
+    return;
+  }
   div.innerHTML = buildPinMarkerHtml(opts.type, opts.selected ?? false, opts.spaceStatus);
 }
 
@@ -186,6 +202,12 @@ export function setupHotspotElement(div: HTMLDivElement, opts: HotspotVisualOpti
 
 export function setHotspotSelected(div: HTMLDivElement, type: HotspotType, selected: boolean) {
   div.dataset.lrtSelected = selected ? "1" : "0";
+
+  const facilityImg = div.querySelector(`.${PIN_MARKER_IMG_CLASS}`);
+  if (facilityImg) {
+    facilityImg.classList.toggle("is-selected", selected);
+    return;
+  }
 
   const discClass = type === "scene" ? SCENE_NAV_DISC_CLASS : PIN_MARKER_DISC_CLASS;
   const disc = div.querySelector(`.${discClass}`);

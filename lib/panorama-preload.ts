@@ -16,14 +16,16 @@ export function preloadPanoramaUrl(url: string): Promise<void> {
   if (cached) return cached;
 
   evictOldestEntry();
-  const task = new Promise<void>((resolve, reject) => {
+  const task = new Promise<void>((resolve) => {
     const img = new Image();
     img.decoding = "async";
 
     const finish = () => resolve();
     const fail = () => {
+      // Soft-fail: S3/proxy sering down di lokal — jangan unhandledRejection
       readyCache.delete(url);
-      reject(new Error(`Gagal preload panorama: ${url}`));
+      console.warn(`Gagal preload panorama: ${url}`);
+      resolve();
     };
 
     img.onload = () => {

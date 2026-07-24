@@ -447,6 +447,7 @@ export function TourStructureSidebar({
                                         src={getS3ProxyUrl(thumb)}
                                         alt=""
                                         fill
+                                        unoptimized
                                         className="object-cover opacity-80"
                                         sizes="40px"
                                       />

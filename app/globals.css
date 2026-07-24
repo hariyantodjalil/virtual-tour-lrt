@@ -28,9 +28,9 @@
   --color-live: var(--live);
   --color-fog: var(--fog);
   --color-panel: var(--panel);
-  --font-sans: var(--font-source), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-chakra), ui-sans-serif, system-ui, sans-serif;
-  --font-body: var(--font-source), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
@@ -39,11 +39,11 @@ body {
 }
 
 .font-display {
-  font-family: var(--font-chakra), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
 }
 
 .font-body {
-  font-family: var(--font-source), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
 }
 
 @keyframes home-rail-sweep {
@@ -469,6 +469,35 @@ body {
 .lrt-pin-marker--space-maintenance .lrt-pin-marker__disc,
 .lrt-pin-marker--space-unknown .lrt-pin-marker__disc {
   background: #9ca3af;
+}
+
+.lrt-pin-marker--facility {
+  width: 75px;
+  height: 81px;
+}
+
+.lrt-pin-marker__img {
+  display: block;
+  width: 75px;
+  height: 81px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.lrt-pin-marker__img.is-selected {
+  filter:
+    drop-shadow(0 0 0 3px rgba(255, 255, 255, 0.95))
+    drop-shadow(0 0 0 6px rgba(59, 130, 246, 0.55))
+    drop-shadow(0 4px 14px rgba(0, 0, 0, 0.55));
+  transform: scale(1.06);
+}
+
+.lrt-hotspot--info .lrt-pin-marker--facility,
+.lrt-info-hotspot .lrt-pin-marker--facility {
+  transform: scale(var(--lrt-hotspot-scale, 1));
+  transform-origin: center bottom;
 }
 
 .lrt-pin-marker--info .lrt-pin-marker__disc {

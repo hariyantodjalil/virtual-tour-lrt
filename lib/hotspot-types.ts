@@ -1,3 +1,5 @@
+import type { FacilityIconId } from "./facility-icons";
+
 export type HotspotType = "scene" | "space" | "info" | "ad";
 
 export type HotspotDirection =
@@ -74,6 +76,8 @@ export type HotspotData = {
   sceneId?: string;
   spaceCode?: string;
   description?: string;
+  /** Ikon fasilitas untuk hotspot info (toilet, mushola, dll.) */
+  facilityIcon?: FacilityIconId;
   /** URL aset kreatif untuk hotspot iklan */
   creativeUrl?: string;
   creativeTitle?: string;

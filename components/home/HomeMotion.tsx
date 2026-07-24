@@ -53,8 +53,7 @@ export function HomeShell({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <div className="home-void relative min-h-screen overflow-x-hidden selection:bg-[#E31E2D] selection:text-white">
-      <div className="home-noise" aria-hidden />
+    <div className="relative min-h-screen overflow-x-hidden bg-[#f5f5f5] text-[#101828] selection:bg-[#d32f2f] selection:text-white">
       {children}
     </div>
   );

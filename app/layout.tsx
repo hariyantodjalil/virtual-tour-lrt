@@ -1,17 +1,12 @@
 import type { Metadata } from "next";
-import { Chakra_Petch, Source_Sans_3 } from "next/font/google";
+import { Poppins } from "next/font/google";
+import PublicContactFab from "@/components/PublicContactFab";
 import "./globals.css";
 
-const display = Chakra_Petch({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-chakra",
-});
-
-const body = Source_Sans_3({
+const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-  variable: "--font-source",
+  variable: "--font-poppins",
 });
 
 export const metadata: Metadata = {
@@ -28,8 +23,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={`${display.variable} ${body.variable} h-full scroll-smooth antialiased`}>
-      <body className="min-h-full flex flex-col font-body">{children}</body>
+    <html lang="id" className={`${poppins.variable} h-full scroll-smooth antialiased`}>
+      <body className="flex min-h-full flex-col font-body">
+        {children}
+        <PublicContactFab />
+      </body>
     </html>
   );
 }

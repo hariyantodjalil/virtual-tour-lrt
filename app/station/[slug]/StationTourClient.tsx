@@ -9,6 +9,7 @@
 
 import { useState, useCallback, useEffect, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Building2,
@@ -26,7 +27,11 @@ import {
 import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
 import InTourAdPopup from "@/components/tour/InTourAdPopup";
 import InTourInfoPopup from "@/components/tour/InTourInfoPopup";
+import StationPickerModal, {
+  type StationPickerItem,
+} from "@/components/tour/StationPickerModal";
 import VirtualTourViewer from "@/components/tour/VirtualTourViewer";
+import ContactPersonFab from "@/components/tour/ContactPersonFab";
 import { TourNavigationBar } from "@/components/tour/TourNavigationBar";
 import { GuidedRouteBar } from "@/components/tour/GuidedRouteBar";
 import { formatNumber, getWhatsAppUrl } from "@/lib/utils";
@@ -59,7 +64,11 @@ type Space = {
   tenantBrand?: string | null;
 };
 
-type Props = { stationInfo: StationInfo; spaces: Space[] };
+type Props = {
+  stationInfo: StationInfo;
+  spaces: Space[];
+  pickerStations: StationPickerItem[];
+};
 
 const TYPE_LABELS: Record<string, string> = {
   KIOS: "Kios",
@@ -126,7 +135,13 @@ function ToolButton({
   );
 }
 
-export default function StationTourClient({ stationInfo, spaces }: Props) {
+export default function StationTourClient({
+  stationInfo,
+  spaces,
+  pickerStations,
+}: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const initialPlacement = findScenePlacement(stationInfo.levels, stationInfo.scenes[0]?.id ?? "");
   const firstLevel = initialPlacement?.level ?? stationInfo.levels[0];
   const firstScene =
@@ -135,6 +150,9 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
     "concourse";
   const lastScene = stationInfo.scenes.at(-1)?.id ?? firstScene;
 
+  const [pickerOpen, setPickerOpen] = useState(
+    () => searchParams.get("pilih") === "1" || searchParams.get("pilih") === "true"
+  );
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
   const [selectedAd, setSelectedAd] = useState<AdHotspotPayload | null>(null);
   const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
@@ -341,8 +359,33 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
     setUnitsOpen(false);
   };
 
+  function closeStationPicker() {
+    setPickerOpen(false);
+    // Hapus query ?pilih agar refresh tidak buka ulang
+    if (searchParams.get("pilih")) {
+      router.replace(`/station/${stationInfo.slug}`, { scroll: false });
+    }
+  }
+
+  function selectStation(slug: string) {
+    if (slug === stationInfo.slug) {
+      closeStationPicker();
+      return;
+    }
+    router.push(`/station/${slug}`);
+  }
+
   return (
     <div className="tour-shell relative flex h-full min-h-0 flex-1 overflow-hidden">
+      {pickerOpen && pickerStations.length > 0 && (
+        <StationPickerModal
+          stations={pickerStations}
+          currentSlug={stationInfo.slug}
+          onSelect={selectStation}
+          onClose={closeStationPicker}
+        />
+      )}
+
       <VirtualTourViewer
         scenes={stationInfo.scenes}
         spaces={spaces.map((s) => ({ code: s.code, status: s.status }))}
@@ -396,14 +439,25 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
       {/* TOP CHIP — di atas navbar / tanpa bentrok hit-area */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[60] px-3 pt-4 sm:px-5 sm:pt-5">
         <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/"
-            className="tour-glass pointer-events-auto inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-[#F8ECEE] transition duration-300 hover:border-[#E31E2D]/40 hover:bg-[#3A161C]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="font-display hidden sm:inline">{stationInfo.name}</span>
-            <span className="font-display sm:hidden">Kembali</span>
-          </Link>
+          <div className="pointer-events-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-[#F8ECEE] transition duration-300 hover:border-[#E31E2D]/40 hover:bg-[#3A161C]"
+              aria-label="Pilih stasiun"
+            >
+              <MapPin className="h-4 w-4 text-[#E31E2D]" />
+              <span className="font-display hidden sm:inline">Pilih Stasiun</span>
+            </button>
+            <Link
+              href="/"
+              className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-[#F8ECEE] transition duration-300 hover:border-[#E31E2D]/40 hover:bg-[#3A161C]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="font-display hidden sm:inline">{stationInfo.name}</span>
+              <span className="font-display sm:hidden">Kembali</span>
+            </Link>
+          </div>
 
           {availableCount > 0 && (
             <div className="tour-glass pointer-events-none inline-flex items-center gap-2 rounded-full px-3 py-2">
@@ -804,6 +858,11 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
           onClose={() => setInfoPopup(null)}
         />
       )}
+
+      <ContactPersonFab
+        phone={commercialContactPhone}
+        stationName={stationInfo.name}
+      />
     </div>
   );
 }

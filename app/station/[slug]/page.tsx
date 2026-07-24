@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getStationBySlug, getStationMetaBySlug } from "@/lib/stations-data";
@@ -42,11 +43,35 @@ async function getStationData(slug: string) {
   }
 }
 
+/** Daftar stasiun untuk popup pilih stasiun (Figma 234:7240) */
+async function getPickerStations() {
+  try {
+    const stations = await prisma.station.findMany({
+      where: {
+        isActive: true,
+        virtualTourScenes: { some: { isActive: true } },
+      },
+      orderBy: { order: "asc" },
+      select: {
+        slug: true,
+        name: true,
+        order: true,
+        line: true,
+      },
+    });
+
+    return stations;
+  } catch {
+    return [];
+  }
+}
+
 export default async function StationPage({ params }: Props) {
   const { slug } = await params;
-  const [stationInfo, stationData] = await Promise.all([
+  const [stationInfo, stationData, pickerStations] = await Promise.all([
     getStationBySlug(slug),
     getStationData(slug),
+    getPickerStations(),
   ]);
 
   if (!stationInfo || stationInfo.scenes.length === 0) notFound();
@@ -69,30 +94,33 @@ export default async function StationPage({ params }: Props) {
 
   return (
     <div className="relative h-dvh overflow-hidden bg-[#1C0A0E]">
-      <StationTourClient
-        stationInfo={stationInfo}
-        spaces={spaces.map((s) => ({
-          id: s.id,
-          code: s.code,
-          name: s.name,
-          type: s.type,
-          status: s.status as "TERSEDIA" | "TERISI" | "MAINTENANCE",
-          area: s.area,
-          deposit: s.deposit,
-          floor: s.floor,
-          location: s.location,
-          nearestExit: s.nearestExit,
-          exposure: s.exposure,
-          powerSupply: s.powerSupply,
-          waterAccess: s.waterAccess,
-          airConditioning: s.airConditioning,
-          description: s.description,
-          tenantBrand:
-            s.occupancy?.tenant?.isActive !== false
-              ? s.occupancy?.tenant?.brandName ?? null
-              : null,
-        }))}
-      />
+      <Suspense fallback={<div className="h-full bg-[#1C0A0E]" />}>
+        <StationTourClient
+          stationInfo={stationInfo}
+          pickerStations={pickerStations}
+          spaces={spaces.map((s) => ({
+            id: s.id,
+            code: s.code,
+            name: s.name,
+            type: s.type,
+            status: s.status as "TERSEDIA" | "TERISI" | "MAINTENANCE",
+            area: s.area,
+            deposit: s.deposit,
+            floor: s.floor,
+            location: s.location,
+            nearestExit: s.nearestExit,
+            exposure: s.exposure,
+            powerSupply: s.powerSupply,
+            waterAccess: s.waterAccess,
+            airConditioning: s.airConditioning,
+            description: s.description,
+            tenantBrand:
+              s.occupancy?.tenant?.isActive !== false
+                ? s.occupancy?.tenant?.brandName ?? null
+                : null,
+          }))}
+        />
+      </Suspense>
     </div>
   );
 }

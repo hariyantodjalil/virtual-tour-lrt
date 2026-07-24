@@ -1,4 +1,5 @@
 import type { PrivacyBlur } from "./privacy-blur-types";
+import type { FacilityIconId } from "./facility-icons";
 
 export type Hotspot = {
   pitch: number;
@@ -18,6 +19,8 @@ export type Hotspot = {
   sceneId?: string;
   spaceCode?: string;
   description?: string;
+  /** Ikon fasilitas (toilet, mushola, dll.) — hanya untuk type info */
+  facilityIcon?: FacilityIconId;
   creativeUrl?: string;
   creativeTitle?: string;
 };

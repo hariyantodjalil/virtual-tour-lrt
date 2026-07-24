@@ -218,6 +218,7 @@ export function PannellumPreview({
                 onClick,
                 scale: h.scale,
                 spaceStatus,
+                facilityIcon: h.type === "info" ? h.facilityIcon : undefined,
                 sceneTitle:
                   h.type === "scene"
                     ? resolveSceneHotspotTitle(h.sceneId, scenesRef.current, h.text)

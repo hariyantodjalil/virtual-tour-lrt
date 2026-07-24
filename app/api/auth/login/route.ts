@@ -10,6 +10,7 @@ import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/r
 const loginSchema = z.object({
   email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
   password: z.string().min(1).max(128),
+  remember: z.boolean().optional(),
 }).strict();
 
 function emailFingerprint(email: string) {
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
   try {
     const parsed = await parseJsonRequest(request, loginSchema);
     if (!parsed.success) return parsed.response;
-    const { email, password } = parsed.data;
+    const { email, password, remember } = parsed.data;
 
     const accountLimit = consumeRateLimit(request, "auth-login-account", {
       limit: 5,
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 8,
+      maxAge: remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8,
       path: "/",
     });
     for (const [name, value] of Object.entries(rateLimitHeaders(accountLimit))) {

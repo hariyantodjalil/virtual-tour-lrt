@@ -80,6 +80,7 @@ function buildEditorHotspotEl(
     selected: isSelected,
     scale: h.scale,
     spaceStatus,
+    facilityIcon: h.type === "info" ? h.facilityIcon : undefined,
     sceneTitle:
       h.type === "scene" ? getSceneTitle(h.sceneId, h.text) : undefined,
     direction: h.type === "scene" ? h.direction : undefined,
@@ -463,7 +464,17 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
   }, [panoramaUrl]);
 
   const hotspotsSig = JSON.stringify(
-    hotspots.map((h) => [h._id, h.pitch, h.yaw, h.type, h.text, h.scale ?? 1, h.spaceCode ?? "", h.sceneId ?? ""])
+    hotspots.map((h) => [
+      h._id,
+      h.pitch,
+      h.yaw,
+      h.type,
+      h.text,
+      h.scale ?? 1,
+      h.spaceCode ?? "",
+      h.sceneId ?? "",
+      h.facilityIcon ?? "",
+    ])
   );
   const spacesSig = spaces.map((s) => `${s.code}:${s.status}`).join("|");
   const blursSig = JSON.stringify(

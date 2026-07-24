@@ -73,6 +73,11 @@ import type { TourLevel, TourArea } from "@/lib/virtual-tour-structure";
 import type { TourLevelPublic } from "@/lib/tour-types";
 
 import type { AddMode, HotspotItem } from "@/lib/hotspot-types";
+import {
+  DEFAULT_FACILITY_ICON,
+  FACILITY_ICONS,
+  type FacilityIconId,
+} from "@/lib/facility-icons";
 import { PannellumPreview } from "./PannellumPreview";
 import { PannellumEditor, type PannellumEditorHandle } from "./PannellumEditor";
 import { UnitPicker } from "./UnitPicker";
@@ -618,7 +623,9 @@ export default function VirtualTourEditorPage() {
                 ? "Iklan baru"
                 : "Info baru",
         scale: HOTSPOT_SCALE_DEFAULT,
-        ...(type === "info" ? { description: "" } : {}),
+        ...(type === "info"
+          ? { description: "", facilityIcon: DEFAULT_FACILITY_ICON }
+          : {}),
       };
       setHotspots((prev) => [...prev, newH]);
       setSelectedHotspotId(newH._id);
@@ -1100,12 +1107,14 @@ export default function VirtualTourEditorPage() {
           if (newType === "scene") {
             delete next.spaceCode;
             delete next.description;
+            delete next.facilityIcon;
             delete next.creativeUrl;
             delete next.creativeTitle;
           } else if (newType === "space") {
             delete next.sceneId;
             delete next.direction;
             delete next.description;
+            delete next.facilityIcon;
             delete next.creativeUrl;
             delete next.creativeTitle;
           } else if (newType === "info") {
@@ -1115,10 +1124,12 @@ export default function VirtualTourEditorPage() {
             delete next.creativeUrl;
             delete next.creativeTitle;
             if (!next.description) next.description = "";
+            if (!next.facilityIcon) next.facilityIcon = DEFAULT_FACILITY_ICON;
           } else if (newType === "ad") {
             delete next.sceneId;
             delete next.direction;
             delete next.description;
+            delete next.facilityIcon;
           }
           return next;
         })
@@ -2259,16 +2270,59 @@ export default function VirtualTourEditorPage() {
                       </div>
                     </>
                   ) : (
-                    <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Deskripsi Info</Label>
-                      <textarea
-                        value={selectedHotspot.description ?? ""}
-                        onChange={(e) => updateHotspot("description", e.target.value)}
-                        rows={4}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 resize-none"
-                        placeholder="Teks yang muncul di modal info saat diklik pengunjung"
-                      />
-                    </div>
+                    <>
+                      <div>
+                        <Label className="text-xs text-slate-500 mb-1.5 block">
+                          Ikon Fasilitas
+                        </Label>
+                        <div className="grid grid-cols-5 gap-1.5">
+                          {FACILITY_ICONS.map((icon) => {
+                            const active =
+                              (selectedHotspot.facilityIcon ?? DEFAULT_FACILITY_ICON) ===
+                              icon.id;
+                            return (
+                              <button
+                                key={icon.id}
+                                type="button"
+                                title={icon.label}
+                                onClick={() =>
+                                  updateHotspot("facilityIcon", icon.id as FacilityIconId)
+                                }
+                                className={`flex flex-col items-center gap-1 rounded-lg border p-1.5 transition ${
+                                  active
+                                    ? "border-blue-500 bg-blue-500/15"
+                                    : "border-slate-700 hover:bg-slate-800"
+                                }`}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={icon.src}
+                                  alt={icon.label}
+                                  width={36}
+                                  height={39}
+                                  className="h-[39px] w-9 object-contain"
+                                />
+                                <span className="text-[9px] font-medium text-slate-400">
+                                  {icon.label}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-slate-500 mb-1.5 block">
+                          Deskripsi Info
+                        </Label>
+                        <textarea
+                          value={selectedHotspot.description ?? ""}
+                          onChange={(e) => updateHotspot("description", e.target.value)}
+                          rows={4}
+                          className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                          placeholder="Teks yang muncul di modal info saat diklik pengunjung"
+                        />
+                      </div>
+                    </>
                   )}
 
                   <div>

@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { LogIn, Phone, UserCircle } from "lucide-react";
-
-type NavbarProps = {
-  variant?: "light" | "dark";
-};
+import LoginModal from "@/components/LoginModal";
+import RegisterModal from "@/components/RegisterModal";
 
 type AuthUser = {
   id: string;
@@ -15,11 +13,18 @@ type AuthUser = {
   role: string;
 };
 
-export default function Navbar({ variant = "light" }: NavbarProps) {
+const navItems = [
+  { href: "/", label: "Beranda", active: true },
+  { href: "#kontak", label: "Hubungi Tim" },
+  { href: "#area-komersial", label: "Area Komersial" },
+] as const;
+
+export default function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [scrolled, setScrolled] = useState(false);
-  const isDark = variant === "dark";
+  const [authView, setAuthView] = useState<"login" | "register" | null>(null);
   const panelHref = user?.role === "MITRA" ? "/partner" : "/cms/dashboard";
+  void variant;
 
   useEffect(() => {
     fetch("/api/auth/verify")
@@ -29,116 +34,121 @@ export default function Navbar({ variant = "light" }: NavbarProps) {
   }, []);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 48);
+    const onScroll = () => setScrolled(window.scrollY > 24);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   return (
-    <header
-      className={`fixed top-0 right-0 left-0 z-50 transition-all duration-500 ${
-        scrolled
-          ? isDark
-            ? "border-b border-white/5 bg-[#1C0A0E]/85 py-4 backdrop-blur-md"
-            : "border-b border-[var(--hairline)] bg-[color:rgb(255_248_242_/_0.92)] py-3 backdrop-blur-md"
-          : isDark
-            ? "bg-transparent py-7"
-            : "border-b border-transparent bg-transparent py-4"
-      }`}
-    >
-      <div className="container mx-auto flex max-w-7xl items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E31E2D]">
-            <span className="font-display text-sm font-bold text-white">LRT</span>
-          </div>
-          <div className="flex flex-col leading-tight">
-            <span
-              className={`font-display text-lg font-semibold tracking-tight ${
-                isDark ? "text-white" : "text-[#1B3A6B]"
-              }`}
-            >
-              LRT Jabodebek
+    <>
+      <header
+        className={`fixed top-0 right-0 left-0 z-50 transition-all duration-300 ${
+          scrolled ? "bg-black/70 py-3 shadow-lg backdrop-blur-md" : "bg-transparent py-5"
+        }`}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 md:px-10">
+          <Link href="/" className="flex shrink-0 items-center gap-1.5" aria-label="LRT Jabodebek">
+            <span className="relative h-10 w-[96px]">
+              <Image
+                src="/brand/landing/logo-kai-nav.png"
+                alt="KAI"
+                fill
+                sizes="96px"
+                className="object-contain object-left"
+                priority
+              />
             </span>
-            <span
-              className={`font-display text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                isDark ? "text-white/45" : "text-[var(--fog)]"
-              }`}
-            >
-              Virtual Tour
+            <span className="relative h-11 w-[108px]">
+              <Image
+                src="/brand/landing/logo-lrt-nav.png"
+                alt="LRT Jabodebek"
+                fill
+                sizes="108px"
+                className="object-contain object-left"
+                priority
+              />
             </span>
-          </div>
-        </Link>
-
-        <div className="hidden items-center gap-8 md:flex">
-          <a
-            href="#alur"
-            className={`text-sm transition-colors ${
-              isDark ? "text-white/45 hover:text-white" : "text-[var(--fog)] hover:text-[var(--ink)]"
-            }`}
-          >
-            Alur
-          </a>
-          <a
-            href="#deck"
-            className={`text-sm transition-colors ${
-              isDark ? "text-white/45 hover:text-white" : "text-[var(--fog)] hover:text-[var(--ink)]"
-            }`}
-          >
-            Stasiun
-          </a>
-          <a
-            href="#kontak"
-            className={`text-sm transition-colors ${
-              isDark ? "text-white/45 hover:text-white" : "text-[var(--fog)] hover:text-[var(--ink)]"
-            }`}
-          >
-            Kontak
-          </a>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="tel:+622180800000"
-            className={`hidden h-10 items-center gap-2 rounded-full px-4 text-sm font-medium transition sm:inline-flex ${
-              isDark
-                ? "text-white/70 hover:bg-white/5 hover:text-white"
-                : "text-[#1B3A6B] hover:bg-black/5"
-            }`}
-          >
-            <Phone className="h-4 w-4" />
-            Hubungi
           </Link>
-          <Link
-            href={user ? panelHref : "#deck"}
-            className={`inline-flex h-10 items-center gap-2 rounded-full px-5 text-sm font-semibold transition hover:scale-[1.03] ${
-              isDark
-                ? "bg-white text-black hover:bg-neutral-100"
-                : "bg-[#1B3A6B] text-white hover:bg-[#163058]"
-            }`}
+
+          <nav
+            className="hidden items-center rounded-xl bg-[#fffcfc] py-1.5 pr-6 pl-1.5 md:flex"
+            aria-label="Navigasi utama"
           >
-            {user ? (
-              <>
-                <UserCircle className="h-4 w-4" />
-                Panel
-              </>
+            {navItems.map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                className={`rounded-xl px-6 py-2.5 text-xs font-medium transition ${
+                  item.active ? "bg-[#d32f2f] text-white" : "text-[#d32f2f] hover:bg-[#d32f2f]/10"
+                }`}
+              >
+                {item.label}
+              </a>
+            ))}
+          </nav>
+
+          <nav className="flex items-center gap-1 md:hidden" aria-label="Navigasi cepat">
+            {navItems.slice(1).map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                className="rounded-lg px-2 py-1.5 text-[10px] font-medium text-white/90"
+              >
+                {item.label}
+              </a>
+            ))}
+          </nav>
+
+          {user ? (
+            user.role === "MITRA" ? (
+              <Link
+                href={panelHref}
+                aria-label={`Profil ${user.name || "Mitra"}`}
+                title={user.name || "Panel Mitra"}
+                className="inline-flex size-12 items-center justify-center rounded-xl text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110"
+                style={{ backgroundImage: "linear-gradient(155deg, #d32f2f 0%, #b71c1c 100%)" }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/brand/landing/icons/user.svg" alt="" width={18} height={18} className="size-[18px]" />
+              </Link>
             ) : (
-              "Mulai jelajah"
-            )}
-          </Link>
-          {!user && (
-            <Link
-              href="/login"
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
-                isDark ? "text-white/60 hover:bg-white/5 hover:text-white" : "text-[#1B3A6B] hover:bg-black/5"
-              }`}
-              aria-label="Login"
+              <Link
+                href={panelHref}
+                title={user.name}
+                className="inline-flex h-12 max-w-[180px] items-center justify-center rounded-xl px-5 text-xs font-semibold tracking-wide text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110"
+                style={{ backgroundImage: "linear-gradient(155deg, #d32f2f 0%, #b71c1c 100%)" }}
+              >
+                <span className="truncate">{user.name || "Akun"}</span>
+              </Link>
+            )
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAuthView("login")}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-xs font-semibold tracking-wide text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110"
+              style={{ backgroundImage: "linear-gradient(155deg, #d32f2f 0%, #b71c1c 100%)" }}
             >
-              <LogIn className="h-4 w-4" />
-            </Link>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/landing/icons/user.svg" alt="" width={16} height={16} className="size-4" />
+              Login
+            </button>
           )}
         </div>
-      </div>
-    </header>
+      </header>
+
+      <LoginModal
+        open={authView === "login"}
+        onClose={() => setAuthView(null)}
+        onSwitchToRegister={() => setAuthView("register")}
+        onSuccess={(u) => setUser(u)}
+      />
+      <RegisterModal
+        open={authView === "register"}
+        onClose={() => setAuthView(null)}
+        onSwitchToLogin={() => setAuthView("login")}
+        onSuccess={(u) => setUser(u)}
+      />
+    </>
   );
 }

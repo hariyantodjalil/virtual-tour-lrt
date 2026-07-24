@@ -1,0 +1,233 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "LRT Jabodebek" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "KAI" [ref=e7]
+          - img "LRT Jabodebek" [ref=e9]
+        - navigation "Navigasi utama" [ref=e10]:
+          - link "Beranda" [ref=e11] [cursor=pointer]:
+            - /url: /
+          - link "Hubungi Tim" [ref=e12] [cursor=pointer]:
+            - /url: "#kontak"
+          - link "Area Komersial" [ref=e13] [cursor=pointer]:
+            - /url: "#area-komersial"
+        - link "Login" [ref=e14] [cursor=pointer]:
+          - /url: /login
+    - generic [ref=e16]:
+      - heading "Temukan Ruang Komersial Terbaik di Area LRT Jabodebek" [level=1] [ref=e18]
+      - paragraph [ref=e20]: Cari berbagai pilihan ruang komersial, media iklan, dan area usaha di stasiun LRT Jabodebek. Lihat lokasinya lewat Virtual Tour 360° sebelum mengajukan penyewaan.
+      - generic [ref=e22]:
+        - link "Jelajahi Sekarang" [ref=e23] [cursor=pointer]:
+          - /url: "#area-komersial"
+        - link "Tutorial" [ref=e24] [cursor=pointer]:
+          - /url: "#langkah"
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - paragraph [ref=e31]: LRT JABODEBEK
+          - heading "Menghubungkan Perjalanan, Membuka Peluang" [level=2] [ref=e32]
+          - paragraph [ref=e33]: LRT Jabodebek menghubungkan berbagai kawasan strategis di Jabodetabek melalui layanan transportasi yang modern dan terintegrasi. Selain mendukung mobilitas masyarakat, setiap stasiun juga menghadirkan fasilitas serta area komersial yang dapat dimanfaatkan oleh masyarakat maupun mitra usaha.
+        - img "Kereta LRT Jabodebek di stasiun" [ref=e36]
+      - generic [ref=e37]:
+        - heading "Kenapa Harus Memilih LRT JABODEBEK?" [level=2] [ref=e39]
+        - generic [ref=e41]:
+          - paragraph [ref=e42]: Terintegrasi dengan Tranportasi lainnya
+          - generic [ref=e43]:
+            - paragraph [ref=e47]: KRL
+            - paragraph [ref=e52]: MRT
+            - paragraph [ref=e57]: Trans Jakarta
+            - paragraph [ref=e62]: Angkutan Lainnya
+        - generic [ref=e63]:
+          - generic [ref=e65]:
+            - generic [ref=e66]:
+              - generic [ref=e67]: S
+              - generic [ref=e70]: S
+              - generic [ref=e73]: R
+              - generic [ref=e76]: K
+              - generic [ref=e79]: J
+              - generic [ref=e82]: J
+              - generic [ref=e85]: A
+            - generic [ref=e88]: "2026"
+          - generic [ref=e90]:
+            - generic [ref=e94]:
+              - heading "Mobilitas Penumpang Tinggi" [level=3] [ref=e95]
+              - paragraph [ref=e96]: Menjangkau lebih dari +500.000 penumpang setiap hari, memberikan peluang eksposur yang luas bagi bisnis dan media promosi anda.
+            - generic [ref=e100]:
+              - heading "Lokasi Strategis" [level=3] [ref=e101]
+              - paragraph [ref=e102]: Berada di kawasan strategis yang mencakup pusat aktivitas, perkantoran, permukiman, dan pusat perbelanjaan, dengan fasilitas stasiun yang mendukung kenyamanan perjalanan.
+            - generic [ref=e106]:
+              - heading "Peluang Bisnis" [level=3] [ref=e107]
+              - paragraph [ref=e108]: Menjangkau lebih dari +500.000 penumpang setiap hari, memberikan peluang eksposur yang luas bagi bisnis dan media promosi anda.
+    - generic [ref=e110]:
+      - generic [ref=e111]:
+        - heading "Temukan dan Rasakan Lokasi yang Tepat" [level=2] [ref=e112]
+        - paragraph [ref=e113]: Jelajahi setiap sudut stasiun melalui Virtual Tour 360° untuk menemukan fasilitas, area komersial, media promosi, dan berbagai peluang yang tersedia di LRT Jabodebek.
+        - link "Klik Gambar Berikut Untuk Memulai Virtual Tour" [ref=e114] [cursor=pointer]:
+          - /url: "#area-komersial"
+      - link "Preview virtual tour 360 stasiun LRT Mulai Virtual Tour Klik Untuk Memulai Virtual Tour 360°" [ref=e116] [cursor=pointer]:
+        - /url: "#area-komersial"
+        - img "Preview virtual tour 360 stasiun LRT" [ref=e117]
+        - generic [ref=e118]:
+          - paragraph [ref=e120]: Mulai Virtual Tour
+          - paragraph [ref=e121]: Klik Untuk Memulai Virtual Tour 360°
+    - generic [ref=e124]:
+      - img "Reno, maskot LRT Jabodebek" [ref=e127]
+      - generic [ref=e128]:
+        - generic [ref=e129]:
+          - heading "Langkah Langkah Untuk Memulai Bisnis Anda" [level=2] [ref=e130]
+          - paragraph [ref=e131]: Ikuti langkah-langkah berikut untuk menjelajahi area komersial dan mengajukan penyewaan dengan mudah melalui platform LRT Jabodebek.
+        - generic [ref=e132]:
+          - generic [ref=e133]: "1"
+          - generic [ref=e136]: "2"
+          - generic [ref=e139]: "3"
+          - generic [ref=e142]: "4"
+        - generic [ref=e144]:
+          - generic [ref=e146]:
+            - heading "Pilih Space dan Kategori" [level=3] [ref=e148]
+            - paragraph [ref=e150]: Jelajahi berbagai area komersial dan media promosi yang tersedia di stasiun LRT Jabodebek sesuai kebutuhan bisnis Anda.
+          - generic [ref=e152]:
+            - heading "Ajukan Penyewaan" [level=3] [ref=e154]
+            - paragraph [ref=e156]: Isi formulir pengajuan penyewaan melalui platform untuk mendaftarkan minat Anda pada area yang dipilih.
+          - generic [ref=e158]:
+            - heading "Tunggu Konfirmasi Dari Petugas" [level=3] [ref=e160]
+            - paragraph [ref=e162]: Petugas akan meninjau pengajuan Anda dan menghubungi Anda untuk proses selanjutnya.
+          - generic [ref=e164]:
+            - heading "Penyewaan Berhasil" [level=3] [ref=e166]
+            - paragraph [ref=e168]: Proses pengajuan Anda telah selesai dan area komersial siap digunakan.
+    - generic [ref=e171]:
+      - generic [ref=e172]:
+        - generic [ref=e173]:
+          - heading "Temukan Area Komersial yang Sesuai dengan Kebutuhan Anda" [level=2] [ref=e174]
+          - paragraph [ref=e175]: Jelajahi berbagai pilihan area komersial dan media promosi yang tersedia di stasiun LRT Jabodebek. Temukan lokasi yang tepat untuk mendukung kebutuhan bisnis dan promosi Anda.
+        - generic [ref=e176]:
+          - generic [ref=e177]:
+            - paragraph [ref=e178]: 110+
+            - paragraph [ref=e179]: Area Komersial
+          - generic [ref=e180]:
+            - paragraph [ref=e181]: "18"
+            - paragraph [ref=e182]: Stasiun
+      - generic [ref=e183]:
+        - button "Semua" [ref=e184]
+        - button "Kios" [ref=e185]
+        - button "Vending Machine" [ref=e186]
+        - button "Iklan" [ref=e187]
+      - generic [ref=e188]:
+        - link "Retail 9 B di Bekasi Barat Tersedia Tenant Retail 9 B Stasiun Bekasi Barat" [ref=e189] [cursor=pointer]:
+          - /url: /station/bekasi-barat
+          - generic [ref=e190]:
+            - img "Retail 9 B di Bekasi Barat" [ref=e191]
+            - generic [ref=e192]:
+              - generic [ref=e193]: Tersedia
+              - generic [ref=e194]: Tenant
+          - generic [ref=e196]:
+            - heading "Retail 9 B" [level=3] [ref=e197]
+            - paragraph [ref=e198]: Stasiun Bekasi Barat
+        - link "Retail 8 B di Bekasi Barat Tersedia Vending Retail 8 B Stasiun Bekasi Barat" [ref=e200] [cursor=pointer]:
+          - /url: /station/bekasi-barat
+          - generic [ref=e201]:
+            - img "Retail 8 B di Bekasi Barat" [ref=e202]
+            - generic [ref=e203]:
+              - generic [ref=e204]: Tersedia
+              - generic [ref=e205]: Vending
+          - generic [ref=e207]:
+            - heading "Retail 8 B" [level=3] [ref=e208]
+            - paragraph [ref=e209]: Stasiun Bekasi Barat
+        - link "Retail 8 A di Bekasi Barat Tersedia Vending Retail 8 A Stasiun Bekasi Barat" [ref=e211] [cursor=pointer]:
+          - /url: /station/bekasi-barat
+          - generic [ref=e212]:
+            - img "Retail 8 A di Bekasi Barat" [ref=e213]
+            - generic [ref=e214]:
+              - generic [ref=e215]: Tersedia
+              - generic [ref=e216]: Vending
+          - generic [ref=e218]:
+            - heading "Retail 8 A" [level=3] [ref=e219]
+            - paragraph [ref=e220]: Stasiun Bekasi Barat
+        - link "Vending Machine 4 di Harjamukti Tersedia Vending HAR-04 Stasiun Harjamukti" [ref=e222] [cursor=pointer]:
+          - /url: /station/harjamukti
+          - generic [ref=e223]:
+            - img "Vending Machine 4 di Harjamukti" [ref=e224]
+            - generic [ref=e225]:
+              - generic [ref=e226]: Tersedia
+              - generic [ref=e227]: Vending
+          - generic [ref=e229]:
+            - heading "HAR-04" [level=3] [ref=e230]
+            - paragraph [ref=e231]: Stasiun Harjamukti
+        - link "Ruko 2 di Harjamukti Tersedia Ruko HAR-02 Stasiun Harjamukti" [ref=e233] [cursor=pointer]:
+          - /url: /station/harjamukti
+          - generic [ref=e234]:
+            - img "Ruko 2 di Harjamukti" [ref=e235]
+            - generic [ref=e236]:
+              - generic [ref=e237]: Tersedia
+              - generic [ref=e238]: Ruko
+          - generic [ref=e240]:
+            - heading "HAR-02" [level=3] [ref=e241]
+            - paragraph [ref=e242]: Stasiun Harjamukti
+        - link "Kios 1 di Harjamukti Tersedia Tenant HAR-01 Stasiun Harjamukti" [ref=e244] [cursor=pointer]:
+          - /url: /station/harjamukti
+          - generic [ref=e245]:
+            - img "Kios 1 di Harjamukti" [ref=e246]
+            - generic [ref=e247]:
+              - generic [ref=e248]: Tersedia
+              - generic [ref=e249]: Tenant
+          - generic [ref=e251]:
+            - heading "HAR-01" [level=3] [ref=e252]
+            - paragraph [ref=e253]: Stasiun Harjamukti
+        - link "Vending Machine 4 di Ciracas Tersedia Vending CRC-04 Stasiun Ciracas" [ref=e255] [cursor=pointer]:
+          - /url: /station/ciracas
+          - generic [ref=e256]:
+            - img "Vending Machine 4 di Ciracas" [ref=e257]
+            - generic [ref=e258]:
+              - generic [ref=e259]: Tersedia
+              - generic [ref=e260]: Vending
+          - generic [ref=e262]:
+            - heading "CRC-04" [level=3] [ref=e263]
+            - paragraph [ref=e264]: Stasiun Ciracas
+        - link "Ruko 2 di Ciracas Tersedia Ruko CRC-02 Stasiun Ciracas" [ref=e266] [cursor=pointer]:
+          - /url: /station/ciracas
+          - generic [ref=e267]:
+            - img "Ruko 2 di Ciracas" [ref=e268]
+            - generic [ref=e269]:
+              - generic [ref=e270]: Tersedia
+              - generic [ref=e271]: Ruko
+          - generic [ref=e273]:
+            - heading "CRC-02" [level=3] [ref=e274]
+            - paragraph [ref=e275]: Stasiun Ciracas
+    - contentinfo [ref=e277]:
+      - generic [ref=e278]:
+        - generic [ref=e279]:
+          - generic [ref=e280]:
+            - img "KAI" [ref=e282]
+            - img "LRT Jabodebek" [ref=e284]
+          - paragraph [ref=e285]: PT Kereta Api Indonesia (Persero)Divisi LRT Jabodebek
+          - link "Hubungi Tim Komersial" [ref=e286] [cursor=pointer]:
+            - /url: https://wa.me/628118012012
+        - generic [ref=e287]:
+          - paragraph [ref=e288]: Transportasi Cerdas, Mobilitas Tanpa Batas
+          - paragraph [ref=e289]: Jelajahi stasiun LRT Jabodebek melalui Virtual Tour 360° untuk melihat fasilitas, area komersial, dan media promosi secara interaktif dalam satu platform.
+          - generic [ref=e290]:
+            - link "Instagram" [ref=e291] [cursor=pointer]:
+              - /url: https://www.instagram.com/
+            - link "Facebook" [ref=e292] [cursor=pointer]:
+              - /url: https://www.facebook.com/
+            - link "TikTok" [ref=e293] [cursor=pointer]:
+              - /url: https://www.tiktok.com/
+            - link "YouTube" [ref=e294] [cursor=pointer]:
+              - /url: https://www.youtube.com/
+        - generic [ref=e295]:
+          - list [ref=e296]:
+            - listitem [ref=e297]:
+              - link "Testimoni" [ref=e298] [cursor=pointer]:
+                - /url: "#kontak"
+            - listitem [ref=e299]:
+              - link "Tentang Kami" [ref=e300] [cursor=pointer]:
+                - /url: "#tentang"
+            - listitem [ref=e301]:
+              - link "Kebijakan Privasi" [ref=e302] [cursor=pointer]:
+                - /url: "#kontak"
+            - listitem [ref=e303]:
+              - link "Syarat Dan Ketentuan" [ref=e304] [cursor=pointer]:
+                - /url: "#kontak"
+          - paragraph [ref=e305]: © 2026 LRT Jabodebek Virtual Tour
+  - button "Open Next.js Dev Tools" [ref=e311] [cursor=pointer]

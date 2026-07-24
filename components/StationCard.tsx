@@ -1,6 +1,6 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Users } from "lucide-react";
-import { formatNumber } from "@/lib/utils";
+import { getStationImage } from "@/lib/station-images";
 
 type SpaceStats = {
   total: number;
@@ -13,63 +13,51 @@ type StationCardProps = {
   slug: string;
   line: string;
   address: string;
+  location?: string | null;
   dailyPassengers: number;
   spaceStats?: SpaceStats;
   order: number;
+  imageUrl?: string | null;
 };
 
 export default function StationCard({
   name,
   slug,
-  line,
   address,
-  dailyPassengers,
-  spaceStats,
+  location,
   order,
+  imageUrl,
 }: StationCardProps) {
-  const availableCount = spaceStats?.available ?? 0;
-  const hasAvailable = availableCount > 0;
+  const image = imageUrl || getStationImage(slug, order);
+  const areaLabel = location?.trim() || address;
 
   return (
     <Link
       href={`/station/${slug}`}
-      className="group relative flex aspect-[5/4] flex-col justify-between overflow-hidden rounded-3xl border border-[color:rgb(255_214_218_/_0.14)] bg-[#3A161C] p-7 transition duration-500 hover:border-[#E31E2D]/55 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]"
+      className="group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-[0_2px_12px_rgba(16,24,40,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(196,18,48,0.18)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d32f2f]"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/5 transition group-hover:scale-110">
-          <ArrowUpRight className="h-5 w-5 -rotate-45 text-white" />
+      <div className="relative aspect-[200/176] w-full overflow-hidden">
+        <Image
+          src={image}
+          alt={`Stasiun ${name}`}
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 200px"
+          className="object-cover transition duration-500 group-hover:scale-105"
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-3 border border-t-0 border-[#f3f4f6] px-4 py-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold leading-5 text-[#101828]">{name}</h3>
+          <p className="mt-0.5 truncate text-xs leading-4 text-[#6a7282]">{areaLabel}</p>
         </div>
-        <span className="rounded-full border border-white/10 px-3 py-1 font-display text-xs font-medium text-white/50">
-          {String(order).padStart(2, "0")}
-        </span>
-      </div>
 
-      <div>
-        <p className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-white/35">
-          {line}
-        </p>
-        <h3 className="mt-2 font-display text-3xl font-semibold leading-none tracking-tight text-white">
-          {name}
-        </h3>
-        <p className="mt-3 line-clamp-1 text-sm text-white/40">{address}</p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 border-t border-white/10 pt-5 text-sm text-white/45">
-        {hasAvailable ? (
-          <span className="inline-flex items-center gap-1.5 text-[#34d399]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" />
-            {availableCount} tersedia
-          </span>
-        ) : (
-          <span>Penuh</span>
-        )}
-        <span className="inline-flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5 text-[#E31E2D]" />
-          {formatNumber(dailyPassengers)}/hari
-        </span>
-        {spaceStats && <span>{spaceStats.total} unit</span>}
-        <span className="ml-auto font-display text-sm font-semibold text-white transition group-hover:text-[#E31E2D]">
-          Masuk tour
+        <span
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#c41230] transition group-hover:scale-110"
+          aria-hidden
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/icon-arrow.svg" alt="" width={14} height={14} className="size-3.5" />
         </span>
       </div>
     </Link>

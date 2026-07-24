@@ -5,6 +5,7 @@ import {
   type HotspotDirection,
   type HotspotType,
 } from "./hotspot-types";
+import { isFacilityIconId } from "./facility-icons";
 
 function normalizeDirection(raw: unknown): HotspotDirection | undefined {
   if (typeof raw !== "string") return undefined;
@@ -33,6 +34,7 @@ export function normalizeHotspots(raw: unknown): Hotspot[] {
     const creativeUrl = h.creativeUrl ? String(h.creativeUrl) : undefined;
     const creativeTitle = h.creativeTitle ? String(h.creativeTitle) : undefined;
     const direction = normalizeDirection(h.direction);
+    const facilityIcon = isFacilityIconId(h.facilityIcon) ? h.facilityIcon : undefined;
 
     let type = normalizeType(h.type);
     if (!type) {
@@ -52,6 +54,7 @@ export function normalizeHotspots(raw: unknown): Hotspot[] {
       sceneId,
       spaceCode,
       description,
+      ...(type === "info" && facilityIcon ? { facilityIcon } : {}),
       ...(type === "ad"
         ? {
             ...(creativeUrl ? { creativeUrl } : {}),
