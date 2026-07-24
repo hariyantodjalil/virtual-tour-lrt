@@ -4,7 +4,7 @@
  * Wrapper fetch untuk halaman CMS.
  *
  * Jika API mengembalikan 401 (sesi expired atau belum login),
- * otomatis redirect ke /cms/login dengan menyertakan URL saat ini
+ * otomatis redirect ke /login dengan menyertakan URL saat ini
  * sebagai `redirect` param agar user bisa kembali ke halaman yang sama.
  */
 export async function cmsFetch(
@@ -16,7 +16,7 @@ export async function cmsFetch(
   if (response.status === 401) {
     const currentPath =
       typeof window !== "undefined" ? window.location.pathname : "/cms/dashboard";
-    const loginUrl = `/cms/login?redirect=${encodeURIComponent(currentPath)}&reason=expired`;
+    const loginUrl = `/login?redirect=${encodeURIComponent(currentPath)}&reason=expired`;
     if (typeof window !== "undefined") {
       window.location.href = loginUrl;
     }

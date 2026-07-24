@@ -109,6 +109,19 @@ function makeSceneData(stationCode: string, index: number) {
 }
 
 async function main() {
+  if (process.env.ALLOW_DESTRUCTIVE_SEED !== "true") {
+    throw new Error("Seed dibatalkan. Set ALLOW_DESTRUCTIVE_SEED=true untuk mengizinkan reset data.");
+  }
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_PRODUCTION_SEED !== "true") {
+    throw new Error("Seed production dibatalkan. Set ALLOW_PRODUCTION_SEED=true jika benar-benar diperlukan.");
+  }
+
+  const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
+  const adminPlainPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (!adminEmail || !adminPlainPassword || adminPlainPassword.length < 12) {
+    throw new Error("SEED_ADMIN_EMAIL dan SEED_ADMIN_PASSWORD (minimal 12 karakter) wajib diisi.");
+  }
+
   console.log("Seeding database...");
 
   await prisma.visitEvent.deleteMany();
@@ -119,16 +132,16 @@ async function main() {
   await prisma.station.deleteMany();
   await prisma.user.deleteMany();
 
-  const adminPassword = await bcrypt.hash("admin123", 10);
+  const adminPassword = await bcrypt.hash(adminPlainPassword, 12);
   await prisma.user.create({
     data: {
-      email: "admin@lrtjabodebek.id",
+      email: adminEmail,
       name: "Administrator",
       password: adminPassword,
       role: "ADMIN",
     },
   });
-  console.log("  ok Admin user (admin@lrtjabodebek.id / admin123)");
+  console.log(`  ok Admin user (${adminEmail})`);
 
   for (const stationData of stations) {
     const station = await prisma.station.create({

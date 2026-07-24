@@ -3,21 +3,23 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { requireRole } from "@/lib/auth";
+import { parseJsonRequest } from "@/lib/api-validation";
+import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/rate-limit";
 
 const leadSchema = z.object({
-  spaceId: z.string().optional(),
-  companyName: z.string().min(2),
-  contactName: z.string().min(2),
-  phone: z.string().min(10),
-  email: z.string().email(),
-  password: z.string().min(8, "Password minimal 8 karakter"),
-  businessType: z.string().min(3),
-  spaceRequirement: z.string().optional(),
-  message: z.string().optional(),
-});
+  spaceId: z.string().trim().min(1).max(128).optional(),
+  companyName: z.string().trim().min(2).max(160),
+  contactName: z.string().trim().min(2).max(160),
+  phone: z.string().trim().min(10).max(32).regex(/^[+0-9()\s.-]+$/),
+  email: z.string().trim().email().max(254),
+  password: z.string().min(8, "Password minimal 8 karakter").max(128),
+  businessType: z.string().trim().min(3).max(120),
+  spaceRequirement: z.string().trim().max(500).optional(),
+  message: z.string().trim().max(2_000).optional(),
+}).strict();
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["ADMIN", "EDITOR"]);
+  const auth = await requireRole(req, ["ADMIN", "EDITOR"]);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {
@@ -36,9 +38,21 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const rateLimit = consumeRateLimit(req, "lead-submit", {
+    limit: 10,
+    windowMs: 10 * 60 * 1000,
+  });
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Terlalu banyak pengajuan. Coba lagi nanti." },
+      { status: 429, headers: rateLimitHeaders(rateLimit) }
+    );
+  }
+
   try {
-    const body = await req.json();
-    const data = leadSchema.parse(body);
+    const parsed = await parseJsonRequest(req, leadSchema);
+    if (!parsed.success) return parsed.response;
+    const data = parsed.data;
     const email = data.email.toLowerCase();
 
     let user = await prisma.user.findUnique({ where: { email } });
@@ -60,7 +74,7 @@ export async function POST(req: NextRequest) {
         data: {
           email,
           name: data.contactName,
-          password: await bcrypt.hash(data.password, 10),
+          password: await bcrypt.hash(data.password, 12),
           role: "MITRA",
         },
       });
@@ -90,16 +104,13 @@ export async function POST(req: NextRequest) {
         data: {
           spaceId: data.spaceId,
           eventType: "FORM_SUBMIT",
-          sessionId: req.headers.get("x-forwarded-for") ?? "unknown",
+          sessionId: getClientIdentifier(req),
         },
       });
     }
 
-    return NextResponse.json(lead, { status: 201 });
-  } catch (e) {
-    if (e instanceof z.ZodError) {
-      return NextResponse.json({ error: "Data tidak valid", details: e.issues }, { status: 400 });
-    }
+    return NextResponse.json(lead, { status: 201, headers: rateLimitHeaders(rateLimit) });
+  } catch {
     return NextResponse.json({ error: "Gagal menyimpan lead" }, { status: 500 });
   }
 }

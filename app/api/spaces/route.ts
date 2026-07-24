@@ -8,8 +8,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const station = await prisma.station.findUnique({
-      where: { slug: stationSlug },
+    const station = await prisma.station.findFirst({
+      where: { slug: stationSlug, isActive: true },
       include: {
         commercialSpaces: {
           orderBy: [{ floor: "asc" }, { code: "asc" }],
@@ -24,18 +24,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(station.commercialSpaces);
   } catch {
     return NextResponse.json({ error: "Gagal mengambil data ruang" }, { status: 500 });
-  }
-}
-
-export async function PUT(req: NextRequest) {
-  try {
-    const { id, status } = await req.json();
-    const updated = await prisma.commercialSpace.update({
-      where: { id },
-      data: { status },
-    });
-    return NextResponse.json(updated);
-  } catch {
-    return NextResponse.json({ error: "Gagal memperbarui status" }, { status: 500 });
   }
 }

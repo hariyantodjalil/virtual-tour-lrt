@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
+import type { ViewerBakeContext } from "@/lib/panorama-privacy-blur-geometry";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { AddMode, HotspotItem } from "@/lib/hotspot-types";
 import type { PrivacyBlurItem } from "@/lib/privacy-blur-types";
@@ -8,14 +9,20 @@ import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { findSpaceStatus } from "@/lib/space-availability";
 import {
   setupHotspotElement,
+  resolveSceneHotspotTitle,
   setHotspotSelected,
   setHotspotScale,
+  setSceneNavDirection,
 } from "@/lib/pannellum-hotspot";
 import {
+  bindPrivacyBlursInContainer,
   setupPrivacyBlurElement,
   setPrivacyBlurSelected,
   setPrivacyBlurDimensions,
 } from "@/lib/pannellum-privacy-blur";
+import { PANNELLUM_EDITOR_HFOV, PANNELLUM_INTERACTION, PANNELLUM_PITCH_LIMITS } from "@/lib/pannellum-viewer-defaults";
+import type { SceneInitialView } from "@/lib/tour-types";
+import { PANNELLUM_HFOV } from "@/lib/pannellum-viewer-defaults";
 
 declare global {
   interface Window {
@@ -62,12 +69,22 @@ function buildEditorHotspotEl(
   h: HotspotItem,
   isSelected: boolean,
   getSpaceStatus: (code: string) => SpaceAvailabilityStatus | undefined,
+  getSceneTitle: (sceneId: string | undefined, fallback: string) => string,
   onPointerDownRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string, e: PointerEvent) => void>,
   onDeleteRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string) => void>
 ) {
   const spaceStatus =
     h.type === "space" && h.spaceCode ? getSpaceStatus(h.spaceCode) : undefined;
-  setupHotspotElement(div, { type: h.type, selected: isSelected, scale: h.scale, spaceStatus });
+  setupHotspotElement(div, {
+    type: h.type,
+    selected: isSelected,
+    scale: h.scale,
+    spaceStatus,
+    facilityIcon: h.type === "info" ? h.facilityIcon : undefined,
+    sceneTitle:
+      h.type === "scene" ? getSceneTitle(h.sceneId, h.text) : undefined,
+    direction: h.type === "scene" ? h.direction : undefined,
+  });
   div.style.cursor = "grab";
 
   div.addEventListener("pointerdown", (e) => {
@@ -87,15 +104,18 @@ function buildEditorBlurEl(
   div: HTMLDivElement,
   blur: PrivacyBlurItem,
   isSelected: boolean,
+  guideOnly: boolean,
   onPointerDownRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string, e: PointerEvent) => void>,
   onDeleteRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string) => void>
 ) {
   setupPrivacyBlurElement(div, {
     editor: true,
+    guideOnly,
     selected: isSelected,
     width: blur.width,
     height: blur.height,
     intensity: blur.intensity,
+    radius: blur.radius,
     scale: blur.scale,
   });
   div.style.cursor = "grab";
@@ -129,25 +149,40 @@ interface Props {
   onHotspotDelete: (id: string) => void;
   onBlurDelete: (id: string) => void;
   spaces?: { code: string; status: SpaceAvailabilityStatus }[];
+  scenes?: { sceneId: string; title: string }[];
+  initialView?: SceneInitialView | null;
+  /** Setelah pernah dibake: overlay tanpa backdrop (hindari double blur). */
+  privacyBlurGuideOnly?: boolean;
 }
 
-export function PannellumEditor({
-  panoramaUrl,
-  hotspots,
-  privacyBlurs,
-  selectedId,
-  selectedBlurId,
-  addMode,
-  onHotspotAdd,
-  onBlurAdd,
-  onHotspotMove,
-  onBlurMove,
-  onHotspotSelect,
-  onBlurSelect,
-  onHotspotDelete,
-  onBlurDelete,
-  spaces = [],
-}: Props) {
+export type PannellumEditorHandle = {
+  getView: () => { yaw: number; pitch: number; hfov: number } | null;
+  getViewerBakeContext: () => ViewerBakeContext | null;
+};
+
+export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function PannellumEditor(
+  {
+    panoramaUrl,
+    hotspots,
+    privacyBlurs,
+    selectedId,
+    selectedBlurId,
+    addMode,
+    onHotspotAdd,
+    onBlurAdd,
+    onHotspotMove,
+    onBlurMove,
+    onHotspotSelect,
+    onBlurSelect,
+    onHotspotDelete,
+    onBlurDelete,
+    spaces = [],
+    scenes = [],
+    initialView = null,
+    privacyBlurGuideOnly = false,
+  },
+  ref
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewerRef = useRef<any>(null);
@@ -160,6 +195,7 @@ export function PannellumEditor({
   const hotspotsRef = useRef(hotspots);
   const privacyBlursRef = useRef(privacyBlurs);
   const spacesRef = useRef(spaces);
+  const scenesRef = useRef(scenes);
   const getSpaceStatusRef = useRef((code: string) => findSpaceStatus(spacesRef.current, code));
 
   const onSelectRef = useRef(onHotspotSelect);
@@ -171,13 +207,47 @@ export function PannellumEditor({
   const onMoveRef = useRef(onHotspotMove);
   const onBlurMoveRef = useRef(onBlurMove);
   const addModeRef = useRef(addMode);
+  const privacyBlurGuideOnlyRef = useRef(privacyBlurGuideOnly);
+
+  useImperativeHandle(ref, () => ({
+    getViewerBakeContext: () => {
+      if (!containerRef.current || !viewerRef.current) return null;
+      const rect = containerRef.current.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return null;
+      const hfov =
+        typeof viewerRef.current.getHfov === "function" ? viewerRef.current.getHfov() : 100;
+      return {
+        viewerWidth: rect.width,
+        viewerHeight: rect.height,
+        hfov: Number.isFinite(hfov) ? hfov : 100,
+      };
+    },
+    getView: () => {
+      const viewer = viewerRef.current;
+      if (!viewer || !viewerReadyRef.current) return null;
+      try {
+        return {
+          yaw: Number(viewer.getYaw()),
+          pitch: Number(viewer.getPitch()),
+          hfov: Number(viewer.getHfov()),
+        };
+      } catch {
+        return null;
+      }
+    },
+  }));
+
+  useEffect(() => {
+    privacyBlurGuideOnlyRef.current = privacyBlurGuideOnly;
+  }, [privacyBlurGuideOnly]);
 
   useEffect(() => {
     hotspotsRef.current = hotspots;
     privacyBlursRef.current = privacyBlurs;
     spacesRef.current = spaces;
+    scenesRef.current = scenes;
     getSpaceStatusRef.current = (code: string) => findSpaceStatus(spacesRef.current, code);
-  }, [hotspots, privacyBlurs, spaces]);
+  }, [hotspots, privacyBlurs, spaces, scenes]);
 
   useEffect(() => {
     onSelectRef.current = onHotspotSelect;
@@ -259,6 +329,7 @@ export function PannellumEditor({
                 div,
                 blur,
                 blur._id === selectedBlurIdRef.current,
+                privacyBlurGuideOnlyRef.current,
                 onPointerDownItemRef,
                 onDeleteItemRef
               );
@@ -267,6 +338,10 @@ export function PannellumEditor({
           mountedBlurIdsRef.current.push(blur._id);
         } catch { /* ignore */ }
       }
+
+      requestAnimationFrame(() => {
+        bindPrivacyBlursInContainer(viewer, containerRef.current);
+      });
     },
     []
   );
@@ -298,6 +373,8 @@ export function PannellumEditor({
                 h,
                 h._id === selectedIdRef.current,
                 (code) => getSpaceStatusRef.current(code),
+                (sceneId, fallback) =>
+                  resolveSceneHotspotTitle(sceneId, scenesRef.current, fallback),
                 onPointerDownItemRef,
                 onDeleteItemRef
               );
@@ -319,10 +396,12 @@ export function PannellumEditor({
     [syncHotspots, syncPrivacyBlurs]
   );
 
-  // Init viewer
+  // Init viewer — sengaja hanya re-init saat panoramaUrl berubah
   useEffect(() => {
     if (!containerRef.current || !panoramaUrl) return;
     const isMounted = { current: true };
+    const hotspotDom = hotspotDomRef.current;
+    const blurDom = blurDomRef.current;
 
     async function init() {
       try {
@@ -344,9 +423,16 @@ export function PannellumEditor({
           showControls: true,
           showFullscreenCtrl: false,
           showZoomCtrl: true,
-          hfov: 100,
-          minHfov: 40,
-          maxHfov: 120,
+          ...PANNELLUM_EDITOR_HFOV,
+          ...(initialView
+            ? {
+                yaw: initialView.yaw,
+                pitch: initialView.pitch,
+                hfov: initialView.hfov ?? PANNELLUM_HFOV.hfov,
+              }
+            : {}),
+          ...PANNELLUM_PITCH_LIMITS,
+          ...PANNELLUM_INTERACTION,
           hotSpots: [],
         });
 
@@ -366,28 +452,38 @@ export function PannellumEditor({
       viewerReadyRef.current = false;
       mountedHotspotIdsRef.current = [];
       mountedBlurIdsRef.current = [];
-      hotspotDomRef.current.clear();
-      blurDomRef.current.clear();
+      hotspotDom.clear();
+      blurDom.clear();
       if (viewerRef.current) {
         try { viewerRef.current.destroy(); } catch { /* ignore */ }
         viewerRef.current = null;
       }
     };
+    // panoramaUrl is the intentional init key; overlays sync in a separate effect
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panoramaUrl]);
 
   const hotspotsSig = JSON.stringify(
-    hotspots.map((h) => [h._id, h.pitch, h.yaw, h.type, h.text, h.scale ?? 1, h.spaceCode ?? ""])
+    hotspots.map((h) => [
+      h._id,
+      h.pitch,
+      h.yaw,
+      h.type,
+      h.text,
+      h.scale ?? 1,
+      h.spaceCode ?? "",
+      h.sceneId ?? "",
+      h.facilityIcon ?? "",
+    ])
   );
   const spacesSig = spaces.map((s) => `${s.code}:${s.status}`).join("|");
   const blursSig = JSON.stringify(
-    privacyBlurs.map((b) => [b._id, b.pitch, b.yaw, b.width, b.height, b.intensity, b.scale ?? 1])
+    privacyBlurs.map((b) => [b._id, b.pitch, b.yaw, b.width, b.height, b.intensity, b.radius, b.scale ?? 1])
   );
 
   useEffect(() => {
     if (!viewerReadyRef.current || !viewerRef.current) return;
     syncAllOverlays(viewerRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hotspotsSig, blursSig, spacesSig, syncAllOverlays]);
 
   const scaleSig = hotspots.map((h) => `${h._id}:${h.scale ?? 1}`).join("|");
@@ -399,16 +495,27 @@ export function PannellumEditor({
     }
   }, [scaleSig, hotspots]);
 
+  const dirSig = hotspots.map((h) => `${h._id}:${h.direction ?? "right"}`).join("|");
+  useEffect(() => {
+    if (!viewerReadyRef.current) return;
+    for (const h of hotspots) {
+      if (h.type !== "scene") continue;
+      const div = hotspotDomRef.current.get(h._id);
+      if (div) setSceneNavDirection(div, h.direction);
+    }
+  }, [dirSig, hotspots]);
+
   const blurDimSig = privacyBlurs
-    .map((b) => `${b._id}:${b.width}:${b.height}:${b.intensity}:${b.scale ?? 1}`)
+    .map((b) => `${b._id}:${b.width}:${b.height}:${b.intensity}:${b.radius}:${b.scale ?? 1}`)
     .join("|");
+  const guideSig = privacyBlurGuideOnly ? "1" : "0";
   useEffect(() => {
     if (!viewerReadyRef.current) return;
     for (const b of privacyBlurs) {
       const div = blurDomRef.current.get(b._id);
-      if (div) setPrivacyBlurDimensions(div, b, true);
+      if (div) setPrivacyBlurDimensions(div, b, true, privacyBlurGuideOnly);
     }
-  }, [blurDimSig, privacyBlurs]);
+  }, [blurDimSig, privacyBlurs, guideSig, privacyBlurGuideOnly]);
 
   useEffect(() => {
     hotspotDomRef.current.forEach((div, id) => {
@@ -497,11 +604,13 @@ export function PannellumEditor({
       ? "scene"
       : addMode === "space"
         ? "unit komersial"
-        : addMode === "info"
-          ? "info"
-          : addMode === "blur"
-            ? "blur privasi"
-            : "";
+        : addMode === "ad"
+          ? "media iklan"
+          : addMode === "info"
+            ? "info"
+            : addMode === "blur"
+              ? "blur privasi"
+              : "";
 
   return (
     <div className="cms-vt-panorama relative h-full min-h-0 w-full overflow-hidden overscroll-none select-none">
@@ -521,18 +630,28 @@ export function PannellumEditor({
           className={`absolute top-4 left-1/2 -translate-x-1/2 text-sm px-5 py-2.5 rounded-full pointer-events-none flex items-center gap-2 shadow-lg z-20 backdrop-blur border ${
             addMode === "blur"
               ? "bg-slate-900/95 border-purple-500/70 text-purple-300"
-              : "bg-slate-900/95 border-emerald-500/70 text-emerald-300"
+              : addMode === "ad"
+                ? "bg-slate-900/95 border-purple-400/70 text-purple-200"
+                : "bg-slate-900/95 border-emerald-500/70 text-emerald-300"
           }`}
         >
           <span className="text-base">
-            {addMode === "scene" ? "🔀" : addMode === "space" ? "🏪" : addMode === "info" ? "ℹ️" : "🫥"}
+            {addMode === "scene"
+              ? "🔀"
+              : addMode === "space"
+                ? "🏪"
+                : addMode === "ad"
+                  ? "📢"
+                  : addMode === "info"
+                    ? "ℹ️"
+                    : "🫥"}
           </span>
           Klik (tanpa drag) untuk pasang <strong>{addModeLabel}</strong>
         </div>
       )}
 
       <div className="absolute bottom-4 left-4 flex items-center gap-3 pointer-events-none z-20">
-        <div className="bg-slate-900/80 backdrop-blur text-slate-400 text-xs px-3 py-1.5 rounded-full border border-slate-700 flex items-center gap-1.5">
+        <div className="hidden bg-slate-900/80 backdrop-blur text-slate-400 text-xs px-3 py-1.5 rounded-full border border-slate-700 items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
           Edit 3D — drag untuk lihat sekeliling
         </div>
@@ -549,4 +668,4 @@ export function PannellumEditor({
       )}
     </div>
   );
-}
+});

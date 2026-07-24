@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { parseJsonRequest } from "@/lib/api-validation";
+import { leadUpdateSchema } from "@/lib/api-schemas";
 
 export async function GET(request: NextRequest) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const leads = await prisma.tenantLead.findMany({
@@ -14,11 +16,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const { id, status, notes, followUpAt } = await request.json();
-  if (!id) return NextResponse.json({ error: "ID wajib diisi" }, { status: 400 });
+  const parsed = await parseJsonRequest(request, leadUpdateSchema);
+  if (!parsed.success) return parsed.response;
+  const { id, status, notes, followUpAt } = parsed.data;
 
   const lead = await prisma.tenantLead.update({
     where: { id },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { requireAuth } from "@/lib/auth";
 
 const s3Client = new S3Client({
   endpoint: process.env.S3_ENDPOINT,
@@ -18,8 +19,6 @@ const CONTENT_TYPE_MAP: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".png": "image/png",
-  ".gif": "image/gif",
-  ".svg": "image/svg+xml",
   ".webp": "image/webp",
   ".mp4": "video/mp4",
   ".json": "application/json",
@@ -31,24 +30,51 @@ function getContentType(path: string): string {
 }
 
 function shouldServeDirectly(path: string): boolean {
-  const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
+  const imageExtensions = [".jpg", ".jpeg", ".png", ".webp"];
   const ext = path.substring(path.lastIndexOf(".")).toLowerCase();
   return imageExtensions.includes(ext);
 }
 
 function validateS3Key(pathSegments: string[]): string | null {
-  const sanitizedSegments = pathSegments
-    .map((segment) => segment.replace(/[^a-zA-Z0-9._\-/]/g, "").replace(/\.\./g, ""))
-    .filter((segment) => segment.length > 0);
-
-  if (sanitizedSegments.length === 0) return null;
-  const s3Key = sanitizedSegments.join("/");
+  if (
+    pathSegments.length === 0 ||
+    pathSegments.some(
+      (segment) => !segment || segment === "." || segment === ".." || !/^[a-zA-Z0-9._-]+$/.test(segment)
+    )
+  ) {
+    return null;
+  }
+  const s3Key = pathSegments.join("/");
   if (s3Key.startsWith("/") || s3Key.length > 500) return null;
   return s3Key;
 }
 
+const PUBLIC_PREFIXES = [
+  "virtual-tour/panoramas/",
+  "virtual-tour/thumbnails/",
+  "virtual-tour/ad-creatives/",
+  "stations/covers/",
+  "spaces/photos/",
+  "panoramas/",
+  "floorplans/",
+  "thumbnails/",
+];
+
+function isPublicKey(key: string): boolean {
+  return PUBLIC_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+function toWebStream(body: {
+  transformToWebStream?: () => ReadableStream;
+}): ReadableStream | null {
+  if (typeof body.transformToWebStream === "function") {
+    return body.transformToWebStream();
+  }
+  return null;
+}
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
@@ -56,6 +82,17 @@ export async function GET(
     const s3Key = validateS3Key(path);
     if (!s3Key) {
       return new NextResponse("Resource not found", { status: 404 });
+    }
+
+    const isPublic = isPublicKey(s3Key);
+    if (isPublic && !shouldServeDirectly(s3Key)) {
+      return new NextResponse("Resource not found", { status: 404 });
+    }
+    if (!isPublic) {
+      const auth = await requireAuth(request);
+      if ("error" in auth) {
+        return new NextResponse("Resource not found", { status: 404 });
+      }
     }
 
     const contentType = getContentType(s3Key);
@@ -67,18 +104,27 @@ export async function GET(
         return new NextResponse("Resource not found", { status: 404 });
       }
 
-      const chunks: Uint8Array[] = [];
-      for await (const chunk of s3Response.Body as AsyncIterable<Uint8Array>) {
-        chunks.push(chunk);
+      const stream = toWebStream(s3Response.Body);
+      if (!stream) {
+        return new NextResponse("Resource not found", { status: 404 });
       }
-      const buffer = Buffer.concat(chunks);
 
-      return new NextResponse(buffer, {
-        headers: {
-          "Content-Type": contentType,
-          "Cache-Control": "public, max-age=31536000, immutable",
-        },
+      const headers = new Headers({
+        "Content-Type": contentType,
+        "Cache-Control": isPublic
+          ? "public, max-age=31536000, immutable"
+          : "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Cross-Origin-Resource-Policy": "same-origin",
       });
+      if (typeof s3Response.ContentLength === "number") {
+        headers.set("Content-Length", String(s3Response.ContentLength));
+      }
+      if (s3Response.ETag) {
+        headers.set("ETag", s3Response.ETag);
+      }
+
+      return new NextResponse(stream, { headers });
     }
 
     const command = new GetObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key });

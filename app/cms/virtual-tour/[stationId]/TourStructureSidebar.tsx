@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 import Image from "next/image";
 import {
   Plus,
@@ -17,6 +17,7 @@ import {
   Layers,
   ChevronsDownUp,
   ChevronsUpDown,
+  GripVertical,
 } from "lucide-react";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { TourArea, TourLevel } from "@/lib/virtual-tour-structure";
@@ -47,6 +48,7 @@ type Props = {
   onAddScene: (areaId: string, levelSlug: string) => void;
   onBulkImport: () => void;
   onManageLevels: () => void;
+  onReorderLevels: (orderedLevelIds: string[]) => void;
   onAddArea: (levelId: string, levelLabel: string) => void;
   onEditArea: (area: TourArea, levelLabel: string) => void;
   onDeleteArea: (area: TourArea, levelLabel: string) => void;
@@ -83,6 +85,7 @@ export function TourStructureSidebar({
   onAddScene,
   onBulkImport,
   onManageLevels,
+  onReorderLevels,
   onAddArea,
   onEditArea,
   onDeleteArea,
@@ -91,6 +94,8 @@ export function TourStructureSidebar({
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
   const [hydrated, setHydrated] = useState(false);
+  const [dragLevelId, setDragLevelId] = useState<string | null>(null);
+  const [dropLevelId, setDropLevelId] = useState<string | null>(null);
 
   const scenesByArea = (areaId: string) =>
     scenes
@@ -108,24 +113,32 @@ export function TourStructureSidebar({
     return { level, area };
   }, [selectedScene, levels]);
 
-  // Restore expanded state + buka path scene aktif
+  // Hydrate expanded tree dari sessionStorage + buka path scene aktif (async agar tidak cascade render)
   useEffect(() => {
-    const saved = loadExpanded();
-    const levelIds = new Set(saved?.levels ?? []);
-    const areaIds = new Set(saved?.areas ?? []);
+    let cancelled = false;
+    const frame = requestAnimationFrame(() => {
+      if (cancelled) return;
+      const saved = loadExpanded();
+      const levelIds = new Set(saved?.levels ?? []);
+      const areaIds = new Set(saved?.areas ?? []);
 
-    if (levelIds.size === 0 && levels[0]) {
-      levelIds.add(levels[0].id);
-      if (levels[0].areas[0]) areaIds.add(levels[0].areas[0].id);
-    }
+      if (levelIds.size === 0 && levels[0]) {
+        levelIds.add(levels[0].id);
+        if (levels[0].areas[0]) areaIds.add(levels[0].areas[0].id);
+      }
 
-    const scene = scenes[selectedSceneIndex];
-    if (scene?.levelId) levelIds.add(scene.levelId);
-    if (scene?.areaId) areaIds.add(scene.areaId);
+      const scene = scenes[selectedSceneIndex];
+      if (scene?.levelId) levelIds.add(scene.levelId);
+      if (scene?.areaId) areaIds.add(scene.areaId);
 
-    setExpandedLevels(levelIds);
-    setExpandedAreas(areaIds);
-    setHydrated(true);
+      setExpandedLevels(levelIds);
+      setExpandedAreas(areaIds);
+      setHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
   }, [levels, scenes, selectedSceneIndex]);
 
   useEffect(() => {
@@ -172,6 +185,45 @@ export function TourStructureSidebar({
     levels.length > 0 &&
     levels.every((l) => expandedLevels.has(l.id)) &&
     levels.every((l) => l.areas.every((a) => expandedAreas.has(a.id)));
+
+  function handleLevelDragStart(levelId: string) {
+    setDragLevelId(levelId);
+  }
+
+  function handleLevelDragOver(e: DragEvent, levelId: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragLevelId && dragLevelId !== levelId) {
+      setDropLevelId(levelId);
+    }
+  }
+
+  function handleLevelDrop(targetLevelId: string) {
+    if (!dragLevelId || dragLevelId === targetLevelId) {
+      setDragLevelId(null);
+      setDropLevelId(null);
+      return;
+    }
+    const ids = levels.map((l) => l.id);
+    const from = ids.indexOf(dragLevelId);
+    const to = ids.indexOf(targetLevelId);
+    if (from < 0 || to < 0) {
+      setDragLevelId(null);
+      setDropLevelId(null);
+      return;
+    }
+    const next = [...ids];
+    next.splice(from, 1);
+    next.splice(to, 0, dragLevelId);
+    setDragLevelId(null);
+    setDropLevelId(null);
+    onReorderLevels(next);
+  }
+
+  function handleLevelDragEnd() {
+    setDragLevelId(null);
+    setDropLevelId(null);
+  }
 
   return (
     <aside className="flex w-72 flex-none flex-col overflow-hidden border-r border-slate-800 bg-slate-900">
@@ -246,16 +298,35 @@ export function TourStructureSidebar({
 
           return (
             <div key={level.id} className="mb-1">
-              {/* Level row */}
+              {/* Level row — drag handle untuk urutan tab publik */}
               <div
+                onDragOver={(e) => handleLevelDragOver(e, level.id)}
+                onDrop={() => handleLevelDrop(level.id)}
                 className={`flex items-center gap-0.5 rounded-lg pr-1 transition-colors hover:bg-slate-800/60 ${
                   selectedScene?.levelId === level.id ? "bg-slate-800/40" : ""
+                } ${dragLevelId === level.id ? "opacity-40" : ""} ${
+                  dropLevelId === level.id ? "ring-1 ring-emerald-500/70 bg-emerald-950/30" : ""
                 }`}
               >
                 <button
                   type="button"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", level.id);
+                    handleLevelDragStart(level.id);
+                  }}
+                  onDragEnd={handleLevelDragEnd}
+                  className="shrink-0 cursor-grab rounded p-1 text-slate-600 active:cursor-grabbing hover:bg-slate-700 hover:text-slate-300"
+                  title="Drag untuk ubah urutan level (tab publik)"
+                  aria-label={`Geser urutan level ${level.label}`}
+                >
+                  <GripVertical className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => toggleLevel(level.id)}
-                  className="flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-2 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-1.5 px-1 py-2 text-left"
                   aria-expanded={levelOpen}
                 >
                   {levelOpen ? (
@@ -376,8 +447,9 @@ export function TourStructureSidebar({
                                         src={getS3ProxyUrl(thumb)}
                                         alt=""
                                         fill
-                                        className="object-cover opacity-80"
                                         unoptimized
+                                        className="object-cover opacity-80"
+                                        sizes="40px"
                                       />
                                       <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-center text-[8px] font-mono text-white/90">
                                         {posInArea + 1}

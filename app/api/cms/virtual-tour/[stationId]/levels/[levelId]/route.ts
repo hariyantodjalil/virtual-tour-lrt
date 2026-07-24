@@ -2,23 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { slugifyLabel } from "@/lib/virtual-tour-defaults";
+import { parseJsonRequest } from "@/lib/api-validation";
+import { levelUpdateSchema } from "@/lib/api-schemas";
 
 type Params = { params: Promise<{ stationId: string; levelId: string }> };
 
 export async function PATCH(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { stationId, levelId } = await params;
-  const body = await request.json();
+  const parsed = await parseJsonRequest(request, levelUpdateSchema);
+  if (!parsed.success) return parsed.response;
+  const body = parsed.data;
 
   const data: Record<string, unknown> = {};
-  if (body.label != null) data.label = String(body.label);
-  if (body.color != null) data.color = String(body.color);
-  if (body.hint != null) data.hint = body.hint ? String(body.hint) : null;
-  if (body.order != null) data.order = Number(body.order);
-  if (body.isActive != null) data.isActive = Boolean(body.isActive);
-  if (body.slug != null) data.slug = slugifyLabel(String(body.slug));
+  if (body.label != null) data.label = body.label;
+  if (body.color != null) data.color = body.color;
+  if (body.hint !== undefined) data.hint = body.hint || null;
+  if (body.order != null) data.order = body.order;
+  if (body.isActive != null) data.isActive = body.isActive;
+  if (body.slug != null) data.slug = slugifyLabel(body.slug);
 
   const level = await prisma.virtualTourLevel.update({
     where: { id: levelId, stationId },
@@ -37,7 +41,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { stationId, levelId } = await params;

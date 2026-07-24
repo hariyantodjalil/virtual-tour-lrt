@@ -1,0 +1,35 @@
+- generic [active] [ref=f8e1]:
+  - generic [ref=f8e3]:
+    - generic [ref=f8e8]:
+      - generic [ref=f8e14]:
+        - button "Concourse" [ref=f8e15]
+        - button "Peron" [ref=f8e17]
+        - button "Outdoor" [ref=f8e19]
+        - button "Transfer" [ref=f8e21]
+        - button "Komersial" [ref=f8e23]
+      - button "Concourse Umum" [ref=f8e31]
+      - generic [ref=f8e32]:
+        - button "Scene sebelumnya" [disabled] [ref=f8e33]
+        - button "1/5 Paid Mid 1" [ref=f8e36]:
+          - generic [ref=f8e37]: 1/5
+          - generic [ref=f8e38]: Paid Mid 1
+        - button "Scene berikutnya" [ref=f8e41]
+    - generic:
+      - generic:
+        - generic [ref=f8e44]:
+          - button "Pilih stasiun" [ref=f8e45]:
+            - generic [ref=f8e49]: Pilih Stasiun
+          - link "Dukuh Atas BNI" [ref=f8e50] [cursor=pointer]:
+            - /url: /
+        - generic: 3 unit tersedia
+    - generic:
+      - generic [ref=f8e54]:
+        - generic: Info
+        - button "Info stasiun" [ref=f8e55]
+      - generic [ref=f8e58]:
+        - generic: Rute
+        - button "Guided route" [ref=f8e59]
+      - generic [ref=f8e64]:
+        - generic: Unit
+        - button "3" [ref=f8e65]
+  - button "Open Next.js Dev Tools" [ref=f8e74] [cursor=pointer]

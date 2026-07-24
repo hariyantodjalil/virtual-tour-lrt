@@ -1,8 +1,28 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   experimental: {
-    proxyClientMaxBodySize: "64mb",
+    proxyClientMaxBodySize: "40mb",
+  },
+  // Seed demo panoramas memakai URL pannellum.org
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "pannellum.org",
+        pathname: "/images/**",
+      },
+    ],
+  },
+  // Pastikan Prisma + pg ikut ter-trace ke bundle standalone (Docker)
+  outputFileTracingIncludes: {
+    "/*": [
+      "./node_modules/.prisma/**/*",
+      "./node_modules/@prisma/client/**/*",
+      "./node_modules/pg/**/*",
+      "./node_modules/@prisma/adapter-pg/**/*",
+    ],
   },
 };
 

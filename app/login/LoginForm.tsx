@@ -31,7 +31,7 @@ export default function LoginForm() {
     setLoading(false);
 
     if (!res.ok) {
-      setError(data.message ?? "Login gagal");
+      setError(data.message ?? data.error ?? "Login gagal");
       return;
     }
 

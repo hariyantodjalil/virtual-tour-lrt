@@ -1,23 +1,28 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Store } from "lucide-react";
 
-type Station = {
-  id: string;
-  name: string;
-  _count: { commercialSpaces: number };
-};
+export const dynamic = "force-dynamic";
 
-export default function CmsSpacesIndexPage() {
-  const [stations, setStations] = useState<Station[]>([]);
+async function getStations() {
+  try {
+    return await prisma.station.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        _count: { select: { commercialSpaces: true } },
+      },
+    });
+  } catch {
+    return [];
+  }
+}
 
-  useEffect(() => {
-    fetch("/api/cms/stations").then((r) => r.json()).then(setStations);
-  }, []);
+export default async function CmsSpacesIndexPage() {
+  const stations = await getStations();
 
   return (
     <div>
@@ -25,16 +30,21 @@ export default function CmsSpacesIndexPage() {
       <div className="grid gap-3 md:grid-cols-2">
         {stations.map((s) => (
           <Card key={s.id} className="bg-slate-900 border-slate-800">
-            <CardHeader className="pb-2"><CardTitle className="text-base">{s.name}</CardTitle></CardHeader>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">{s.name}</CardTitle>
+            </CardHeader>
             <CardContent className="flex items-center justify-between">
               <span className="text-sm text-slate-400">{s._count.commercialSpaces} unit</span>
               <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-500">
-                <Link href={`/cms/spaces/${s.id}`}><Store className="h-3 w-3 mr-1" /> Kelola</Link>
+                <Link href={`/cms/spaces/${s.id}`}>
+                  <Store className="h-3 w-3 mr-1" /> Kelola
+                </Link>
               </Button>
             </CardContent>
           </Card>
         ))}
       </div>
+      {stations.length === 0 && <p className="text-slate-400">Belum ada stasiun.</p>}
     </div>
   );
 }

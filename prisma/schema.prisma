@@ -7,45 +7,47 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      UserRole @default(EDITOR)
-  isActive  Boolean  @default(true)
+  id          String       @id @default(cuid())
+  email       String       @unique
+  password    String
+  name        String
+  role        UserRole     @default(EDITOR)
+  isActive    Boolean      @default(true)
   tenantLeads TenantLead[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@map("users")
 }
 
 model Station {
-  id                String              @id @default(cuid())
-  code              String?             @unique // Kode stasiun resmi (DKA, SET, dll.) — selaras portal-lrt
-  name              String
-  nameId            String?             // Nama tampilan ID (biasanya sama dengan name)
-  slug              String              @unique
-  line              String
-  address           String
-  location          String?             // Wilayah: Jakarta Selatan, Kota Bekasi, dll.
-  dailyPassengers   Int                 @default(0)
-  latitude          Float?
-  longitude         Float?
-  imageUrl          String?
-  description       String?
-  commercialContactPhone String?        @default("628118012012")
-  order             Int                 @default(0)
-  isActive          Boolean             @default(true)
-  commercialSpaces  CommercialSpace[]
-  visitEvents       VisitEvent[]
-  virtualTourScenes VirtualTourScene[]
-  virtualTourLevels VirtualTourLevel[]
-  virtualTourAreas  VirtualTourArea[]
-  virtualTour       StationVirtualTour?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id                     String              @id @default(cuid())
+  code                   String?             @unique // Kode stasiun resmi (DKA, SET, dll.) — selaras portal-lrt
+  name                   String
+  nameId                 String? // Nama tampilan ID (biasanya sama dengan name)
+  slug                   String              @unique
+  line                   String
+  address                String
+  location               String? // Wilayah: Jakarta Selatan, Kota Bekasi, dll.
+  dailyPassengers        Int                 @default(0)
+  latitude               Float?
+  longitude              Float?
+  imageUrl               String?
+  description            String?
+  commercialContactPhone String?             @default("628118012012")
+  order                  Int                 @default(0)
+  isActive               Boolean             @default(true)
+  commercialSpaces       CommercialSpace[]
+  visitEvents            VisitEvent[]
+  virtualTourScenes      VirtualTourScene[]
+  virtualTourLevels      VirtualTourLevel[]
+  virtualTourAreas       VirtualTourArea[]
+  virtualTour            StationVirtualTour?
+  tenants                Tenant[]
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
 
+  @@index([isActive, order])
   @@map("stations")
 }
 
@@ -103,56 +105,94 @@ model VirtualTourArea {
 }
 
 model VirtualTourScene {
-  id           String            @id @default(cuid())
-  stationId    String
-  station      Station           @relation(fields: [stationId], references: [id], onDelete: Cascade)
-  levelId      String?
-  levelRef     VirtualTourLevel? @relation(fields: [levelId], references: [id], onDelete: SetNull)
-  areaId       String?
-  areaRef      VirtualTourArea?  @relation(fields: [areaId], references: [id], onDelete: SetNull)
-  sceneId      String            // slug scene: concourse, gate-area, platform
-  title        String
-  panoramaUrl  String            // path S3 equirectangular — paralel svgPath di floorplan
-  level        String            @default("CONCOURSE") // legacy slug level (concourse/platform)
-  thumbnailUrl String?           // thumbnail preview scene
-  order        Int               @default(0) // urutan jalur jalan dalam area
-  hotspots     Json              @default("[]") // array hotspot — paralel placedAssets di floorplan
-  canvasData   Json?             // initialView {yaw,pitch,hfov}, editor viewport state
-  isActive     Boolean           @default(true)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  id                  String            @id @default(cuid())
+  stationId           String
+  station             Station           @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  levelId             String?
+  levelRef            VirtualTourLevel? @relation(fields: [levelId], references: [id], onDelete: SetNull)
+  areaId              String?
+  areaRef             VirtualTourArea?  @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  sceneId             String // slug scene: concourse, gate-area, platform
+  title               String
+  panoramaUrl         String // path S3 equirectangular — paralel svgPath di floorplan
+  originalPanoramaUrl String?
+  level               String            @default("CONCOURSE") // legacy slug level (concourse/platform)
+  thumbnailUrl        String? // thumbnail preview scene
+  order               Int               @default(0) // urutan jalur jalan dalam area
+  hotspots            Json              @default("[]") // array hotspot — paralel placedAssets di floorplan
+  canvasData          Json? // initialView {yaw,pitch,hfov}, editor viewport state
+  isActive            Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   @@unique([stationId, sceneId])
   @@map("virtual_tour_scenes")
 }
 
 model CommercialSpace {
-  id              String        @id @default(cuid())
+  id              String       @id @default(cuid())
   stationId       String
-  station         Station       @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  station         Station      @relation(fields: [stationId], references: [id], onDelete: Cascade)
   code            String
   name            String
-  type            SpaceType     @default(KIOS)
-  status          SpaceStatus   @default(TERSEDIA)
+  type            SpaceType    @default(KIOS)
+  status          SpaceStatus  @default(TERSEDIA)
   area            Float
   monthlyRent     Float
-  deposit         Float         @default(0)
-  floor           String        @default("G")
+  deposit         Float        @default(0)
+  floor           String       @default("G")
   location        String
   nearestExit     String?
-  exposure        Int           @default(0)
+  exposure        Int          @default(0)
   powerSupply     String?
-  waterAccess     Boolean       @default(false)
-  airConditioning Boolean       @default(false)
+  waterAccess     Boolean      @default(false)
+  airConditioning Boolean      @default(false)
   description     String?
   panoramaUrl     String?
   tenantLeads     TenantLead[]
   visitEvents     VisitEvent[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  occupancy       SpaceOccupancy?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   @@unique([stationId, code])
   @@map("commercial_spaces")
+}
+
+/** Tenant aktif (brand yang mengisi unit TERISI) — beda dari TenantLead (pipeline calon). */
+model Tenant {
+  id          String           @id @default(cuid())
+  stationId   String
+  station     Station          @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  brandName   String
+  contactName String?
+  phone       String?
+  email       String?
+  logoUrl     String?
+  notes       String?
+  isActive    Boolean          @default(true)
+  occupancies SpaceOccupancy[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([stationId])
+  @@map("tenants")
+}
+
+/** Satu occupancy aktif per unit — menandai tenant yang mengisi CommercialSpace. */
+model SpaceOccupancy {
+  id        String          @id @default(cuid())
+  spaceId   String          @unique
+  space     CommercialSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  tenantId  String
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([tenantId])
+  @@map("space_occupancies")
 }
 
 model TenantLead {
@@ -174,6 +214,10 @@ model TenantLead {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([createdAt])
   @@map("tenant_leads")
 }
 
@@ -188,6 +232,8 @@ model VisitEvent {
   userAgent String?
   createdAt DateTime         @default(now())
 
+  @@index([eventType, createdAt])
+  @@index([stationId, eventType])
   @@map("visit_events")
 }
 

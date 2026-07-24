@@ -1,17 +1,42 @@
+/*
+  THESIS: Chrome tour sebagai cockpit maroon LRT — panorama memimpin, UI brand-coherent; tolak HUD hitam generik.
+  OWN-WORLD: void #1C0A0E, panel #3A161C, signal #E31E2D, glass hairline hangat, Chakra Petch.
+  STORY: Mitra jelajah 360°, putar rute otomatis, cek unit, hubungi tim.
+  FIRST VIEWPORT: Panorama full-bleed; chip stasiun; rail tool; nav / guided autopilot bar bawah.
+  FORM: Perluasan Void Portal (Experience) — bukan dunia visual baru.
+*/
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft, Building2, CheckCircle2, ChevronDown, ChevronRight,
-  Grid3X3, Info, MapPin, Play, Route, Users, X,
+  ArrowLeft,
+  Building2,
+  CheckCircle2,
+  ChevronRight,
+  Grid3X3,
+  Info,
+  MapPin,
+  Pause,
+  Play,
+  Route,
+  Users,
+  X,
 } from "lucide-react";
 import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
+import InTourAdPopup from "@/components/tour/InTourAdPopup";
 import InTourInfoPopup from "@/components/tour/InTourInfoPopup";
+import StationPickerModal, {
+  type StationPickerItem,
+} from "@/components/tour/StationPickerModal";
 import VirtualTourViewer from "@/components/tour/VirtualTourViewer";
+import ContactPersonFab from "@/components/tour/ContactPersonFab";
 import { TourNavigationBar } from "@/components/tour/TourNavigationBar";
+import { GuidedRouteBar } from "@/components/tour/GuidedRouteBar";
 import { formatNumber, getWhatsAppUrl } from "@/lib/utils";
 import type { StationInfo } from "@/lib/stations-data";
+import type { AdHotspotPayload } from "@/lib/pannellum-tour-config";
 import {
   findScenePlacement,
   firstSceneIdInLevel,
@@ -36,28 +61,87 @@ type Space = {
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;
+  tenantBrand?: string | null;
 };
 
-type Props = { stationInfo: StationInfo; spaces: Space[] };
+type Props = {
+  stationInfo: StationInfo;
+  spaces: Space[];
+  pickerStations: StationPickerItem[];
+};
 
 const TYPE_LABELS: Record<string, string> = {
-  KIOS: "Kios", RUKO: "Ruko", ATM: "ATM",
-  VENDING: "Vending", MEDIA_IKLAN: "Iklan", AREA_PROMOSI: "Promosi",
+  KIOS: "Kios",
+  RUKO: "Ruko",
+  ATM: "ATM",
+  VENDING: "Vending",
+  MEDIA_IKLAN: "Iklan",
+  AREA_PROMOSI: "Promosi",
 };
 
 const STATUS_DOT: Record<Space["status"], string> = {
-  TERSEDIA: "bg-emerald-400",
-  TERISI: "bg-red-400",
+  TERSEDIA: "bg-[#34d399]",
+  TERISI: "bg-[#E31E2D]",
   MAINTENANCE: "bg-amber-400",
 };
 
 function buildRoute(sceneIds: string[], from: string, to: string) {
-  const fi = sceneIds.indexOf(from), ti = sceneIds.indexOf(to);
+  const fi = sceneIds.indexOf(from);
+  const ti = sceneIds.indexOf(to);
   if (fi < 0 || ti < 0) return sceneIds.slice(0, 1);
   return fi <= ti ? sceneIds.slice(fi, ti + 1) : sceneIds.slice(ti, fi + 1).reverse();
 }
 
-export default function StationTourClient({ stationInfo, spaces }: Props) {
+function ToolButton({
+  active,
+  onClick,
+  title,
+  label,
+  badge,
+  children,
+  delayMs = 0,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  label: string;
+  badge?: number;
+  children: ReactNode;
+  delayMs?: number;
+}) {
+  return (
+    <div
+      className={`tour-rail-pop pointer-events-auto group relative flex items-center justify-end`}
+      style={{ animationDelay: `${delayMs}ms` }}
+    >
+      <span className="pointer-events-none mr-2 hidden translate-x-1 rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/85 px-2.5 py-1 font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-[#F8ECEE]/80 opacity-0 backdrop-blur-md transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100 sm:block">
+        {label}
+      </span>
+      <button
+        type="button"
+        onClick={onClick}
+        title={title}
+        aria-pressed={active}
+        className={`tour-tool-btn pointer-events-auto relative ${active ? "tour-tool-btn--active" : ""}`}
+      >
+        {children}
+        {badge != null && badge > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 font-display text-[9px] font-bold text-[#E31E2D]">
+            {badge}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+export default function StationTourClient({
+  stationInfo,
+  spaces,
+  pickerStations,
+}: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const initialPlacement = findScenePlacement(stationInfo.levels, stationInfo.scenes[0]?.id ?? "");
   const firstLevel = initialPlacement?.level ?? stationInfo.levels[0];
   const firstScene =
@@ -66,7 +150,11 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
     "concourse";
   const lastScene = stationInfo.scenes.at(-1)?.id ?? firstScene;
 
+  const [pickerOpen, setPickerOpen] = useState(
+    () => searchParams.get("pilih") === "1" || searchParams.get("pilih") === "true"
+  );
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
+  const [selectedAd, setSelectedAd] = useState<AdHotspotPayload | null>(null);
   const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
   const [activeSceneId, setActiveSceneId] = useState(firstScene);
   const [activeLevelId, setActiveLevelId] = useState(
@@ -78,10 +166,11 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
   const [routeFrom, setRouteFrom] = useState(firstScene);
   const [routeTo, setRouteTo] = useState(lastScene);
 
-  // Panel states — semua COLLAPSED by default
   const [infoOpen, setInfoOpen] = useState(false);
   const [unitsOpen, setUnitsOpen] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
+  const [guidedActive, setGuidedActive] = useState(false);
+  const [routeAutoplay, setRouteAutoplay] = useState(false);
   const [openedFromUnitsList, setOpenedFromUnitsList] = useState(false);
   const [cameraFocus, setCameraFocus] = useState<{
     yaw: number;
@@ -104,15 +193,17 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
     activeLevelId || stationInfo.levels[0]?.id,
     activeAreaId
   );
-  const showTourNav = !unitsOpen && !selectedSpace && !routeOpen;
+  // Nav tetap terlihat saat unit drawer kanan terbuka; sembunyi hanya saat detail unit
+  const showTourNav = !selectedSpace;
 
-  // Sinkronkan tab level/area saat pindah scene lewat hotspot
-  useEffect(() => {
-    const placement = findScenePlacement(stationInfo.levels, activeSceneId);
-    if (!placement) return;
-    setActiveLevelId(placement.level.id);
-    setActiveAreaId(placement.area?.id ?? placement.level.areas[0]?.id ?? null);
-  }, [activeSceneId, stationInfo.levels]);
+  function activateScene(sceneId: string) {
+    const placement = findScenePlacement(stationInfo.levels, sceneId);
+    setActiveSceneId(sceneId);
+    if (placement) {
+      setActiveLevelId(placement.level.id);
+      setActiveAreaId(placement.area?.id ?? placement.level.areas[0]?.id ?? null);
+    }
+  }
 
   function clearCameraFocus() {
     setCameraFocus(null);
@@ -125,9 +216,12 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
     if (!level) return;
     const area = defaultAreaForLevel(level);
     const sceneId = area?.sceneIds[0] ?? firstSceneIdInLevel(level);
-    setActiveLevelId(levelId);
-    setActiveAreaId(area?.id ?? null);
-    if (sceneId) setActiveSceneId(sceneId);
+    if (sceneId) {
+      activateScene(sceneId);
+    } else {
+      setActiveLevelId(levelId);
+      setActiveAreaId(area?.id ?? null);
+    }
   }
 
   function selectArea(areaId: string) {
@@ -135,29 +229,89 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
     const level = stationInfo.levels.find((l) => l.id === activeLevelId);
     const area = level?.areas.find((a) => a.id === areaId);
     const sceneId = area?.sceneIds[0];
-    setActiveAreaId(areaId);
-    if (sceneId) setActiveSceneId(sceneId);
+    if (sceneId) {
+      activateScene(sceneId);
+    } else {
+      setActiveAreaId(areaId);
+    }
   }
 
   const selectedRoute = buildRoute(sceneIds, routeFrom, routeTo);
   const routeIdx = selectedRoute.indexOf(activeSceneId);
+  const safeRouteIdx = routeIdx >= 0 ? routeIdx : 0;
   const nextStep = routeIdx >= 0 ? selectedRoute[routeIdx + 1] : undefined;
+  const prevStep = routeIdx > 0 ? selectedRoute[routeIdx - 1] : undefined;
+  const routeFinished = guidedActive && routeIdx >= 0 && routeIdx >= selectedRoute.length - 1;
+  const routeFromTitle =
+    stationInfo.scenes.find((s) => s.id === routeFrom)?.title ?? "Awal";
+  const routeToTitle = stationInfo.scenes.find((s) => s.id === routeTo)?.title ?? "Tujuan";
+  const popupBlocksAutoplay = Boolean(selectedSpace || selectedAd || infoPopup);
 
   function handleSceneChange(sceneId: string) {
     clearCameraFocus();
-    setActiveSceneId(sceneId);
+    activateScene(sceneId);
   }
+
+  function startGuidedRoute(opts?: { autoplay?: boolean }) {
+    setGuidedActive(true);
+    setRouteAutoplay(Boolean(opts?.autoplay));
+    setRouteOpen(false);
+    setInfoOpen(false);
+    setUnitsOpen(false);
+    setSelectedSpace(null);
+    setSelectedAd(null);
+    handleSceneChange(routeFrom);
+  }
+
+  function exitGuidedRoute() {
+    setGuidedActive(false);
+    setRouteAutoplay(false);
+  }
+
+  function toggleRouteAutoplay() {
+    if (routeFinished) {
+      handleSceneChange(routeFrom);
+      setRouteAutoplay(true);
+      return;
+    }
+    setRouteAutoplay((v) => !v);
+  }
+
+  useEffect(() => {
+    if (!guidedActive || !routeAutoplay || popupBlocksAutoplay || !nextStep) {
+      if (guidedActive && routeAutoplay && !popupBlocksAutoplay && !nextStep) {
+        setRouteAutoplay(false);
+      }
+      return;
+    }
+
+    const targetId = nextStep;
+    const timer = window.setTimeout(() => {
+      clearCameraFocus();
+      activateScene(targetId);
+    }, 4500);
+
+    return () => window.clearTimeout(timer);
+    // Intentionally omit activateScene/clearCameraFocus — recreated each render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guidedActive, routeAutoplay, nextStep, activeSceneId, popupBlocksAutoplay]);
+
+  useEffect(() => {
+    if (popupBlocksAutoplay) {
+      setRouteAutoplay((playing) => (playing ? false : playing));
+    }
+  }, [popupBlocksAutoplay]);
 
   function focusOnSpaceHotspot(spaceCode: string) {
     const placement = findSpaceHotspotPlacement(stationInfo.scenes, spaceCode);
     if (!placement) return;
-    setActiveSceneId(placement.sceneId);
+    activateScene(placement.sceneId);
     setCameraFocus({
       yaw: placement.yaw,
       pitch: placement.pitch,
       hfov: 78,
     });
-    setFocusToken(Date.now());
+    setFocusToken((token) => token + 1);
   }
 
   const openSpaceFromList = (space: Space) => {
@@ -169,13 +323,22 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
     setUnitsOpen(false);
   };
 
-  const openSpaceFromHotspot = useCallback((spaceCode: string) => {
-    const space = spaces.find((s) => s.code === spaceCode);
-    if (space) {
-      setOpenedFromUnitsList(false);
-      setSelectedSpace(space);
-    }
-  }, [spaces]);
+  const openSpaceFromHotspot = useCallback(
+    (spaceCode: string) => {
+      const space = spaces.find((s) => s.code === spaceCode);
+      if (space) {
+        setOpenedFromUnitsList(false);
+        setSelectedAd(null);
+        setSelectedSpace(space);
+      }
+    },
+    [spaces]
+  );
+
+  const openAdFromHotspot = useCallback((payload: AdHotspotPayload) => {
+    setSelectedSpace(null);
+    setSelectedAd(payload);
+  }, []);
 
   const handleInfoClick = useCallback((title: string, description: string) => {
     setInfoPopup({ title, description });
@@ -190,13 +353,44 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
     }
   };
 
+  const closeSidePanels = () => {
+    setInfoOpen(false);
+    setRouteOpen(false);
+    setUnitsOpen(false);
+  };
+
+  function closeStationPicker() {
+    setPickerOpen(false);
+    // Hapus query ?pilih agar refresh tidak buka ulang
+    if (searchParams.get("pilih")) {
+      router.replace(`/station/${stationInfo.slug}`, { scroll: false });
+    }
+  }
+
+  function selectStation(slug: string) {
+    if (slug === stationInfo.slug) {
+      closeStationPicker();
+      return;
+    }
+    router.push(`/station/${slug}`);
+  }
+
   return (
-    <div className="relative flex flex-1 overflow-hidden bg-gray-950">
-      {/* ── 360° Viewer (full-bleed) ── */}
+    <div className="tour-shell relative flex h-full min-h-0 flex-1 overflow-hidden">
+      {pickerOpen && pickerStations.length > 0 && (
+        <StationPickerModal
+          stations={pickerStations}
+          currentSlug={stationInfo.slug}
+          onSelect={selectStation}
+          onClose={closeStationPicker}
+        />
+      )}
+
       <VirtualTourViewer
         scenes={stationInfo.scenes}
         spaces={spaces.map((s) => ({ code: s.code, status: s.status }))}
         onSpaceClick={openSpaceFromHotspot}
+        onAdClick={openAdFromHotspot}
         onInfoClick={handleInfoClick}
         onSceneChange={handleSceneChange}
         selectedSceneId={activeSceneId}
@@ -204,9 +398,10 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
         focusToken={focusToken}
         stationName={stationInfo.name}
         hideSceneBar
+        chromeTone="maroon"
       />
 
-      {showTourNav && stationInfo.levels.length > 0 && (
+      {showTourNav && stationInfo.levels.length > 0 && !guidedActive && (
         <TourNavigationBar
           levels={stationInfo.levels}
           scenes={stationInfo.scenes}
@@ -217,163 +412,243 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
           onSelectLevel={selectLevel}
           onSelectArea={selectArea}
           onSelectScene={handleSceneChange}
+          offsetClassName={unitsOpen ? "sm:pr-[22rem]" : ""}
         />
       )}
 
-      {/* subtle gradient overlay for text legibility */}
-      <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(to_bottom,rgba(0,0,0,.45)_0%,transparent_30%,transparent_65%,rgba(0,0,0,.5)_100%)]" />
+      {guidedActive && showTourNav && (
+        <GuidedRouteBar
+          fromTitle={routeFromTitle}
+          toTitle={routeToTitle}
+          stepIndex={safeRouteIdx}
+          stepTotal={selectedRoute.length}
+          autoplay={routeAutoplay}
+          canPrev={Boolean(prevStep)}
+          canNext={Boolean(nextStep)}
+          finished={routeFinished}
+          onToggleAutoplay={toggleRouteAutoplay}
+          onPrev={() => prevStep && handleSceneChange(prevStep)}
+          onNext={() => nextStep && handleSceneChange(nextStep)}
+          onExit={exitGuidedRoute}
+        />
+      )}
 
-      {/* ── TOP BAR ── */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-3 sm:px-5 sm:pt-4">
-        <Link
-          href="/"
-          className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/55 px-3 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur-md transition-colors hover:bg-black/70"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">{stationInfo.name}</span>
-        </Link>
+      {/* Vignette legibility — tinted maroon, not pure black */}
+      <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(to_bottom,rgba(28,10,14,.55)_0%,transparent_28%,transparent_62%,rgba(28,10,14,.62)_100%)]" />
+
+      {/* TOP CHIP — di atas navbar / tanpa bentrok hit-area */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[60] px-3 pt-4 sm:px-5 sm:pt-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="pointer-events-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-[#F8ECEE] transition duration-300 hover:border-[#E31E2D]/40 hover:bg-[#3A161C]"
+              aria-label="Pilih stasiun"
+            >
+              <MapPin className="h-4 w-4 text-[#E31E2D]" />
+              <span className="font-display hidden sm:inline">Pilih Stasiun</span>
+            </button>
+            <Link
+              href="/"
+              className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-[#F8ECEE] transition duration-300 hover:border-[#E31E2D]/40 hover:bg-[#3A161C]"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="font-display hidden sm:inline">{stationInfo.name}</span>
+              <span className="font-display sm:hidden">Kembali</span>
+            </Link>
+          </div>
+
+          {availableCount > 0 && (
+            <div className="tour-glass pointer-events-none inline-flex items-center gap-2 rounded-full px-3 py-2">
+              <span className="h-2 w-2 rounded-full bg-[#34d399]" />
+              <span className="font-display text-xs font-semibold text-[#F8ECEE]/85">
+                {availableCount} unit tersedia
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── LEFT FLOATING CONTROLS ── */}
-      <div className="pointer-events-none absolute left-3 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-2 sm:left-5">
-        {/* Info toggle */}
-        <button
-          onClick={() => { setInfoOpen((v) => !v); setRouteOpen(false); setUnitsOpen(false); }}
-          className={`pointer-events-auto flex h-11 w-11 flex-col items-center justify-center rounded-2xl border shadow-lg backdrop-blur-md transition-all ${
-            infoOpen
-              ? "border-white/25 bg-white text-[#1B3A6B]"
-              : "border-white/15 bg-black/55 text-white hover:bg-black/70"
-          }`}
-          title="Info Stasiun"
+      {/* RIGHT TOOL RAIL */}
+      <div className="pointer-events-none absolute right-3 top-1/2 z-[60] flex -translate-y-1/2 flex-col items-end gap-2.5 sm:right-5">
+        <ToolButton
+          active={infoOpen}
+          label="Info"
+          title="Info stasiun"
+          delayMs={40}
+          onClick={() => {
+            setInfoOpen((v) => !v);
+            setRouteOpen(false);
+            setUnitsOpen(false);
+          }}
         >
           <Info className="h-5 w-5" />
-        </button>
+        </ToolButton>
 
-        {/* Route toggle */}
         {stationInfo.scenes.length > 1 && (
-          <button
-            onClick={() => { setRouteOpen((v) => !v); setInfoOpen(false); setUnitsOpen(false); }}
-            className={`pointer-events-auto flex h-11 w-11 flex-col items-center justify-center rounded-2xl border shadow-lg backdrop-blur-md transition-all ${
-              routeOpen
-                ? "border-white/25 bg-white text-[#1B3A6B]"
-                : "border-white/15 bg-black/55 text-white hover:bg-black/70"
-            }`}
-            title="Guided Route"
+          <ToolButton
+            active={routeOpen || guidedActive}
+            label="Rute"
+            title="Guided route"
+            delayMs={90}
+            onClick={() => {
+              if (guidedActive) {
+                exitGuidedRoute();
+                setRouteOpen(true);
+                setInfoOpen(false);
+                setUnitsOpen(false);
+                return;
+              }
+              setRouteOpen((v) => !v);
+              setInfoOpen(false);
+              setUnitsOpen(false);
+            }}
           >
             <Route className="h-5 w-5" />
-          </button>
+          </ToolButton>
         )}
 
-        {/* Units toggle */}
-        <button
-          onClick={() => { setUnitsOpen((v) => !v); setInfoOpen(false); setRouteOpen(false); if (unitsOpen) { setSelectedSpace(null); setOpenedFromUnitsList(false); } }}
-          className={`pointer-events-auto relative flex h-11 w-11 flex-col items-center justify-center rounded-2xl border shadow-lg backdrop-blur-md transition-all ${
-            unitsOpen
-              ? "border-white/25 bg-white text-[#1B3A6B]"
-              : "border-white/15 bg-black/55 text-white hover:bg-black/70"
-          }`}
-          title="Daftar Unit"
+        <ToolButton
+          active={unitsOpen}
+          label="Unit"
+          title="Daftar unit"
+          badge={availableCount}
+          delayMs={140}
+          onClick={() => {
+            setUnitsOpen((v) => !v);
+            setInfoOpen(false);
+            setRouteOpen(false);
+            if (unitsOpen) {
+              setSelectedSpace(null);
+              setOpenedFromUnitsList(false);
+            }
+          }}
         >
           <Grid3X3 className="h-5 w-5" />
-          {availableCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#E31E2D] text-[9px] font-black text-white">
-              {availableCount}
-            </span>
-          )}
-        </button>
+        </ToolButton>
       </div>
 
-      {/* ── INFO PANEL (slides in from left) ── */}
+      {/* Backdrop soft close for side panels */}
+      {(infoOpen || routeOpen) && !selectedSpace && (
+        <button
+          type="button"
+          aria-label="Tutup panel"
+          className="pointer-events-auto absolute inset-0 z-[55] bg-[#1C0A0E]/25 backdrop-blur-[1px]"
+          onClick={closeSidePanels}
+        />
+      )}
+
+      {/* INFO PANEL — kanan, di samping rail */}
       {infoOpen && !selectedSpace && (
-        <div className="pointer-events-auto absolute left-16 top-1/2 z-30 w-72 -translate-y-1/2 rounded-2xl border border-white/15 bg-[#0d1f3c]/90 text-white shadow-2xl backdrop-blur-xl sm:left-20" style={{animation:"fadeSlideIn .18s ease"}}>
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-            <h2 className="font-black">{stationInfo.name}</h2>
-            <button onClick={() => setInfoOpen(false)} className="rounded-full p-1 hover:bg-white/10 transition-colors">
-              <X className="h-4 w-4 text-white/60" />
+        <aside className="tour-glass-panel tour-panel-in pointer-events-auto absolute right-16 top-1/2 z-[65] w-[min(18.5rem,calc(100vw-5.5rem))] -translate-y-1/2 overflow-hidden rounded-2xl text-[#F8ECEE] sm:right-20">
+          <div className="flex items-center justify-between border-b border-[color:rgb(255_214_218_/_0.12)] px-4 py-3">
+            <h2 className="font-display text-base font-semibold tracking-tight">{stationInfo.name}</h2>
+            <button
+              type="button"
+              onClick={() => setInfoOpen(false)}
+              className="rounded-full p-1.5 transition-colors hover:bg-white/10"
+            >
+              <X className="h-4 w-4 text-[#F8ECEE]/60" />
             </button>
           </div>
-          <div className="p-4 space-y-4">
+          <div className="space-y-4 p-4">
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-xl bg-white/8 py-2.5">
-                <p className="text-base font-black text-emerald-300">{availableCount}</p>
-                <p className="text-[10px] text-white/55">Tersedia</p>
+              <div className="rounded-xl bg-[#1C0A0E]/55 py-2.5">
+                <p className="font-display text-base font-semibold text-[#34d399]">{availableCount}</p>
+                <p className="text-[10px] text-[#C4A8AD]">Tersedia</p>
               </div>
-              <div className="rounded-xl bg-white/8 py-2.5">
-                <p className="text-base font-black text-red-300">{occupiedCount}</p>
-                <p className="text-[10px] text-white/55">Terisi</p>
+              <div className="rounded-xl bg-[#1C0A0E]/55 py-2.5">
+                <p className="font-display text-base font-semibold text-[#ff8a93]">{occupiedCount}</p>
+                <p className="text-[10px] text-[#C4A8AD]">Terisi</p>
               </div>
-              <div className="rounded-xl bg-white/8 py-2.5">
-                <p className="text-base font-black">{spaces.length}</p>
-                <p className="text-[10px] text-white/55">Total</p>
+              <div className="rounded-xl bg-[#1C0A0E]/55 py-2.5">
+                <p className="font-display text-base font-semibold">{spaces.length}</p>
+                <p className="text-[10px] text-[#C4A8AD]">Total</p>
               </div>
             </div>
-            <div className="space-y-2 text-xs text-white/70">
+            <div className="space-y-2 text-xs text-[#F8ECEE]/75">
               <div className="flex items-start gap-2">
-                <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/40" />
+                <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#C4A8AD]" />
                 <span>{stationInfo.address}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Users className="h-3.5 w-3.5 shrink-0 text-[#ff4f5b]" />
-                <span className="font-semibold text-white">{formatNumber(stationInfo.dailyPassengers)} penumpang/hari</span>
+                <Users className="h-3.5 w-3.5 shrink-0 text-[#E31E2D]" />
+                <span className="font-semibold text-white">
+                  {formatNumber(stationInfo.dailyPassengers)} penumpang/hari
+                </span>
               </div>
             </div>
-            {/* Occupancy bar */}
             <div>
-              <div className="mb-1 flex justify-between text-[10px] text-white/50">
+              <div className="mb-1 flex justify-between text-[10px] text-[#C4A8AD]">
                 <span>Tingkat hunian</span>
-                <span>{spaces.length > 0 ? Math.round(occupiedCount / spaces.length * 100) : 0}%</span>
+                <span>
+                  {spaces.length > 0 ? Math.round((occupiedCount / spaces.length) * 100) : 0}%
+                </span>
               </div>
-              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-1.5 overflow-hidden rounded-full bg-[#1C0A0E]/70">
                 <div
-                  className="h-full bg-[#E31E2D] rounded-full transition-all"
-                  style={{ width: `${spaces.length > 0 ? occupiedCount / spaces.length * 100 : 0}%` }}
+                  className="h-full rounded-full bg-[#E31E2D] transition-all duration-500"
+                  style={{
+                    width: `${spaces.length > 0 ? (occupiedCount / spaces.length) * 100 : 0}%`,
+                  }}
                 />
               </div>
             </div>
             <a
               href={stationWaUrl}
-              target="_blank" rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] py-2.5 text-xs font-black text-white hover:bg-[#1DA851] transition-colors"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] py-2.5 font-display text-xs font-bold text-white transition hover:bg-[#1DA851]"
             >
               Hubungi Tim Komersial
             </a>
           </div>
-        </div>
+        </aside>
       )}
 
-      {/* ── ROUTE PANEL ── */}
+      {/* ROUTE PANEL */}
       {routeOpen && !selectedSpace && stationInfo.scenes.length > 1 && (
-        <div className="pointer-events-auto absolute left-16 top-1/2 z-30 w-72 -translate-y-1/2 rounded-2xl border border-white/15 bg-[#0d1f3c]/90 text-white shadow-2xl backdrop-blur-xl sm:left-20" style={{animation:"fadeSlideIn .18s ease"}}>
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+        <aside className="tour-glass-panel tour-panel-in pointer-events-auto absolute right-16 top-1/2 z-[65] w-[min(18.5rem,calc(100vw-5.5rem))] -translate-y-1/2 overflow-hidden rounded-2xl text-[#F8ECEE] sm:right-20">
+          <div className="flex items-center justify-between border-b border-[color:rgb(255_214_218_/_0.12)] px-4 py-3">
             <div className="flex items-center gap-2">
-              <Route className="h-4 w-4 text-emerald-300" />
-              <p className="font-black text-sm">Guided Route</p>
+              <Route className="h-4 w-4 text-[#E31E2D]" />
+              <p className="font-display text-sm font-semibold">Guided Route</p>
             </div>
-            <button onClick={() => setRouteOpen(false)} className="rounded-full p-1 hover:bg-white/10 transition-colors">
-              <X className="h-4 w-4 text-white/60" />
+            <button
+              type="button"
+              onClick={() => setRouteOpen(false)}
+              className="rounded-full p-1.5 transition-colors hover:bg-white/10"
+            >
+              <X className="h-4 w-4 text-[#F8ECEE]/60" />
             </button>
           </div>
-          <div className="p-4 space-y-3">
+          <div className="max-h-[min(70vh,28rem)] space-y-3 overflow-y-auto p-4">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[10px] text-white/50 mb-1 block">Dari</label>
+                <label className="mb-1 block font-display text-[10px] uppercase tracking-[0.12em] text-[#C4A8AD]">
+                  Dari
+                </label>
                 <select
                   value={routeFrom}
                   onChange={(e) => setRouteFrom(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-white/10 bg-white/10 px-3 text-xs font-semibold text-white outline-none"
+                  className="h-9 w-full rounded-xl border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/65 px-3 text-xs font-semibold text-white outline-none focus:border-[#E31E2D]/50"
                 >
                   {stationInfo.levels.map((level) => (
                     <optgroup key={level.id} label={level.label}>
                       {(level.areas.length > 0
                         ? level.areas.flatMap((a) =>
-                            a.sceneIds.map((id) => ({ id, title: stationInfo.scenes.find((s) => s.id === id)?.title ?? id }))
+                            a.sceneIds.map((id) => ({
+                              id,
+                              title: stationInfo.scenes.find((s) => s.id === id)?.title ?? id,
+                            }))
                           )
                         : level.sceneIds.map((id) => ({
                             id,
                             title: stationInfo.scenes.find((s) => s.id === id)?.title ?? id,
                           }))
                       ).map((s) => (
-                        <option key={s.id} value={s.id} className="bg-[#17355f]">
+                        <option key={s.id} value={s.id} className="bg-[#1C0A0E]">
                           {s.title}
                         </option>
                       ))}
@@ -382,24 +657,29 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
                 </select>
               </div>
               <div>
-                <label className="text-[10px] text-white/50 mb-1 block">Ke</label>
+                <label className="mb-1 block font-display text-[10px] uppercase tracking-[0.12em] text-[#C4A8AD]">
+                  Ke
+                </label>
                 <select
                   value={routeTo}
                   onChange={(e) => setRouteTo(e.target.value)}
-                  className="w-full h-9 rounded-lg border border-white/10 bg-white/10 px-3 text-xs font-semibold text-white outline-none"
+                  className="h-9 w-full rounded-xl border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/65 px-3 text-xs font-semibold text-white outline-none focus:border-[#E31E2D]/50"
                 >
                   {stationInfo.levels.map((level) => (
                     <optgroup key={level.id} label={level.label}>
                       {(level.areas.length > 0
                         ? level.areas.flatMap((a) =>
-                            a.sceneIds.map((id) => ({ id, title: stationInfo.scenes.find((s) => s.id === id)?.title ?? id }))
+                            a.sceneIds.map((id) => ({
+                              id,
+                              title: stationInfo.scenes.find((s) => s.id === id)?.title ?? id,
+                            }))
                           )
                         : level.sceneIds.map((id) => ({
                             id,
                             title: stationInfo.scenes.find((s) => s.id === id)?.title ?? id,
                           }))
                       ).map((s) => (
-                        <option key={s.id} value={s.id} className="bg-[#17355f]">
+                        <option key={s.id} value={s.id} className="bg-[#1C0A0E]">
                           {s.title}
                         </option>
                       ))}
@@ -409,11 +689,20 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
               </div>
             </div>
             <button
-              onClick={() => { handleSceneChange(routeFrom); setSelectedSpace(null); }}
-              className="flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 text-xs font-black text-[#0d1f3c] hover:bg-emerald-300 transition-colors"
+              type="button"
+              onClick={() => startGuidedRoute({ autoplay: true })}
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[#E31E2D] font-display text-xs font-bold text-white shadow-[0_12px_28px_rgba(227,30,45,0.3)] transition hover:bg-[#c41926]"
             >
-              <Play className="h-3.5 w-3.5" />
-              Mulai Rute
+              <Play className="h-3.5 w-3.5 fill-current" />
+              Putar otomatis
+            </button>
+            <button
+              type="button"
+              onClick={() => startGuidedRoute({ autoplay: false })}
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[color:rgb(255_214_218_/_0.18)] bg-[#1C0A0E]/45 font-display text-xs font-bold text-[#F8ECEE] transition hover:bg-[#1C0A0E]/7"
+            >
+              <Route className="h-3.5 w-3.5" />
+              Mulai rute manual
             </button>
             <div className="space-y-1.5 pt-1">
               {selectedRoute.map((sceneId, idx) => {
@@ -422,83 +711,121 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
                 return (
                   <button
                     key={sceneId}
+                    type="button"
                     onClick={() => handleSceneChange(sceneId)}
-                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs transition-colors ${
-                      isActive ? "bg-white text-[#17355f] font-bold" : "bg-white/8 text-white/70 hover:bg-white/12"
+                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs transition-all duration-300 ${
+                      isActive
+                        ? "bg-white font-bold text-[#1C0A0E]"
+                        : "bg-[#1C0A0E]/45 text-[#F8ECEE]/70 hover:bg-[#1C0A0E]/7"
                     }`}
                   >
-                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${isActive ? "bg-[#E31E2D] text-white" : "bg-white/10 text-white/70"}`}>
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-display text-[10px] font-bold ${
+                        isActive ? "bg-[#E31E2D] text-white" : "bg-white/10 text-[#F8ECEE]/70"
+                      }`}
+                    >
                       {idx + 1}
                     </span>
                     <span>{scene?.title ?? sceneId}</span>
-                    {isActive && <CheckCircle2 className="ml-auto h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+                    {isActive && (
+                      <CheckCircle2 className="ml-auto h-3.5 w-3.5 shrink-0 text-[#34d399]" />
+                    )}
                   </button>
                 );
               })}
             </div>
 
-            {nextStep && (
+            {guidedActive && nextStep && (
               <button
+                type="button"
                 onClick={() => handleSceneChange(nextStep)}
-                className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-emerald-300/40 bg-emerald-400 text-xs font-black text-[#0d1f3c] transition-colors hover:bg-emerald-300"
+                className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-full border border-[#E31E2D]/40 bg-[#E31E2D]/15 font-display text-xs font-bold text-white transition hover:bg-[#E31E2D]/25"
               >
                 Lanjut ke {stationInfo.scenes.find((s) => s.id === nextStep)?.title}
                 <ChevronRight className="h-4 w-4" />
               </button>
             )}
+
+            {guidedActive && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (routeAutoplay) setRouteAutoplay(false);
+                  else toggleRouteAutoplay();
+                }}
+                className="flex h-9 w-full items-center justify-center gap-2 rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-transparent font-display text-[11px] font-bold text-[#C4A8AD] transition hover:text-white"
+              >
+                {routeAutoplay ? (
+                  <>
+                    <Pause className="h-3.5 w-3.5" />
+                    Jeda autoplay
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-3.5 w-3.5" />
+                    Lanjut autoplay
+                  </>
+                )}
+              </button>
+            )}
           </div>
-        </div>
+        </aside>
       )}
 
-      {/* ── UNITS BOTTOM DRAWER ── */}
+      {/* UNITS RIGHT DRAWER — tidak bentrok dengan bottom nav */}
       {unitsOpen && !selectedSpace && (
-        <div className="pointer-events-auto absolute inset-x-0 bottom-0 z-40" style={{ animation: "slideUpIn .2s ease" }}>
-          <div className="mx-3 mb-3 sm:mx-5 sm:mb-5 rounded-2xl border border-white/15 bg-[#080f1e]/90 shadow-2xl backdrop-blur-xl overflow-hidden">
-            {/* Drawer header */}
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-              <div className="flex items-center gap-2">
-                <Grid3X3 className="h-4 w-4 text-white/60" />
-                <p className="text-sm font-black text-white">Unit Komersial</p>
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white/60">{spaces.length}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-[11px] text-emerald-400 font-semibold">{availableCount} tersedia</span>
-                <button onClick={() => setUnitsOpen(false)} className="rounded-full p-1 hover:bg-white/10 transition-colors">
-                  <ChevronDown className="h-4 w-4 text-white/60" />
-                </button>
-              </div>
+        <aside className="tour-glass-panel tour-drawer-in pointer-events-auto absolute inset-y-0 right-0 z-[65] flex w-full max-w-sm flex-col border-l border-[color:rgb(255_214_218_/_0.14)] text-[#F8ECEE] sm:max-w-[22rem]">
+          <div className="flex items-center justify-between border-b border-[color:rgb(255_214_218_/_0.12)] px-4 py-3.5">
+            <div className="flex items-center gap-2">
+              <Grid3X3 className="h-4 w-4 text-[#E31E2D]" />
+              <p className="font-display text-sm font-semibold">Unit Komersial</p>
+              <span className="rounded-full bg-[#1C0A0E]/55 px-2 py-0.5 font-display text-[10px] font-bold text-[#C4A8AD]">
+                {spaces.length}
+              </span>
             </div>
-            {/* Scroll area */}
-            <div className="overflow-x-auto">
-              <div className="flex gap-2.5 p-3" style={{ minWidth: "max-content" }}>
-                {spaces.map((space) => (
-                  <button
-                    key={space.id}
-                    onClick={() => openSpaceFromList(space)}
-                    className="w-48 shrink-0 rounded-xl border border-white/10 bg-white/5 p-3 text-left text-white transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/10 active:scale-[.98]"
-                  >
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="font-mono text-[11px] font-black text-white/60">{space.code}</span>
-                      <span className={`h-2 w-2 rounded-full ${STATUS_DOT[space.status]}`} />
-                    </div>
-                    <p className="mb-1 truncate text-sm font-bold">{space.name}</p>
-                    <div className="flex items-center gap-1.5 text-[11px] text-white/50">
-                      <Building2 className="h-3 w-3" />
-                      <span>{TYPE_LABELS[space.type] ?? space.type}</span>
-                      <span>·</span>
-                      <span>{space.area} m²</span>
-                    </div>
-                    <p className="mt-1.5 text-xs text-white/50">{space.area} m²</p>
-                  </button>
-                ))}
-              </div>
+            <div className="flex items-center gap-3">
+              <span className="font-display text-[11px] font-semibold text-[#34d399]">
+                {availableCount} tersedia
+              </span>
+              <button
+                type="button"
+                onClick={() => setUnitsOpen(false)}
+                className="rounded-full p-1.5 transition-colors hover:bg-white/10"
+              >
+                <X className="h-4 w-4 text-[#F8ECEE]/60" />
+              </button>
             </div>
           </div>
-        </div>
+          <div className="flex-1 space-y-2 overflow-y-auto p-3 pb-28">
+            {spaces.map((space) => (
+              <button
+                key={space.id}
+                type="button"
+                onClick={() => openSpaceFromList(space)}
+                className="w-full rounded-2xl border border-[color:rgb(255_214_218_/_0.1)] bg-[#1C0A0E]/45 p-3.5 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-[#E31E2D]/40 hover:bg-[#1C0A0E]/7 active:scale-[0.98]"
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="font-mono text-[11px] font-bold text-[#C4A8AD]">{space.code}</span>
+                  <span className={`h-2 w-2 rounded-full ${STATUS_DOT[space.status]}`} />
+                </div>
+                <p className="mb-1 truncate font-display text-sm font-semibold">{space.name}</p>
+                <div className="flex items-center gap-1.5 text-[11px] text-[#C4A8AD]">
+                  <Building2 className="h-3 w-3" />
+                  <span>{TYPE_LABELS[space.type] ?? space.type}</span>
+                  <span>·</span>
+                  <span>{space.area} m²</span>
+                </div>
+              </button>
+            ))}
+            {spaces.length === 0 && (
+              <p className="px-2 py-8 text-center text-sm text-[#C4A8AD]">
+                Belum ada unit untuk stasiun ini.
+              </p>
+            )}
+          </div>
+        </aside>
       )}
 
-
-      {/* ── SPACE DETAIL POPUP ── */}
       {selectedSpace && (
         <InTourSpacePopup
           key={selectedSpace.id}
@@ -510,6 +837,20 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
         />
       )}
 
+      {selectedAd && (
+        <InTourAdPopup
+          title={selectedAd.text}
+          creativeTitle={selectedAd.creativeTitle}
+          creativeUrl={selectedAd.creativeUrl}
+          spaceCode={selectedAd.spaceCode}
+          spaceName={spaces.find((s) => s.code === selectedAd.spaceCode)?.name}
+          brandName={spaces.find((s) => s.code === selectedAd.spaceCode)?.tenantBrand ?? undefined}
+          stationName={stationInfo.name}
+          contactPhone={commercialContactPhone}
+          onClose={() => setSelectedAd(null)}
+        />
+      )}
+
       {infoPopup && (
         <InTourInfoPopup
           title={infoPopup.title}
@@ -517,6 +858,11 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
           onClose={() => setInfoPopup(null)}
         />
       )}
+
+      <ContactPersonFab
+        phone={commercialContactPhone}
+        stationName={stationInfo.name}
+      />
     </div>
   );
 }

@@ -1,14 +1,34 @@
 import type { PrivacyBlur } from "./privacy-blur-types";
+import type { FacilityIconId } from "./facility-icons";
 
 export type Hotspot = {
   pitch: number;
   yaw: number;
-  type: "scene" | "space" | "info";
+  type: "scene" | "space" | "info" | "ad";
   text: string;
   scale?: number;
+  direction?:
+    | "right"
+    | "left"
+    | "up"
+    | "down"
+    | "up-right"
+    | "up-left"
+    | "down-right"
+    | "down-left";
   sceneId?: string;
   spaceCode?: string;
   description?: string;
+  /** Ikon fasilitas (toilet, mushola, dll.) — hanya untuk type info */
+  facilityIcon?: FacilityIconId;
+  creativeUrl?: string;
+  creativeTitle?: string;
+};
+
+export type SceneInitialView = {
+  yaw: number;
+  pitch: number;
+  hfov?: number;
 };
 
 export type PanoramaScene = {
@@ -17,6 +37,7 @@ export type PanoramaScene = {
   panoramaUrl: string;
   hotspots: Hotspot[];
   privacyBlurs?: PrivacyBlur[];
+  initialView?: SceneInitialView;
   thumbnailUrl?: string;
   levelId?: string | null;
   areaId?: string | null;

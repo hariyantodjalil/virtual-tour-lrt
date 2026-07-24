@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 56" fill="none" aria-hidden="true">
+  <!-- Panah lengkung kiri ? kanan (bawah) -->
+  <path
+    d="M14 38c6 8 18 13 26 13s20-5 26-13"
+    stroke="#fff"
+    stroke-width="4.2"
+    stroke-linecap="round"
+    fill="none"
+  />
+  <path d="M62 38l8-1.5-3.5 8.5z" fill="#fff" />
+  <!-- Panah lengkung kanan ? kiri (atas) -->
+  <path
+    d="M66 18c-6-8-18-13-26-13S20 10 14 18"
+    stroke="#fff"
+    stroke-width="4.2"
+    stroke-linecap="round"
+    fill="none"
+  />
+  <path d="M18 18l-8 1.5 3.5-8.5z" fill="#fff" />
+</svg>

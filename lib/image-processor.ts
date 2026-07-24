@@ -12,9 +12,11 @@
 
 import sharp from "sharp";
 
+const MAX_INPUT_PIXELS = 80_000_000;
+
 export interface ProcessResult {
   buffer: Buffer;
-  contentType: "image/webp" | "image/jpeg";
+  contentType: "image/webp" | "image/jpeg" | "image/png";
   width: number;
   height: number;
   sizeBytes: number;
@@ -23,30 +25,21 @@ export interface ProcessResult {
 // ─── Panorama 360° equirectangular ───────────────────────────────────────────
 // Target: max 6000×3000px WebP q82 → biasanya 2–5 MB dari file 15–22 MB asli
 export async function processPanorama(input: Buffer): Promise<ProcessResult> {
-  const image = sharp(input, { limitInputPixels: false });
-  const meta = await image.metadata();
+  const image = sharp(input, { limitInputPixels: MAX_INPUT_PIXELS });
+  const source = await image.metadata();
+  const width = source.width ?? 0;
+  const height = source.height ?? 0;
+  const aspectRatio = height > 0 ? width / height : 0;
+  if (!width || !height || aspectRatio < 1.8 || aspectRatio > 2.2) {
+    throw new Error("Panorama harus berupa gambar equirectangular dengan rasio mendekati 2:1");
+  }
 
-  const maxWidth = 6000;
-  const maxHeight = 3000;
-
-  // Resize hanya jika lebih besar dari target
-  const needsResize =
-    (meta.width && meta.width > maxWidth) ||
-    (meta.height && meta.height > maxHeight);
-
-  const pipeline = needsResize
-    ? image.resize(maxWidth, maxHeight, {
-        fit: "inside",
-        withoutEnlargement: true,
-        kernel: sharp.kernel.lanczos3,
-      })
-    : image;
-
-  const buffer = await pipeline
-    .webp({ quality: 82, effort: 4 })
+  const buffer = await image
+    .resize({ width: 6000, height: 3000, fit: "inside", withoutEnlargement: true })
+    .webp({ quality: 82, effort: 5 })
     .toBuffer();
 
-  const out = await sharp(buffer, { limitInputPixels: false }).metadata();
+  const out = await sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
 
   return {
     buffer,
@@ -57,10 +50,74 @@ export async function processPanorama(input: Buffer): Promise<ProcessResult> {
   };
 }
 
+/**
+ * Encode hasil bake: dimensi identik dengan master, tanpa resize.
+ * Format & kualitas mengikuti sumber (JPEG q100 / WebP lossless).
+ */
+export async function encodeBakedPanoramaFromSource(
+  bakedLossless: Buffer,
+  sourceBuffer: Buffer
+): Promise<ProcessResult> {
+  const srcMeta = await sharp(sourceBuffer, { limitInputPixels: false }).metadata();
+  const srcW = srcMeta.width ?? 0;
+  const srcH = srcMeta.height ?? 0;
+  if (!srcW || !srcH) {
+    throw new Error("Metadata master panorama tidak valid");
+  }
+
+  const bakedMeta = await sharp(bakedLossless, { limitInputPixels: false }).metadata();
+  if (bakedMeta.width !== srcW || bakedMeta.height !== srcH) {
+    throw new Error(
+      `Resolusi bake (${bakedMeta.width}×${bakedMeta.height}) ≠ master (${srcW}×${srcH})`
+    );
+  }
+
+  const image = sharp(bakedLossless, { limitInputPixels: false });
+  const fmt = (srcMeta.format ?? "webp").toLowerCase();
+
+  let buffer: Buffer;
+  let contentType: ProcessResult["contentType"];
+
+  if (fmt === "jpeg" || fmt === "jpg") {
+    buffer = await image
+      .jpeg({ quality: 100, mozjpeg: true, chromaSubsampling: "4:4:4" })
+      .toBuffer();
+    contentType = "image/jpeg";
+  } else if (fmt === "png") {
+    buffer = await image.png({ compressionLevel: 6, adaptiveFiltering: false }).toBuffer();
+    contentType = "image/png";
+  } else {
+    buffer = await image.webp({ lossless: true, effort: 6, smartSubsample: false }).toBuffer();
+    contentType = "image/webp";
+  }
+
+  const out = await sharp(buffer, { limitInputPixels: false }).metadata();
+  if (out.width !== srcW || out.height !== srcH) {
+    throw new Error(
+      `Resolusi berubah saat encode (${srcW}×${srcH} → ${out.width}×${out.height})`
+    );
+  }
+
+  return {
+    buffer,
+    contentType,
+    width: srcW,
+    height: srcH,
+    sizeBytes: buffer.length,
+  };
+}
+
+/**
+ * @deprecated Prefer encodeBakedPanoramaFromSource — tetap ada untuk kompatibilitas.
+ */
+export async function processPanoramaPreserveResolution(input: Buffer): Promise<ProcessResult> {
+  return encodeBakedPanoramaFromSource(input, input);
+}
+
 // ─── Thumbnail scene (preview di sidebar CMS dan list scene) ─────────────────
 // Target: 900×450px WebP q78 → ~40–120 KB
 export async function generatePanoramaThumbnail(input: Buffer): Promise<ProcessResult> {
-  const buffer = await sharp(input, { limitInputPixels: false })
+  const buffer = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
     .resize(900, 450, {
       fit: "cover",
       position: "centre",
@@ -81,7 +138,7 @@ export async function generatePanoramaThumbnail(input: Buffer): Promise<ProcessR
 // ─── Cover stasiun / foto komersial ─────────────────────────────────────────
 // Target: max 1600px wide WebP q85 → biasanya 100–400 KB
 export async function processStationCover(input: Buffer): Promise<ProcessResult> {
-  const image = sharp(input);
+  const image = sharp(input, { limitInputPixels: MAX_INPUT_PIXELS });
   const meta = await image.metadata();
 
   const maxWidth = 1600;
@@ -113,7 +170,7 @@ export async function processStationCover(input: Buffer): Promise<ProcessResult>
 // ─── Foto unit komersial (space) ─────────────────────────────────────────────
 // Target: max 1200px wide WebP q83 → biasanya 80–250 KB
 export async function processSpacePhoto(input: Buffer): Promise<ProcessResult> {
-  const buffer = await sharp(input)
+  const buffer = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
     .resize(1200, undefined, {
       fit: "inside",
       withoutEnlargement: true,

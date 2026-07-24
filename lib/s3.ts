@@ -1,11 +1,18 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
 
 export type S3AssetType =
   | "panoramas"       // virtual-tour/panoramas/{station-slug}/
+  | "originals"       // virtual-tour/originals/{station-slug}/
   | "floorplans"      // virtual-tour/floorplans/{station-slug}/
   | "stations"        // stations/covers/
   | "spaces"          // spaces/photos/
   | "thumbnails"      // virtual-tour/thumbnails/{station-slug}/
+  | "ad-creatives"    // virtual-tour/ad-creatives/{station-slug}/
   | "misc";           // misc/
 
 function getS3Client() {
@@ -66,10 +73,14 @@ export function generateS3Key(
   switch (type) {
     case "panoramas":
       return `virtual-tour/panoramas/${slug}/panorama_${timestamp}_${randomId}.${extension}`;
+    case "originals":
+      return `virtual-tour/originals/${slug}/original_${timestamp}_${randomId}.${extension}`;
     case "floorplans":
       return `virtual-tour/floorplans/${slug}/floorplan_${timestamp}_${randomId}.${extension}`;
     case "thumbnails":
       return `virtual-tour/thumbnails/${slug}/thumb_${timestamp}_${randomId}.${extension}`;
+    case "ad-creatives":
+      return `virtual-tour/ad-creatives/${slug}/creative_${timestamp}_${randomId}.${extension}`;
     case "stations":
       return `stations/covers/station_${timestamp}_${randomId}.${extension}`;
     case "spaces":
@@ -104,6 +115,20 @@ export async function uploadToS3(
     key,
     bucket,
   };
+}
+
+export async function downloadFromS3(key: string): Promise<Buffer> {
+  const s3Client = getS3Client();
+  const bucket = getBucketName();
+  const res = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const body = res.Body;
+  if (!body) throw new Error("S3 object kosong");
+
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of body as AsyncIterable<Uint8Array>) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 export async function deleteFromS3(key: string): Promise<void> {

@@ -14,6 +14,7 @@ const sceneSelect = {
   levelId: true,
   areaId: true,
   panoramaUrl: true,
+  originalPanoramaUrl: true,
   thumbnailUrl: true,
   order: true,
   hotspots: true,
@@ -24,7 +25,7 @@ const sceneSelect = {
 };
 
 export async function GET(request: NextRequest, { params }: Params) {
-  const auth = requireAuth(request);
+  const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { stationId } = await params;
@@ -41,7 +42,12 @@ export async function GET(request: NextRequest, { params }: Params) {
       },
     });
 
-    const scenes = sortScenesByTourOrder(rawScenes).map(({ levelRef: _l, areaRef: _a, ...scene }) => scene);
+    const scenes = sortScenesByTourOrder(rawScenes).map((row) => {
+      const { levelRef, areaRef, ...scene } = row;
+      void levelRef;
+      void areaRef;
+      return scene;
+    });
 
     return NextResponse.json({ ...structure, scenes });
   } catch (err) {
