@@ -47,4 +47,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 --start-period=20s \
   CMD wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1
 
-CMD ["dumb-init", "node", "server.js"]
+CMD ["dumb-init", "npm", "run", "start"]
