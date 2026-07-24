@@ -13,11 +13,11 @@ type AuthUser = {
   role: string;
 };
 
-const navItems = [
+const navItems: { href: string; label: string; active?: boolean }[] = [
   { href: "/", label: "Beranda", active: true },
   { href: "#kontak", label: "Hubungi Tim" },
   { href: "#area-komersial", label: "Area Komersial" },
-] as const;
+];
 
 export default function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
   const [user, setUser] = useState<AuthUser | null>(null);
