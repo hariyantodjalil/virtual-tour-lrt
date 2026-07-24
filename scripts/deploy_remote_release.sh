@@ -100,7 +100,7 @@ fi
 
 docker compose --project-name "$project_name" --env-file "$render_env_file" -f "$compose_file" pull virtualtour
 docker compose --project-name "$project_name" --env-file "$render_env_file" -f "$compose_file" up -d postgres
-docker compose --project-name "$project_name" --env-file "$render_env_file" -f "$compose_file" run --rm virtualtour npx prisma migrate deploy
+docker compose --project-name "$project_name" --env-file "$render_env_file" -f "$compose_file" run --rm virtualtour npm run db:deploy:recover
 docker compose --project-name "$project_name" --env-file "$render_env_file" -f "$compose_file" up -d --remove-orphans virtualtour
 docker compose --project-name "$project_name" --env-file "$render_env_file" -f "$compose_file" ps
 EOF

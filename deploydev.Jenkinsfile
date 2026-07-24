@@ -107,15 +107,10 @@ pipeline {
                             set -a && . ./.env && set +a
                             sudo docker stack deploy --resolve-image=always -c docker-compose.yml --with-registry-auth ${APP_NAME}
                             sleep 15
-                            # P3009: tandai migrasi gagal sebagai applied (partial run), tanpa nested quote
                             sudo docker run --rm --network ${APP_NAME}_virtualtour-net \
                                 -e DATABASE_URL="\$DATABASE_URL" \
                                 hub.kai.id/lrt/${APP_NAME}:${TAG} \
-                                npx prisma migrate resolve --applied 20260629040000_add_mitra_role_and_lead_user || true
-                            sudo docker run --rm --network ${APP_NAME}_virtualtour-net \
-                                -e DATABASE_URL="\$DATABASE_URL" \
-                                hub.kai.id/lrt/${APP_NAME}:${TAG} \
-                                npx prisma migrate deploy
+                                npm run db:deploy:recover
                         '
                     """
                 }
