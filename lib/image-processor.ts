@@ -190,6 +190,30 @@ export async function processSpacePhoto(input: Buffer): Promise<ProcessResult> {
   };
 }
 
+// ─── Avatar profil ───────────────────────────────────────────────────────────
+// Target: square 512×512 WebP q85
+export async function processAvatarPhoto(input: Buffer): Promise<ProcessResult> {
+  const buffer = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
+    .resize(512, 512, {
+      fit: "cover",
+      position: "centre",
+      withoutEnlargement: false,
+      kernel: sharp.kernel.lanczos3,
+    })
+    .webp({ quality: 85, effort: 4 })
+    .toBuffer();
+
+  const out = await sharp(buffer).metadata();
+
+  return {
+    buffer,
+    contentType: "image/webp",
+    width: out.width ?? 0,
+    height: out.height ?? 0,
+    sizeBytes: buffer.length,
+  };
+}
+
 // ─── Helper: format ukuran file ──────────────────────────────────────────────
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

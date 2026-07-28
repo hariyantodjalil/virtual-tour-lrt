@@ -46,6 +46,10 @@ export const spaceMutationSchema = z.object({
   floor: z.string().trim().min(1).max(64),
   location: z.string().trim().min(1).max(300),
   nearestExit: optionalText(160),
+  nearbyFacilities: z
+    .array(z.enum(["toilet", "mushola", "escalator", "lift", "gate"]))
+    .max(10)
+    .default([]),
   exposure: z.number().int().min(0).max(1_000_000),
   powerSupply: optionalText(160),
   waterAccess: z.boolean(),

@@ -21,7 +21,10 @@ export function hotspotIconSvg(type: HotspotType): string {
 }
 
 const SCENE_CHEVRON_SVG =
-  '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+
+const SCENE_PIN_SVG =
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 22s7-7.2 7-12.2A7 7 0 1 0 5 9.8C5 14.8 12 22 12 22z" fill="#c41230"/><circle cx="12" cy="9.5" r="2.6" fill="#fff"/></svg>';
 
 export type HotspotVisualOptions = {
   type: HotspotType;
@@ -130,7 +133,7 @@ function buildSceneNavHtml(selected: boolean, title: string, direction?: Hotspot
   const rotate = directionRotateCss(direction);
   const safeTitle = escapeHtml(title);
   const chevronStyle = rotate ? ` style="transform:${rotate}"` : "";
-  return `<div class="lrt-scene-nav"><div class="lrt-scene-nav__pulse" aria-hidden="true"></div><div class="${SCENE_NAV_DISC_CLASS}${sel}"><span class="lrt-scene-nav__chevron"${chevronStyle}>${SCENE_CHEVRON_SVG}</span></div><div class="lrt-scene-nav__label" title="${safeTitle}"><span class="lrt-scene-nav__label-text">${safeTitle}</span></div></div>`;
+  return `<div class="lrt-scene-nav"><div class="lrt-scene-nav__pulse" aria-hidden="true"></div><div class="${SCENE_NAV_DISC_CLASS}${sel}"><span class="lrt-scene-nav__core"><span class="lrt-scene-nav__chevron"${chevronStyle}>${SCENE_CHEVRON_SVG}</span></span></div><div class="lrt-scene-nav__label" title="${safeTitle}"><span class="lrt-scene-nav__pin" aria-hidden="true">${SCENE_PIN_SVG}</span><span class="lrt-scene-nav__divider" aria-hidden="true"></span><span class="lrt-scene-nav__label-text">${safeTitle}</span></div></div>`;
 }
 
 function buildFacilityPinHtml(icon: FacilityIconId, selected: boolean): string {

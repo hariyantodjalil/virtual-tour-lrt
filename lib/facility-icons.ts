@@ -22,31 +22,31 @@ export const FACILITY_ICONS: FacilityIconDef[] = [
   {
     id: "toilet",
     label: "Toilet",
-    color: "#1e3a8a",
+    color: "#283D9E",
     src: "/brand/tour-pins/toilet.png",
   },
   {
     id: "mushola",
     label: "Mushola",
-    color: "#166534",
+    color: "#0C623C",
     src: "/brand/tour-pins/mushola.png",
   },
   {
     id: "escalator",
     label: "Eskalator",
-    color: "#6b21a8",
+    color: "#8B3DFF",
     src: "/brand/tour-pins/escalator.png",
   },
   {
     id: "lift",
     label: "Lift",
-    color: "#b91c1c",
+    color: "#D32F2F",
     src: "/brand/tour-pins/lift.png",
   },
   {
     id: "gate",
     label: "Gate",
-    color: "#c2410c",
+    color: "#FF9800",
     src: "/brand/tour-pins/gate.png",
   },
 ];

@@ -14,7 +14,7 @@ const DEFAULT_PHONE = "628118012012";
 export default function ContactPersonFab({
   phone = DEFAULT_PHONE,
   stationName,
-  className = "absolute bottom-24 right-3 sm:bottom-28 sm:right-5",
+  className = "absolute bottom-6 right-3 sm:bottom-8 sm:right-5",
 }: Props) {
   const message = stationName
     ? `Halo, saya tertarik ruang komersial di Stasiun ${stationName}. Mohon info lebih lanjut.`
@@ -30,7 +30,7 @@ export default function ContactPersonFab({
       title="Hubungi contact person"
       className={`group pointer-events-auto z-[70] flex items-end gap-2.5 ${className}`}
     >
-      <span className="relative z-10 flex size-[45px] shrink-0 items-center justify-center rounded-full bg-[#c41230] shadow-[0_8px_24px_rgba(196,18,48,0.45)] transition group-hover:scale-105 group-hover:brightness-110">
+      <span className="relative z-10 flex size-[45px] shrink-0 items-center justify-center rounded-full bg-[#D81435] shadow-[0_8px_24px_rgba(216,20,53,0.45)] transition group-hover:scale-105 group-hover:brightness-110">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/brand/tour-contact/phone.svg"

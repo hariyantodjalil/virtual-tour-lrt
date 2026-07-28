@@ -15,6 +15,7 @@ const leadSchema = z.object({
   password: z.string().min(8, "Password minimal 8 karakter").max(128),
   businessType: z.string().trim().min(3).max(120),
   spaceRequirement: z.string().trim().max(500).optional(),
+  surveyPreference: z.string().trim().max(500).optional(),
   message: z.string().trim().max(2_000).optional(),
 }).strict();
 
@@ -88,6 +89,7 @@ export async function POST(req: NextRequest) {
       email: data.email,
       businessType: data.businessType,
       spaceRequirement: data.spaceRequirement,
+      surveyPreference: data.surveyPreference,
       message: data.message,
     };
     const lead = await prisma.tenantLead.create({

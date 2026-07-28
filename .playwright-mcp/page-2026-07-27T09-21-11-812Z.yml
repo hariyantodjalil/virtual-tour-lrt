@@ -1,0 +1,56 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e8]:
+      - generic [ref=e14]:
+        - button "Concourse" [ref=e15]
+        - button "Peron" [ref=e17]
+        - button "Outdoor" [ref=e19]
+        - button "Transfer" [ref=e21]
+        - button "Komersial" [ref=e23]
+      - button "Concourse Umum" [ref=e31]
+      - generic [ref=e32]:
+        - button "Scene sebelumnya" [disabled] [ref=e33]
+        - button "1/5 Paid Mid 1" [ref=e36]:
+          - generic [ref=e37]: 1/5
+          - generic [ref=e38]: Paid Mid 1
+        - button "Scene berikutnya" [ref=e41]
+    - generic:
+      - generic:
+        - generic [ref=e44]:
+          - button "Pilih stasiun" [ref=e45]:
+            - generic [ref=e49]: Pilih Stasiun
+          - link "Dukuh Atas BNI" [ref=e50] [cursor=pointer]:
+            - /url: /
+        - generic: 3 unit tersedia
+    - generic:
+      - generic [ref=e54]:
+        - generic: Info
+        - button "Info stasiun" [ref=e55]
+      - generic [ref=e58]:
+        - generic: Rute
+        - button "Guided route" [ref=e59]
+      - generic [ref=e64]:
+        - generic: Unit
+        - button "3" [ref=e65]
+    - link "Hubungi contact person" [ref=e69] [cursor=pointer]:
+      - /url: https://wa.me/628118012012?text=Halo%2C%20saya%20tertarik%20ruang%20komersial%20di%20Stasiun%20Dukuh%20Atas%20BNI.%20Mohon%20info%20lebih%20lanjut.
+    - generic [ref=e72]:
+      - button "Sembunyikan legenda fasilitas" [expanded] [ref=e73]
+      - list [ref=e77]:
+        - listitem [ref=e78]:
+          - generic [ref=e79]: Eskalator
+          - img "Eskalator" [ref=e81]
+        - listitem [ref=e82]:
+          - generic [ref=e83]: Mushola
+          - img "Mushola" [ref=e85]
+        - listitem [ref=e86]:
+          - generic [ref=e87]: Toilet
+          - img "Toilet" [ref=e89]
+        - listitem [ref=e90]:
+          - generic [ref=e91]: Gate
+          - img "Gate" [ref=e93]
+        - listitem [ref=e94]:
+          - generic [ref=e95]: Lift
+          - img "Lift" [ref=e97]
+  - button "Open Next.js Dev Tools" [ref=e103] [cursor=pointer]
+  - alert [ref=e107]
