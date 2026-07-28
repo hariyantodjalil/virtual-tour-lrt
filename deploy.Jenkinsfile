@@ -8,7 +8,7 @@ pipeline {
     environment {
         APP_NAME        = 'lrt-virtualtour'
         ENV             = 'Production'
-        VER             = 'alpha'
+        VER             = 'live'
         APP_SERVER      = '172.16.27.74'
         CONT_PORT       = '3000'
         SSH_USER        = 'devops-lrt'
