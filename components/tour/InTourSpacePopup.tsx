@@ -34,6 +34,7 @@ import {
 import { FACILITY_ICONS, isFacilityIconId } from "@/lib/facility-icons";
 import TenantInterestForm from "./TenantInterestForm";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
+import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 
 type CommercialSpace = {
   id: string;
@@ -87,10 +88,13 @@ export default function InTourSpacePopup({
   space,
   stationName,
   stationSlug,
-  contactPhone = "628118012012",
+  contactPhone,
   onClose,
   returnToList = false,
 }: Props) {
+  const commercialProfile = useCommercialProfile();
+  const resolvedContactPhone =
+    contactPhone || commercialProfile.whatsappNumber;
   const [showInterestModal, setShowInterestModal] = useState(false);
   const [favorited, setFavorited] = useState(() => isFavoriteSpace(space.id));
 
@@ -114,7 +118,7 @@ export default function InTourSpacePopup({
   }
 
   const waMessage = `Halo, saya tertarik dengan unit komersial ${space.code} (${space.name}) di Stasiun ${stationName}. Mohon informasi lebih lanjut.`;
-  const waUrl = getWhatsAppUrl(contactPhone, waMessage);
+  const waUrl = getWhatsAppUrl(resolvedContactPhone, waMessage);
   const isMedia = MEDIA_TYPES.has(space.type);
   const occupiedTenant =
     space.status === "TERISI" ? space.tenantBrand?.trim() : "";
@@ -283,7 +287,7 @@ export default function InTourSpacePopup({
             <tr><td>AC</td><td>${space.airConditioning ? "Tersedia" : "Tidak tersedia"}</td></tr>
             <tr><td>Catatan</td><td>${space.description ?? "Unit siap dievaluasi melalui virtual tour 360."}</td></tr>
           </table>
-          <div class="cta">Hubungi tim komersial: ${contactPhone}. Ringkasan ini dibuat otomatis dari data aset virtual tour.</div>
+          <div class="cta">Hubungi ${commercialProfile.teamName}: ${resolvedContactPhone}. Ringkasan ini dibuat otomatis dari data aset virtual tour.</div>
           <script>window.onload = () => setTimeout(() => window.print(), 250);</script>
         </body>
       </html>

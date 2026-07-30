@@ -1,6 +1,7 @@
 "use client";
 
 import { getWhatsAppUrl } from "@/lib/utils";
+import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 
 type Props = {
   phone?: string;
@@ -9,25 +10,25 @@ type Props = {
   className?: string;
 };
 
-const DEFAULT_PHONE = "628118012012";
-
 export default function ContactPersonFab({
-  phone = DEFAULT_PHONE,
+  phone,
   stationName,
   className = "absolute bottom-6 right-3 sm:bottom-8 sm:right-5",
 }: Props) {
+  const profile = useCommercialProfile();
+  const resolvedPhone = phone || profile.whatsappNumber;
   const message = stationName
     ? `Halo, saya tertarik ruang komersial di Stasiun ${stationName}. Mohon info lebih lanjut.`
-    : "Halo, saya tertarik ruang komersial LRT Jabodebek. Mohon info lebih lanjut.";
-  const waUrl = getWhatsAppUrl(phone, message);
+    : profile.defaultWhatsappMessage;
+  const waUrl = getWhatsAppUrl(resolvedPhone, message);
 
   return (
     <a
       href={waUrl}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Hubungi contact person"
-      title="Hubungi contact person"
+      aria-label={`Hubungi ${profile.teamName}`}
+      title={`Hubungi ${profile.teamName}`}
       className={`group pointer-events-auto z-[70] flex items-end gap-2.5 ${className}`}
     >
       <span className="relative z-10 flex size-[45px] shrink-0 items-center justify-center rounded-full bg-[#D81435] shadow-[0_8px_24px_rgba(216,20,53,0.45)] transition group-hover:scale-105 group-hover:brightness-110">
