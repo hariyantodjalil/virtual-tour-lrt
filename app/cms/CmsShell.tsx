@@ -14,6 +14,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Building2,
+  PhoneCall,
   type LucideIcon,
 } from "lucide-react";
 import CmsNotifications from "@/components/cms/CmsNotifications";
@@ -39,6 +40,12 @@ const navItems: NavItem[] = [
   { href: "/cms/spaces", label: "Ruang Komersial", icon: Store },
   { href: "/cms/tenants", label: "Penyewa Aktif", icon: Building2 },
   { href: "/cms/leads", label: "Pengajuan & Site Visit", icon: UserCircle },
+  {
+    href: "/cms/commercial-profile",
+    label: "Profil Tim Komersial",
+    icon: PhoneCall,
+    adminOnly: true,
+  },
   { href: "/cms/users", label: "Users", icon: Users, adminOnly: true },
 ];
 
@@ -98,6 +105,12 @@ function getPageMeta(pathname: string) {
     return {
       title: "Pengajuan & Site Visit",
       subtitle: "Pipeline calon mitra dari inquiry hingga operasional komersial",
+    };
+  }
+  if (pathname.startsWith("/cms/commercial-profile")) {
+    return {
+      title: "Profil Tim Komersial",
+      subtitle: "Sumber kontak utama untuk seluruh kanal komersial",
     };
   }
   if (pathname.startsWith("/cms/users")) {

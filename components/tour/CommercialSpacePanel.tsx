@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatRupiah, formatNumber, getWhatsAppUrl } from "@/lib/utils";
 import TenantInterestForm from "./TenantInterestForm";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
+import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 
 type CommercialSpace = {
   id: string;
@@ -45,11 +46,14 @@ type Props = {
   onClose: () => void;
 };
 
-export default function CommercialSpacePanel({ space, stationName, contactPhone = "628118012012", onClose }: Props) {
+export default function CommercialSpacePanel({ space, stationName, contactPhone, onClose }: Props) {
+  const commercialProfile = useCommercialProfile();
+  const resolvedContactPhone =
+    contactPhone || commercialProfile.whatsappNumber;
   const [showForm, setShowForm] = useState(false);
 
   const waMessage = `Halo, saya tertarik dengan unit komersial ${space.code} (${space.name}) di Stasiun ${stationName}. Mohon informasi lebih lanjut.`;
-  const waUrl = getWhatsAppUrl(contactPhone, waMessage);
+  const waUrl = getWhatsAppUrl(resolvedContactPhone, waMessage);
   const statusConfig = {
     TERSEDIA: {
       label: "Tersedia",
@@ -142,7 +146,7 @@ export default function CommercialSpacePanel({ space, stationName, contactPhone 
             <tr><td>Catatan</td><td>${space.description ?? "Unit siap dievaluasi melalui virtual tour 360."}</td></tr>
           </table>
           <div class="cta">
-            Hubungi tim komersial: ${contactPhone}. Ringkasan ini dibuat otomatis dari data aset virtual tour.
+            Hubungi ${commercialProfile.teamName}: ${resolvedContactPhone}. Ringkasan ini dibuat otomatis dari data aset virtual tour.
           </div>
           <script>window.onload = () => setTimeout(() => window.print(), 250);</script>
         </body>

@@ -36,7 +36,7 @@ model Station {
   longitude              Float?
   imageUrl               String?
   description            String?
-  commercialContactPhone String?             @default("628118012012")
+  commercialContactPhone String?
   order                  Int                 @default(0)
   isActive               Boolean             @default(true)
   commercialSpaces       CommercialSpace[]
@@ -51,6 +51,22 @@ model Station {
 
   @@index([isActive, order])
   @@map("stations")
+}
+
+/** Singleton profil kontak yang menjadi sumber utama seluruh kanal komersial publik. */
+model CommercialProfile {
+  id                     String   @id @default("default")
+  teamName               String   @default("Tim Komersial LRT Jabodebek")
+  contactPersonName      String?
+  whatsappNumber         String   @default("628118012012")
+  phoneNumber            String?
+  email                  String?
+  officeAddress          String?
+  defaultWhatsappMessage String   @default("Halo, saya tertarik ruang komersial LRT Jabodebek. Mohon info lebih lanjut.")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("commercial_profiles")
 }
 
 // Agregat konfigurasi virtual tour per stasiun — paralel station_floorplans di portal-lrt.

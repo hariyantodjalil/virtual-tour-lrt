@@ -6,6 +6,12 @@ const optionalText = (max: number) => z.string().trim().max(max).nullable().opti
 const safeInteger = z.number().int().min(0).max(1_000_000);
 const nonNegativeNumber = z.number().finite().min(0).max(1_000_000_000_000);
 const nullableUrl = z.string().trim().max(2_048).nullable().optional();
+const contactNumber = z
+  .string()
+  .trim()
+  .min(8)
+  .max(32)
+  .regex(/^[+0-9()\s.-]+$/, "Format nomor kontak tidak valid");
 const optionalDate = z.string().trim().max(64).refine(
   (value) => !Number.isNaN(Date.parse(value)),
   "Tanggal tidak valid"
@@ -34,6 +40,19 @@ export const stationUpdateSchema = z.object(stationFields).partial().strict().re
   (value) => Object.keys(value).length > 0,
   "Minimal satu field harus diisi"
 );
+
+export const commercialProfileUpdateSchema = z
+  .object({
+    teamName: shortText.optional(),
+    contactPersonName: optionalText(160),
+    whatsappNumber: contactNumber.optional(),
+    phoneNumber: contactNumber.nullable().optional(),
+    email: z.string().trim().email().max(254).nullable().optional(),
+    officeAddress: optionalText(500),
+    defaultWhatsappMessage: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, "Minimal satu field harus diisi");
 
 export const spaceMutationSchema = z.object({
   code: z.string().trim().min(1).max(64),

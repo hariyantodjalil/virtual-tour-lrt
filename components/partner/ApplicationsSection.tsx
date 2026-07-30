@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { formatRupiah, getWhatsAppUrl } from "@/lib/utils";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
+import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 import {
   ACTIVE_LEAD_STATUSES,
   isCommercialOperation,
@@ -167,8 +168,11 @@ export default function ApplicationsSection({
   leads,
   onExplore,
   pickerReady,
-  contactPhone = "628118012012",
+  contactPhone,
 }: Props) {
+  const commercialProfile = useCommercialProfile();
+  const resolvedContactPhone =
+    contactPhone || commercialProfile.whatsappNumber;
   const [filter, setFilter] = useState<FilterTab>("semua");
   const [detailLead, setDetailLead] = useState<PartnerLead | null>(null);
   const [recommendations, setRecommendations] = useState<RecommendedSpace[]>([]);
@@ -211,7 +215,7 @@ export default function ApplicationsSection({
 
   const visibleLeads = showAll ? filtered : filtered.slice(0, 5);
   const waUrl = getWhatsAppUrl(
-    contactPhone,
+    resolvedContactPhone,
     "Halo, saya ingin menanyakan status pengajuan sewa di Panel Mitra Virtual Tour LRT Jabodebek."
   );
 
