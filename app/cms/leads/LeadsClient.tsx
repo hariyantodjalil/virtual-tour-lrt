@@ -22,20 +22,31 @@ export type LeadItem = {
 
 const STATUSES = ["NEW", "CONTACTED", "NEGOTIATING", "CLOSED_WON", "CLOSED_LOST"];
 
+function asLeadList(value: unknown): LeadItem[] {
+  return Array.isArray(value) ? (value as LeadItem[]) : [];
+}
+
 export default function LeadsClient({ initialLeads }: { initialLeads: LeadItem[] }) {
-  const [leads, setLeads] = useState(initialLeads);
+  const [leads, setLeads] = useState(() => asLeadList(initialLeads));
 
   async function load() {
     const res = await cmsFetch("/api/cms/leads");
-    setLeads(await res.json());
+    if (!res.ok) return;
+    const data = await res.json().catch(() => null);
+    setLeads(asLeadList(data));
   }
 
   async function updateStatus(id: string, status: string) {
-    await cmsFetch("/api/cms/leads", {
+    const res = await cmsFetch("/api/cms/leads", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert((data as { error?: string }).error ?? "Gagal mengubah status lead.");
+      return;
+    }
     await load();
   }
 
@@ -44,7 +55,7 @@ export default function LeadsClient({ initialLeads }: { initialLeads: LeadItem[]
     const res = await cmsFetch(`/api/cms/leads/${lead.id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      alert(data.error ?? "Gagal menghapus lead.");
+      alert((data as { error?: string }).error ?? "Gagal menghapus lead.");
       return;
     }
     await load();

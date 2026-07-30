@@ -10,12 +10,21 @@ export async function GET(request: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },
-    select: { id: true, email: true, name: true, role: true, isActive: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      isActive: true,
+    },
   });
 
   if (!user || !user.isActive) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 
-  return NextResponse.json({ authenticated: true, user });
+  return NextResponse.json({
+    authenticated: true,
+    user: { ...user, avatarUrl: null as string | null },
+  });
 }

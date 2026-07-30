@@ -57,6 +57,9 @@ async function getPickerStations() {
         name: true,
         order: true,
         line: true,
+        address: true,
+        location: true,
+        dailyPassengers: true,
       },
     });
 
@@ -105,15 +108,18 @@ export default async function StationPage({ params }: Props) {
             type: s.type,
             status: s.status as "TERSEDIA" | "TERISI" | "MAINTENANCE",
             area: s.area,
+            monthlyRent: s.monthlyRent,
             deposit: s.deposit,
             floor: s.floor,
             location: s.location,
             nearestExit: s.nearestExit,
+            nearbyFacilities: Array.isArray(s.nearbyFacilities) ? s.nearbyFacilities : [],
             exposure: s.exposure,
             powerSupply: s.powerSupply,
             waterAccess: s.waterAccess,
             airConditioning: s.airConditioning,
             description: s.description,
+            panoramaUrl: s.panoramaUrl,
             tenantBrand:
               s.occupancy?.tenant?.isActive !== false
                 ? s.occupancy?.tenant?.brandName ?? null

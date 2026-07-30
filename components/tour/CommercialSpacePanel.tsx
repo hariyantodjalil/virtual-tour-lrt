@@ -95,7 +95,7 @@ export default function CommercialSpacePanel({ space, stationName, contactPhone 
           <title>Ringkasan ${space.code} - ${stationName}</title>
           <style>
             body { font-family: Arial, sans-serif; color: #111827; margin: 40px; }
-            .brand { color: #E31E2D; font-weight: 800; letter-spacing: .08em; font-size: 12px; text-transform: uppercase; }
+            .brand { color: #D81435; font-weight: 800; letter-spacing: .08em; font-size: 12px; text-transform: uppercase; }
             h1 { margin: 8px 0 4px; font-size: 30px; color: #17355f; }
             .muted { color: #6b7280; }
             .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 24px 0; }
@@ -206,10 +206,10 @@ export default function CommercialSpacePanel({ space, stationName, contactPhone 
             </div>
           </div>
           <div className="flex items-center gap-3 text-gray-600">
-            <Users className="h-4 w-4 shrink-0 text-[#E31E2D]" />
+            <Users className="h-4 w-4 shrink-0 text-[#D81435]" />
             <div>
               <span className="text-xs text-gray-400 block">Eksposur Penumpang</span>
-              <span className="font-bold text-[#E31E2D]">{formatNumber(Math.round(space.exposure))} orang/hari</span>
+              <span className="font-bold text-[#D81435]">{formatNumber(Math.round(space.exposure))} orang/hari</span>
             </div>
           </div>
         </div>

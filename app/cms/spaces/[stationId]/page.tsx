@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { FACILITY_ICONS, isFacilityIconId, type FacilityIconId } from "@/lib/facility-icons";
 
 type SpaceStatus = "TERSEDIA" | "TERISI" | "MAINTENANCE";
 
@@ -26,6 +27,7 @@ type Space = {
   floor: string;
   location: string;
   nearestExit: string | null;
+  nearbyFacilities: FacilityIconId[];
   exposure: number;
   powerSupply: string | null;
   waterAccess: boolean;
@@ -45,6 +47,11 @@ const SPACE_TYPES = [
 
 const STATUSES: SpaceStatus[] = ["TERSEDIA", "TERISI", "MAINTENANCE"];
 
+function normalizeFacilities(value: unknown): FacilityIconId[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isFacilityIconId);
+}
+
 function createDraft(): Space {
   return {
     id: "",
@@ -58,6 +65,7 @@ function createDraft(): Space {
     floor: "G",
     location: "Concourse",
     nearestExit: "",
+    nearbyFacilities: [],
     exposure: 0,
     powerSupply: "",
     waterAccess: false,
@@ -79,13 +87,55 @@ function toPayload(space: Space) {
     floor: space.floor.trim() || "G",
     location: space.location.trim(),
     nearestExit: space.nearestExit?.trim() || null,
-    exposure: Number(space.exposure) || 0,
+    nearbyFacilities: space.nearbyFacilities,
+    exposure: Math.round(Number(space.exposure) || 0),
     powerSupply: space.powerSupply?.trim() || null,
     waterAccess: Boolean(space.waterAccess),
     airConditioning: Boolean(space.airConditioning),
     description: space.description?.trim() || null,
     panoramaUrl: space.panoramaUrl?.trim() || null,
   };
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  code: "Kode unit",
+  name: "Nama unit",
+  floor: "Lantai",
+  location: "Lokasi",
+  exposure: "Eksposur penumpang",
+  area: "Luas",
+  monthlyRent: "Sewa bulanan",
+};
+
+function validateSpace(space: Space): string | null {
+  if (!space.code.trim()) return "Kode unit wajib diisi.";
+  if (!space.name.trim()) return "Nama unit wajib diisi.";
+  if (!space.floor.trim()) return "Lantai wajib diisi.";
+  if (!space.location.trim()) return "Lokasi wajib diisi.";
+  if (!Number.isFinite(Number(space.exposure))) return "Eksposur penumpang harus angka.";
+  return null;
+}
+
+async function readSaveError(res: Response): Promise<string> {
+  try {
+    const data = (await res.json()) as {
+      error?: string;
+      details?: Array<{ path?: string; message?: string }>;
+    };
+    if (data.details?.length) {
+      const parts = data.details.map((issue) => {
+        const label = FIELD_LABELS[issue.path ?? ""] ?? issue.path ?? "Field";
+        return `${label}: ${issue.message ?? "tidak valid"}`;
+      });
+      return parts.join(" · ");
+    }
+    if (data.error === "Data tidak valid") {
+      return "Data tidak valid. Periksa kode unit, nama, lantai, dan lokasi.";
+    }
+    return data.error ?? "Gagal menyimpan unit.";
+  } catch {
+    return "Gagal menyimpan unit. Coba refresh halaman atau restart server.";
+  }
 }
 
 export default function CmsSpacesStationPage() {
@@ -97,7 +147,15 @@ export default function CmsSpacesStationPage() {
 
   async function load() {
     const res = await cmsFetch(`/api/cms/spaces/station/${stationId}`);
-    setSpaces(await res.json());
+    if (!res.ok) return;
+    const data = await res.json().catch(() => null);
+    const list = Array.isArray(data) ? data : [];
+    setSpaces(
+      list.map((item: Space) => ({
+        ...item,
+        nearbyFacilities: normalizeFacilities(item.nearbyFacilities),
+      }))
+    );
   }
 
   useEffect(() => {
@@ -108,6 +166,13 @@ export default function CmsSpacesStationPage() {
 
   async function saveSpace() {
     if (!editing) return;
+
+    const validationError = validateSpace(editing);
+    if (validationError) {
+      setMessage(validationError);
+      return;
+    }
+
     setSaving(true);
     setMessage("");
 
@@ -123,7 +188,7 @@ export default function CmsSpacesStationPage() {
 
     setSaving(false);
     if (!res.ok) {
-      setMessage("Gagal menyimpan unit. Periksa kode unit dan field wajib.");
+      setMessage(await readSaveError(res));
       return;
     }
 
@@ -142,7 +207,10 @@ export default function CmsSpacesStationPage() {
     const res = await cmsFetch(`/api/cms/spaces/${editing.id}`, { method: "POST", body: formData });
     const data = await res.json();
     if (res.ok) {
-      setEditing(data.space);
+      setEditing({
+        ...data.space,
+        nearbyFacilities: normalizeFacilities(data.space?.nearbyFacilities),
+      });
       setMessage("Foto unit berhasil diupload.");
       await load();
     } else {
@@ -193,7 +261,7 @@ export default function CmsSpacesStationPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" className="border-slate-700" onClick={() => { setMessage(""); setEditing(space); }}>
+                <Button size="sm" variant="outline" className="border-slate-700" onClick={() => { setMessage(""); setEditing({ ...space, nearbyFacilities: normalizeFacilities(space.nearbyFacilities) }); }}>
                   <Pencil className="h-3.5 w-3.5" />
                   Edit
                 </Button>
@@ -229,10 +297,10 @@ export default function CmsSpacesStationPage() {
 
             <div className="min-h-0 flex-1 overflow-y-auto p-6">
               <div className="grid gap-5 md:grid-cols-2">
-                <Field label="Kode Unit">
+                <Field label="Kode Unit" required>
                   <Input value={editing.code} onChange={(e) => setEditing({ ...editing, code: e.target.value })} className="bg-slate-900 border-slate-700" />
                 </Field>
-                <Field label="Nama Unit">
+                <Field label="Nama Unit" required>
                   <Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="bg-slate-900 border-slate-700" />
                 </Field>
                 <Field label="Tipe">
@@ -248,16 +316,19 @@ export default function CmsSpacesStationPage() {
                 <Field label="Luas (m2)">
                   <Input type="number" value={editing.area} onChange={(e) => setEditing({ ...editing, area: Number(e.target.value) })} className="bg-slate-900 border-slate-700" />
                 </Field>
+                <Field label="Sewa Bulanan (Rp)">
+                  <Input type="number" value={editing.monthlyRent} onChange={(e) => setEditing({ ...editing, monthlyRent: Number(e.target.value) })} className="bg-slate-900 border-slate-700" />
+                </Field>
                 <Field label="Deposit">
                   <Input type="number" value={editing.deposit} onChange={(e) => setEditing({ ...editing, deposit: Number(e.target.value) })} className="bg-slate-900 border-slate-700" />
                 </Field>
                 <Field label="Eksposur Penumpang / Hari">
                   <Input type="number" value={editing.exposure} onChange={(e) => setEditing({ ...editing, exposure: Number(e.target.value) })} className="bg-slate-900 border-slate-700" />
                 </Field>
-                <Field label="Lantai">
+                <Field label="Lantai" required>
                   <Input value={editing.floor} onChange={(e) => setEditing({ ...editing, floor: e.target.value })} className="bg-slate-900 border-slate-700" />
                 </Field>
-                <Field label="Lokasi">
+                <Field label="Lokasi" required>
                   <Input value={editing.location} onChange={(e) => setEditing({ ...editing, location: e.target.value })} className="bg-slate-900 border-slate-700" />
                 </Field>
                 <Field label="Exit Terdekat">
@@ -266,6 +337,34 @@ export default function CmsSpacesStationPage() {
                 <Field label="Daya Listrik">
                   <Input value={editing.powerSupply ?? ""} onChange={(e) => setEditing({ ...editing, powerSupply: e.target.value })} placeholder="contoh: 2200 VA" className="bg-slate-900 border-slate-700" />
                 </Field>
+                <div className="md:col-span-2">
+                  <Label>Daftar Fasilitas Terdekat</Label>
+                  <div className="mt-2 grid gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {FACILITY_ICONS.map((facility) => {
+                      const checked = editing.nearbyFacilities.includes(facility.id);
+                      return (
+                        <label
+                          key={facility.id}
+                          className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-700/80 bg-slate-950/50 px-3 py-2.5 text-sm text-slate-200 transition hover:border-slate-500"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const next = e.target.checked
+                                ? [...editing.nearbyFacilities, facility.id]
+                                : editing.nearbyFacilities.filter((id) => id !== facility.id);
+                              setEditing({ ...editing, nearbyFacilities: next });
+                            }}
+                          />
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={facility.src} alt="" className="size-6 rounded-full object-cover" />
+                          <span>{facility.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
                 <Field label="URL Foto/Panorama Unit">
                   <Input value={editing.panoramaUrl ?? ""} onChange={(e) => setEditing({ ...editing, panoramaUrl: e.target.value })} className="bg-slate-900 border-slate-700" />
                 </Field>
@@ -305,10 +404,13 @@ export default function CmsSpacesStationPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
   return (
     <div>
-      <Label>{label}</Label>
+      <Label>
+        {label}
+        {required ? <span className="text-amber-400"> *</span> : null}
+      </Label>
       <div className="mt-2">{children}</div>
     </div>
   );

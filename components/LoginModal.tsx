@@ -57,7 +57,25 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, remember }),
       });
-      const data = await res.json();
+
+      let data: {
+        message?: string;
+        error?: string;
+        user?: { id: string; email: string; name: string; role: string };
+        redirectTo?: string;
+      } = {};
+      try {
+        data = await res.json();
+      } catch {
+        setLoading(false);
+        setError(
+          res.status === 404
+            ? "Endpoint login tidak ditemukan. Restart server `npm run dev`."
+            : "Respons server tidak valid. Coba refresh halaman."
+        );
+        return;
+      }
+
       setLoading(false);
 
       if (!res.ok) {
@@ -65,7 +83,7 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
         return;
       }
 
-      onSuccess?.(data.user);
+      onSuccess?.(data.user!);
       onClose();
 
       // Admin / editor → CMS; mitra tetap di halaman saat ini
