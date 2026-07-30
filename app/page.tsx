@@ -10,6 +10,9 @@ import Navbar from "@/components/Navbar";
 import { HomeReveal, HomeShell } from "@/components/home/HomeMotion";
 import CommercialSpaceGrid from "./CommercialSpaceGrid";
 
+/** Runtime DB fetch — jangan prerender saat docker build (DATABASE_URL palsu → list kosong). */
+export const dynamic = "force-dynamic";
+
 const TRANSPORT = [
   { label: "KRL", icon: "/brand/landing/icons/transport-krl.png" },
   { label: "MRT", icon: "/brand/landing/icons/transport-mrt.png" },
@@ -118,7 +121,8 @@ async function getCommercialListings() {
         stationLine: s.station.line,
       })),
     };
-  } catch {
+  } catch (error) {
+    console.error("getCommercialListings failed:", error);
     return { totalSpaces: 0, totalStations: 18, spaces: [] };
   }
 }
