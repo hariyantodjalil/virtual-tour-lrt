@@ -16,6 +16,7 @@ import {
   Building2,
   type LucideIcon,
 } from "lucide-react";
+import CmsNotifications from "@/components/cms/CmsNotifications";
 
 export type CmsUser = {
   id: string;
@@ -122,7 +123,7 @@ export default function CmsShell({
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    router.push("/");
   }
 
   const fullWidth = isFullWidthPage(pathname);
@@ -224,6 +225,8 @@ export default function CmsShell({
             <div className="min-w-0">
               <h1 className="truncate text-base font-black text-white sm:text-lg">{pageMeta.title}</h1>
             </div>
+
+            <CmsNotifications />
           </div>
         </header>
 

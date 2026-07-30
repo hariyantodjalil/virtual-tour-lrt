@@ -11,6 +11,7 @@ model User {
   email       String       @unique
   password    String
   name        String
+  avatarUrl   String?
   role        UserRole     @default(EDITOR)
   isActive    Boolean      @default(true)
   tenantLeads TenantLead[]
@@ -143,6 +144,7 @@ model CommercialSpace {
   floor           String       @default("G")
   location        String
   nearestExit     String?
+  nearbyFacilities String[]      @default([])
   exposure        Int          @default(0)
   powerSupply     String?
   waterAccess     Boolean      @default(false)
@@ -207,6 +209,7 @@ model TenantLead {
   email            String
   businessType     String
   spaceRequirement String?
+  surveyPreference String?
   message          String?
   status           LeadStatus       @default(NEW)
   notes            String?

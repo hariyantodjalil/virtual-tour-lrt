@@ -20,6 +20,7 @@ export async function GET() {
       slug: s.slug,
       line: s.line,
       address: s.address,
+      location: s.location,
       dailyPassengers: s.dailyPassengers,
       order: s.order,
       description: s.description,

@@ -10,5 +10,6 @@ export function cmsTokenCookieOptions(maxAge = 60 * 60 * 24) {
     secure: isSecureAuthCookie(),
     sameSite: "lax" as const,
     maxAge,
+    path: "/",
   };
 }

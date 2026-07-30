@@ -53,7 +53,7 @@ export default function StationCard({
         </div>
 
         <span
-          className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#c41230] transition group-hover:scale-110"
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#D81435] transition group-hover:scale-110"
           aria-hidden
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}

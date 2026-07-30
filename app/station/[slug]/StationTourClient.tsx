@@ -11,16 +11,18 @@ import { useState, useCallback, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft,
-  Building2,
   CheckCircle2,
   ChevronRight,
+  Eye,
+  EyeOff,
   Grid3X3,
+  Home,
   Info,
   MapPin,
   Pause,
   Play,
   Route,
+  TrainFront,
   Users,
   X,
 } from "lucide-react";
@@ -32,6 +34,9 @@ import StationPickerModal, {
 } from "@/components/tour/StationPickerModal";
 import VirtualTourViewer from "@/components/tour/VirtualTourViewer";
 import ContactPersonFab from "@/components/tour/ContactPersonFab";
+import FacilityLegend from "@/components/tour/FacilityLegend";
+import TourLeftPanel from "@/components/tour/TourLeftPanel";
+import TourUnitsPanel from "@/components/tour/TourUnitsPanel";
 import { TourNavigationBar } from "@/components/tour/TourNavigationBar";
 import { GuidedRouteBar } from "@/components/tour/GuidedRouteBar";
 import { formatNumber, getWhatsAppUrl } from "@/lib/utils";
@@ -44,6 +49,8 @@ import {
   defaultAreaForLevel,
 } from "@/lib/public-tour-structure";
 import { findSpaceHotspotPlacement } from "@/lib/space-hotspot-locate";
+import { findFacilityHotspotPlacement } from "@/lib/facility-hotspot-locate";
+import type { FacilityIconId } from "@/lib/facility-icons";
 
 type Space = {
   id: string;
@@ -52,15 +59,18 @@ type Space = {
   type: string;
   status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
   area: number;
+  monthlyRent?: number;
   deposit: number;
   floor: string;
   location: string;
   nearestExit: string | null;
+  nearbyFacilities?: string[];
   exposure: number;
   powerSupply: string | null;
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;
+  panoramaUrl?: string | null;
   tenantBrand?: string | null;
 };
 
@@ -77,12 +87,6 @@ const TYPE_LABELS: Record<string, string> = {
   VENDING: "Vending",
   MEDIA_IKLAN: "Iklan",
   AREA_PROMOSI: "Promosi",
-};
-
-const STATUS_DOT: Record<Space["status"], string> = {
-  TERSEDIA: "bg-[#34d399]",
-  TERISI: "bg-[#E31E2D]",
-  MAINTENANCE: "bg-amber-400",
 };
 
 function buildRoute(sceneIds: string[], from: string, to: string) {
@@ -169,6 +173,8 @@ export default function StationTourClient({
   const [infoOpen, setInfoOpen] = useState(false);
   const [unitsOpen, setUnitsOpen] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [uiCleared, setUiCleared] = useState(false);
   const [guidedActive, setGuidedActive] = useState(false);
   const [routeAutoplay, setRouteAutoplay] = useState(false);
   const [openedFromUnitsList, setOpenedFromUnitsList] = useState(false);
@@ -178,6 +184,19 @@ export default function StationTourClient({
     hfov?: number;
   } | null>(null);
   const [focusToken, setFocusToken] = useState(0);
+  const [unitDeepLinkHandled, setUnitDeepLinkHandled] = useState(false);
+  const [activeFacilityId, setActiveFacilityId] = useState<FacilityIconId | null>(null);
+
+  useEffect(() => {
+    if (unitDeepLinkHandled) return;
+    const unitId = searchParams.get("unit");
+    if (!unitId) return;
+    const space = spaces.find((item) => item.id === unitId);
+    if (!space) return;
+    setSelectedSpace(space);
+    setOpenedFromUnitsList(false);
+    setUnitDeepLinkHandled(true);
+  }, [searchParams, spaces, unitDeepLinkHandled]);
 
   const availableCount = spaces.filter((s) => s.status === "TERSEDIA").length;
   const occupiedCount = spaces.filter((s) => s.status === "TERISI").length;
@@ -193,8 +212,8 @@ export default function StationTourClient({
     activeLevelId || stationInfo.levels[0]?.id,
     activeAreaId
   );
-  // Nav tetap terlihat saat unit drawer kanan terbuka; sembunyi hanya saat detail unit
-  const showTourNav = !selectedSpace;
+  // Nav tetap terlihat saat unit drawer kanan terbuka; sembunyi hanya saat detail unit / clear UI
+  const showTourNav = !selectedSpace && !uiCleared;
 
   function activateScene(sceneId: string) {
     const placement = findScenePlacement(stationInfo.levels, sceneId);
@@ -314,6 +333,34 @@ export default function StationTourClient({
     setFocusToken((token) => token + 1);
   }
 
+  function focusOnFacility(facilityIcon: FacilityIconId) {
+    const placement = findFacilityHotspotPlacement(
+      stationInfo.scenes,
+      facilityIcon,
+      activeSceneId
+    );
+    if (!placement) {
+      setActiveFacilityId(null);
+      return;
+    }
+
+    setActiveFacilityId(facilityIcon);
+    setInfoPopup(null);
+    setSelectedSpace(null);
+    setSelectedAd(null);
+    setUnitsOpen(false);
+    setRouteOpen(false);
+    setInfoOpen(false);
+
+    activateScene(placement.sceneId);
+    setCameraFocus({
+      yaw: placement.yaw,
+      pitch: placement.pitch,
+      hfov: 78,
+    });
+    setFocusToken((token) => token + 1);
+  }
+
   const openSpaceFromList = (space: Space) => {
     focusOnSpaceHotspot(space.code);
     setOpenedFromUnitsList(true);
@@ -412,7 +459,7 @@ export default function StationTourClient({
           onSelectLevel={selectLevel}
           onSelectArea={selectArea}
           onSelectScene={handleSceneChange}
-          offsetClassName={unitsOpen ? "sm:pr-[22rem]" : ""}
+          offsetClassName={unitsOpen ? "sm:pl-[22rem]" : ""}
         />
       )}
 
@@ -434,30 +481,34 @@ export default function StationTourClient({
       )}
 
       {/* Vignette legibility — tinted maroon, not pure black */}
-      <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(to_bottom,rgba(28,10,14,.55)_0%,transparent_28%,transparent_62%,rgba(28,10,14,.62)_100%)]" />
+      {!uiCleared && (
+        <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(to_bottom,rgba(28,10,14,.55)_0%,transparent_28%,transparent_62%,rgba(28,10,14,.62)_100%)]" />
+      )}
 
-      {/* TOP CHIP — di atas navbar / tanpa bentrok hit-area */}
+      {/* TOP CHIP — kanan saja; aksi kiri ada di TourLeftPanel (atau compact Home+Pilih saat panel tertutup) */}
+      {!uiCleared && (
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[60] px-3 pt-4 sm:px-5 sm:pt-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="pointer-events-auto flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPickerOpen(true)}
-              className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-[#F8ECEE] transition duration-300 hover:border-[#E31E2D]/40 hover:bg-[#3A161C]"
-              aria-label="Pilih stasiun"
-            >
-              <MapPin className="h-4 w-4 text-[#E31E2D]" />
-              <span className="font-display hidden sm:inline">Pilih Stasiun</span>
-            </button>
-            <Link
-              href="/"
-              className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-[#F8ECEE] transition duration-300 hover:border-[#E31E2D]/40 hover:bg-[#3A161C]"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="font-display hidden sm:inline">{stationInfo.name}</span>
-              <span className="font-display sm:hidden">Kembali</span>
-            </Link>
-          </div>
+        <div className="flex items-center justify-end gap-3">
+          {!leftPanelOpen && (
+            <div className="pointer-events-auto mr-auto flex w-[min(calc(100vw-1rem),244px)] items-center gap-1.5 sm:w-[260px]">
+              <Link
+                href="/"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-black/60 text-white shadow-md backdrop-blur-sm transition hover:brightness-110"
+                aria-label="Beranda"
+              >
+                <Home className="size-3.5" strokeWidth={2.25} />
+              </Link>
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-full bg-black/60 px-3 text-left text-xs font-semibold text-white shadow-md backdrop-blur-sm transition hover:brightness-110"
+                aria-label="Pilih stasiun"
+              >
+                <TrainFront className="size-3.5 shrink-0 opacity-90" />
+                <span className="flex-1 truncate font-display">Pilih Stasiun</span>
+              </button>
+            </div>
+          )}
 
           {availableCount > 0 && (
             <div className="tour-glass pointer-events-none inline-flex items-center gap-2 rounded-full px-3 py-2">
@@ -469,8 +520,50 @@ export default function StationTourClient({
           )}
         </div>
       </div>
+      )}
+
+      {!uiCleared && !selectedSpace && !selectedAd && !unitsOpen && (
+        <TourLeftPanel
+          open={leftPanelOpen}
+          onToggle={() => setLeftPanelOpen((v) => !v)}
+          stationName={stationInfo.name}
+          spaces={spaces}
+          typeLabels={TYPE_LABELS}
+          onPickStation={() => setPickerOpen(true)}
+          onSelectSpace={(space) => {
+            const full = spaces.find((s) => s.id === space.id);
+            if (full) openSpaceFromList(full);
+          }}
+          onViewAll={() => {
+            setSelectedSpace(null);
+            setSelectedAd(null);
+            setInfoOpen(false);
+            setRouteOpen(false);
+            setUnitsOpen(true);
+          }}
+          clearUiControl={
+            leftPanelOpen ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setInfoOpen(false);
+                  setRouteOpen(false);
+                  setUnitsOpen(false);
+                  setUiCleared(true);
+                }}
+                className="flex size-11 items-center justify-center rounded-full bg-black/60 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/75"
+                aria-label="Sembunyikan UI"
+                title="Sembunyikan UI"
+              >
+                <EyeOff className="size-5" />
+              </button>
+            ) : undefined
+          }
+        />
+      )}
 
       {/* RIGHT TOOL RAIL */}
+      {!uiCleared && (
       <div className="pointer-events-none absolute right-3 top-1/2 z-[60] flex -translate-y-1/2 flex-col items-end gap-2.5 sm:right-5">
         <ToolButton
           active={infoOpen}
@@ -528,9 +621,10 @@ export default function StationTourClient({
           <Grid3X3 className="h-5 w-5" />
         </ToolButton>
       </div>
+      )}
 
       {/* Backdrop soft close for side panels */}
-      {(infoOpen || routeOpen) && !selectedSpace && (
+      {!uiCleared && (infoOpen || routeOpen) && !selectedSpace && (
         <button
           type="button"
           aria-label="Tutup panel"
@@ -540,7 +634,7 @@ export default function StationTourClient({
       )}
 
       {/* INFO PANEL — kanan, di samping rail */}
-      {infoOpen && !selectedSpace && (
+      {!uiCleared && infoOpen && !selectedSpace && (
         <aside className="tour-glass-panel tour-panel-in pointer-events-auto absolute right-16 top-1/2 z-[65] w-[min(18.5rem,calc(100vw-5.5rem))] -translate-y-1/2 overflow-hidden rounded-2xl text-[#F8ECEE] sm:right-20">
           <div className="flex items-center justify-between border-b border-[color:rgb(255_214_218_/_0.12)] px-4 py-3">
             <h2 className="font-display text-base font-semibold tracking-tight">{stationInfo.name}</h2>
@@ -608,7 +702,7 @@ export default function StationTourClient({
       )}
 
       {/* ROUTE PANEL */}
-      {routeOpen && !selectedSpace && stationInfo.scenes.length > 1 && (
+      {!uiCleared && routeOpen && !selectedSpace && stationInfo.scenes.length > 1 && (
         <aside className="tour-glass-panel tour-panel-in pointer-events-auto absolute right-16 top-1/2 z-[65] w-[min(18.5rem,calc(100vw-5.5rem))] -translate-y-1/2 overflow-hidden rounded-2xl text-[#F8ECEE] sm:right-20">
           <div className="flex items-center justify-between border-b border-[color:rgb(255_214_218_/_0.12)] px-4 py-3">
             <div className="flex items-center gap-2">
@@ -772,58 +866,21 @@ export default function StationTourClient({
         </aside>
       )}
 
-      {/* UNITS RIGHT DRAWER — tidak bentrok dengan bottom nav */}
-      {unitsOpen && !selectedSpace && (
-        <aside className="tour-glass-panel tour-drawer-in pointer-events-auto absolute inset-y-0 right-0 z-[65] flex w-full max-w-sm flex-col border-l border-[color:rgb(255_214_218_/_0.14)] text-[#F8ECEE] sm:max-w-[22rem]">
-          <div className="flex items-center justify-between border-b border-[color:rgb(255_214_218_/_0.12)] px-4 py-3.5">
-            <div className="flex items-center gap-2">
-              <Grid3X3 className="h-4 w-4 text-[#E31E2D]" />
-              <p className="font-display text-sm font-semibold">Unit Komersial</p>
-              <span className="rounded-full bg-[#1C0A0E]/55 px-2 py-0.5 font-display text-[10px] font-bold text-[#C4A8AD]">
-                {spaces.length}
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="font-display text-[11px] font-semibold text-[#34d399]">
-                {availableCount} tersedia
-              </span>
-              <button
-                type="button"
-                onClick={() => setUnitsOpen(false)}
-                className="rounded-full p-1.5 transition-colors hover:bg-white/10"
-              >
-                <X className="h-4 w-4 text-[#F8ECEE]/60" />
-              </button>
-            </div>
-          </div>
-          <div className="flex-1 space-y-2 overflow-y-auto p-3 pb-28">
-            {spaces.map((space) => (
-              <button
-                key={space.id}
-                type="button"
-                onClick={() => openSpaceFromList(space)}
-                className="w-full rounded-2xl border border-[color:rgb(255_214_218_/_0.1)] bg-[#1C0A0E]/45 p-3.5 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-[#E31E2D]/40 hover:bg-[#1C0A0E]/7 active:scale-[0.98]"
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="font-mono text-[11px] font-bold text-[#C4A8AD]">{space.code}</span>
-                  <span className={`h-2 w-2 rounded-full ${STATUS_DOT[space.status]}`} />
-                </div>
-                <p className="mb-1 truncate font-display text-sm font-semibold">{space.name}</p>
-                <div className="flex items-center gap-1.5 text-[11px] text-[#C4A8AD]">
-                  <Building2 className="h-3 w-3" />
-                  <span>{TYPE_LABELS[space.type] ?? space.type}</span>
-                  <span>·</span>
-                  <span>{space.area} m²</span>
-                </div>
-              </button>
-            ))}
-            {spaces.length === 0 && (
-              <p className="px-2 py-8 text-center text-sm text-[#C4A8AD]">
-                Belum ada unit untuk stasiun ini.
-              </p>
-            )}
-          </div>
-        </aside>
+      {/* UNITS LEFT DRAWER — muncul dari "Lihat semua Tenant" */}
+      {!uiCleared && unitsOpen && !selectedSpace && (
+        <TourUnitsPanel
+          spaces={spaces}
+          typeLabels={TYPE_LABELS}
+          onClose={() => setUnitsOpen(false)}
+          onSelect={(space) => {
+            const full = spaces.find((s) => s.id === space.id);
+            if (full) openSpaceFromList(full);
+          }}
+          onViewMap={() => {
+            setUnitsOpen(false);
+            setLeftPanelOpen(true);
+          }}
+        />
       )}
 
       {selectedSpace && (
@@ -831,6 +888,7 @@ export default function StationTourClient({
           key={selectedSpace.id}
           space={selectedSpace}
           stationName={stationInfo.name}
+          stationSlug={stationInfo.slug}
           contactPhone={commercialContactPhone}
           returnToList={openedFromUnitsList}
           onClose={closeSpaceDetail}
@@ -859,10 +917,41 @@ export default function StationTourClient({
         />
       )}
 
-      <ContactPersonFab
-        phone={commercialContactPhone}
-        stationName={stationInfo.name}
-      />
+      {!uiCleared && (
+        <ContactPersonFab
+          phone={commercialContactPhone}
+          stationName={stationInfo.name}
+        />
+      )}
+
+      {!uiCleared && !selectedSpace && !selectedAd && (
+        <FacilityLegend
+          activeFacilityId={activeFacilityId}
+          onSelectFacility={focusOnFacility}
+        />
+      )}
+
+      {/* Clear / restore UI — di bawah mini map saat panel terbuka; floating saat UI disembunyikan / panel tertutup */}
+      {(uiCleared || !leftPanelOpen || selectedSpace || selectedAd || unitsOpen) && (
+        <button
+          type="button"
+          onClick={() => {
+            setUiCleared((v) => {
+              if (!v) {
+                setInfoOpen(false);
+                setRouteOpen(false);
+                setUnitsOpen(false);
+              }
+              return !v;
+            });
+          }}
+          className="pointer-events-auto absolute bottom-24 left-3 z-[70] flex size-11 items-center justify-center rounded-full bg-black/60 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/75 sm:bottom-28 sm:left-5"
+          aria-label={uiCleared ? "Tampilkan UI" : "Sembunyikan UI"}
+          title={uiCleared ? "Tampilkan UI" : "Sembunyikan UI"}
+        >
+          {uiCleared ? <Eye className="size-5" /> : <EyeOff className="size-5" />}
+        </button>
+      )}
     </div>
   );
 }

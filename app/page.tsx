@@ -10,6 +10,9 @@ import Navbar from "@/components/Navbar";
 import { HomeReveal, HomeShell } from "@/components/home/HomeMotion";
 import CommercialSpaceGrid from "./CommercialSpaceGrid";
 
+/** Runtime DB fetch — jangan prerender saat docker build (DATABASE_URL palsu → list kosong). */
+export const dynamic = "force-dynamic";
+
 const TRANSPORT = [
   { label: "KRL", icon: "/brand/landing/icons/transport-krl.png" },
   { label: "MRT", icon: "/brand/landing/icons/transport-mrt.png" },
@@ -94,7 +97,7 @@ async function getCommercialListings() {
         orderBy: [{ status: "asc" }, { createdAt: "desc" }],
         take: 8,
         include: {
-          station: { select: { name: true, slug: true, order: true } },
+          station: { select: { name: true, slug: true, order: true, line: true } },
         },
       }),
       prisma.commercialSpace.count({ where: { station: { isActive: true } } }),
@@ -110,12 +113,16 @@ async function getCommercialListings() {
         code: s.code,
         type: s.type,
         status: s.status,
+        area: s.area,
+        monthlyRent: s.monthlyRent,
         stationName: s.station.name,
         stationSlug: s.station.slug,
         stationOrder: s.station.order,
+        stationLine: s.station.line,
       })),
     };
-  } catch {
+  } catch (error) {
+    console.error("getCommercialListings failed:", error);
     return { totalSpaces: 0, totalStations: 18, spaces: [] };
   }
 }
@@ -263,7 +270,7 @@ export default function HomePage() {
           <HomeReveal>
             <h1 className="font-display text-3xl font-bold leading-tight text-white md:text-[40px] md:leading-[50px]">
               Temukan Ruang Komersial Terbaik di Area{" "}
-              <span className="text-[#ff6b6b]">LRT Jabodebek</span>
+              <span className="text-[#d32f2f]">LRT Jabodebek</span>
             </h1>
           </HomeReveal>
           <HomeReveal delayMs={100}>
@@ -297,7 +304,7 @@ export default function HomePage() {
           <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
             <HomeReveal>
               <div className="flex items-center gap-4">
-                <span className="h-[3px] w-16 bg-[#c41230]" aria-hidden />
+                <span className="h-[3px] w-16 bg-[#D81435]" aria-hidden />
                 <p className="font-display text-lg font-bold tracking-tight text-[#d32f2f] md:text-[20px]">
                   LRT JABODEBEK
                 </p>
@@ -413,11 +420,12 @@ export default function HomePage() {
             <HomeReveal className="shrink-0">
               <div className="relative mx-auto h-[260px] w-[200px] lg:mx-0 lg:h-[320px] lg:w-[240px] xl:h-[339px] xl:w-[284px]">
                 <Image
-                  src="/brand/landing/mascot-reno.png"
+                  src="/brand/landing/mascot-reno-steps.png"
                   alt="Reno, maskot LRT Jabodebek"
                   fill
                   sizes="284px"
                   className="object-contain object-bottom"
+                  unoptimized
                 />
               </div>
             </HomeReveal>
