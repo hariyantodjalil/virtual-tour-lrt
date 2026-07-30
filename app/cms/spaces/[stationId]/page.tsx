@@ -12,8 +12,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { FACILITY_ICONS, isFacilityIconId, type FacilityIconId } from "@/lib/facility-icons";
+import {
+  SPACE_STATUS_LABELS,
+  SPACE_STATUS_VALUES,
+  type CommercialSpaceStatus,
+} from "@/lib/commercial-pipeline";
 
-type SpaceStatus = "TERSEDIA" | "TERISI" | "MAINTENANCE";
+type SpaceStatus = CommercialSpaceStatus;
 
 type Space = {
   id: string;
@@ -34,6 +39,14 @@ type Space = {
   airConditioning: boolean;
   description: string | null;
   panoramaUrl: string | null;
+  tenantId: string | null;
+  tenantBrand: string | null;
+};
+
+type TenantOption = {
+  id: string;
+  brandName: string;
+  isActive: boolean;
 };
 
 const SPACE_TYPES = [
@@ -45,7 +58,7 @@ const SPACE_TYPES = [
   { value: "AREA_PROMOSI", label: "Area Promosi" },
 ];
 
-const STATUSES: SpaceStatus[] = ["TERSEDIA", "TERISI", "MAINTENANCE"];
+const STATUSES = SPACE_STATUS_VALUES;
 
 function normalizeFacilities(value: unknown): FacilityIconId[] {
   if (!Array.isArray(value)) return [];
@@ -72,6 +85,8 @@ function createDraft(): Space {
     airConditioning: false,
     description: "",
     panoramaUrl: "",
+    tenantId: null,
+    tenantBrand: null,
   };
 }
 
@@ -94,6 +109,7 @@ function toPayload(space: Space) {
     airConditioning: Boolean(space.airConditioning),
     description: space.description?.trim() || null,
     panoramaUrl: space.panoramaUrl?.trim() || null,
+    tenantId: space.status === "TERISI" ? space.tenantId : null,
   };
 }
 
@@ -113,6 +129,9 @@ function validateSpace(space: Space): string | null {
   if (!space.floor.trim()) return "Lantai wajib diisi.";
   if (!space.location.trim()) return "Lokasi wajib diisi.";
   if (!Number.isFinite(Number(space.exposure))) return "Eksposur penumpang harus angka.";
+  if (space.status === "TERISI" && !space.tenantId) {
+    return "Penyewa wajib dipilih untuk unit berstatus TERISI.";
+  }
   return null;
 }
 
@@ -141,14 +160,18 @@ async function readSaveError(res: Response): Promise<string> {
 export default function CmsSpacesStationPage() {
   const { stationId } = useParams<{ stationId: string }>();
   const [spaces, setSpaces] = useState<Space[]>([]);
+  const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [editing, setEditing] = useState<Space | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
   async function load() {
-    const res = await cmsFetch(`/api/cms/spaces/station/${stationId}`);
-    if (!res.ok) return;
-    const data = await res.json().catch(() => null);
+    const [spacesRes, tenantsRes] = await Promise.all([
+      cmsFetch(`/api/cms/spaces/station/${stationId}`),
+      cmsFetch(`/api/cms/tenants?stationId=${encodeURIComponent(stationId)}`),
+    ]);
+    if (!spacesRes.ok) return;
+    const data = await spacesRes.json().catch(() => null);
     const list = Array.isArray(data) ? data : [];
     setSpaces(
       list.map((item: Space) => ({
@@ -156,6 +179,11 @@ export default function CmsSpacesStationPage() {
         nearbyFacilities: normalizeFacilities(item.nearbyFacilities),
       }))
     );
+    if (tenantsRes.ok) {
+      const tenantData = await tenantsRes.json().catch(() => null);
+      const tenantList: TenantOption[] = Array.isArray(tenantData) ? tenantData : [];
+      setTenants(tenantList.filter((tenant) => tenant.isActive));
+    }
   }
 
   useEffect(() => {
@@ -170,6 +198,17 @@ export default function CmsSpacesStationPage() {
     const validationError = validateSpace(editing);
     if (validationError) {
       setMessage(validationError);
+      return;
+    }
+
+    if (
+      editing.id &&
+      editing.tenantBrand &&
+      editing.status !== "TERISI" &&
+      !confirm(
+        `Ubah unit menjadi ${editing.status}? Occupancy ${editing.tenantBrand} akan dilepas dari unit ini.`
+      )
+    ) {
       return;
     }
 
@@ -208,7 +247,10 @@ export default function CmsSpacesStationPage() {
     const data = await res.json();
     if (res.ok) {
       setEditing({
+        ...editing,
         ...data.space,
+        tenantId: editing.tenantId,
+        tenantBrand: editing.tenantBrand,
         nearbyFacilities: normalizeFacilities(data.space?.nearbyFacilities),
       });
       setMessage("Foto unit berhasil diupload.");
@@ -250,6 +292,14 @@ export default function CmsSpacesStationPage() {
                   <p className="font-semibold text-white">{space.code} - {space.name}</p>
                   <Badge variant="outline" className="border-slate-700 text-slate-300">{space.status}</Badge>
                   <Badge variant="outline" className="border-slate-700 text-slate-300">{SPACE_TYPES.find((t) => t.value === space.type)?.label ?? space.type}</Badge>
+                  {space.status === "TERISI" && space.tenantBrand && (
+                    <Badge
+                      variant="outline"
+                      className="border-emerald-700 bg-emerald-950/40 text-emerald-300"
+                    >
+                      Penyewa: {space.tenantBrand}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-sm text-slate-400">
                   {space.floor} · {space.location} · {space.area} m²
@@ -309,10 +359,60 @@ export default function CmsSpacesStationPage() {
                   </select>
                 </Field>
                 <Field label="Status">
-                  <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value as SpaceStatus })} className="h-10 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white">
-                    {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+                  <select
+                    value={editing.status}
+                    onChange={(e) => {
+                      const status = e.target.value as SpaceStatus;
+                      setEditing({
+                        ...editing,
+                        status,
+                        tenantId: status === "TERISI" ? editing.tenantId : null,
+                      });
+                    }}
+                    className="h-10 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white"
+                  >
+                    {STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {SPACE_STATUS_LABELS[status]}
+                      </option>
+                    ))}
                   </select>
                 </Field>
+                {editing.status === "TERISI" && (
+                  <Field label="Penyewa Aktif" required>
+                    <select
+                      value={editing.tenantId ?? ""}
+                      onChange={(e) => {
+                        const tenantId = e.target.value || null;
+                        const tenant = tenants.find((item) => item.id === tenantId);
+                        setEditing({
+                          ...editing,
+                          tenantId,
+                          tenantBrand: tenant?.brandName ?? null,
+                        });
+                      }}
+                      className="h-10 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white"
+                    >
+                      <option value="">Pilih penyewa</option>
+                      {tenants.map((tenant) => (
+                        <option key={tenant.id} value={tenant.id}>
+                          {tenant.brandName}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <p className="text-xs text-slate-500">
+                        Memilih penyewa akan membuat status occupancy unit menjadi terisi.
+                      </p>
+                      <Link
+                        href="/cms/tenants"
+                        className="shrink-0 text-xs font-semibold text-emerald-400 hover:text-emerald-300"
+                      >
+                        Tambah penyewa
+                      </Link>
+                    </div>
+                  </Field>
+                )}
                 <Field label="Luas (m2)">
                   <Input type="number" value={editing.area} onChange={(e) => setEditing({ ...editing, area: Number(e.target.value) })} className="bg-slate-900 border-slate-700" />
                 </Field>

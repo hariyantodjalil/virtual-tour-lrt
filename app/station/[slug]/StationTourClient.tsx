@@ -51,13 +51,14 @@ import {
 import { findSpaceHotspotPlacement } from "@/lib/space-hotspot-locate";
 import { findFacilityHotspotPlacement } from "@/lib/facility-hotspot-locate";
 import type { FacilityIconId } from "@/lib/facility-icons";
+import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 
 type Space = {
   id: string;
   code: string;
   name: string;
   type: string;
-  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  status: SpaceAvailabilityStatus;
   area: number;
   monthlyRent?: number;
   deposit: number;

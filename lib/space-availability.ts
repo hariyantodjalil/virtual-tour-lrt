@@ -1,10 +1,16 @@
-export type SpaceAvailabilityStatus = "TERSEDIA" | "TERISI" | "MAINTENANCE";
+export type SpaceAvailabilityStatus =
+  | "TERSEDIA"
+  | "RESERVED"
+  | "FIT_OUT"
+  | "TERISI"
+  | "MAINTENANCE";
 
 export function spaceStatusCssVariant(
   status?: SpaceAvailabilityStatus | null
 ): "available" | "occupied" | "maintenance" | "unknown" {
   if (status === "TERISI") return "occupied";
-  if (status === "MAINTENANCE") return "maintenance";
+  if (status === "RESERVED") return "occupied";
+  if (status === "FIT_OUT" || status === "MAINTENANCE") return "maintenance";
   if (status === "TERSEDIA") return "available";
   return "unknown";
 }

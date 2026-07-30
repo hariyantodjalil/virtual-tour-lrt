@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 
 type Space = {
   id: string;
   code: string;
   name: string;
-  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  status: SpaceAvailabilityStatus;
   area: number;
   floor: string;
   location: string;
@@ -21,6 +22,8 @@ type Props = {
 
 const STATUS_COLORS = {
   TERSEDIA: { fill: "#10B981", hover: "#059669", text: "Tersedia" },
+  RESERVED: { fill: "#6366F1", hover: "#4F46E5", text: "Reserved" },
+  FIT_OUT: { fill: "#8B5CF6", hover: "#7C3AED", text: "Fit-Out" },
   TERISI: { fill: "#EF4444", hover: "#DC2626", text: "Terisi" },
   MAINTENANCE: { fill: "#F59E0B", hover: "#D97706", text: "Maintenance" },
 };

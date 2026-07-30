@@ -33,13 +33,14 @@ import {
 } from "@/lib/favorite-spaces";
 import { FACILITY_ICONS, isFacilityIconId } from "@/lib/facility-icons";
 import TenantInterestForm from "./TenantInterestForm";
+import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 
 type CommercialSpace = {
   id: string;
   code: string;
   name: string;
   type: string;
-  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  status: SpaceAvailabilityStatus;
   area: number;
   monthlyRent?: number;
   deposit: number;
@@ -91,11 +92,7 @@ export default function InTourSpacePopup({
   returnToList = false,
 }: Props) {
   const [showInterestModal, setShowInterestModal] = useState(false);
-  const [favorited, setFavorited] = useState(false);
-
-  useEffect(() => {
-    setFavorited(isFavoriteSpace(space.id));
-  }, [space.id]);
+  const [favorited, setFavorited] = useState(() => isFavoriteSpace(space.id));
 
   function handleToggleFavorite() {
     if (!stationSlug) return;
@@ -119,6 +116,8 @@ export default function InTourSpacePopup({
   const waMessage = `Halo, saya tertarik dengan unit komersial ${space.code} (${space.name}) di Stasiun ${stationName}. Mohon informasi lebih lanjut.`;
   const waUrl = getWhatsAppUrl(contactPhone, waMessage);
   const isMedia = MEDIA_TYPES.has(space.type);
+  const occupiedTenant =
+    space.status === "TERISI" ? space.tenantBrand?.trim() : "";
   const categoryLabel = isMedia ? "Media" : "Tenant";
   const priceValue =
     space.monthlyRent && space.monthlyRent > 0
@@ -143,6 +142,18 @@ export default function InTourSpacePopup({
       className: "bg-red-50 text-red-700",
       dot: "bg-red-500",
       icon: <XCircle className="h-3.5 w-3.5" />,
+    },
+    RESERVED: {
+      label: "Reserved",
+      className: "bg-indigo-50 text-indigo-700",
+      dot: "bg-indigo-500",
+      icon: <AlertCircle className="h-3.5 w-3.5" />,
+    },
+    FIT_OUT: {
+      label: "Fit-Out",
+      className: "bg-violet-50 text-violet-700",
+      dot: "bg-violet-500",
+      icon: <AlertCircle className="h-3.5 w-3.5" />,
     },
     MAINTENANCE: {
       label: "Maintenance",
@@ -343,7 +354,7 @@ export default function InTourSpacePopup({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="font-display text-xl font-bold tracking-tight text-[#101828] uppercase">
-                  {space.code}
+                  {occupiedTenant || space.code}
                 </h3>
                 <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
                   <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
@@ -351,9 +362,9 @@ export default function InTourSpacePopup({
                     {space.location || space.floor}, Stasiun {stationName}
                   </span>
                 </p>
-                {space.tenantBrand && space.status === "TERISI" && (
+                {occupiedTenant && (
                   <p className="mt-1 text-sm font-semibold text-[#D81435]">
-                    Tenant: {space.tenantBrand}
+                    Unit {space.code} · {space.name}
                   </p>
                 )}
               </div>

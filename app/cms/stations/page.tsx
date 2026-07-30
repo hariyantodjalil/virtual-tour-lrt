@@ -3,8 +3,10 @@ import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Pencil, Map } from "lucide-react";
+import StationActions from "./StationActions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +33,19 @@ export default async function CmsStationsPage() {
         {stations.map((station) => (
           <Card key={station.id} className="bg-slate-900 border-slate-800">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">{station.name}</CardTitle>
+              <div className="flex items-start justify-between gap-3">
+                <CardTitle className="text-base">{station.name}</CardTitle>
+                <Badge
+                  variant="outline"
+                  className={
+                    station.isActive
+                      ? "border-emerald-700 bg-emerald-950/50 text-emerald-300"
+                      : "border-slate-700 bg-slate-800 text-slate-400"
+                  }
+                >
+                  {station.isActive ? "Aktif" : "Nonaktif"}
+                </Badge>
+              </div>
               <p className="text-xs text-slate-400">{station.address}</p>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -61,6 +75,13 @@ export default async function CmsStationsPage() {
                   </Link>
                 </Button>
               </div>
+              <StationActions
+                station={{
+                  id: station.id,
+                  name: station.name,
+                  isActive: station.isActive,
+                }}
+              />
             </CardContent>
           </Card>
         ))}

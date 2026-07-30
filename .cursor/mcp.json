@@ -9,7 +9,7 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-postgres",
-        "postgresql://postgres:postgres@localhost:5432/virtual-tour-lrt"
+        "postgresql://postgres:postgres@192.168.64.12:6010/virtual_tour_lrt"
       ]
     }
   }
