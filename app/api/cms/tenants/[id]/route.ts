@@ -35,7 +35,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!parsed.success) return parsed.response;
   const body = parsed.data;
 
-  const existing = await prisma.tenant.findUnique({ where: { id } });
+  const existing = await prisma.tenant.findUnique({
+    where: { id },
+    include: {
+      occupancies: {
+        select: { spaceId: true },
+      },
+    },
+  });
   if (!existing) return NextResponse.json({ error: "Tenant tidak ditemukan" }, { status: 404 });
 
   const data: Record<string, unknown> = {};
@@ -47,17 +54,28 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (body.isActive !== undefined) data.isActive = body.isActive;
   if (body.logoUrl !== undefined) data.logoUrl = body.logoUrl || null;
 
-  const tenant = await prisma.tenant.update({
-    where: { id },
-    data,
-    include: {
-      station: { select: { id: true, name: true, slug: true } },
-      occupancies: {
-        include: {
-          space: { select: { id: true, code: true, name: true, type: true, status: true } },
+  const tenant = await prisma.$transaction(async (tx) => {
+    if (body.isActive === false && existing.occupancies.length > 0) {
+      const spaceIds = existing.occupancies.map((occupancy) => occupancy.spaceId);
+      await tx.spaceOccupancy.deleteMany({ where: { tenantId: id } });
+      await tx.commercialSpace.updateMany({
+        where: { id: { in: spaceIds } },
+        data: { status: "TERSEDIA" },
+      });
+    }
+
+    return tx.tenant.update({
+      where: { id },
+      data,
+      include: {
+        station: { select: { id: true, name: true, slug: true } },
+        occupancies: {
+          include: {
+            space: { select: { id: true, code: true, name: true, type: true, status: true } },
+          },
         },
       },
-    },
+    });
   });
 
   return NextResponse.json(tenant);

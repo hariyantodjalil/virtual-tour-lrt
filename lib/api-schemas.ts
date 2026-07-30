@@ -39,7 +39,7 @@ export const spaceMutationSchema = z.object({
   code: z.string().trim().min(1).max(64),
   name: shortText,
   type: z.enum(["KIOS", "RUKO", "ATM", "VENDING", "MEDIA_IKLAN", "AREA_PROMOSI"]),
-  status: z.enum(["TERSEDIA", "TERISI", "MAINTENANCE"]),
+  status: z.enum(["TERSEDIA", "RESERVED", "FIT_OUT", "TERISI", "MAINTENANCE"]),
   area: nonNegativeNumber,
   monthlyRent: nonNegativeNumber,
   deposit: nonNegativeNumber,
@@ -56,6 +56,7 @@ export const spaceMutationSchema = z.object({
   airConditioning: z.boolean(),
   description: optionalText(5_000),
   panoramaUrl: nullableUrl,
+  tenantId: id.nullable().optional(),
 }).strict();
 
 export const userCreateSchema = z.object({
@@ -108,7 +109,24 @@ export const occupancySchema = z.object({
 
 export const leadUpdateSchema = z.object({
   id,
-  status: z.enum(["NEW", "CONTACTED", "NEGOTIATING", "CLOSED_WON", "CLOSED_LOST"]).optional(),
+  status: z.enum([
+    "NEW",
+    "CONTACTED",
+    "NEGOTIATING",
+    "PKS",
+    "FIT_OUT_HANDOVER",
+    "COMMERCIAL_OPERATION",
+    "CLOSED_WON",
+    "CLOSED_LOST",
+  ]).optional(),
+  siteVisitStatus: z.enum([
+    "NONE",
+    "REQUESTED",
+    "SCHEDULED",
+    "COMPLETED",
+    "CANCELLED",
+  ]).optional(),
+  siteVisitScheduledAt: optionalDate,
   notes: optionalText(5_000),
   followUpAt: optionalDate,
 }).strict().refine((value) => Object.keys(value).length > 1, "Minimal satu perubahan harus diisi");

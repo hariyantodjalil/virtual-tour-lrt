@@ -12,6 +12,7 @@ export type PickerSpace = {
   name: string;
   type: string;
   status: SpaceAvailabilityStatus;
+  tenantBrand?: string | null;
 };
 
 type Props = {
@@ -34,6 +35,8 @@ const TYPE_LABELS: Record<string, string> = {
 
 const STATUS_LABELS: Record<SpaceAvailabilityStatus, string> = {
   TERSEDIA: "Tersedia",
+  RESERVED: "Reserved",
+  FIT_OUT: "Fit-Out",
   TERISI: "Terisi",
   MAINTENANCE: "Maintenance",
 };
@@ -75,6 +78,8 @@ export function UnitPicker({
   }, [pool, query, typeFilter, statusFilter]);
 
   const selected = pool.find((s) => s.code === value);
+  const selectedTenant =
+    selected?.status === "TERISI" ? selected.tenantBrand?.trim() : "";
 
   return (
     <div className="space-y-2">
@@ -107,6 +112,8 @@ export function UnitPicker({
         >
           <option value="ALL">Semua status</option>
           <option value="TERSEDIA">Tersedia</option>
+          <option value="RESERVED">Reserved</option>
+          <option value="FIT_OUT">Fit-Out</option>
           <option value="TERISI">Terisi</option>
           <option value="MAINTENANCE">Maintenance</option>
         </select>
@@ -114,8 +121,19 @@ export function UnitPicker({
 
       {selected && (
         <div className="rounded-lg border border-emerald-700/40 bg-emerald-950/30 px-2.5 py-2 text-xs">
-          <p className="font-mono font-semibold text-emerald-300">{selected.code}</p>
-          <p className="truncate text-slate-300">{selected.name}</p>
+          {selectedTenant ? (
+            <>
+              <p className="truncate font-semibold text-emerald-300">{selectedTenant}</p>
+              <p className="truncate text-[10px] text-slate-400">
+                Tenant aktif · <span className="font-mono">{selected.code}</span> · {selected.name}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-mono font-semibold text-emerald-300">{selected.code}</p>
+              <p className="truncate text-slate-300">{selected.name}</p>
+            </>
+          )}
         </div>
       )}
 
@@ -125,6 +143,8 @@ export function UnitPicker({
         ) : (
           filtered.map((s) => {
             const active = s.code === value;
+            const tenantBrand =
+              s.status === "TERISI" ? s.tenantBrand?.trim() : "";
             return (
               <button
                 key={s.id}
@@ -139,10 +159,23 @@ export function UnitPicker({
                   style={{ background: spaceStatusColor(s.status) }}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-mono text-[11px] font-semibold text-slate-200">
-                    {s.code}
-                  </span>
-                  <span className="block truncate text-[10px] text-slate-400">{s.name}</span>
+                  {tenantBrand ? (
+                    <>
+                      <span className="block truncate text-[11px] font-semibold text-slate-100">
+                        {tenantBrand}
+                      </span>
+                      <span className="block truncate text-[10px] text-slate-400">
+                        <span className="font-mono">{s.code}</span> · {s.name}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="block truncate font-mono text-[11px] font-semibold text-slate-200">
+                        {s.code}
+                      </span>
+                      <span className="block truncate text-[10px] text-slate-400">{s.name}</span>
+                    </>
+                  )}
                   <span className="mt-0.5 block text-[9px] text-slate-500">
                     {TYPE_LABELS[s.type] ?? s.type} · {STATUS_LABELS[s.status]}
                   </span>

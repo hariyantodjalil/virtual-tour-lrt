@@ -116,7 +116,7 @@ export default function TenantInterestForm({
         const res = await fetch("/api/auth/verify");
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled && data.user?.role === "MITRA") {
+        if (!cancelled && data.authenticated && data.user?.role === "MITRA") {
           setAuthUser(data.user);
         }
       } finally {

@@ -10,14 +10,16 @@ import {
   Store,
   X,
 } from "lucide-react";
+import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 
 type SpaceItem = {
   id: string;
   code: string;
   name: string;
   type: string;
-  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  status: SpaceAvailabilityStatus;
   area: number;
+  tenantBrand?: string | null;
 };
 
 type Props = {
@@ -35,6 +37,14 @@ const STATUS_BADGE: Record<
   TERSEDIA: {
     label: "Tersedia",
     className: "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-400/40",
+  },
+  RESERVED: {
+    label: "Reserved",
+    className: "bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-400/35",
+  },
+  FIT_OUT: {
+    label: "Fit-Out",
+    className: "bg-violet-500/20 text-violet-200 ring-1 ring-violet-400/35",
   },
   TERISI: {
     label: "Terisi",
@@ -155,11 +165,15 @@ export default function TourUnitsPanel({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold text-white">
-                  {space.name}
+                  {space.status === "TERISI" && space.tenantBrand
+                    ? space.tenantBrand
+                    : space.name}
                 </span>
                 <span className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-white/55">
                   <Building2 className="size-3 shrink-0" />
-                  {typeLabels[space.type] ?? space.type}
+                  {space.status === "TERISI" && space.tenantBrand
+                    ? space.name
+                    : typeLabels[space.type] ?? space.type}
                   <span className="opacity-40">·</span>
                   {space.area} m²
                 </span>

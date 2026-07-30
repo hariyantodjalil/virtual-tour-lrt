@@ -13,14 +13,16 @@ import {
   TrainFront,
 } from "lucide-react";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
+import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 
 type SpaceItem = {
   id: string;
   code: string;
   name: string;
   type: string;
-  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  status: SpaceAvailabilityStatus;
   panoramaUrl?: string | null;
+  tenantBrand?: string | null;
 };
 
 type Props = {
@@ -38,12 +40,16 @@ type Props = {
 
 const STATUS_BADGE: Record<SpaceItem["status"], string> = {
   TERSEDIA: "bg-[#ec4899] text-white",
+  RESERVED: "bg-indigo-500 text-white",
+  FIT_OUT: "bg-violet-500 text-white",
   TERISI: "bg-[#E31E2D] text-white",
   MAINTENANCE: "bg-amber-500 text-white",
 };
 
 const STATUS_LABEL: Record<SpaceItem["status"], string> = {
   TERSEDIA: "TERSEDIA",
+  RESERVED: "RSV",
+  FIT_OUT: "FIT-OUT",
   TERISI: "TERISI",
   MAINTENANCE: "MTN",
 };
@@ -149,10 +155,14 @@ export default function TourLeftPanel({
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1 truncate text-[11px] font-bold text-white">
                         <MapPin className="size-2.5 shrink-0 text-white" />
-                        {space.name}
+                        {space.status === "TERISI" && space.tenantBrand
+                          ? space.tenantBrand
+                          : space.name}
                       </p>
                       <p className="mt-0.5 truncate text-[9px] text-white/75">
-                        {typeLabels[space.type] ?? space.type}
+                        {space.status === "TERISI" && space.tenantBrand
+                          ? `${space.code} · ${space.name}`
+                          : typeLabels[space.type] ?? space.type}
                       </p>
                     </div>
                   </button>

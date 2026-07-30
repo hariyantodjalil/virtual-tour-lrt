@@ -12,15 +12,18 @@ export default async function CmsStationEditPage({ params }: Props) {
     where: { id },
     select: {
       id: true,
+      code: true,
       name: true,
       slug: true,
       line: true,
       address: true,
+      location: true,
       dailyPassengers: true,
       description: true,
       commercialContactPhone: true,
       imageUrl: true,
       order: true,
+      isActive: true,
     },
   });
 

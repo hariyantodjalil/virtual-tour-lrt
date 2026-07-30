@@ -35,8 +35,29 @@ export async function GET(request: NextRequest, { params }: Params) {
   const spaces = await prisma.commercialSpace.findMany({
     where: { stationId },
     orderBy: [{ floor: "asc" }, { code: "asc" }],
+    include: {
+      occupancy: {
+        select: {
+          tenantId: true,
+          tenant: {
+            select: {
+              brandName: true,
+              isActive: true,
+            },
+          },
+        },
+      },
+    },
   });
-  return NextResponse.json(spaces);
+  return NextResponse.json(
+    spaces.map(({ occupancy, ...space }) => ({
+      ...space,
+      tenantId:
+        occupancy?.tenant.isActive === true ? occupancy.tenantId : null,
+      tenantBrand:
+        occupancy?.tenant.isActive === true ? occupancy.tenant.brandName : null,
+    }))
+  );
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
@@ -46,9 +67,48 @@ export async function POST(request: NextRequest, { params }: Params) {
   const { stationId } = await params;
   const parsed = await parseJsonRequest(request, spaceMutationSchema);
   if (!parsed.success) return parsed.response;
+  const { tenantId, ...spaceData } = parsed.data;
+
+  if (spaceData.status === "TERISI" && !tenantId) {
+    return NextResponse.json(
+      { error: "Penyewa wajib dipilih ketika status unit TERISI." },
+      { status: 400 }
+    );
+  }
+  if (spaceData.status !== "TERISI" && tenantId) {
+    return NextResponse.json(
+      { error: "Penyewa hanya dapat dipilih untuk unit berstatus TERISI." },
+      { status: 400 }
+    );
+  }
+
+  if (tenantId) {
+    const tenant = await prisma.tenant.findFirst({
+      where: { id: tenantId, stationId, isActive: true },
+      select: { id: true },
+    });
+    if (!tenant) {
+      return NextResponse.json(
+        { error: "Penyewa aktif tidak ditemukan di stasiun ini." },
+        { status: 400 }
+      );
+    }
+  }
+
   try {
-    const space = await prisma.commercialSpace.create({
-      data: { ...parsed.data, stationId },
+    const space = await prisma.$transaction(async (tx) => {
+      const created = await tx.commercialSpace.create({
+        data: { ...spaceData, stationId },
+      });
+      if (tenantId) {
+        await tx.spaceOccupancy.create({
+          data: {
+            spaceId: created.id,
+            tenantId,
+          },
+        });
+      }
+      return created;
     });
     return NextResponse.json(space, { status: 201 });
   } catch (error) {

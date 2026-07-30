@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { z } from "zod";
 import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/rate-limit";
+import { ACTIVE_LEAD_STATUSES } from "@/lib/commercial-pipeline";
 
 const partnerLeadSchema = z
   .object({
@@ -77,12 +78,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Akun mitra tidak aktif" }, { status: 403 });
   }
 
-  const space = await prisma.commercialSpace.findUnique({
-    where: { id: parsed.data.spaceId },
+  const space = await prisma.commercialSpace.findFirst({
+    where: {
+      id: parsed.data.spaceId,
+      status: "TERSEDIA",
+      station: { isActive: true },
+    },
     select: { id: true },
   });
   if (!space) {
-    return NextResponse.json({ error: "Unit tidak ditemukan" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Unit tidak tersedia atau stasiun sedang nonaktif." },
+      { status: 409 }
+    );
   }
 
   const latestLead = await prisma.tenantLead.findFirst({
@@ -108,7 +116,7 @@ export async function POST(request: NextRequest) {
     where: {
       userId: user.id,
       spaceId: space.id,
-      status: { in: ["NEW", "CONTACTED", "NEGOTIATING"] },
+      status: { in: ACTIVE_LEAD_STATUSES },
     },
     select: { id: true },
   });
@@ -130,6 +138,7 @@ export async function POST(request: NextRequest) {
       businessType: parsed.data.businessType,
       message: parsed.data.message || null,
       surveyPreference: parsed.data.surveyPreference || null,
+      siteVisitStatus: parsed.data.surveyPreference ? "REQUESTED" : "NONE",
     },
   });
 

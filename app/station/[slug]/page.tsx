@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { getStationBySlug, getStationMetaBySlug } from "@/lib/stations-data";
 import StationTourClient from "./StationTourClient";
 
@@ -106,7 +107,7 @@ export default async function StationPage({ params }: Props) {
             code: s.code,
             name: s.name,
             type: s.type,
-            status: s.status as "TERSEDIA" | "TERISI" | "MAINTENANCE",
+            status: s.status as SpaceAvailabilityStatus,
             area: s.area,
             monthlyRent: s.monthlyRent,
             deposit: s.deposit,

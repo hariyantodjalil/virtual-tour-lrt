@@ -37,8 +37,61 @@ export async function PUT(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const parsed = await parseJsonRequest(request, spaceMutationSchema);
   if (!parsed.success) return parsed.response;
+  const { tenantId, ...spaceData } = parsed.data;
+
+  const existing = await prisma.commercialSpace.findUnique({
+    where: { id },
+    select: { id: true, stationId: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Unit tidak ditemukan." }, { status: 404 });
+  }
+
+  if (spaceData.status === "TERISI" && !tenantId) {
+    return NextResponse.json(
+      { error: "Penyewa wajib dipilih ketika status unit TERISI." },
+      { status: 400 }
+    );
+  }
+  if (spaceData.status !== "TERISI" && tenantId) {
+    return NextResponse.json(
+      { error: "Penyewa hanya dapat dipilih untuk unit berstatus TERISI." },
+      { status: 400 }
+    );
+  }
+
+  if (tenantId) {
+    const tenant = await prisma.tenant.findFirst({
+      where: { id: tenantId, stationId: existing.stationId, isActive: true },
+      select: { id: true },
+    });
+    if (!tenant) {
+      return NextResponse.json(
+        { error: "Penyewa aktif tidak ditemukan di stasiun ini." },
+        { status: 400 }
+      );
+    }
+  }
+
   try {
-    const space = await prisma.commercialSpace.update({ where: { id }, data: parsed.data });
+    const space = await prisma.$transaction(async (tx) => {
+      const updated = await tx.commercialSpace.update({
+        where: { id },
+        data: spaceData,
+      });
+
+      if (tenantId) {
+        await tx.spaceOccupancy.upsert({
+          where: { spaceId: id },
+          create: { spaceId: id, tenantId },
+          update: { tenantId },
+        });
+      } else {
+        await tx.spaceOccupancy.deleteMany({ where: { spaceId: id } });
+      }
+
+      return updated;
+    });
     return NextResponse.json(space);
   } catch (error) {
     return spaceWriteError(error);
