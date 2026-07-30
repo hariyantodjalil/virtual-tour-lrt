@@ -80,7 +80,9 @@ export default function Navbar({ variant = "light" }: { variant?: "light" | "dar
                 key={item.label}
                 href={item.href}
                 className={`rounded-[6px] px-6 py-2.5 text-xs font-medium transition ${
-                  item.active ? "bg-[#d32f2f] text-white" : "text-[#d32f2f] hover:bg-[#d32f2f]/10"
+                  "active" in item && item.active
+                    ? "bg-[#d32f2f] text-white"
+                    : "text-[#d32f2f] hover:bg-[#d32f2f]/10"
                 }`}
               >
                 {item.label}

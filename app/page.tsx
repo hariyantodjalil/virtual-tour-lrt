@@ -95,6 +95,13 @@ async function getCommercialListings() {
         take: 8,
         include: {
           station: { select: { name: true, slug: true, order: true, line: true } },
+          occupancy: {
+            select: {
+              tenant: {
+                select: { brandName: true, isActive: true },
+              },
+            },
+          },
         },
       }),
       prisma.commercialSpace.count({ where: { station: { isActive: true } } }),
@@ -116,6 +123,10 @@ async function getCommercialListings() {
         stationSlug: s.station.slug,
         stationOrder: s.station.order,
         stationLine: s.station.line,
+        tenantBrand:
+          s.status === "TERISI" && s.occupancy?.tenant.isActive
+            ? s.occupancy.tenant.brandName
+            : null,
       })),
     };
   } catch {

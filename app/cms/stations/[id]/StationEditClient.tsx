@@ -14,41 +14,58 @@ import { ArrowLeft, Upload } from "lucide-react";
 
 export type StationEditData = {
   id: string;
+  code: string | null;
   name: string;
   slug: string;
   line: string;
   address: string;
+  location: string | null;
   dailyPassengers: number;
   description: string | null;
   commercialContactPhone: string | null;
   imageUrl: string | null;
   order: number;
+  isActive: boolean;
 };
 
 export default function StationEditClient({ initialStation }: { initialStation: StationEditData }) {
   const [station, setStation] = useState(initialStation);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [isError, setIsError] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const res = await cmsFetch(`/api/cms/stations/${station.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: station.name,
-        slug: station.slug,
-        line: station.line,
-        address: station.address,
-        dailyPassengers: station.dailyPassengers,
-        description: station.description,
-        commercialContactPhone: station.commercialContactPhone,
-        order: station.order,
-      }),
-    });
-    setSaving(false);
-    setMessage(res.ok ? "Berhasil disimpan" : "Gagal menyimpan");
+    setMessage("");
+    setIsError(false);
+    try {
+      const res = await cmsFetch(`/api/cms/stations/${station.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: station.code || null,
+          name: station.name,
+          slug: station.slug,
+          line: station.line,
+          address: station.address,
+          location: station.location || null,
+          dailyPassengers: station.dailyPassengers,
+          description: station.description || null,
+          commercialContactPhone: station.commercialContactPhone || null,
+          order: station.order,
+          isActive: station.isActive,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      setIsError(!res.ok);
+      setMessage(res.ok ? "Perubahan stasiun berhasil disimpan." : data?.error ?? "Gagal menyimpan.");
+    } catch {
+      setIsError(true);
+      setMessage("Gagal terhubung ke server.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -83,10 +100,27 @@ export default function StationEditClient({ initialStation }: { initialStation: 
           <CardContent>
             <form onSubmit={handleSave} className="space-y-4">
               <div>
+                <Label>Kode Stasiun</Label>
+                <Input
+                  value={station.code ?? ""}
+                  onChange={(e) => setStation({ ...station, code: e.target.value })}
+                  placeholder="Contoh: DKA"
+                  className="bg-slate-800 border-slate-700"
+                />
+              </div>
+              <div>
                 <Label>Nama</Label>
                 <Input
                   value={station.name}
                   onChange={(e) => setStation({ ...station, name: e.target.value })}
+                  className="bg-slate-800 border-slate-700"
+                />
+              </div>
+              <div>
+                <Label>Lintas / Line</Label>
+                <Input
+                  value={station.line}
+                  onChange={(e) => setStation({ ...station, line: e.target.value })}
                   className="bg-slate-800 border-slate-700"
                 />
               </div>
@@ -99,12 +133,44 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                 />
               </div>
               <div>
+                <Label>Wilayah</Label>
+                <Input
+                  value={station.location ?? ""}
+                  onChange={(e) => setStation({ ...station, location: e.target.value })}
+                  placeholder="Contoh: Jakarta Selatan"
+                  className="bg-slate-800 border-slate-700"
+                />
+              </div>
+              <div>
                 <Label>Alamat</Label>
                 <Input
                   value={station.address}
                   onChange={(e) => setStation({ ...station, address: e.target.value })}
                   className="bg-slate-800 border-slate-700"
                 />
+              </div>
+              <div>
+                <Label>Urutan Tampil</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={station.order}
+                  onChange={(e) => setStation({ ...station, order: Number(e.target.value) })}
+                  className="bg-slate-800 border-slate-700"
+                />
+              </div>
+              <div>
+                <Label>Status Stasiun</Label>
+                <select
+                  value={station.isActive ? "active" : "inactive"}
+                  onChange={(e) =>
+                    setStation({ ...station, isActive: e.target.value === "active" })
+                  }
+                  className="mt-2 h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-sm"
+                >
+                  <option value="active">Aktif — tampil di halaman publik</option>
+                  <option value="inactive">Nonaktif — sembunyikan beserta tenant dan tur</option>
+                </select>
               </div>
               <div>
                 <Label>Penumpang/hari</Label>
@@ -144,7 +210,14 @@ export default function StationEditClient({ initialStation }: { initialStation: 
               >
                 {saving ? "Menyimpan..." : "Simpan"}
               </Button>
-              {message && <p className="text-sm text-emerald-400">{message}</p>}
+              {message && (
+                <p
+                  role={isError ? "alert" : "status"}
+                  className={`text-sm ${isError ? "text-red-400" : "text-emerald-400"}`}
+                >
+                  {message}
+                </p>
+              )}
             </form>
           </CardContent>
         </Card>

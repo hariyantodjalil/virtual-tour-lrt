@@ -37,8 +37,8 @@ const navItems: NavItem[] = [
   { href: "/cms/stations", label: "Stasiun", icon: Train },
   { href: "/cms/virtual-tour", label: "Virtual Tour", icon: Map },
   { href: "/cms/spaces", label: "Ruang Komersial", icon: Store },
-  { href: "/cms/tenants", label: "Tenant", icon: Building2 },
-  { href: "/cms/leads", label: "Leads", icon: UserCircle },
+  { href: "/cms/tenants", label: "Penyewa Aktif", icon: Building2 },
+  { href: "/cms/leads", label: "Pengajuan & Site Visit", icon: UserCircle },
   { href: "/cms/users", label: "Users", icon: Users, adminOnly: true },
 ];
 
@@ -89,10 +89,16 @@ function getPageMeta(pathname: string) {
     return { title: "Ruang Komersial", subtitle: "Inventori tenant, kios, media, dan area promosi" };
   }
   if (pathname.startsWith("/cms/tenants")) {
-    return { title: "Tenant", subtitle: "Tenant aktif yang mengisi unit komersial" };
+    return {
+      title: "Penyewa Aktif",
+      subtitle: "Brand atau mitra yang sedang mengisi unit komersial",
+    };
   }
   if (pathname.startsWith("/cms/leads")) {
-    return { title: "Leads", subtitle: "Pipeline calon tenant dari public virtual tour" };
+    return {
+      title: "Pengajuan & Site Visit",
+      subtitle: "Pipeline calon mitra dari inquiry hingga operasional komersial",
+    };
   }
   if (pathname.startsWith("/cms/users")) {
     return { title: "Users", subtitle: "Akses pengguna dan peran admin CMS" };

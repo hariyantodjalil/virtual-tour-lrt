@@ -19,6 +19,7 @@ type SpaceRef = {
   name: string;
   type: string;
   status: SpaceAvailabilityStatus;
+  tenantBrand?: string | null;
 };
 
 type Placement = {
@@ -152,7 +153,16 @@ export function CoveragePanel({
                     />
                     <p className="truncate font-mono text-[11px] text-slate-200">{space.code}</p>
                   </div>
-                  <p className="truncate text-[10px] text-slate-500">{space.name}</p>
+                  {space.status === "TERISI" && space.tenantBrand ? (
+                    <>
+                      <p className="truncate text-[10px] font-semibold text-emerald-400">
+                        {space.tenantBrand}
+                      </p>
+                      <p className="truncate text-[9px] text-slate-600">{space.name}</p>
+                    </>
+                  ) : (
+                    <p className="truncate text-[10px] text-slate-500">{space.name}</p>
+                  )}
                   {covered ? (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {placements.map((p) => (

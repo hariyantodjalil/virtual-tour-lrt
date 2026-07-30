@@ -20,6 +20,11 @@ import {
 } from "lucide-react";
 import { formatRupiah, getWhatsAppUrl } from "@/lib/utils";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
+import {
+  ACTIVE_LEAD_STATUSES,
+  isCommercialOperation,
+  SITE_VISIT_STATUS_LABELS,
+} from "@/lib/commercial-pipeline";
 
 export type PartnerLead = {
   id: string;
@@ -31,6 +36,9 @@ export type PartnerLead = {
   status: string;
   message: string | null;
   surveyPreference: string | null;
+  siteVisitStatus: string;
+  siteVisitScheduledAt: string | null;
+  notes: string | null;
   createdAt: string;
   space: {
     id: string;
@@ -71,11 +79,12 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const STEPS = [
-  "Pengajuan Dikirim",
-  "Dokumen Diverifikasi",
-  "Sedang Direview",
+  "Inquiry",
+  "Dihubungi",
   "Negosiasi",
-  "Disetujui",
+  "Perjanjian Kerja Sama",
+  "Fit-Out & Serah Terima",
+  "Operasional Komersial",
 ] as const;
 
 function statusBadge(status: string) {
@@ -84,8 +93,13 @@ function statusBadge(status: string) {
       return { label: "Sedang Direview", className: "bg-amber-500 text-white" };
     case "NEGOTIATING":
       return { label: "Negosiasi", className: "bg-violet-600 text-white" };
+    case "PKS":
+      return { label: "PKS", className: "bg-indigo-600 text-white" };
+    case "FIT_OUT_HANDOVER":
+      return { label: "Fit-Out & Serah Terima", className: "bg-fuchsia-600 text-white" };
+    case "COMMERCIAL_OPERATION":
     case "CLOSED_WON":
-      return { label: "Disetujui", className: "bg-emerald-600 text-white" };
+      return { label: "Operasional Komersial", className: "bg-emerald-600 text-white" };
     case "CLOSED_LOST":
       return { label: "Ditolak", className: "bg-red-600 text-white" };
     default:
@@ -99,11 +113,16 @@ function currentStepIndex(status: string): number {
     case "NEW":
       return 0;
     case "CONTACTED":
-      return 2;
+      return 1;
     case "NEGOTIATING":
+      return 2;
+    case "PKS":
       return 3;
-    case "CLOSED_WON":
+    case "FIT_OUT_HANDOVER":
       return 4;
+    case "COMMERCIAL_OPERATION":
+    case "CLOSED_WON":
+      return 5;
     case "CLOSED_LOST":
       return -1;
     default:
@@ -113,8 +132,12 @@ function currentStepIndex(status: string): number {
 
 function matchesFilter(status: string, filter: FilterTab) {
   if (filter === "semua") return true;
-  if (filter === "diproses") return ["NEW", "CONTACTED", "NEGOTIATING"].includes(status);
-  if (filter === "disetujui") return status === "CLOSED_WON";
+  if (filter === "diproses") {
+    return ACTIVE_LEAD_STATUSES.includes(
+      status as (typeof ACTIVE_LEAD_STATUSES)[number]
+    );
+  }
+  if (filter === "disetujui") return isCommercialOperation(status);
   if (filter === "ditolak") return status === "CLOSED_LOST";
   return true;
 }
@@ -168,10 +191,14 @@ export default function ApplicationsSection({
     () => ({
       total: leads.length,
       diproses: leads.filter((l) =>
-        ["NEW", "CONTACTED", "NEGOTIATING"].includes(l.status)
+        ACTIVE_LEAD_STATUSES.includes(
+          l.status as (typeof ACTIVE_LEAD_STATUSES)[number]
+        )
       ).length,
-      menungguBayar: 0,
-      disetujui: leads.filter((l) => l.status === "CLOSED_WON").length,
+      siteVisit: leads.filter((l) =>
+        ["REQUESTED", "SCHEDULED"].includes(l.siteVisitStatus)
+      ).length,
+      disetujui: leads.filter((l) => isCommercialOperation(l.status)).length,
       ditolak: leads.filter((l) => l.status === "CLOSED_LOST").length,
     }),
     [leads]
@@ -191,7 +218,7 @@ export default function ApplicationsSection({
   const tabs: { id: FilterTab; label: string }[] = [
     { id: "semua", label: "Semua" },
     { id: "diproses", label: "Diproses" },
-    { id: "disetujui", label: "Disetujui" },
+    { id: "disetujui", label: "Operasional" },
     { id: "ditolak", label: "Ditolak" },
   ];
 
@@ -231,13 +258,13 @@ export default function ApplicationsSection({
           tone="orange"
         />
         <StatCard
-          title="Menunggu Pembayaran"
-          value={summary.menungguBayar}
+          title="Site Visit"
+          value={summary.siteVisit}
           icon={<CalendarDays className="size-4" />}
           tone="violet"
         />
         <StatCard
-          title="Disetujui"
+          title="Operasional"
           value={summary.disetujui}
           icon={<CheckCircle2 className="size-4" />}
           tone="green"
@@ -368,11 +395,11 @@ export default function ApplicationsSection({
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-base font-bold text-[#101828]">Jadwal Survey</h3>
-          {leads.some((l) => l.surveyPreference?.trim()) ? (
+          <h3 className="text-base font-bold text-[#101828]">Site Visit</h3>
+          {leads.some((l) => l.siteVisitStatus !== "NONE") ? (
             <ul className="mt-4 space-y-3">
               {leads
-                .filter((l) => l.surveyPreference?.trim())
+                .filter((l) => l.siteVisitStatus !== "NONE")
                 .slice(0, 4)
                 .map((l) => (
                   <li
@@ -384,7 +411,20 @@ export default function ApplicationsSection({
                     </p>
                     <p className="mt-1 flex items-start gap-1.5 text-xs text-slate-600">
                       <CalendarDays className="mt-0.5 size-3.5 shrink-0 text-[#c41230]" />
-                      {l.surveyPreference}
+                      {l.siteVisitScheduledAt
+                        ? new Date(l.siteVisitScheduledAt).toLocaleString("id-ID", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : `${SITE_VISIT_STATUS_LABELS[
+                            l.siteVisitStatus as keyof typeof SITE_VISIT_STATUS_LABELS
+                          ] ?? l.siteVisitStatus}: ${
+                            l.surveyPreference ||
+                            "menunggu jadwal dari admin"
+                          }`}
                     </p>
                   </li>
                 ))}
@@ -392,9 +432,11 @@ export default function ApplicationsSection({
           ) : (
             <div className="mt-8 flex flex-col items-center py-6 text-center">
               <CalendarDays className="size-12 text-slate-300" />
-              <p className="mt-3 text-sm font-medium text-slate-600">Belum ada jadwal survey.</p>
+              <p className="mt-3 text-sm font-medium text-slate-600">
+                Belum ada permintaan site visit.
+              </p>
               <p className="mt-1 text-xs text-slate-400">
-                Isi preferensi survei saat mengajukan, atau tunggu jadwal dari tim leasing.
+                Preferensi Anda akan masuk ke CMS untuk dijadwalkan admin.
               </p>
             </div>
           )}
@@ -561,9 +603,12 @@ function ApplicationCard({
           ) : (
             <ol className="space-y-2.5">
               {STEPS.map((label, index) => {
-                const done = stepIdx > index || (stepIdx === 4 && index === 4);
-                const current = stepIdx === index && stepIdx < 4;
-                const completeFinal = stepIdx === 4 && index === 4;
+                const finalIndex = STEPS.length - 1;
+                const done =
+                  stepIdx > index || (stepIdx === finalIndex && index === finalIndex);
+                const current = stepIdx === index && stepIdx < finalIndex;
+                const completeFinal =
+                  stepIdx === finalIndex && index === finalIndex;
                 return (
                   <li key={label} className="flex items-start gap-2.5">
                     <span className="mt-0.5 shrink-0">
@@ -648,6 +693,28 @@ function DetailModal({ lead, onClose }: { lead: PartnerLead; onClose: () => void
             </dd>
           </div>
         </dl>
+
+        {lead.siteVisitStatus !== "NONE" && (
+          <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50 p-3">
+            <p className="text-xs font-semibold uppercase text-sky-600">Site Visit</p>
+            <p className="mt-1 text-sm font-semibold text-sky-900">
+              {SITE_VISIT_STATUS_LABELS[
+                lead.siteVisitStatus as keyof typeof SITE_VISIT_STATUS_LABELS
+              ] ?? lead.siteVisitStatus}
+            </p>
+            {lead.siteVisitScheduledAt && (
+              <p className="mt-1 text-sm text-sky-800">
+                {new Date(lead.siteVisitScheduledAt).toLocaleString("id-ID", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            )}
+          </div>
+        )}
 
         {lead.surveyPreference && (
           <div className="mt-4 rounded-xl border border-slate-100 p-3">

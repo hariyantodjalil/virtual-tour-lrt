@@ -15,6 +15,7 @@ model User {
   role        UserRole     @default(EDITOR)
   isActive    Boolean      @default(true)
   tenantLeads TenantLead[]
+  tenants     Tenant[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -164,6 +165,8 @@ model CommercialSpace {
 /** Tenant aktif (brand yang mengisi unit TERISI) — beda dari TenantLead (pipeline calon). */
 model Tenant {
   id          String           @id @default(cuid())
+  userId      String?
+  user        User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   stationId   String
   station     Station          @relation(fields: [stationId], references: [id], onDelete: Cascade)
   brandName   String
@@ -178,6 +181,7 @@ model Tenant {
   updatedAt   DateTime         @updatedAt
 
   @@index([stationId])
+  @@index([userId])
   @@map("tenants")
 }
 
@@ -210,6 +214,8 @@ model TenantLead {
   businessType     String
   spaceRequirement String?
   surveyPreference String?
+  siteVisitStatus  SiteVisitStatus @default(NONE)
+  siteVisitScheduledAt DateTime?
   message          String?
   status           LeadStatus       @default(NEW)
   notes            String?
@@ -259,14 +265,27 @@ enum SpaceStatus {
   TERSEDIA
   TERISI
   MAINTENANCE
+  RESERVED
+  FIT_OUT
 }
 
 enum LeadStatus {
   NEW
   CONTACTED
   NEGOTIATING
+  PKS
+  FIT_OUT_HANDOVER
+  COMMERCIAL_OPERATION
   CLOSED_WON
   CLOSED_LOST
+}
+
+enum SiteVisitStatus {
+  NONE
+  REQUESTED
+  SCHEDULED
+  COMPLETED
+  CANCELLED
 }
 
 enum EventType {

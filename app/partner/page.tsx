@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowUpRight,
   Bell,
+  Building2,
   CheckCircle2,
   ChevronDown,
   CircleHelp,
@@ -19,11 +20,8 @@ import {
   LayoutDashboard,
   LogOut,
   MapPin,
-  MessageCircle,
   Plus,
   Settings,
-  TrendingUp,
-  XCircle,
 } from "lucide-react";
 import StationPickerModal, {
   type StationPickerItem,
@@ -32,12 +30,19 @@ import ApplicationsSection, {
   type PartnerLead,
 } from "@/components/partner/ApplicationsSection";
 import AccountSettingsSection from "@/components/partner/AccountSettingsSection";
+import ActiveTenanciesSection, {
+  type ActiveTenancy,
+} from "@/components/partner/ActiveTenanciesSection";
 import {
   FAVORITES_UPDATED_EVENT,
   readFavoriteSpaces,
   removeFavoriteSpace,
   type FavoriteSpace,
 } from "@/lib/favorite-spaces";
+import {
+  ACTIVE_LEAD_STATUSES,
+  isCommercialOperation,
+} from "@/lib/commercial-pipeline";
 import { formatRupiah } from "@/lib/utils";
 
 type User = {
@@ -49,40 +54,10 @@ type User = {
 
 type Lead = PartnerLead;
 
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; icon: React.ElementType; className: string }
-> = {
-  NEW: {
-    label: "Baru diajukan",
-    icon: Clock3,
-    className: "border-sky-200 bg-sky-50 text-sky-700",
-  },
-  CONTACTED: {
-    label: "Dihubungi",
-    icon: MessageCircle,
-    className: "border-cyan-200 bg-cyan-50 text-cyan-700",
-  },
-  NEGOTIATING: {
-    label: "Negosiasi",
-    icon: TrendingUp,
-    className: "border-amber-200 bg-amber-50 text-amber-700",
-  },
-  CLOSED_WON: {
-    label: "Disetujui",
-    icon: CheckCircle2,
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  },
-  CLOSED_LOST: {
-    label: "Ditolak",
-    icon: XCircle,
-    className: "border-red-200 bg-red-50 text-red-700",
-  },
-};
-
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "pengajuan", label: "Pengajuan Sewa", icon: FileText },
+  { id: "unit-aktif", label: "Unit Aktif Saya", icon: Building2 },
   { id: "tour", label: "Virtual Tour", icon: Glasses },
   { id: "favorit", label: "Favorit", icon: Heart },
   { id: "akun", label: "Pengaturan Akun", icon: Settings },
@@ -93,6 +68,7 @@ export default function PartnerPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [tenancies, setTenancies] = useState<ActiveTenancy[]>([]);
   const [loading, setLoading] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerStations, setPickerStations] = useState<StationPickerItem[]>([]);
@@ -112,10 +88,11 @@ export default function PartnerPage() {
 
   useEffect(() => {
     async function load() {
-      const [verifyRes, leadsRes, stationsRes] = await Promise.all([
+      const [verifyRes, leadsRes, stationsRes, tenanciesRes] = await Promise.all([
         fetch("/api/auth/verify"),
         fetch("/api/partner/leads"),
         fetch("/api/stations"),
+        fetch("/api/partner/tenancies"),
       ]);
 
       if (verifyRes.ok) {
@@ -124,6 +101,7 @@ export default function PartnerPage() {
       }
 
       if (leadsRes.ok) setLeads(await leadsRes.json());
+      if (tenanciesRes.ok) setTenancies(await tenanciesRes.json());
 
       if (stationsRes.ok) {
         const stations = (await stationsRes.json()) as Array<{
@@ -158,9 +136,11 @@ export default function PartnerPage() {
     () => ({
       total: leads.length,
       active: leads.filter((lead) =>
-        ["NEW", "CONTACTED", "NEGOTIATING"].includes(lead.status)
+        ACTIVE_LEAD_STATUSES.includes(
+          lead.status as (typeof ACTIVE_LEAD_STATUSES)[number]
+        )
       ).length,
-      won: leads.filter((lead) => lead.status === "CLOSED_WON").length,
+      won: leads.filter((lead) => isCommercialOperation(lead.status)).length,
       lost: leads.filter((lead) => lead.status === "CLOSED_LOST").length,
     }),
     [leads]
@@ -319,13 +299,13 @@ export default function PartnerPage() {
               <p className="mt-1 text-xs leading-relaxed text-slate-500">
                 Tim komersial siap membantu proses sewa Anda.
               </p>
-              <a
+              <Link
                 href="/#kontak"
                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#c41230] px-3 py-2 text-xs font-semibold text-white transition hover:brightness-110"
               >
                 <Headset className="size-3.5" />
                 Hubungi Kami
-              </a>
+              </Link>
             </div>
 
             <div className="flex items-center justify-center gap-3 px-1 pb-1">
@@ -369,6 +349,12 @@ export default function PartnerPage() {
                 leads={leads}
                 onExplore={openStationPicker}
                 pickerReady={pickerStations.length > 0}
+              />
+            ) : activeNav === "unit-aktif" ? (
+              <ActiveTenanciesSection
+                displayName={displayName}
+                tenancies={tenancies}
+                loading={loading}
               />
             ) : activeNav === "favorit" ? (
               <FavoritesSection
@@ -613,12 +599,17 @@ function applicationBadge(status: string, createdAt: string) {
   });
 
   switch (status) {
+    case "COMMERCIAL_OPERATION":
     case "CLOSED_WON":
-      return { label: "Disetujui", className: "bg-emerald-500 text-white" };
+      return { label: "Operasional", className: "bg-emerald-500 text-white" };
     case "CLOSED_LOST":
       return { label: "Ditolak", className: "bg-red-500 text-white" };
     case "NEGOTIATING":
       return { label: `Negosiasi · ${dateLabel}`, className: "bg-[#1e293b] text-white" };
+    case "PKS":
+      return { label: `PKS · ${dateLabel}`, className: "bg-indigo-600 text-white" };
+    case "FIT_OUT_HANDOVER":
+      return { label: `Fit-Out · ${dateLabel}`, className: "bg-violet-600 text-white" };
     case "CONTACTED":
       return { label: `Direview · ${dateLabel}`, className: "bg-[#1e293b] text-white" };
     default:
@@ -627,7 +618,7 @@ function applicationBadge(status: string, createdAt: string) {
 }
 
 function isApplicationDone(status: string) {
-  return status === "CLOSED_WON" || status === "CLOSED_LOST";
+  return isCommercialOperation(status) || status === "CLOSED_LOST";
 }
 
 function ApplicationProgressList({ leads }: { leads: Lead[] }) {

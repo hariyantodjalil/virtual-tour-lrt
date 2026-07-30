@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatRupiah, formatNumber, getWhatsAppUrl } from "@/lib/utils";
 import TenantInterestForm from "./TenantInterestForm";
+import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 
 type CommercialSpace = {
   id: string;
   code: string;
   name: string;
   type: string;
-  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  status: SpaceAvailabilityStatus;
   area: number;
   deposit: number;
   floor: string;
@@ -61,6 +62,18 @@ export default function CommercialSpacePanel({ space, stationName, contactPhone 
       variant: "occupied" as const,
       icon: <XCircle className="h-3.5 w-3.5" />,
       color: "text-red-600",
+    },
+    RESERVED: {
+      label: "Reserved",
+      variant: "occupied" as const,
+      icon: <AlertCircle className="h-3.5 w-3.5" />,
+      color: "text-indigo-600",
+    },
+    FIT_OUT: {
+      label: "Fit-Out",
+      variant: "maintenance" as const,
+      icon: <AlertCircle className="h-3.5 w-3.5" />,
+      color: "text-violet-600",
     },
     MAINTENANCE: {
       label: "Maintenance",

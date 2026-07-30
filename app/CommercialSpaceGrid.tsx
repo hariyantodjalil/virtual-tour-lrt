@@ -24,6 +24,7 @@ export type SpaceListing = {
   stationSlug: string;
   stationOrder: number;
   stationLine: string;
+  tenantBrand?: string | null;
 };
 
 const FILTERS = [
@@ -43,6 +44,14 @@ const TYPE_META: Record<string, { label: string; className: string }> = {
   VENDING: { label: "Vending", className: "bg-[#8b5cf6]" },
   MEDIA_IKLAN: { label: "Iklan", className: "bg-[#ec4899]" },
   AREA_PROMOSI: { label: "Area Promosi", className: "bg-[#14b8a6]" },
+};
+
+const STATUS_META: Record<string, { label: string; className: string }> = {
+  TERSEDIA: { label: "Tersedia", className: "bg-[#22c55e]" },
+  RESERVED: { label: "Reserved", className: "bg-[#6366f1]" },
+  FIT_OUT: { label: "Fit-Out", className: "bg-[#8b5cf6]" },
+  TERISI: { label: "Terisi", className: "bg-[#d32f2f]" },
+  MAINTENANCE: { label: "Maintenance", className: "bg-[#f59e0b]" },
 };
 
 function lineLabel(line: string): string {
@@ -176,7 +185,12 @@ export default function CommercialSpaceGrid({
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {filtered.map((space) => {
-          const available = space.status === "TERSEDIA";
+          const occupiedTenant =
+            space.status === "TERISI" ? space.tenantBrand?.trim() : "";
+          const statusMeta = STATUS_META[space.status] ?? {
+            label: space.status,
+            className: "bg-[#64748b]",
+          };
           const typeMeta = TYPE_META[space.type] ?? {
             label: space.type,
             className: "bg-[#64748b]",
@@ -200,11 +214,9 @@ export default function CommercialSpaceGrid({
 
                 <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-white ${
-                      available ? "bg-[#22c55e]" : "bg-[#d32f2f]"
-                    }`}
+                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-white ${statusMeta.className}`}
                   >
-                    {available ? "Tersedia" : "Terisi"}
+                    {statusMeta.label}
                   </span>
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-white ${typeMeta.className}`}
@@ -228,8 +240,13 @@ export default function CommercialSpaceGrid({
 
               <div className="flex flex-1 flex-col gap-2 px-3.5 pt-3 pb-3.5">
                 <h3 className="truncate text-[15px] font-bold text-[#101828]">
-                  {space.code || space.name}
+                  {occupiedTenant || space.code || space.name}
                 </h3>
+                {occupiedTenant && (
+                  <p className="-mt-1 truncate text-[10px] font-medium text-[#98a2b3]">
+                    Unit {space.code} · {space.name}
+                  </p>
+                )}
 
                 <p className="flex items-center gap-1.5 truncate text-xs text-[#667085]">
                   <MapPin className="size-3.5 shrink-0 text-[#d32f2f]" strokeWidth={2.25} />

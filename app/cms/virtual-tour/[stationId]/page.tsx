@@ -39,7 +39,11 @@ import {
   Megaphone,
 } from "lucide-react";
 import { hotspotColor, hotspotLabel, HOTSPOT_SCALE_MIN, HOTSPOT_SCALE_MAX, HOTSPOT_SCALE_DEFAULT, DIRECTION_COMPASS, DIRECTION_LABELS, DIRECTION_ROTATE_DEG, type HotspotDirection } from "@/lib/hotspot-types";
-import { findSpaceStatus, spaceStatusColor } from "@/lib/space-availability";
+import {
+  findSpaceStatus,
+  spaceStatusColor,
+  type SpaceAvailabilityStatus,
+} from "@/lib/space-availability";
 import { normalizeHotspots } from "@/lib/hotspot-normalize";
 import {
   BLUR_HEIGHT_DEFAULT,
@@ -116,7 +120,7 @@ type CommercialSpace = {
   code: string;
   name: string;
   type: string;
-  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  status: SpaceAvailabilityStatus;
   area: number;
   monthlyRent: number;
   deposit: number;
@@ -128,6 +132,8 @@ type CommercialSpace = {
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;
+  panoramaUrl?: string | null;
+  tenantBrand?: string | null;
 };
 
 function getLevelConfig(levelSlug: string | undefined, levels: TourLevel[]) {
@@ -2526,9 +2532,24 @@ export default function VirtualTourEditorPage() {
                                 );
                               })()}
                               {h.type === "space" && h.spaceCode && (
-                                <p className="truncate text-[10px] text-slate-500 font-mono">
-                                  {h.spaceCode}
-                                </p>
+                                (() => {
+                                  const linkedSpace = stationSpaces.find(
+                                    (space) => space.code === h.spaceCode
+                                  );
+                                  return (
+                                    <>
+                                      {linkedSpace?.status === "TERISI" &&
+                                        linkedSpace.tenantBrand && (
+                                          <p className="truncate text-[10px] font-semibold text-emerald-400">
+                                            {linkedSpace.tenantBrand}
+                                          </p>
+                                        )}
+                                      <p className="truncate font-mono text-[10px] text-slate-500">
+                                        {h.spaceCode}
+                                      </p>
+                                    </>
+                                  );
+                                })()
                               )}
                               {h.type === "ad" && h.spaceCode && (
                                 <p className="truncate text-[10px] text-slate-500 font-mono">

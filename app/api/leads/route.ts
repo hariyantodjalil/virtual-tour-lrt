@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { requireRole } from "@/lib/auth";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/rate-limit";
+import { ACTIVE_LEAD_STATUSES } from "@/lib/commercial-pipeline";
 
 const leadSchema = z.object({
   spaceId: z.string().trim().min(1).max(128).optional(),
@@ -56,6 +57,23 @@ export async function POST(req: NextRequest) {
     const data = parsed.data;
     const email = data.email.toLowerCase();
 
+    if (data.spaceId) {
+      const space = await prisma.commercialSpace.findFirst({
+        where: {
+          id: data.spaceId,
+          status: "TERSEDIA",
+          station: { isActive: true },
+        },
+        select: { id: true },
+      });
+      if (!space) {
+        return NextResponse.json(
+          { error: "Unit tidak tersedia atau stasiun sedang nonaktif." },
+          { status: 409 }
+        );
+      }
+    }
+
     let user = await prisma.user.findUnique({ where: { email } });
 
     if (user) {
@@ -81,6 +99,23 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (data.spaceId) {
+      const existingOpen = await prisma.tenantLead.findFirst({
+        where: {
+          userId: user.id,
+          spaceId: data.spaceId,
+          status: { in: ACTIVE_LEAD_STATUSES },
+        },
+        select: { id: true },
+      });
+      if (existingOpen) {
+        return NextResponse.json(
+          { error: "Anda sudah memiliki pengajuan aktif untuk unit ini." },
+          { status: 409 }
+        );
+      }
+    }
+
     const leadData = {
       spaceId: data.spaceId,
       companyName: data.companyName,
@@ -97,6 +132,7 @@ export async function POST(req: NextRequest) {
         ...leadData,
         email,
         userId: user.id,
+        siteVisitStatus: data.surveyPreference ? "REQUESTED" : "NONE",
       },
     });
 
