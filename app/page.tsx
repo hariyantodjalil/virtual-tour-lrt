@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import Navbar from "@/components/Navbar";
 import { HomeReveal, HomeShell } from "@/components/home/HomeMotion";
 import CommercialSpaceGrid from "./CommercialSpaceGrid";
+import CommercialContactDetails from "@/components/commercial/CommercialContactDetails";
 
 /** Runtime DB fetch — jangan prerender saat docker build (DATABASE_URL palsu → list kosong). */
 export const dynamic = "force-dynamic";
@@ -551,6 +552,7 @@ export default function HomePage() {
               <img src="/brand/landing/icons/phone.svg" alt="" width={16} height={16} className="size-4" />
               Call Center 121
             </a>
+            <CommercialContactDetails />
           </div>
 
           <div className="text-center md:px-4">

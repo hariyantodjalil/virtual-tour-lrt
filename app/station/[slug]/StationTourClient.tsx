@@ -52,6 +52,7 @@ import { findSpaceHotspotPlacement } from "@/lib/space-hotspot-locate";
 import { findFacilityHotspotPlacement } from "@/lib/facility-hotspot-locate";
 import type { FacilityIconId } from "@/lib/facility-icons";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
+import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 
 type Space = {
   id: string;
@@ -145,6 +146,7 @@ export default function StationTourClient({
   spaces,
   pickerStations,
 }: Props) {
+  const commercialProfile = useCommercialProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialPlacement = findScenePlacement(stationInfo.levels, stationInfo.scenes[0]?.id ?? "");
@@ -201,7 +203,8 @@ export default function StationTourClient({
 
   const availableCount = spaces.filter((s) => s.status === "TERSEDIA").length;
   const occupiedCount = spaces.filter((s) => s.status === "TERISI").length;
-  const commercialContactPhone = stationInfo.commercialContactPhone ?? "628118012012";
+  const commercialContactPhone =
+    stationInfo.commercialContactPhone || commercialProfile.whatsappNumber;
   const stationWaUrl = getWhatsAppUrl(
     commercialContactPhone,
     `Halo, saya tertarik dengan ruang komersial di Stasiun ${stationInfo.name}. Mohon informasi lebih lanjut.`

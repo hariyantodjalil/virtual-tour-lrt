@@ -184,15 +184,18 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                 />
               </div>
               <div>
-                <Label>WhatsApp Tim Komersial</Label>
+                <Label>Override WhatsApp Komersial</Label>
                 <Input
                   value={station.commercialContactPhone ?? ""}
                   onChange={(e) =>
                     setStation({ ...station, commercialContactPhone: e.target.value })
                   }
-                  placeholder="628118012012"
+                  placeholder="Kosong = mengikuti profil tim komersial"
                   className="bg-slate-800 border-slate-700"
                 />
+                <p className="mt-1 text-xs text-slate-500">
+                  Isi hanya jika stasiun ini memiliki nomor kontak khusus.
+                </p>
               </div>
               <div>
                 <Label>Deskripsi</Label>
