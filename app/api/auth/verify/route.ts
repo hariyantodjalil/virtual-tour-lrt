@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET(request: NextRequest) {
   const payload = getUserFromRequest(request);
   if (!payload) {
-    return NextResponse.json({ authenticated: false }, { status: 401 });
+    return NextResponse.json({ authenticated: false });
   }
 
   const user = await prisma.user.findUnique({
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   });
 
   if (!user || !user.isActive) {
-    return NextResponse.json({ authenticated: false }, { status: 401 });
+    return NextResponse.json({ authenticated: false });
   }
 
   return NextResponse.json({

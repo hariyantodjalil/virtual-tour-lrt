@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { signToken } from "@/lib/auth";
+import { cmsTokenCookieOptions } from "@/lib/auth-cookie";
 import { prisma } from "@/lib/prisma";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/rate-limit";
@@ -81,13 +82,11 @@ export async function POST(request: NextRequest) {
       redirectTo: "/partner",
     }, { status: 201 });
 
-    response.cookies.set("cms-token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8,
-      path: "/",
-    });
+    response.cookies.set(
+      "cms-token",
+      token,
+      cmsTokenCookieOptions(remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8)
+    );
 
     return response;
   } catch (error) {
