@@ -120,7 +120,7 @@ export default function PartnerPage() {
 
       if (verifyRes.ok) {
         const verify = await verifyRes.json();
-        setUser(verify.user);
+        if (verify.authenticated && verify.user) setUser(verify.user);
       }
 
       if (leadsRes.ok) setLeads(await leadsRes.json());
