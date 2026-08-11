@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -64,11 +65,33 @@ export default function LoginForm() {
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-slate-900 border-slate-700" required />
             </div>
             {error && <p className="text-sm text-red-300">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full bg-[#d32f2f] hover:bg-[#b71c1c]" disabled={loading}>
               <LogIn className="h-4 w-4" />
               {loading ? "Memproses..." : "Login"}
             </Button>
           </form>
+
+          <div className="my-4 flex items-center gap-2">
+            <div className="h-px flex-1 bg-white/20" />
+            <span className="text-xs font-medium whitespace-nowrap text-slate-400">
+              atau masuk dengan
+            </span>
+            <div className="h-px flex-1 bg-white/20" />
+          </div>
+
+          <GoogleSignInButton
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-800/80 text-xs font-medium text-slate-100 transition hover:bg-slate-700"
+            label="Masuk dengan Google"
+            onSuccess={(u, redirect) => {
+              const target =
+                searchParams.get("redirect") ||
+                redirect ||
+                (u.role === "MITRA" ? "/partner" : "/cms/dashboard");
+              router.push(target);
+            }}
+            onError={(err) => setError(err)}
+            disabled={loading}
+          />
         </CardContent>
       </Card>
     </div>

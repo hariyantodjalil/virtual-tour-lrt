@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Bell,
   ChevronRight,
@@ -125,10 +125,6 @@ export default function AccountSettingsSection({
   const [activePanel, setActivePanel] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState(user?.name ?? "");
 
-  useEffect(() => {
-    setNameDraft(user?.name ?? "");
-  }, [user?.name]);
-
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return SETTING_GROUPS;
@@ -154,6 +150,9 @@ export default function AccountSettingsSection({
     if (item.id === "bantuan") {
       onOpenBantuan();
       return;
+    }
+    if (item.id === "akun") {
+      setNameDraft(user?.name ?? "");
     }
     setActivePanel(item.id);
   }
