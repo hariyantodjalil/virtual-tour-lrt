@@ -37,9 +37,30 @@ declare global {
 type CredentialCallback = (credential: string) => void;
 const activeListeners = new Set<CredentialCallback>();
 let initializedClientId: string | null = null;
+let cachedClientId: string = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+let clientConfigPromise: Promise<string> | null = null;
+
+async function fetchGoogleClientId(): Promise<string> {
+  if (cachedClientId) return cachedClientId;
+  if (!clientConfigPromise) {
+    clientConfigPromise = fetch("/api/auth/google/config")
+      .then((res) => (res.ok ? res.json() : { clientId: "" }))
+      .then((data) => {
+        if (data.clientId) {
+          cachedClientId = data.clientId;
+        }
+        return cachedClientId;
+      })
+      .catch(() => "")
+      .finally(() => {
+        clientConfigPromise = null;
+      });
+  }
+  return clientConfigPromise;
+}
 
 function ensureGsiInitialized(clientId: string) {
-  if (typeof window === "undefined" || !window.google?.accounts?.id) return false;
+  if (typeof window === "undefined" || !window.google?.accounts?.id || !clientId) return false;
   if (initializedClientId === clientId) return true;
 
   window.google.accounts.id.initialize({
@@ -104,12 +125,20 @@ export default function GoogleSignInButton({
   disabled = false,
 }: Props) {
   const [loading, setLoading] = useState(false);
+  const [clientId, setClientId] = useState<string>(() => cachedClientId);
   const [scriptLoaded, setScriptLoaded] = useState(() => {
     return typeof window !== "undefined" && Boolean(window.google?.accounts?.id);
   });
   const hiddenBtnRef = useRef<HTMLDivElement>(null);
 
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+  // Fetch client ID dynamically from server if not inlined at build time (e.g. Docker container)
+  useEffect(() => {
+    if (!clientId) {
+      void fetchGoogleClientId().then((id) => {
+        if (id) setClientId(id);
+      });
+    }
+  }, [clientId]);
 
   const handleCredential = useCallback(
     async (credential: string) => {
@@ -192,10 +221,20 @@ export default function GoogleSignInButton({
     }
   }, [scriptLoaded, clientId]);
 
-  function handleClick() {
+  async function handleClick() {
     if (disabled || loading) return;
 
-    if (!clientId) {
+    let targetClientId = clientId;
+    if (!targetClientId) {
+      setLoading(true);
+      targetClientId = await fetchGoogleClientId();
+      setLoading(false);
+      if (targetClientId) {
+        setClientId(targetClientId);
+      }
+    }
+
+    if (!targetClientId) {
       onError?.(
         "Google Client ID belum diatur. Tambahkan NEXT_PUBLIC_GOOGLE_CLIENT_ID di file .env."
       );
@@ -207,8 +246,8 @@ export default function GoogleSignInButton({
       return;
     }
 
-    // Pastikan GSI sudah terinisialisasi
-    ensureGsiInitialized(clientId);
+    // Pastikan GSI sudah terinisialisasi dengan target client ID
+    ensureGsiInitialized(targetClientId);
 
     // Coba trigger tombol tersembunyi GSI atau prompt One Tap
     const iframeBtn = hiddenBtnRef.current?.querySelector("div[role=button]") as HTMLElement | null;
