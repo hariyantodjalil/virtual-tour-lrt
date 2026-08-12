@@ -13,28 +13,7 @@ type Props = {
   onSuccess?: (user: AuthUser) => void;
 };
 
-function GoogleIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden>
-      <path
-        fill="#EA4335"
-        d="M12 10.2v3.6h5.1c-.2 1.2-.9 2.2-1.9 2.9l3.1 2.4c1.8-1.7 2.9-4.1 2.9-7 0-.7-.1-1.3-.2-1.9H12z"
-      />
-      <path
-        fill="#34A853"
-        d="M5.3 14.3l-.8.6-2.8 2.2C3.5 20.3 7.5 23 12 23c3 0 5.5-1 7.3-2.7l-3.1-2.4c-.9.6-2 1-3.2 1-2.5 0-4.6-1.7-5.3-3.9z"
-      />
-      <path
-        fill="#4A90E2"
-        d="M3.1 6.9C2.4 8.3 2 9.9 2 11.5s.4 3.2 1.1 4.6l3.6-2.8c-.2-.6-.4-1.2-.4-1.8s.1-1.2.4-1.8L3.1 6.9z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M12 4.7c1.6 0 3 .6 4.1 1.6L19 3.4C17.1 1.7 14.7 1 12 1 7.5 1 3.5 3.7 1.7 7.5l3.6 2.8C6.1 7.9 8.3 4.7 12 4.7z"
-      />
-    </svg>
-  );
-}
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 
 export default function RegisterModal({
   open,
@@ -234,14 +213,16 @@ export default function RegisterModal({
           <div className="h-px flex-1 bg-white/80" />
         </div>
 
-        <button
-          type="button"
-          onClick={() => setError("Login Google belum tersedia. Isi form di atas untuk daftar.")}
-          className="mt-4 flex h-9 w-full items-center justify-center gap-2 rounded-[9px] border border-white/80 bg-white/[0.06] text-[11px] font-medium text-white transition hover:bg-white/10"
-        >
-          <GoogleIcon className="size-3.5" />
-          Masuk dengan Google
-        </button>
+        <GoogleSignInButton
+          remember={remember}
+          onSuccess={(u) => {
+            onSuccess?.(u);
+            onClose();
+          }}
+          onError={(err) => setError(err)}
+          disabled={loading}
+          label="Daftar dengan Google"
+        />
 
         <p className="mt-4 text-center text-[10px] text-white">
           Sudah punya akun?{" "}

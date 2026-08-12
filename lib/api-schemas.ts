@@ -219,3 +219,9 @@ export const privacyBlurBakeSchema = z.object({
   viewerHeight: z.number().finite().positive().max(20_000).optional(),
   hfov: z.number().finite().positive().max(180).optional(),
 }).strict();
+
+export const googleAuthSchema = z.object({
+  credential: z.string().trim().min(10).max(4096),
+  remember: z.boolean().optional(),
+}).strict();
+
