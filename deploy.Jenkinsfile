@@ -278,6 +278,10 @@ set -a
 . ./.env
 set +a
 
+echo "Membersihkan container dan network dangling"
+sudo docker container prune -f 2>/dev/null || true
+sudo docker network prune -f 2>/dev/null || true
+
 echo "Menutup legacy Docker Compose jika masih ada"
 
 sudo docker compose \
@@ -299,23 +303,16 @@ READY=0
 NETWORK_NAME="${VIRTUALTOUR_NETWORK_NAME:-lrt-prod-virtualtour-network}"
 
 for i in $(seq 1 30); do
-    if sudo docker run \
-        --rm \
-        --network "$NETWORK_NAME" \
-        -e PGPASSWORD="$POSTGRES_PASSWORD" \
-        postgres:17-alpine \
-        pg_isready \
-            -h postgres \
-            -U "$POSTGRES_USER" \
-            -d "$POSTGRES_DB" \
-        >/dev/null 2>&1
-    then
-        READY=1
-        break
+    POSTGRES_CONT_ID="$(sudo docker ps -q -f name="${STACK_NAME}_postgres" | head -n 1)"
+    if [ -n "$POSTGRES_CONT_ID" ]; then
+        if sudo docker exec "$POSTGRES_CONT_ID" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
+            READY=1
+            break
+        fi
     fi
 
     echo "Menunggu PostgreSQL: percobaan $i/30"
-    sleep 5
+    sleep 3
 done
 
 if [ "$READY" -ne 1 ]; then
@@ -325,12 +322,15 @@ fi
 
 echo "Menjalankan Prisma migration"
 
-sudo docker run \
-    --rm \
-    --network "$NETWORK_NAME" \
-    -e DATABASE_URL="$DATABASE_URL" \
-    "$IMAGE_REF" \
-    npx prisma migrate deploy
+sudo docker container prune -f 2>/dev/null || true
+
+WEB_CONT_ID="$(sudo docker ps -q -f name="${STACK_NAME}_virtualtour" | head -n 1)"
+if [ -n "$WEB_CONT_ID" ]; then
+    sudo docker exec "$WEB_CONT_ID" npx prisma migrate deploy || \
+    sudo docker run --rm --network "$NETWORK_NAME" -e DATABASE_URL="$DATABASE_URL" "$IMAGE_REF" npx prisma migrate deploy
+else
+    sudo docker run --rm --network "$NETWORK_NAME" -e DATABASE_URL="$DATABASE_URL" "$IMAGE_REF" npx prisma migrate deploy
+fi
 
 echo "Deploy ulang Docker Stack"
 
