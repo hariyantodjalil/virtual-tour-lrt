@@ -445,10 +445,11 @@ export default function VirtualTourEditorPage() {
 
   // ─── Load data ───────────────────────────────────────────────────────────
   async function load(keepIndex?: number) {
+    const timestamp = Date.now();
     const [stRes, structRes, spRes] = await Promise.all([
-      cmsFetch(`/api/cms/stations/${stationId}`),
-      cmsFetch(`/api/cms/virtual-tour/${stationId}/structure`),
-      cmsFetch(`/api/cms/spaces/station/${stationId}`),
+      cmsFetch(`/api/cms/stations/${stationId}?_t=${timestamp}`),
+      cmsFetch(`/api/cms/virtual-tour/${stationId}/structure?_t=${timestamp}`),
+      cmsFetch(`/api/cms/spaces/station/${stationId}?_t=${timestamp}`),
     ]);
 
     if (!structRes.ok) {
@@ -832,8 +833,31 @@ export default function VirtualTourEditorPage() {
         { method: "POST", body: fd }
       );
       if (res.ok) {
+        const payload = await res.json().catch(() => null);
+        if (payload?.scene) {
+          setScenes((prev) =>
+            prev.map((s) =>
+              s.sceneId === currentScene.sceneId
+                ? {
+                    ...s,
+                    panoramaUrl: payload.scene.panoramaUrl,
+                    originalPanoramaUrl: payload.scene.originalPanoramaUrl,
+                    thumbnailUrl: payload.scene.thumbnailUrl,
+                    canvasData: payload.scene.canvasData ?? s.canvasData,
+                  }
+                : s
+            )
+          );
+          rememberSavedScene({
+            ...currentScene,
+            panoramaUrl: payload.scene.panoramaUrl,
+            originalPanoramaUrl: payload.scene.originalPanoramaUrl,
+            thumbnailUrl: payload.scene.thumbnailUrl,
+            canvasData: payload.scene.canvasData ?? currentScene.canvasData,
+          });
+        }
         showToast("ok", "Panorama diupload ke S3");
-        load(selectedSceneIndex);
+        await load(selectedSceneIndex);
       } else {
         const data = await res.json().catch(() => ({}));
         showToast("err", data.error ?? "Upload gagal");
@@ -1670,7 +1694,7 @@ export default function VirtualTourEditorPage() {
               /* Edit — Pannellum 3D statis (no auto-rotate), klik untuk pasang hotspot */
               <PannellumEditor
                 ref={editorRef}
-                key={`editor-${currentScene.sceneId}`}
+                key={`editor-${currentScene.sceneId}-${currentScene.panoramaUrl || "none"}`}
                 panoramaUrl={currentScene.panoramaUrl}
                 hotspots={hotspots}
                 privacyBlurs={privacyBlurs}

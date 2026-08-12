@@ -27,6 +27,9 @@ const sceneSelect = {
   updatedAt: true,
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(request: NextRequest, { params }: Params) {
   const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -47,7 +50,11 @@ export async function GET(request: NextRequest, { params }: Params) {
     void areaRef;
     return scene;
   });
-  return NextResponse.json(scenes);
+  return NextResponse.json(scenes, {
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+    },
+  });
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
