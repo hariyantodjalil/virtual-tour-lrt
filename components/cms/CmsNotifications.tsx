@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bell, UserCircle, X } from "lucide-react";
 
@@ -48,36 +48,40 @@ function timeAgo(iso: string) {
 export default function CmsNotifications() {
   const [open, setOpen] = useState(false);
   const [leads, setLeads] = useState<LeadNotif[]>([]);
-  const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
+  const [readIds, setReadIds] = useState<Set<string>>(loadReadIds);
   const [loaded, setLoaded] = useState(false);
 
-  const refresh = useCallback(async () => {
-    try {
-      const res = await fetch("/api/cms/leads");
-      if (!res.ok) return;
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : [];
-      const fresh = list
-        .filter((l: LeadNotif) => l.status === "NEW")
-        .sort(
-          (a: LeadNotif, b: LeadNotif) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )
-        .slice(0, 12);
-      setLeads(fresh);
-    } catch {
-      /* ignore */
-    } finally {
-      setLoaded(true);
-    }
-  }, []);
-
   useEffect(() => {
-    setReadIds(loadReadIds());
-    void refresh();
-    const id = window.setInterval(() => void refresh(), 60_000);
-    return () => window.clearInterval(id);
-  }, [refresh]);
+    let active = true;
+    async function load() {
+      try {
+        const res = await fetch("/api/cms/leads");
+        if (!res.ok || !active) return;
+        const data = await res.json();
+        if (!active) return;
+        const list = Array.isArray(data) ? data : [];
+        const fresh = list
+          .filter((l: LeadNotif) => l.status === "NEW")
+          .sort(
+            (a: LeadNotif, b: LeadNotif) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+          .slice(0, 12);
+        setLeads(fresh);
+      } catch {
+        /* ignore */
+      } finally {
+        if (active) setLoaded(true);
+      }
+    }
+
+    void load();
+    const id = window.setInterval(() => void load(), 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, []);
 
   const unread = leads.filter((l) => !readIds.has(l.id));
   const unreadCount = unread.length;

@@ -160,7 +160,11 @@ export default function StationTourClient({
   const [pickerOpen, setPickerOpen] = useState(
     () => searchParams.get("pilih") === "1" || searchParams.get("pilih") === "true"
   );
-  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
+  const [selectedSpace, setSelectedSpace] = useState<Space | null>(() => {
+    const unitId = searchParams.get("unit");
+    if (!unitId) return null;
+    return spaces.find((item) => item.id === unitId) ?? null;
+  });
   const [selectedAd, setSelectedAd] = useState<AdHotspotPayload | null>(null);
   const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
   const [activeSceneId, setActiveSceneId] = useState(firstScene);
@@ -187,19 +191,7 @@ export default function StationTourClient({
     hfov?: number;
   } | null>(null);
   const [focusToken, setFocusToken] = useState(0);
-  const [unitDeepLinkHandled, setUnitDeepLinkHandled] = useState(false);
   const [activeFacilityId, setActiveFacilityId] = useState<FacilityIconId | null>(null);
-
-  useEffect(() => {
-    if (unitDeepLinkHandled) return;
-    const unitId = searchParams.get("unit");
-    if (!unitId) return;
-    const space = spaces.find((item) => item.id === unitId);
-    if (!space) return;
-    setSelectedSpace(space);
-    setOpenedFromUnitsList(false);
-    setUnitDeepLinkHandled(true);
-  }, [searchParams, spaces, unitDeepLinkHandled]);
 
   const availableCount = spaces.filter((s) => s.status === "TERSEDIA").length;
   const occupiedCount = spaces.filter((s) => s.status === "TERISI").length;
@@ -303,7 +295,10 @@ export default function StationTourClient({
   useEffect(() => {
     if (!guidedActive || !routeAutoplay || popupBlocksAutoplay || !nextStep) {
       if (guidedActive && routeAutoplay && !popupBlocksAutoplay && !nextStep) {
-        setRouteAutoplay(false);
+        const timer = window.setTimeout(() => {
+          setRouteAutoplay(false);
+        }, 0);
+        return () => window.clearTimeout(timer);
       }
       return;
     }
@@ -321,7 +316,10 @@ export default function StationTourClient({
 
   useEffect(() => {
     if (popupBlocksAutoplay) {
-      setRouteAutoplay((playing) => (playing ? false : playing));
+      const timer = window.setTimeout(() => {
+        setRouteAutoplay((playing) => (playing ? false : playing));
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, [popupBlocksAutoplay]);
 
