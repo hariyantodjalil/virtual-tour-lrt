@@ -102,6 +102,7 @@ type Scene = {
   levelId?: string | null;
   areaId?: string | null;
   panoramaUrl: string;
+  originalPanoramaUrl?: string | null;
   thumbnailUrl?: string | null;
   order: number;
   hotspots: Omit<HotspotItem, "_id">[];
