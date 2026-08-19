@@ -15,6 +15,7 @@ import {
   PanelLeft,
   Building2,
   PhoneCall,
+  Sliders,
   type LucideIcon,
 } from "lucide-react";
 import CmsNotifications from "@/components/cms/CmsNotifications";
@@ -47,6 +48,7 @@ const navItems: NavItem[] = [
     adminOnly: true,
   },
   { href: "/cms/users", label: "Users", icon: Users, adminOnly: true },
+  { href: "/cms/settings", label: "Pengaturan Sistem", icon: Sliders, adminOnly: true },
 ];
 
 const SIDEBAR_STORAGE_KEY = "cms-sidebar-collapsed";
@@ -74,6 +76,12 @@ function isFullWidthPage(pathname: string) {
 }
 
 function getPageMeta(pathname: string) {
+  if (pathname.startsWith("/cms/settings")) {
+    return {
+      title: "Pengaturan Sistem",
+      subtitle: "Kelola status mode maintenance dan konfigurasi sistem",
+    };
+  }
   if (pathname.startsWith("/cms/dashboard")) {
     return { title: "Dashboard", subtitle: "Ringkasan performa komersial dan aktivitas tenant" };
   }

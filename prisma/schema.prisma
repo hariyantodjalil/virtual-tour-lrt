@@ -69,6 +69,17 @@ model CommercialProfile {
   @@map("commercial_profiles")
 }
 
+/** Singleton pengaturan sistem dan mode pemeliharaan (maintenance mode). */
+model SystemSetting {
+  id                 String   @id @default("default")
+  isMaintenanceMode  Boolean  @default(false)
+  maintenanceMessage String?  @default("Situs Virtual Tour LRT Jabodebek sedang dalam pemeliharaan sistem. Silakan kembali beberapa saat lagi.")
+  updatedBy          String?
+  updatedAt          DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
 // Agregat konfigurasi virtual tour per stasiun — paralel station_floorplans di portal-lrt.
 // Scene & hotspot tetap dinormalisasi di virtual_tour_scenes.
 model StationVirtualTour {
