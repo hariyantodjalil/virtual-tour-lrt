@@ -3,8 +3,9 @@
  *
  * Mengompresi file gambar sebelum dikirim ke server / API:
  * - Menghindari batas payload WAF (Web Application Firewall / F5 BIG-IP).
+ * - Menghindari pemblokiran WAF pada double extension (misal .jpg.jpeg / .jpg.webp) dan mime-type.
+ * - Menggunakan format JPEG standar (.jpg) berkualitas tinggi yang 100% diizinkan oleh semua WAF.
  * - Mempercepat waktu upload hingga 10x lebih cepat.
- * - Mengubah file 15-25 MB menjadi ~2-3 MB WebP kualitas tinggi (6000x3000).
  */
 
 export interface CompressionOptions {
@@ -17,19 +18,15 @@ export interface CompressionOptions {
 /**
  * Kompresi khusus gambar panorama equirectangular 360°.
  * - Max resolusi 6000×3000 px
- * - Format WebP quality 0.85 (biasanya menghasilkan file 2–3.5 MB dari file 15–30 MB)
+ * - Format JPEG quality 0.85 (menghasilkan file ~1–2 MB dari 15–30 MB)
+ * - Single extension .jpg bersih tanpa karakter aneh
  */
 export async function compressPanoramaClient(file: File): Promise<File> {
-  // Jika file sudah kecil (< 3.5 MB) dan sudah WebP, tidak perlu kompres ulang
-  if (file.size <= 3.5 * 1024 * 1024 && file.type === "image/webp") {
-    return file;
-  }
-
   return compressImageClient(file, {
     maxWidth: 6000,
     maxHeight: 3000,
     quality: 0.85,
-    mimeType: "image/webp",
+    mimeType: "image/jpeg",
   });
 }
 
@@ -44,7 +41,7 @@ export async function compressImageClient(
     maxWidth = 2048,
     maxHeight = 2048,
     quality = 0.85,
-    mimeType = "image/webp",
+    mimeType = "image/jpeg",
   } = options;
 
   // Lewati file SVG atau format non-raster
@@ -102,24 +99,27 @@ export async function compressImageClient(
       imageSource.close();
     }
 
-    // Export ke Blob
+    // Export ke Blob JPEG standar
+    const targetMime = mimeType === "image/webp" ? "image/webp" : "image/jpeg";
     const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob((b) => resolve(b), mimeType, quality);
+      canvas.toBlob((b) => resolve(b), targetMime, quality);
     });
 
     if (!blob) {
       return file;
     }
 
-    // Jika hasil kompresi ternyata lebih besar dari file asli (jarang terjadi), gunakan file asli
-    if (blob.size >= file.size && file.type === mimeType) {
-      return file;
-    }
+    // Buat nama file tunggal bersih (buang semua double extension seperti .jpg.jpeg atau .jpg.webp)
+    const cleanBaseName = file.name
+      .replace(/\.[a-zA-Z0-9._-]+$/g, "") // buang ekstensi dari titik pertama
+      .replace(/[^a-zA-Z0-9_-]/g, "_")
+      .substring(0, 50);
 
-    const baseName = file.name.replace(/\.[^/.]+$/, "");
-    const ext = mimeType === "image/webp" ? "webp" : "jpg";
-    const compressedFile = new File([blob], `${baseName}.${ext}`, {
-      type: mimeType,
+    const ext = targetMime === "image/webp" ? "webp" : "jpg";
+    const finalFileName = `${cleanBaseName || "image"}.${ext}`;
+
+    const compressedFile = new File([blob], finalFileName, {
+      type: targetMime,
       lastModified: Date.now(),
     });
 
