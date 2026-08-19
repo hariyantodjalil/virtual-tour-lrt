@@ -90,7 +90,10 @@ import { ConnectionMapDialog } from "./ConnectionMapDialog";
 import { TourStructureSidebar } from "./TourStructureSidebar";
 import { ManageLevelsDialog } from "./ManageLevelsDialog";
 import { ManageAreaDialog, type AreaDialogState } from "./ManageAreaDialog";
-import { SceneTargetPicker } from "./SceneTargetPicker";
+import {
+  compressPanoramaClient,
+  compressImageClient,
+} from "@/lib/client-image-compression";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -823,12 +826,13 @@ export default function VirtualTourEditorPage() {
 
   // ─── Upload panorama ─────────────────────────────────────────────────────
   async function uploadPanorama(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !currentScene) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile || !currentScene) return;
     setUploading(true);
-    const fd = new FormData();
-    fd.append("file", file);
     try {
+      const file = await compressPanoramaClient(rawFile);
+      const fd = new FormData();
+      fd.append("file", file);
       const res = await cmsFetch(
         `/api/cms/virtual-tour/${stationId}/${currentScene.sceneId}`,
         { method: "POST", body: fd }
@@ -1263,12 +1267,17 @@ export default function VirtualTourEditorPage() {
   }
 
   async function uploadAdCreative(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !selectedHotspotId) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile || !selectedHotspotId) return;
     setUploadingCreative(true);
-    const fd = new FormData();
-    fd.append("file", file);
     try {
+      const file = await compressImageClient(rawFile, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.85,
+      });
+      const fd = new FormData();
+      fd.append("file", file);
       const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}/ad-creative`, {
         method: "POST",
         body: fd,
@@ -1427,24 +1436,39 @@ export default function VirtualTourEditorPage() {
         prev.map((r) => (r.key === row.key ? { ...r, status: "uploading" } : r))
       );
 
-      const fd = new FormData();
-      fd.append("file", row.file);
-      const uploadRes = await cmsFetch(
-        `/api/cms/virtual-tour/${stationId}/${row.sceneId}`,
-        { method: "POST", body: fd }
-      );
-
-      if (uploadRes.ok) {
-        anySucceeded = true;
-        setBulkRows((prev) =>
-          prev.map((r) => (r.key === row.key ? { ...r, status: "done" } : r))
+      try {
+        const compressedFile = await compressPanoramaClient(row.file);
+        const fd = new FormData();
+        fd.append("file", compressedFile);
+        const uploadRes = await cmsFetch(
+          `/api/cms/virtual-tour/${stationId}/${row.sceneId}`,
+          { method: "POST", body: fd }
         );
-      } else {
-        const data = await uploadRes.json().catch(() => ({}));
+
+        if (uploadRes.ok) {
+          anySucceeded = true;
+          setBulkRows((prev) =>
+            prev.map((r) => (r.key === row.key ? { ...r, status: "done" } : r))
+          );
+        } else {
+          const data = await uploadRes.json().catch(() => ({}));
+          setBulkRows((prev) =>
+            prev.map((r) =>
+              r.key === row.key
+                ? { ...r, status: "error", error: data.error ?? "Gagal upload panorama" }
+                : r
+            )
+          );
+        }
+      } catch (err) {
         setBulkRows((prev) =>
           prev.map((r) =>
             r.key === row.key
-              ? { ...r, status: "error", error: data.error ?? "Gagal upload panorama" }
+              ? {
+                  ...r,
+                  status: "error",
+                  error: err instanceof Error ? err.message : "Error upload panorama",
+                }
               : r
           )
         );

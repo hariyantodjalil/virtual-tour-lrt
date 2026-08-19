@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import { cmsFetch } from "@/lib/cms-fetch";
+import { compressImageClient } from "@/lib/client-image-compression";
 import { ArrowLeft, Upload } from "lucide-react";
 
 export type StationEditData = {
@@ -69,18 +70,23 @@ export default function StationEditClient({ initialStation }: { initialStation: 
   }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await cmsFetch(`/api/cms/stations/${station.id}/upload`, {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setStation({ ...station, imageUrl: data.imageUrl });
-      setMessage("Foto berhasil diupload");
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
+    try {
+      const file = await compressImageClient(rawFile, { maxWidth: 1920, maxHeight: 1080, quality: 0.85 });
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await cmsFetch(`/api/cms/stations/${station.id}/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStation({ ...station, imageUrl: data.imageUrl });
+        setMessage("Foto berhasil diupload");
+      }
+    } catch {
+      setMessage("Gagal upload foto stasiun");
     }
   }
 

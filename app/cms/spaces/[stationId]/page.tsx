@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { FACILITY_ICONS, isFacilityIconId, type FacilityIconId } from "@/lib/facility-icons";
+import { compressImageClient } from "@/lib/client-image-compression";
 import {
   SPACE_STATUS_LABELS,
   SPACE_STATUS_VALUES,
@@ -235,28 +236,33 @@ export default function CmsSpacesStationPage() {
     await load();
   }
 
-  async function uploadSpacePhoto(file: File) {
+  async function uploadSpacePhoto(rawFile: File) {
     if (!editing?.id) {
       setMessage("Simpan unit terlebih dahulu sebelum upload foto.");
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await cmsFetch(`/api/cms/spaces/${editing.id}`, { method: "POST", body: formData });
-    const data = await res.json();
-    if (res.ok) {
-      setEditing({
-        ...editing,
-        ...data.space,
-        tenantId: editing.tenantId,
-        tenantBrand: editing.tenantBrand,
-        nearbyFacilities: normalizeFacilities(data.space?.nearbyFacilities),
-      });
-      setMessage("Foto unit berhasil diupload.");
-      await load();
-    } else {
-      setMessage(data.error ?? "Upload foto gagal.");
+    try {
+      const file = await compressImageClient(rawFile, { maxWidth: 1600, maxHeight: 1200, quality: 0.85 });
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await cmsFetch(`/api/cms/spaces/${editing.id}`, { method: "POST", body: formData });
+      const data = await res.json();
+      if (res.ok) {
+        setEditing({
+          ...editing,
+          ...data.space,
+          tenantId: editing.tenantId,
+          tenantBrand: editing.tenantBrand,
+          nearbyFacilities: normalizeFacilities(data.space?.nearbyFacilities),
+        });
+        setMessage("Foto unit berhasil diupload.");
+        await load();
+      } else {
+        setMessage(data.error ?? "Upload foto gagal.");
+      }
+    } catch {
+      setMessage("Gagal upload foto unit.");
     }
   }
 
