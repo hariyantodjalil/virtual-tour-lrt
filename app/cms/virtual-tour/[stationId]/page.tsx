@@ -90,6 +90,7 @@ import { ConnectionMapDialog } from "./ConnectionMapDialog";
 import { TourStructureSidebar } from "./TourStructureSidebar";
 import { ManageLevelsDialog } from "./ManageLevelsDialog";
 import { ManageAreaDialog, type AreaDialogState } from "./ManageAreaDialog";
+import { SceneTargetPicker } from "./SceneTargetPicker";
 import {
   compressPanoramaClient,
   compressImageClient,
