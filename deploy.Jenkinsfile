@@ -274,11 +274,6 @@ else
     echo "VIRTUALTOUR_HTTP_PORT=${CONT_PORT}" >> .env
 fi
 
-# Normalisasi DATABASE_URL jika mengarah ke IP host / port eksternal 5433 agar menggunakan hostname internal postgres:5432
-if grep -qE '^DATABASE_URL=.*@(172\.16\.[0-9.]*|127\.0\.0\.1|localhost):5433' .env; then
-    sed -i -E 's|@(172\.16\.[0-9.]*\|127\.0\.0\.1\|localhost):5433|@postgres:5432|' .env
-fi
-
 set -a
 . ./.env
 set +a
@@ -329,12 +324,7 @@ echo "Menjalankan Prisma migration"
 
 sudo docker container prune -f 2>/dev/null || true
 
-TARGET_DB_URL="${DATABASE_URL:-}"
-if [ -z "$TARGET_DB_URL" ] || echo "$TARGET_DB_URL" | grep -qE '@(172\.16\.[0-9.]*|127\.0\.0\.1|localhost):5433'; then
-    TARGET_DB_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public"
-fi
-
-sudo docker run --rm --network "$NETWORK_NAME" -e DATABASE_URL="$TARGET_DB_URL" "$IMAGE_REF" npx prisma migrate deploy
+sudo docker run --rm --network "$NETWORK_NAME" -e DATABASE_URL="$DATABASE_URL" "$IMAGE_REF" npx prisma migrate deploy
 
 echo "Deploy ulang Docker Stack"
 
