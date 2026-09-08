@@ -53,10 +53,10 @@ async function VirtualTourSection() {
   const tourHref = await getDefaultTrainTourHref();
 
   return (
-    <section id="virtual-tour" className="bg-[#d32f2f] py-16 md:py-20">
+    <section id="virtual-tour" className="scroll-mt-28 bg-[#d32f2f] py-16 md:py-20">
       <div className="mx-auto flex max-w-5xl flex-col items-center px-5 text-center md:px-10">
         <HomeReveal>
-          <h2 className="font-display text-3xl font-bold text-white md:text-[36px]">
+          <h2 id="rasakan-kereta" className="scroll-mt-28 font-display text-3xl font-bold text-white md:text-[36px]">
             Rasakan Pengalaman di Dalam Kereta
           </h2>
           <p className="mx-auto mt-4 max-w-3xl text-base leading-relaxed text-white md:text-[20px] md:tracking-tight">
@@ -152,7 +152,7 @@ export default async function TrainVirtualTourLandingPage() {
           <HomeReveal delayMs={180}>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
               <a
-                href="#ruang-sewa"
+                href="#rasakan-kereta"
                 className="inline-flex h-12 min-w-[180px] items-center justify-center gap-2 rounded-full bg-[#E31E2D] px-6 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(227,30,45,0.45)] transition hover:brightness-110"
               >
                 Jelajahi Sekarang
