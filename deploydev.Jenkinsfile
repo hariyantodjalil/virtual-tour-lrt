@@ -5,6 +5,12 @@ pipeline {
         }
     }
 
+    // Push ke branch dev-jenkins (ikut tag alpha*) memicu build tanpa Build Now.
+    // Trigger ini aktif setelah Jenkins sekali membaca Jenkinsfile ini.
+    triggers {
+        pollSCM('H/2 * * * *')
+    }
+
     environment {
         APP_NAME        = 'lrt-virtualtour'
         ENV             = 'Development'
@@ -29,10 +35,31 @@ pipeline {
                     url: "${GIT_URL}"
 
                 script {
-                    def tagDescription = sh(
-                        script: "git tag -l '${VER}*' | sort -V | tail -n 1",
-                        returnStdout: true
-                    ).trim()
+                    def head = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    def tagDescription = ''
+
+                    for (int attempt = 1; attempt <= 12; attempt++) {
+                        sh 'git fetch --tags --force'
+
+                        tagDescription = sh(
+                            script: "git tag -l '${VER}*' --points-at HEAD | sort -V | tail -n 1",
+                            returnStdout: true
+                        ).trim()
+
+                        if (tagDescription) {
+                            break
+                        }
+
+                        echo "Menunggu tag ${VER}* pada ${head} (${attempt}/12)"
+                        sleep 10
+                    }
+
+                    if (!tagDescription) {
+                        tagDescription = sh(
+                            script: "git tag -l '${VER}*' | sort -V | tail -n 1",
+                            returnStdout: true
+                        ).trim()
+                    }
 
                     if (tagDescription) {
                         def trimmedTag = tagDescription =~ /([^-]+)/
@@ -40,6 +67,7 @@ pipeline {
                     } else {
                         env.TAG = "${VER}.${env.BUILD_NUMBER}"
                     }
+
                     echo "TAG: ${env.TAG}"
                 }
             }
@@ -133,10 +161,10 @@ pipeline {
                                 sudo -E docker stack deploy --resolve-image=always --with-registry-auth -c ${COMPOSE_FILE} ${STACK_NAME}
                                 echo "Waiting for postgres..."
                                 ready=0
+                                postgres_id=""
                                 for i in \$(seq 1 30); do
-                                    if sudo docker run --rm --network "\${VIRTUALTOUR_NETWORK_NAME:-lrt-dev-virtualtour-network}" \\
-                                        -e PGPASSWORD="\${POSTGRES_PASSWORD}" postgres:17-alpine \\
-                                        pg_isready -h postgres -U "\${POSTGRES_USER}" -d "\${POSTGRES_DB}" >/dev/null 2>&1; then
+                                    postgres_id="\$(sudo docker ps -q -f name=${STACK_NAME}_postgres | head -n 1)"
+                                    if [ -n "\$postgres_id" ] && sudo docker exec "\$postgres_id" pg_isready -U "\${POSTGRES_USER}" -d "\${POSTGRES_DB}" >/dev/null 2>&1; then
                                         ready=1
                                         break
                                     fi
@@ -146,10 +174,18 @@ pipeline {
                                     echo "Postgres did not become ready in time" >&2
                                     exit 1
                                 fi
-                                sudo docker run --rm --network "\${VIRTUALTOUR_NETWORK_NAME:-lrt-dev-virtualtour-network}" \\
-                                    -e DATABASE_URL="\${DATABASE_URL}" \\
-                                    ${imageRef} \\
-                                    npx prisma migrate deploy
+                                app_id="\$(sudo docker ps -q -f name=${STACK_NAME}_virtualtour -f status=running | head -n 1)"
+                                if [ -n "\$app_id" ]; then
+                                    echo "Migration via container aplikasi yang sudah berjalan, tanpa veth baru"
+                                    sudo docker exec "\$app_id" npx prisma migrate deploy
+                                else
+                                    echo "Container aplikasi belum jalan, migration lewat network namespace PostgreSQL"
+                                    migrate_url="\$(printf '%s' "\${DATABASE_URL}" | sed -E 's#@[^/?]+#@127.0.0.1:5432#')"
+                                    sudo docker run --rm --network "container:\${postgres_id}" \\
+                                        -e DATABASE_URL="\$migrate_url" \\
+                                        ${imageRef} \\
+                                        npx prisma migrate deploy
+                                fi
                                 sudo -E docker stack deploy --resolve-image=always --with-registry-auth -c ${COMPOSE_FILE} ${STACK_NAME}
                                 sudo docker stack services ${STACK_NAME}
                             '
