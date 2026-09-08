@@ -15,7 +15,7 @@ pipeline {
         SSH_USER        = 'devops-lrt'
         SSH_KEY         = '/home/devops-lrt/.ssh/id_ed25519'
 
-        GIT_URL         = 'https://gitdev.kai.id/divisi-lrt/lrt-virtualtour.git'
+        GIT_URL         = 'https://gitdev.kai.id/lrt-app/lrt-virtualtour.git'
         GIT_BRANCH      = 'prod'
 
         HARBOR_REGISTRY = 'hub.kai.id/lrt'
@@ -31,7 +31,7 @@ pipeline {
         stage('Checkout Git') {
             steps {
                 git branch: "${GIT_BRANCH}",
-                    credentialsId: 'gitdev-divisi-lrt-lrt-virtualtour',
+                    credentialsId: 'devops-lrt-gitlab',
                     url: "${GIT_URL}"
 
                 script {
