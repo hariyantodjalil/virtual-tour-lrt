@@ -4,6 +4,8 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { AddMode, HotspotItem } from "@/lib/hotspot-types";
 import { hotspotColor } from "@/lib/hotspot-types";
+import { facilityIconSrc } from "@/lib/facility-icons";
+import { INFO_PIN_SRC } from "@/lib/pannellum-hotspot";
 
 export type { AddMode, HotspotItem } from "@/lib/hotspot-types";
 
@@ -326,15 +328,26 @@ export function PanoramaCanvas({
                     strokeWidth={isSelected ? 5 : 4}
                   />
                 </>
+              ) : isInfo ? (
+                <>
+                  <image
+                    href={
+                      h.facilityIcon
+                        ? facilityIconSrc(h.facilityIcon)
+                        : INFO_PIN_SRC
+                    }
+                    x={-22}
+                    y={-23}
+                    width={44}
+                    height={46}
+                    preserveAspectRatio="xMidYMid meet"
+                  />
+                </>
               ) : (
                 <>
-                  <circle r={24} fill="rgba(0,0,0,0.5)" transform="translate(3,4)" />
+                  <circle r={24} fill="rgba(0, 0, 0, 0.5)" transform="translate(3,4)" />
                   <circle r={24} fill={fill} stroke={strokeColor} strokeWidth={isSelected ? 4 : 3.5} />
-                  {isInfo ? (
-                    <text y={6} textAnchor="middle" fontSize={18} fill="white" fontWeight="800">i</text>
-                  ) : (
-                    <circle r={8} fill="white" />
-                  )}
+                  <circle r={8} fill="white" />
                 </>
               )}
 

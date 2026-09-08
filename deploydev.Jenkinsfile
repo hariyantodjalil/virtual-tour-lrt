@@ -12,7 +12,7 @@ pipeline {
         APP_SERVER      = '192.168.64.12'
         CONT_PORT       = '5011'
         SSH_USER        = 'devops-lrt'
-        GIT_URL         = 'https://gitdev.kai.id/divisi-lrt/lrt-virtualtour.git'
+        GIT_URL         = 'https://gitdev.kai.id/lrt-app/lrt-virtualtour.git'
         GIT_BRANCH      = 'dev-jenkins'
         HARBOR_REGISTRY = 'hub.kai.id/lrt'
         DEPLOY_PATH     = "/opt/${APP_NAME}"
@@ -25,7 +25,7 @@ pipeline {
         stage('Checkout Git') {
             steps {
                 git branch: "${GIT_BRANCH}",
-                    credentialsId: 'gitdev-divisi-lrt-lrt-virtualtour',
+                    credentialsId: 'devops-lrt-gitlab',
                     url: "${GIT_URL}"
 
                 script {

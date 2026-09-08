@@ -252,14 +252,14 @@ export default function PartnerPage() {
                   <div className="border-b border-slate-100 px-3 py-2">
                     <p className="truncate text-sm font-semibold">{displayName}</p>
                     <p className="truncate text-xs text-slate-500">{user?.email}</p>
-                  </div>
+            </div>
                   <button
                     type="button"
                     onClick={logout}
                     className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
                   >
                     <LogOut className="size-4" />
-                    Logout
+              Logout
                   </button>
                 </div>
               </>
@@ -510,7 +510,7 @@ function DashboardOverview({
           onClick={onExplore}
           disabled={!pickerReady}
         />
-      </div>
+        </div>
 
       {/* Pengajuan progress — gaya list kartu + timeline */}
       <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
@@ -818,10 +818,10 @@ function FavoritesSection({
                       <span className="text-xs text-slate-400">
                         {new Date(item.savedAt).toLocaleDateString("id-ID")}
                       </span>
-                    </div>
+                      </div>
                     <h2 className="text-base font-bold text-[#101828]">
                       {item.code} — {item.name}
-                    </h2>
+                      </h2>
                     <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
                       <span className="inline-flex items-center gap-1">
                         <MapPin className="size-3.5" />
@@ -872,7 +872,7 @@ function ComingSoonSection({
         <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
           Fitur ini segera hadir. Sementara itu, pantau pengajuan sewa atau jelajahi virtual tour.
         </p>
-      </div>
+    </div>
     </>
   );
 }

@@ -10,9 +10,10 @@ export default function PublicContactFab() {
     pathname.startsWith("/cms") ||
     pathname.startsWith("/partner") ||
     pathname.startsWith("/login") ||
-    pathname.startsWith("/station")
+    pathname.startsWith("/station") ||
+    pathname.startsWith("/train")
   ) {
-    // /station punya FAB sendiri (pakai nomor kontak stasiun)
+    // /station & /train punya FAB sendiri di dalam tour
     return null;
   }
 
