@@ -11,6 +11,7 @@ export type S3AssetType =
   | "floorplans"      // virtual-tour/floorplans/{station-slug}/
   | "stations"        // stations/covers/
   | "spaces"          // spaces/photos/
+  | "train-rental-spaces"
   | "thumbnails"      // virtual-tour/thumbnails/{station-slug}/
   | "ad-creatives"    // virtual-tour/ad-creatives/{station-slug}/
   | "train-rental-spaces" // spaces/train-rental/
@@ -85,6 +86,7 @@ export function generateS3Key(
     case "stations":
       return `stations/covers/station_${timestamp}_${randomId}.${extension}`;
     case "spaces":
+    case "train-rental-spaces":
       return `spaces/photos/space_${timestamp}_${randomId}.${extension}`;
     case "train-rental-spaces":
       return `spaces/train-rental/train-space_${timestamp}_${randomId}.${extension}`;

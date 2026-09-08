@@ -5,7 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { trainRentalSpaceMutationSchema } from "@/lib/api-schemas";
 import { ensureDefaultTrain } from "@/lib/default-train";
-import { ensureDefaultTrainRentalSpaces } from "@/lib/train-rental-spaces";
+import {
+  fetchTrainRentalSalesMap,
+  getTrainRentalSpacesForCms,
+  writeTrainRentalSalesFields,
+} from "@/lib/train-rental-spaces";
 
 function writeError(error: unknown) {
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -22,14 +26,7 @@ export async function GET(request: NextRequest) {
   const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const train = await ensureDefaultTrain();
-  await ensureDefaultTrainRentalSpaces(train.id);
-
-  const spaces = await prisma.trainRentalSpace.findMany({
-    where: { trainId: train.id },
-    orderBy: { order: "asc" },
-  });
-
+  const spaces = await getTrainRentalSpacesForCms();
   return NextResponse.json(spaces);
 }
 
@@ -55,7 +52,25 @@ export async function POST(request: NextRequest) {
         isActive: parsed.data.isActive ?? true,
       },
     });
-    return NextResponse.json(space, { status: 201 });
+    await writeTrainRentalSalesFields(space.id, {
+      availableTrainsets: parsed.data.availableTrainsets,
+      availableByCar: parsed.data.availableByCar,
+      howToOrder: parsed.data.howToOrder ?? null,
+      status: parsed.data.status,
+      monthlyRent: parsed.data.monthlyRent ?? null,
+    });
+    const sales = await fetchTrainRentalSalesMap([space.id]);
+    const extra = sales.get(space.id);
+    return NextResponse.json(
+      {
+        ...space,
+        availableTrainsets: extra?.availableTrainsets ?? [],
+        howToOrder: extra?.howToOrder ?? null,
+        status: extra?.status ?? parsed.data.status,
+        monthlyRent: extra?.monthlyRent ?? null,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     return writeError(error);
   }

@@ -7,6 +7,7 @@ import { processSpacePhoto } from "@/lib/image-processor";
 import { MAX_STANDARD_IMAGE_UPLOAD_BYTES, readValidatedImageUpload } from "@/lib/upload-validation";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { trainRentalSpaceMutationSchema } from "@/lib/api-schemas";
+import { fetchTrainRentalSalesMap, writeTrainRentalSalesFields } from "@/lib/train-rental-spaces";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -47,7 +48,22 @@ export async function PUT(request: NextRequest, { params }: Params) {
         isActive: parsed.data.isActive ?? existing.isActive,
       },
     });
-    return NextResponse.json(space);
+    await writeTrainRentalSalesFields(id, {
+      availableTrainsets: parsed.data.availableTrainsets,
+      availableByCar: parsed.data.availableByCar,
+      howToOrder: parsed.data.howToOrder ?? null,
+      status: parsed.data.status,
+      monthlyRent: parsed.data.monthlyRent ?? null,
+    });
+    const sales = await fetchTrainRentalSalesMap([id]);
+    const extra = sales.get(id);
+    return NextResponse.json({
+      ...space,
+      availableTrainsets: extra?.availableTrainsets ?? [],
+      howToOrder: extra?.howToOrder ?? null,
+      status: extra?.status ?? parsed.data.status,
+      monthlyRent: extra?.monthlyRent ?? null,
+    });
   } catch (error) {
     return writeError(error);
   }

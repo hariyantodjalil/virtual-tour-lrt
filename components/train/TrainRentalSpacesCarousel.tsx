@@ -2,48 +2,41 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
 import {
   DEFAULT_TRAIN_RENTAL_SPACES,
   type TrainRentalSpacePublic,
 } from "@/lib/train-rental-spaces-shared";
+import { DEFAULT_TRAIN_SLUG } from "@/lib/train-constants";
+import { resolvePublicAssetUrl, shouldUnoptimizeImage } from "@/lib/s3-utils";
 
-type CarouselSpace = {
-  id: string;
-  label: string;
-  image: string;
-  objectPosition: string;
-  description?: string | null;
-};
+type SlideItem = TrainRentalSpacePublic & { slideKey: string; loopIndex: number };
 
-type SlideItem = CarouselSpace & { slideKey: string; loopIndex: number };
-
-function toCarouselSpaces(spaces: TrainRentalSpacePublic[]): CarouselSpace[] {
-  return spaces.map((space) => ({
-    id: space.displayNumber,
-    label: space.title,
-    image: space.image,
-    objectPosition: space.objectPosition,
-    description: space.description,
-  }));
-}
-
-const FALLBACK_SPACES = toCarouselSpaces(
-  DEFAULT_TRAIN_RENTAL_SPACES.map((space) => ({
-    id: space.displayNumber,
-    displayNumber: space.displayNumber,
-    title: space.title,
-    description: space.description,
-    image: space.image,
-    objectPosition: space.objectPosition,
-  }))
-);
+const FALLBACK_SPACES: TrainRentalSpacePublic[] = DEFAULT_TRAIN_RENTAL_SPACES.map((space) => ({
+  id: space.displayNumber,
+  displayNumber: space.displayNumber,
+  title: space.title,
+  description: space.description,
+  image: space.image,
+  objectPosition: space.objectPosition,
+  availableTrainsets: [...space.availableTrainsets],
+  availableByCar: { ...space.availableByCar },
+  howToOrder: space.howToOrder,
+  status: space.status,
+  monthlyRent: space.monthlyRent,
+}));
 
 function getVisibleCount(width: number) {
   if (width >= 1280) return 4;
   if (width >= 768) return 3;
   if (width >= 640) return 2;
   return 1;
+}
+
+function spaceTourHref(tourHref: string, space: TrainRentalSpacePublic) {
+  const base = tourHref.startsWith("/") ? tourHref : `/train/${DEFAULT_TRAIN_SLUG}`;
+  return `${base}?space=${encodeURIComponent(space.displayNumber)}`;
 }
 
 function getNearestSlideIndex(track: HTMLDivElement, cards: HTMLElement[]) {
@@ -62,40 +55,55 @@ function getNearestSlideIndex(track: HTMLDivElement, cards: HTMLElement[]) {
   return nearest;
 }
 
-function RentalCard({ space }: { space: SlideItem }) {
+function RentalCard({
+  space,
+  href,
+}: {
+  space: SlideItem;
+  href: string;
+}) {
   return (
     <article
       data-rental-card
       data-loop-index={space.loopIndex}
       className="relative aspect-[3/4] w-[72%] shrink-0 snap-start overflow-hidden rounded-2xl sm:w-[calc((100%-1rem)/2)] md:w-[calc((100%-2rem)/3)] lg:w-[calc((100%-3rem)/3.5)] xl:w-[calc((100%-4rem)/4)]"
     >
-      <Image
-        src={space.image}
-        alt={space.label}
-        fill
-        sizes="(max-width: 640px) 72vw, (max-width: 1024px) 40vw, 24vw"
-        className="pointer-events-none object-cover select-none"
-        style={{ objectPosition: space.objectPosition }}
-        draggable={false}
-      />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
+      <Link
+        href={href}
+        className="absolute inset-0 text-left"
+        aria-label={`Buka virtual tour ${space.title}`}
+      >
+        <Image
+          src={resolvePublicAssetUrl(space.image)}
+          alt={space.title}
+          fill
+          sizes="(max-width: 640px) 72vw, (max-width: 1024px) 40vw, 24vw"
+          className="pointer-events-none object-cover select-none"
+          style={{ objectPosition: space.objectPosition }}
+          draggable={false}
+          unoptimized={shouldUnoptimizeImage(resolvePublicAssetUrl(space.image))}
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
 
-      <span className="pointer-events-none absolute top-3 left-3 inline-flex size-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
-        <LayoutGrid className="size-4 text-white" strokeWidth={2} />
-      </span>
+        <span className="pointer-events-none absolute top-3 left-3 inline-flex size-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+          <LayoutGrid className="size-4 text-white" strokeWidth={2} />
+        </span>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 px-4 pb-4">
-        <p className="text-sm font-semibold text-white">{space.label}</p>
-        <p className="text-sm font-medium text-white/90">{space.id}</p>
-      </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 px-4 pb-4">
+          <p className="text-sm font-semibold text-white">{space.title}</p>
+          <p className="text-sm font-medium text-white/90">{space.displayNumber}</p>
+        </div>
+      </Link>
     </article>
   );
 }
 
 export default function TrainRentalSpacesCarousel({
   spaces = FALLBACK_SPACES,
+  tourHref = `/train/${DEFAULT_TRAIN_SLUG}`,
 }: {
-  spaces?: CarouselSpace[];
+  spaces?: TrainRentalSpacePublic[];
+  tourHref?: string;
 }) {
   const rentalSpaces = spaces.length > 0 ? spaces : FALLBACK_SPACES;
 
@@ -104,7 +112,7 @@ export default function TrainRentalSpacesCarousel({
       Array.from({ length: 3 }, (_, setIndex) =>
         rentalSpaces.map((space, index) => ({
           ...space,
-          slideKey: `${space.id}-set-${setIndex}`,
+          slideKey: `${space.displayNumber}-set-${setIndex}`,
           loopIndex: setIndex * rentalSpaces.length + index,
         }))
       ).flat(),
@@ -309,7 +317,11 @@ export default function TrainRentalSpacesCarousel({
             >
               <div className="flex gap-4">
                 {loopSlides.map((space) => (
-                  <RentalCard key={space.slideKey} space={space} />
+                  <RentalCard
+                    key={space.slideKey}
+                    space={space}
+                    href={spaceTourHref(tourHref, space)}
+                  />
                 ))}
               </div>
             </div>

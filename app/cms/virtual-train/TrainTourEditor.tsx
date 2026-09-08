@@ -14,6 +14,7 @@ import {
 } from "@/lib/hotspot-types";
 import { normalizeHotspots } from "@/lib/hotspot-normalize";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
+import { isTrainRentalStatus, trainRentalStatusToSpaceStatus, type TrainRentalStatus } from "@/lib/train-rental-sales";
 import type { FacilityIconId } from "@/lib/facility-icons";
 import {
   BLUR_HEIGHT_DEFAULT,
@@ -158,26 +159,39 @@ function titleToId(title: string): string {
     .replace(/^-|-$/g, "");
 }
 
-type CommercialSpace = {
+type TrainEditorSpace = {
   id: string;
   code: string;
   name: string;
-  type: string;
+  type: "TRAIN_RENTAL";
   status: SpaceAvailabilityStatus;
-  area: number;
-  monthlyRent: number;
-  deposit: number;
-  floor: string;
-  location: string;
-  nearestExit: string | null;
-  exposure: number;
-  powerSupply: string | null;
-  waterAccess: boolean;
-  airConditioning: boolean;
-  description: string | null;
-  panoramaUrl?: string | null;
+  rentalStatus: TrainRentalStatus;
   tenantBrand?: string | null;
 };
+
+async function loadTrainRentalSpaces(): Promise<TrainEditorSpace[]> {
+  const response = await cmsFetch("/api/cms/train-rental-spaces");
+  if (!response.ok) return [];
+  const rows: Array<{
+    id: string;
+    displayNumber: string;
+    title: string;
+    status?: string;
+  }> = await response.json();
+  if (!Array.isArray(rows)) return [];
+
+  return rows.map((row) => {
+    const rentalStatus = isTrainRentalStatus(row.status) ? row.status : "TERSEDIA";
+    return {
+      id: row.id,
+      code: row.displayNumber,
+      name: row.title,
+      type: "TRAIN_RENTAL",
+      status: trainRentalStatusToSpaceStatus(rentalStatus),
+      rentalStatus,
+    };
+  });
+}
 
 type EditorSnapshot = {
   hotspots: HotspotItem[];
@@ -234,18 +248,6 @@ function wrapYaw(yaw: number): number {
   return y;
 }
 
-async function loadAllCommercialSpaces(): Promise<CommercialSpace[]> {
-  const stRes = await cmsFetch("/api/cms/stations");
-  if (!stRes.ok) return [];
-  const stations: { id: string }[] = await stRes.json();
-  const results = await Promise.all(
-    stations.map((s) =>
-      cmsFetch(`/api/cms/spaces/station/${s.id}`).then((r) => (r.ok ? r.json() : []))
-    )
-  );
-  return results.flat() as CommercialSpace[];
-}
-
 function mapSceneRow(raw: Scene): Scene {
   return {
     ...raw,
@@ -292,7 +294,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
 
   const [cars, setCars] = useState<TrainTourCar[]>([]);
   const [scenes, setScenes] = useState<Scene[]>([]);
-  const [commercialSpaces, setCommercialSpaces] = useState<CommercialSpace[]>([]);
+  const [rentalSpaces, setRentalSpaces] = useState<TrainEditorSpace[]>([]);
   const [selectedSceneIndex, setSelectedSceneIndex] = useState(0);
   const [hotspots, setHotspots] = useState<HotspotItem[]>([]);
   const [privacyBlurs, setPrivacyBlurs] = useState<PrivacyBlurItem[]>([]);
@@ -444,7 +446,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     async (keepIndex?: number) => {
       const [structRes, spaces] = await Promise.all([
         cmsFetch(`/api/cms/virtual-train/${trainId}/structure`),
-        loadAllCommercialSpaces(),
+        loadTrainRentalSpaces(),
       ]);
       if (!structRes.ok) {
         showToast("err", "Gagal memuat struktur tur kereta");
@@ -456,7 +458,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
       const carData: TrainTourCar[] = data.cars ?? [];
       setCars(carData);
       setScenes(sc);
-      setCommercialSpaces(spaces);
+      setRentalSpaces(spaces);
       if (!bulkDefaultAreaId && carData[0]?.zones[0]?.id) {
         setBulkDefaultAreaId(carData[0].zones[0].id);
       }
@@ -1420,7 +1422,6 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                 sceneName={currentScene.title}
                 scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
                 levels={toPreviewLevels(cars)}
-                spaces={commercialSpaces}
                 stationName={trainName}
                 onSceneNavigate={previewNavigateScene}
                 initialView={extractInitialViewFromCanvasData(currentScene.canvasData)}
@@ -1443,7 +1444,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                 onBlurSelect={handleBlurSelect}
                 onHotspotDelete={handleHotspotDelete}
                 onBlurDelete={handleBlurDelete}
-                spaces={commercialSpaces.map((s) => ({ code: s.code, status: s.status }))}
+                spaces={rentalSpaces.map((s) => ({ code: s.code, status: s.status }))}
                 scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
                 initialView={extractInitialViewFromCanvasData(currentScene.canvasData) ?? null}
                 privacyBlurGuideOnly={privacyBlurGuideOnly}
@@ -1466,7 +1467,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
             scenes={scenes}
             hotspots={hotspots}
             privacyBlurs={privacyBlurs}
-            commercialSpaces={commercialSpaces}
+            rentalSpaces={rentalSpaces}
             selectedHotspot={selectedHotspot}
             selectedBlur={selectedBlur}
             selectedHotspotId={selectedHotspotId}

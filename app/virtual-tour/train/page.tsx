@@ -5,6 +5,7 @@ import TrainRentalSpacesCarousel from "@/components/train/TrainRentalSpacesCarou
 import VirtualTourNavbar from "@/components/VirtualTourNavbar";
 import VirtualTourStartOverlay from "@/components/tour/VirtualTourStartOverlay";
 import CommercialContactDetails from "@/components/commercial/CommercialContactDetails";
+import SocialIconLinks from "@/components/home/SocialIconLinks";
 import { HomeReveal, HomeShell } from "@/components/home/HomeMotion";
 import { getDefaultTrainTourHref } from "@/lib/train-tour-entry";
 import { getTrainRentalSpaces } from "@/lib/train-rental-spaces";
@@ -42,12 +43,6 @@ const FOOTER_LINKS = [
   { href: "#kontak", label: "Syarat Dan Ketentuan" },
 ] as const;
 
-const SOCIAL = [
-  { href: "https://www.instagram.com/", icon: "/brand/landing/social/instagram.svg", label: "Instagram" },
-  { href: "https://www.facebook.com/", icon: "/brand/landing/social/facebook.svg", label: "Facebook" },
-  { href: "https://www.tiktok.com/", icon: "/brand/landing/social/tiktok.svg", label: "TikTok" },
-  { href: "https://www.youtube.com/", icon: "/brand/landing/social/youtube.svg", label: "YouTube" },
-] as const;
 
 async function VirtualTourSection() {
   const tourHref = await getDefaultTrainTourHref();
@@ -106,14 +101,6 @@ async function VirtualTourSection() {
 
 export default async function TrainVirtualTourLandingPage() {
   const rentalSpaces = await getTrainRentalSpaces();
-
-  const carouselSpaces = rentalSpaces.map((space) => ({
-    id: space.displayNumber,
-    label: space.title,
-    image: space.image,
-    objectPosition: space.objectPosition,
-    description: space.description,
-  }));
 
   return (
     <HomeShell>
@@ -198,7 +185,7 @@ export default async function TrainVirtualTourLandingPage() {
         </div>
       </section>
 
-      <TrainRentalSpacesCarousel spaces={carouselSpaces} />
+      <TrainRentalSpacesCarousel spaces={rentalSpaces} tourHref={tourHref} />
 
       <section className="bg-[#f8f8f8] py-16 md:py-20">
         <div className="mx-auto max-w-7xl px-5 md:px-10">
@@ -279,21 +266,7 @@ export default async function TrainVirtualTourLandingPage() {
               Jelajahi interior kereta LRT Jabodebek melalui Train Virtual Tour 360° untuk melihat
               gerbong, fasilitas penumpang, dan pengalaman perjalanan secara interaktif.
             </p>
-            <div className="mt-5 flex items-center justify-center gap-3">
-              {SOCIAL.map((s) => (
-                <a
-                  key={s.label}
-                  href={s.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={s.label}
-                  className="flex size-10 items-center justify-center rounded-full border border-black/10 bg-white transition hover:border-[#d32f2f]"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.icon} alt="" width={20} height={20} className="size-5 object-contain" />
-                </a>
-              ))}
-            </div>
+            <SocialIconLinks />
           </div>
 
           <div className="md:text-right">
