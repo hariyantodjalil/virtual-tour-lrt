@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import TrainRentalSpacesCarousel from "@/components/train/TrainRentalSpacesCarousel";
 import VirtualTourNavbar from "@/components/VirtualTourNavbar";
 import VirtualTourStartOverlay from "@/components/tour/VirtualTourStartOverlay";
@@ -104,10 +105,7 @@ async function VirtualTourSection() {
 }
 
 export default async function TrainVirtualTourLandingPage() {
-  const [rentalSpaces, tourHref] = await Promise.all([
-    getTrainRentalSpaces(),
-    getDefaultTrainTourHref(),
-  ]);
+  const rentalSpaces = await getTrainRentalSpaces();
 
   const carouselSpaces = rentalSpaces.map((space) => ({
     id: space.displayNumber,
@@ -153,12 +151,13 @@ export default async function TrainVirtualTourLandingPage() {
           </HomeReveal>
           <HomeReveal delayMs={180}>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-              <Link
-                href={tourHref}
-                className="inline-flex h-11 min-w-[164px] items-center justify-center rounded-xl border border-white/20 bg-white/10 px-5 text-xs font-semibold tracking-wide text-white backdrop-blur-sm transition hover:border-[#ff8a8a]/60 hover:bg-white/15"
+              <a
+                href="#ruang-sewa"
+                className="inline-flex h-12 min-w-[180px] items-center justify-center gap-2 rounded-full bg-[#E31E2D] px-6 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(227,30,45,0.45)] transition hover:brightness-110"
               >
                 Jelajahi Sekarang
-              </Link>
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </a>
             </div>
           </HomeReveal>
         </div>
