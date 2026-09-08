@@ -149,10 +149,10 @@ async function VirtualTourSection() {
   const tourHref = await getDefaultStationTourHref();
 
   return (
-    <section id="virtual-tour" className="bg-[#d32f2f] py-16 md:py-20">
+    <section id="virtual-tour" className="scroll-mt-28 bg-[#d32f2f] py-16 md:py-20">
       <div className="mx-auto flex max-w-5xl flex-col items-center px-5 text-center md:px-10">
         <HomeReveal>
-          <h2 className="font-display text-3xl font-bold text-white md:text-[36px]">
+          <h2 id="temukan-lokasi" className="scroll-mt-28 font-display text-3xl font-bold text-white md:text-[36px]">
             Temukan dan Rasakan Lokasi yang Tepat
           </h2>
           <p className="mx-auto mt-4 max-w-3xl text-base leading-relaxed text-white md:text-[20px] md:tracking-tight">
@@ -254,7 +254,7 @@ export default function HomePage() {
           <HomeReveal delayMs={180}>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <a
-                href="#area-komersial"
+                href="#temukan-lokasi"
                 className="inline-flex h-12 min-w-[180px] items-center justify-center gap-2 rounded-full bg-[#E31E2D] px-6 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(227,30,45,0.45)] transition hover:brightness-110"
               >
                 Jelajahi Sekarang
@@ -461,7 +461,7 @@ export default function HomePage() {
       </section>
 
       {/* Area komersial */}
-      <section id="area-komersial" className="bg-[#d32f2f] py-14 md:py-16">
+      <section id="area-komersial" className="scroll-mt-28 bg-[#d32f2f] py-14 md:py-16">
         <div className="mx-auto max-w-7xl px-5 md:px-10">
           <Suspense fallback={<CommercialSkeleton />}>
             <CommercialSection />

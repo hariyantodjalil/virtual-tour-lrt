@@ -25,7 +25,6 @@ import {
   Play,
   Route,
   TrainFront,
-  Users,
   X,
 } from "lucide-react";
 import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
@@ -40,7 +39,7 @@ import FacilityLegend from "@/components/tour/FacilityLegend";
 import TourLeftPanel from "@/components/tour/TourLeftPanel";
 import TourUnitsPanel from "@/components/tour/TourUnitsPanel";
 import { GuidedRouteBar } from "@/components/tour/GuidedRouteBar";
-import { formatNumber, getWhatsAppUrl } from "@/lib/utils";
+import { getWhatsAppUrl } from "@/lib/utils";
 import type { StationInfo } from "@/lib/stations-data";
 import type { AdHotspotPayload } from "@/lib/pannellum-tour-config";
 import {
@@ -710,12 +709,6 @@ export default function StationTourClient({
               <div className="flex items-start gap-2">
                 <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#C4A8AD]" />
                 <span>{stationInfo.address}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="h-3.5 w-3.5 shrink-0 text-[#E31E2D]" />
-                <span className="font-semibold text-white">
-                  {formatNumber(stationInfo.dailyPassengers)} penumpang/hari
-                </span>
               </div>
             </div>
             <div>

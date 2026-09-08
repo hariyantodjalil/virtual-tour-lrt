@@ -280,7 +280,7 @@ export default function TrainRentalSpacesCarousel({
   );
 
   return (
-    <section id="ruang-sewa" className="bg-white py-14 md:py-20">
+    <section id="ruang-sewa" className="scroll-mt-28 bg-white py-14 md:py-20">
       <div className="mx-auto max-w-7xl px-5 md:px-10">
         <div className="text-center">
           <h2 className="font-display text-2xl font-bold text-black md:text-[32px] md:leading-tight">

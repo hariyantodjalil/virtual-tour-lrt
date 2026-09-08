@@ -1,13 +1,9 @@
 import Image from "next/image";
-import { MapPin, Train, Users } from "lucide-react";
+import { MapPin, Train } from "lucide-react";
 import { getStationImage } from "@/lib/station-images";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { StationPickerItem } from "@/components/tour/StationPickerModal";
-import {
-  formatPassengersPerDay,
-  splitStationLocation,
-  stationLineLabel,
-} from "@/lib/station-picker-utils";
+import { splitStationLocation, stationLineLabel } from "@/lib/station-picker-utils";
 
 type Props = {
   station: StationPickerItem;
@@ -23,7 +19,6 @@ export default function StationPickerCard({
   className = "",
 }: Props) {
   const { area, city } = splitStationLocation(station);
-  const passengers = station.dailyPassengers ?? 0;
   const isDark = variant === "dark";
 
   return (
@@ -86,25 +81,7 @@ export default function StationPickerCard({
           {stationLineLabel(station.line)}
         </span>
 
-        <span className="mt-auto flex items-end justify-between gap-2 pt-1">
-          <span className="min-w-0">
-            <span
-              className={`flex items-center gap-1.5 text-[10px] ${
-                isDark ? "text-white/50" : "text-[#98a2b3]"
-              }`}
-            >
-              <Users className="size-3.5 shrink-0" strokeWidth={2.25} />
-              Rata-rata Penumpang
-            </span>
-            <span
-              className={`mt-0.5 block text-sm font-bold ${
-                isDark ? "text-[#ff8a8a]" : "text-[#D81435]"
-              }`}
-            >
-              {formatPassengersPerDay(passengers)}
-            </span>
-          </span>
-
+        <span className="mt-auto flex items-end justify-end gap-2 pt-1">
           <span
             className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full transition ${
               isDark
