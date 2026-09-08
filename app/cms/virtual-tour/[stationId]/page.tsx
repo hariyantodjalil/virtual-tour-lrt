@@ -78,7 +78,6 @@ import type { TourLevelPublic } from "@/lib/tour-types";
 
 import type { AddMode, HotspotItem } from "@/lib/hotspot-types";
 import {
-  DEFAULT_FACILITY_ICON,
   FACILITY_ICONS,
   type FacilityIconId,
 } from "@/lib/facility-icons";
@@ -630,7 +629,7 @@ export default function VirtualTourEditorPage() {
                 : "Info baru",
         scale: HOTSPOT_SCALE_DEFAULT,
         ...(type === "info"
-          ? { description: "", facilityIcon: DEFAULT_FACILITY_ICON }
+          ? { description: "" }
           : {}),
       };
       setHotspots((prev) => [...prev, newH]);
@@ -1130,13 +1129,23 @@ export default function VirtualTourEditorPage() {
             delete next.creativeUrl;
             delete next.creativeTitle;
             if (!next.description) next.description = "";
-            if (!next.facilityIcon) next.facilityIcon = DEFAULT_FACILITY_ICON;
+            // Tanpa facilityIcon → pin informasi (info.png)
           } else if (newType === "ad") {
             delete next.sceneId;
             delete next.direction;
             delete next.description;
             delete next.facilityIcon;
           }
+          return next;
+        })
+      );
+    } else if (field === "facilityIcon" && value === undefined) {
+      pushHistory();
+      setHotspots((prev) =>
+        prev.map((h) => {
+          if (h._id !== selectedHotspotId) return h;
+          const next = { ...h };
+          delete next.facilityIcon;
           return next;
         })
       );
@@ -1447,7 +1456,7 @@ export default function VirtualTourEditorPage() {
         <div className="h-5 w-px bg-slate-700" />
 
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-slate-400 text-sm shrink-0">Virtual Tour</span>
+          <span className="text-slate-400 text-sm shrink-0">Station Virtual Tour</span>
           <span className="text-slate-600">›</span>
           <span className="text-slate-100 text-sm font-semibold truncate">
             {station?.name ?? "…"}
@@ -2279,13 +2288,34 @@ export default function VirtualTourEditorPage() {
                     <>
                       <div>
                         <Label className="text-xs text-slate-500 mb-1.5 block">
-                          Ikon Fasilitas
+                          Ikon Hotspot
                         </Label>
-                        <div className="grid grid-cols-5 gap-1.5">
+                        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+                          <button
+                            type="button"
+                            title="Informasi"
+                            onClick={() => updateHotspot("facilityIcon", undefined)}
+                            className={`flex flex-col items-center gap-1 rounded-lg border p-1.5 transition ${
+                              !selectedHotspot.facilityIcon
+                                ? "border-blue-500 bg-blue-500/15"
+                                : "border-slate-700 hover:bg-slate-800"
+                            }`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src="/brand/tour-pins/info.png"
+                              alt="Informasi"
+                              width={36}
+                              height={39}
+                              className="h-[39px] w-9 object-contain"
+                            />
+                            <span className="text-[9px] font-medium text-slate-400">
+                              Info
+                            </span>
+                          </button>
                           {FACILITY_ICONS.map((icon) => {
                             const active =
-                              (selectedHotspot.facilityIcon ?? DEFAULT_FACILITY_ICON) ===
-                              icon.id;
+                              selectedHotspot.facilityIcon === icon.id;
                             return (
                               <button
                                 key={icon.id}
