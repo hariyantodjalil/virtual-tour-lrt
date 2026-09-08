@@ -123,6 +123,10 @@ pipeline {
                                 else
                                     echo "VIRTUALTOUR_HTTP_PORT=${CONT_PORT}" >> .env
                                 fi
+                                if grep -q "^DATABASE_URL=" .env && ! grep -qE "^DATABASE_URL=[^@]+@postgres:5432" .env; then
+                                    echo "Normalisasi DATABASE_URL ke postgres:5432 (network internal stack)"
+                                    sed -i -E "s|^(DATABASE_URL=[a-zA-Z]+://[^@]+@)[^/?]+|\\1postgres:5432|" .env
+                                fi
                                 set -a && . ./.env && set +a
                                 echo "${PASSWORD_HARBOR}" | sudo docker login -u "${USERNAME_HARBOR}" --password-stdin hub.kai.id
                                 sudo docker compose --project-name ${LEGACY_COMPOSE_PROJECT} -f ${COMPOSE_FILE} down --remove-orphans 2>/dev/null || true
