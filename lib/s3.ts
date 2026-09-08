@@ -13,6 +13,7 @@ export type S3AssetType =
   | "spaces"          // spaces/photos/
   | "thumbnails"      // virtual-tour/thumbnails/{station-slug}/
   | "ad-creatives"    // virtual-tour/ad-creatives/{station-slug}/
+  | "train-rental-spaces" // spaces/train-rental/
   | "misc";           // misc/
 
 function getS3Client() {
@@ -85,6 +86,8 @@ export function generateS3Key(
       return `stations/covers/station_${timestamp}_${randomId}.${extension}`;
     case "spaces":
       return `spaces/photos/space_${timestamp}_${randomId}.${extension}`;
+    case "train-rental-spaces":
+      return `spaces/train-rental/train-space_${timestamp}_${randomId}.${extension}`;
     case "misc":
     default:
       return `misc/misc_${timestamp}_${randomId}.${extension}`;
