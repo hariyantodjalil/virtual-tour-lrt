@@ -25,7 +25,7 @@ pipeline {
         stage('Checkout Git') {
             steps {
                 git branch: "${GIT_BRANCH}",
-                    credentialsId: 'gitdev-divisi-lrt-lrt-virtualtour',
+                    credentialsId: 'devops-lrt-gitlab',
                     url: "${GIT_URL}"
 
                 script {
