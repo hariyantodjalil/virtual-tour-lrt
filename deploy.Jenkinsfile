@@ -5,12 +5,6 @@ pipeline {
         }
     }
 
-    // Push ke branch prod (ikut tag live*) memicu build tanpa Build Now.
-    // Trigger ini aktif setelah Jenkins sekali membaca Jenkinsfile ini.
-    triggers {
-        pollSCM('H/2 * * * *')
-    }
-
     environment {
         APP_NAME        = 'lrt-virtualtour'
         ENV             = 'Production'
@@ -41,33 +35,10 @@ pipeline {
                     url: "${GIT_URL}"
 
                 script {
-                    def head = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                    def tagDescription = ''
-
-                    // Tunggu tag live* yang menempel di commit ini, supaya push tag
-                    // tidak kalah cepat dengan poll SCM.
-                    for (int attempt = 1; attempt <= 12; attempt++) {
-                        sh 'git fetch --tags --force'
-
-                        tagDescription = sh(
-                            script: "git tag -l '${VER}*' --points-at HEAD | sort -V | tail -n 1",
-                            returnStdout: true
-                        ).trim()
-
-                        if (tagDescription) {
-                            break
-                        }
-
-                        echo "Menunggu tag ${VER}* pada ${head} (${attempt}/12)"
-                        sleep 10
-                    }
-
-                    if (!tagDescription) {
-                        tagDescription = sh(
-                            script: "git tag -l '${VER}*' | sort -V | tail -n 1",
-                            returnStdout: true
-                        ).trim()
-                    }
+                    def tagDescription = sh(
+                        script: "git tag -l '${VER}*' | sort -V | tail -n 1",
+                        returnStdout: true
+                    ).trim()
 
                     if (tagDescription) {
                         def trimmedTag = tagDescription =~ /([^-]+)/
