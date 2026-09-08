@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { cmsFetch } from "@/lib/cms-fetch";
+import { resolvePublicAssetUrl, shouldUnoptimizeImage } from "@/lib/s3-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LayoutGrid, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import {
+  TRAIN_RENTAL_STATUS_LABELS,
+  TRAIN_RENTAL_STATUS_VALUES,
+  emptyCarTrainsetMap,
+  formatCarTrainsetSummary,
+  isTrainRentalStatus,
+  parseCarTrainsetMap,
+  unionCarTrainsets,
+  type CarTrainsetMap,
+  type TrainRentalStatus,
+} from "@/lib/train-rental-sales";
+import TrainCarTrainsetPicker from "@/components/train/TrainCarTrainsetPicker";
 
 type TrainSpace = {
   id: string;
@@ -18,6 +31,11 @@ type TrainSpace = {
   description: string | null;
   imageUrl: string | null;
   objectPosition: string;
+  availableTrainsets: string[];
+  availableByCar: CarTrainsetMap;
+  howToOrder: string | null;
+  status: TrainRentalStatus;
+  monthlyRent: number | null;
   order: number;
   isActive: boolean;
 };
@@ -31,18 +49,31 @@ function createDraft(order: number): TrainSpace {
     description: "",
     imageUrl: "",
     objectPosition: "50% 50%",
+    availableTrainsets: [],
+    availableByCar: emptyCarTrainsetMap(),
+    howToOrder: "",
+    status: "TERSEDIA",
+    monthlyRent: null,
     order,
     isActive: true,
   };
 }
 
 function toPayload(space: TrainSpace) {
+  const availableByCar = parseCarTrainsetMap(space.availableByCar, space.availableTrainsets);
   return {
     displayNumber: space.displayNumber.trim(),
     title: space.title.trim(),
     description: space.description?.trim() || null,
     imageUrl: space.imageUrl?.trim() || null,
     objectPosition: space.objectPosition.trim() || "50% 50%",
+    availableTrainsets: unionCarTrainsets(availableByCar),
+    availableByCar,
+    howToOrder: space.howToOrder?.trim() || null,
+    status: space.status,
+    monthlyRent: space.monthlyRent == null || Number.isNaN(Number(space.monthlyRent))
+      ? null
+      : Number(space.monthlyRent),
     order: Number(space.order) || 0,
     isActive: Boolean(space.isActive),
   };
@@ -59,7 +90,21 @@ export default function TrainSpacesClient() {
     const response = await cmsFetch("/api/cms/train-rental-spaces");
     if (!response.ok) return;
     const data = await response.json().catch(() => null);
-    setSpaces(Array.isArray(data) ? data : []);
+    setSpaces(
+      Array.isArray(data)
+        ? data.map((item: TrainSpace) => ({
+            ...item,
+            availableTrainsets: Array.isArray(item.availableTrainsets) ? item.availableTrainsets : [],
+            availableByCar: parseCarTrainsetMap(
+              (item as TrainSpace).availableByCar,
+              Array.isArray(item.availableTrainsets) ? item.availableTrainsets : []
+            ),
+            howToOrder: item.howToOrder ?? "",
+            status: isTrainRentalStatus(item.status) ? item.status : "TERSEDIA",
+            monthlyRent: item.monthlyRent ?? null,
+          }))
+        : []
+    );
   }
 
   useEffect(() => {
@@ -76,7 +121,13 @@ export default function TrainSpacesClient() {
   }
 
   function openEdit(space: TrainSpace) {
-    setEditing({ ...space, description: space.description ?? "" });
+    setEditing({
+      ...space,
+      description: space.description ?? "",
+      howToOrder: space.howToOrder ?? "",
+      availableTrainsets: space.availableTrainsets ?? [],
+      availableByCar: parseCarTrainsetMap(space.availableByCar, space.availableTrainsets ?? []),
+    });
     setMessage("");
     setError("");
   }
@@ -171,7 +222,7 @@ export default function TrainSpacesClient() {
           <h1 className="text-2xl font-bold text-white">Train Rental Space</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             Kelola kartu carousel &quot;Apa yang Ingin Anda Sewa?&quot; di landing train virtual tour.
-            Setiap item punya nomor, judul, gambar, dan deskripsi detail.
+            Isi ketersediaan trainset, cara pemesanan, dan info penjualan seperti unit ruang komersial.
           </p>
         </div>
         <Button onClick={openCreate} className="bg-[#d32f2f] hover:bg-[#b71c1c]">
@@ -198,12 +249,13 @@ export default function TrainSpacesClient() {
               <div className="relative h-24 w-full overflow-hidden rounded-lg bg-slate-800 sm:h-[88px] sm:w-[88px]">
                 {space.imageUrl ? (
                   <Image
-                    src={space.imageUrl}
+                    src={resolvePublicAssetUrl(space.imageUrl)}
                     alt={space.title}
                     fill
                     sizes="88px"
                     className="object-cover"
                     style={{ objectPosition: space.objectPosition }}
+                    unoptimized={shouldUnoptimizeImage(resolvePublicAssetUrl(space.imageUrl))}
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center text-slate-500">
@@ -220,8 +272,16 @@ export default function TrainSpacesClient() {
                   <Badge variant={space.isActive ? "default" : "secondary"}>
                     {space.isActive ? "Aktif" : "Nonaktif"}
                   </Badge>
+                  <Badge variant="outline">{TRAIN_RENTAL_STATUS_LABELS[space.status]}</Badge>
                   <span className="text-xs text-slate-500">Urutan {space.order + 1}</span>
                 </div>
+                {unionCarTrainsets(parseCarTrainsetMap(space.availableByCar, space.availableTrainsets)).length === 0 ? (
+                  <p className="mb-1 text-xs italic text-slate-500">Belum diatur trainset (TS) mana yang tersedia.</p>
+                ) : (
+                  <p className="mb-1 text-xs text-slate-400">
+                    {formatCarTrainsetSummary(parseCarTrainsetMap(space.availableByCar, space.availableTrainsets))}
+                  </p>
+                )}
                 {space.description ? (
                   <p className="line-clamp-2 text-sm text-slate-400">{space.description}</p>
                 ) : (
@@ -257,7 +317,7 @@ export default function TrainSpacesClient() {
 
       {editing ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white">
                 {editing.id ? "Edit Ruang Sewa" : "Tambah Ruang Sewa"}
@@ -327,6 +387,84 @@ export default function TrainSpacesClient() {
                   }
                   rows={4}
                   placeholder="Jelaskan ruang sewa ini untuk calon mitra iklan..."
+                  className="mt-1.5 border-slate-700 bg-slate-800"
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label className="text-slate-300">Status Penjualan</Label>
+                  <select
+                    value={editing.status}
+                    onChange={(event) =>
+                      setEditing((current) =>
+                        current && isTrainRentalStatus(event.target.value)
+                          ? { ...current, status: event.target.value }
+                          : current
+                      )
+                    }
+                    className="mt-1.5 h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-sm text-white"
+                  >
+                    {TRAIN_RENTAL_STATUS_VALUES.map((value) => (
+                      <option key={value} value={value}>
+                        {TRAIN_RENTAL_STATUS_LABELS[value]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-slate-300">Harga sewa / bulan (opsional)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={editing.monthlyRent ?? ""}
+                    onChange={(event) =>
+                      setEditing((current) =>
+                        current
+                          ? {
+                              ...current,
+                              monthlyRent: event.target.value === "" ? null : Number(event.target.value),
+                            }
+                          : current
+                      )
+                    }
+                    placeholder="Kosongkan jika nego"
+                    className="mt-1.5 border-slate-700 bg-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-slate-300">Tersedia di gerbong & train set</Label>
+                <div className="mt-1.5">
+                  <TrainCarTrainsetPicker
+                    value={parseCarTrainsetMap(editing.availableByCar, editing.availableTrainsets)}
+                    onChange={(availableByCar) =>
+                      setEditing((current) =>
+                        current
+                          ? {
+                              ...current,
+                              availableByCar,
+                              availableTrainsets: unionCarTrainsets(availableByCar),
+                            }
+                          : current
+                      )
+                    }
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-slate-300">Cara Pemesanan</Label>
+                <Textarea
+                  value={editing.howToOrder ?? ""}
+                  onChange={(event) =>
+                    setEditing((current) =>
+                      current ? { ...current, howToOrder: event.target.value } : current
+                    )
+                  }
+                  rows={3}
+                  placeholder="Contoh: Hubungi tim komersial via WhatsApp, sebutkan jenis media dan nomor TS yang diinginkan."
                   className="mt-1.5 border-slate-700 bg-slate-800"
                 />
               </div>

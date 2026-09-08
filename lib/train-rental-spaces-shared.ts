@@ -5,6 +5,11 @@ export type TrainRentalSpacePublic = {
   description: string | null;
   image: string;
   objectPosition: string;
+  availableTrainsets: string[];
+  availableByCar: Record<string, string[]>;
+  howToOrder: string | null;
+  status: "TERSEDIA" | "TERBATAS" | "PENUH";
+  monthlyRent: number | null;
 };
 
 export type TrainRentalSpaceCms = TrainRentalSpacePublic & {
@@ -20,6 +25,11 @@ export const DEFAULT_TRAIN_RENTAL_SPACES = [
     image: "/brand/landing/train-spaces/handgrip.jpg",
     objectPosition: "50% 40%",
     description: null,
+    availableTrainsets: [],
+    availableByCar: {},
+    howToOrder: null,
+    status: "TERSEDIA" as const,
+    monthlyRent: null,
     order: 0,
   },
   {
@@ -28,6 +38,11 @@ export const DEFAULT_TRAIN_RENTAL_SPACES = [
     image: "/brand/landing/intro-train.jpg",
     objectPosition: "30% 50%",
     description: null,
+    availableTrainsets: [],
+    availableByCar: {},
+    howToOrder: null,
+    status: "TERSEDIA" as const,
+    monthlyRent: null,
     order: 1,
   },
   {
@@ -36,6 +51,11 @@ export const DEFAULT_TRAIN_RENTAL_SPACES = [
     image: "/brand/landing/intro-train.jpg",
     objectPosition: "50% 85%",
     description: null,
+    availableTrainsets: [],
+    availableByCar: {},
+    howToOrder: null,
+    status: "TERSEDIA" as const,
+    monthlyRent: null,
     order: 2,
   },
   {
@@ -44,6 +64,11 @@ export const DEFAULT_TRAIN_RENTAL_SPACES = [
     image: "/brand/landing/tour-360.jpg",
     objectPosition: "50% 8%",
     description: null,
+    availableTrainsets: [],
+    availableByCar: {},
+    howToOrder: null,
+    status: "TERSEDIA" as const,
+    monthlyRent: null,
     order: 3,
   },
   {
@@ -52,6 +77,11 @@ export const DEFAULT_TRAIN_RENTAL_SPACES = [
     image: "/brand/landing/train-spaces/train-door-v2.jpg",
     objectPosition: "50% 45%",
     description: null,
+    availableTrainsets: [],
+    availableByCar: {},
+    howToOrder: null,
+    status: "TERSEDIA" as const,
+    monthlyRent: null,
     order: 4,
   },
   {
@@ -60,6 +90,11 @@ export const DEFAULT_TRAIN_RENTAL_SPACES = [
     image: "/brand/landing/train-spaces/in-train-digital-screen.jpg",
     objectPosition: "50% 35%",
     description: null,
+    availableTrainsets: [],
+    availableByCar: {},
+    howToOrder: null,
+    status: "TERSEDIA" as const,
+    monthlyRent: null,
     order: 5,
   },
   {
@@ -68,6 +103,11 @@ export const DEFAULT_TRAIN_RENTAL_SPACES = [
     image: "/brand/landing/train-spaces/standing-panel.jpg",
     objectPosition: "50% 45%",
     description: null,
+    availableTrainsets: [],
+    availableByCar: {},
+    howToOrder: null,
+    status: "TERSEDIA" as const,
+    monthlyRent: null,
     order: 6,
   },
   {
@@ -76,6 +116,11 @@ export const DEFAULT_TRAIN_RENTAL_SPACES = [
     image: "/brand/landing/train-spaces/body-branding.jpg",
     objectPosition: "50% 50%",
     description: null,
+    availableTrainsets: [],
+    availableByCar: {},
+    howToOrder: null,
+    status: "TERSEDIA" as const,
+    monthlyRent: null,
     order: 7,
   },
 ] as const;

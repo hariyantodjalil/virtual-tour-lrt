@@ -826,9 +826,8 @@ body {
 }
 
 .tour-glass {
-  border: 1px solid rgba(255, 214, 218, 0.14);
-  background: rgba(28, 10, 14, 0.78);
-  box-shadow: 0 18px 40px rgba(28, 10, 14, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(28, 28, 30, 0.78);
   backdrop-filter: blur(16px);
 }
 
@@ -847,10 +846,9 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid rgba(255, 214, 218, 0.14);
-  background: rgba(28, 10, 14, 0.72);
-  color: #f8ecee;
-  box-shadow: 0 10px 24px rgba(28, 10, 14, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(28, 28, 30, 0.78);
+  color: #fff;
   backdrop-filter: blur(12px);
   transition:
     transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
@@ -862,8 +860,7 @@ body {
 
 .tour-tool-btn:hover {
   transform: scale(1.06);
-  border-color: rgba(227, 30, 45, 0.45);
-  background: rgba(58, 22, 28, 0.95);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .tour-tool-btn:active {

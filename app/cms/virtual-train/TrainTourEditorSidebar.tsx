@@ -49,7 +49,7 @@ import {
   Upload,
 } from "lucide-react";
 import { SceneTargetPicker } from "../virtual-tour/[stationId]/SceneTargetPicker";
-import { UnitPicker } from "../virtual-tour/[stationId]/UnitPicker";
+import { TrainRentalPicker, type TrainRentalPickerItem } from "./TrainRentalPicker";
 import { CoveragePanel } from "../virtual-tour/[stationId]/CoveragePanel";
 
 type Scene = {
@@ -63,13 +63,8 @@ type Scene = {
   hotspots: Omit<HotspotItem, "_id">[];
 };
 
-type CommercialSpace = {
-  id: string;
-  code: string;
-  name: string;
-  type: string;
-  status: SpaceAvailabilityStatus;
-  tenantBrand?: string | null;
+type TrainEditorSpace = TrainRentalPickerItem & {
+  type: "TRAIN_RENTAL";
 };
 
 type Props = {
@@ -78,7 +73,7 @@ type Props = {
   scenes: Scene[];
   hotspots: HotspotItem[];
   privacyBlurs: PrivacyBlurItem[];
-  commercialSpaces: CommercialSpace[];
+  rentalSpaces: TrainEditorSpace[];
   selectedHotspot: HotspotItem | null;
   selectedBlur: PrivacyBlurItem | null;
   selectedHotspotId: string | null;
@@ -117,7 +112,7 @@ export function TrainTourEditorSidebar({
   scenes,
   hotspots,
   privacyBlurs,
-  commercialSpaces,
+  rentalSpaces,
   selectedHotspot,
   selectedBlur,
   selectedHotspotId,
@@ -434,24 +429,22 @@ export function TrainTourEditorSidebar({
                 </>
               ) : selectedHotspot.type === "space" ? (
                 <div>
-                  <Label className="mb-1.5 block text-xs text-slate-500">Kode Unit</Label>
-                  <UnitPicker
-                    spaces={commercialSpaces}
+                  <Label className="mb-1.5 block text-xs text-slate-500">Ruang sewa kereta</Label>
+                  <TrainRentalPicker
+                    spaces={rentalSpaces}
                     value={selectedHotspot.spaceCode}
-                    mode="retail"
-                    placeholder="Cari unit retail…"
+                    placeholder="Cari handgrip, wall panel, layar…"
                     onChange={(code, space) => assignHotspotSpace(code, space.name)}
                   />
                 </div>
               ) : selectedHotspot.type === "ad" ? (
                 <>
                   <div>
-                    <Label className="mb-1.5 block text-xs text-slate-500">Unit Media</Label>
-                    <UnitPicker
-                      spaces={commercialSpaces}
+                    <Label className="mb-1.5 block text-xs text-slate-500">Ruang sewa kereta</Label>
+                    <TrainRentalPicker
+                      spaces={rentalSpaces}
                       value={selectedHotspot.spaceCode}
-                      mode="media"
-                      placeholder="Cari slot media iklan…"
+                      placeholder="Cari handgrip, wall panel, layar…"
                       onChange={(code, space) => assignHotspotSpace(code, space.name)}
                     />
                   </div>
@@ -646,7 +639,8 @@ export function TrainTourEditorSidebar({
         )}
 
         <CoveragePanel
-          spaces={commercialSpaces}
+          spaces={rentalSpaces}
+          hideKindFilters
           scenes={scenes.map((s) => ({
             sceneId: s.sceneId,
             title: s.title,
@@ -686,7 +680,7 @@ export function TrainTourEditorSidebar({
                           style={{
                             background:
                               h.type === "space" && h.spaceCode
-                                ? spaceStatusColor(findSpaceStatus(commercialSpaces, h.spaceCode))
+                                ? spaceStatusColor(findSpaceStatus(rentalSpaces, h.spaceCode))
                                 : hotspotColor(h.type),
                           }}
                         >

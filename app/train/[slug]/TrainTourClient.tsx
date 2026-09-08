@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import VirtualTourViewer from "@/components/tour/VirtualTourViewer";
 import TourLeftPanel from "@/components/tour/TourLeftPanel";
 import TrainFormationMap from "@/components/tour/TrainFormationMap";
 import ContactPersonFab from "@/components/tour/ContactPersonFab";
 import InTourInfoPopup from "@/components/tour/InTourInfoPopup";
+import TrainRentalSpaceDetail from "@/components/train/TrainRentalSpaceDetail";
 import type { TrainInfo } from "@/lib/trains-data";
+import type { TrainRentalSpacePublic } from "@/lib/train-rental-spaces-shared";
+import { trainRentalStatusToSpaceStatus } from "@/lib/train-rental-sales";
 import { VIRTUAL_TOUR_LANDING, TRAIN_TOUR_LANDING } from "@/lib/tour-nav";
 import {
   findScenePlacement,
@@ -18,10 +21,12 @@ import {
 
 type Props = {
   trainInfo: TrainInfo;
+  rentalSpaces: TrainRentalSpacePublic[];
 };
 
-export default function TrainTourClient({ trainInfo }: Props) {
+export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const firstScene =
     trainInfo.levels[0]?.areas[0]?.sceneIds[0] ??
     trainInfo.levels[0]?.sceneIds[0] ??
@@ -33,7 +38,21 @@ export default function TrainTourClient({ trainInfo }: Props) {
   );
   const [activeSceneId, setActiveSceneId] = useState(firstScene ?? "");
   const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
+  const [selectedSpace, setSelectedSpace] = useState<TrainRentalSpacePublic | null>(null);
   const [uiCleared, setUiCleared] = useState(false);
+  const [spaceDeepLinkHandled, setSpaceDeepLinkHandled] = useState(false);
+
+  useEffect(() => {
+    if (spaceDeepLinkHandled) return;
+    const code = searchParams.get("space");
+    if (!code) return;
+    const space = rentalSpaces.find(
+      (item) => item.displayNumber === code || item.id === code
+    );
+    if (!space) return;
+    setSelectedSpace(space);
+    setSpaceDeepLinkHandled(true);
+  }, [searchParams, rentalSpaces, spaceDeepLinkHandled]);
 
   const currentCar =
     trainInfo.levels.find((l) => l.id === activeLevelId) ?? trainInfo.levels[0];
@@ -73,6 +92,24 @@ export default function TrainTourClient({ trainInfo }: Props) {
         selectedSceneId={activeSceneId}
         onSceneChange={handleSceneChange}
         onInfoClick={(title, description) => setInfoPopup({ title, description })}
+        onSpaceClick={(code) => {
+          const space = rentalSpaces.find(
+            (item) => item.displayNumber === code || item.id === code
+          );
+          if (space) setSelectedSpace(space);
+        }}
+        onAdClick={(payload) => {
+          const code = payload.spaceCode;
+          if (!code) return;
+          const space = rentalSpaces.find(
+            (item) => item.displayNumber === code || item.id === code
+          );
+          if (space) setSelectedSpace(space);
+        }}
+        spaces={rentalSpaces.map((space) => ({
+          code: space.displayNumber,
+          status: trainRentalStatusToSpaceStatus(space.status),
+        }))}
         hideSceneBar
         chromeTone="maroon"
       />
@@ -87,7 +124,7 @@ export default function TrainTourClient({ trainInfo }: Props) {
           <div className="flex items-center justify-end gap-3">
             <div className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2">
               <span className="h-2 w-2 rounded-full bg-[#34d399]" />
-              <span className="font-display text-xs font-semibold text-[#F8ECEE]/85">
+              <span className="font-display text-xs font-semibold text-white">
                 {currentCarLabel}
               </span>
             </div>
@@ -149,6 +186,15 @@ export default function TrainTourClient({ trainInfo }: Props) {
           onClose={() => setInfoPopup(null)}
         />
       )}
+      {selectedSpace ? (
+        <TrainRentalSpaceDetail
+          key={selectedSpace.id}
+          space={selectedSpace}
+          onClose={() => setSelectedSpace(null)}
+          backLabel="Kembali ke Tour"
+          initialCarSlug={currentCar?.slug}
+        />
+      ) : null}
     </div>
   );
 }

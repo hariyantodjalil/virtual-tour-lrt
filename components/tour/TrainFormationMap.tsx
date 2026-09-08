@@ -12,6 +12,7 @@ type Props = {
   activeCarId: string;
   onSelectCar: (carId: string) => void;
   className?: string;
+  svgClassName?: string;
 };
 
 const ACTIVE = "#22C55E";
@@ -42,6 +43,7 @@ export default function TrainFormationMap({
   activeCarId,
   onSelectCar,
   className = "",
+  svgClassName,
 }: Props) {
   if (cars.length === 0) return null;
 
@@ -75,7 +77,10 @@ export default function TrainFormationMap({
         viewBox="0 0 1530 111"
         width={306}
         height={22}
-        className="h-[22px] w-[min(92vw,306px)] sm:h-[28px] sm:w-[min(92vw,390px)]"
+        className={
+          svgClassName ??
+          "h-[22px] w-[min(92vw,306px)] sm:h-[28px] sm:w-[min(92vw,390px)]"
+        }
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >

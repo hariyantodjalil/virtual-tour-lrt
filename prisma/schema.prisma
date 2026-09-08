@@ -325,6 +325,12 @@ enum EventType {
   PDF_DOWNLOAD
 }
 
+enum TrainRentalStatus {
+  TERSEDIA
+  TERBATAS
+  PENUH
+}
+
 // ─── Virtual Train (parallel stack — mirip virtual tour stasiun) ─────────────
 
 model Train {
@@ -426,18 +432,23 @@ model TrainTourScene {
 
 /** Ruang sewa iklan di interior kereta — carousel landing train */
 model TrainRentalSpace {
-  id             String   @id @default(cuid())
-  trainId        String
-  train          Train    @relation(fields: [trainId], references: [id], onDelete: Cascade)
-  displayNumber  String
-  title          String
-  description    String?
-  imageUrl       String?
-  objectPosition String   @default("50% 50%")
-  order          Int      @default(0)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                  String            @id @default(cuid())
+  trainId             String
+  train               Train             @relation(fields: [trainId], references: [id], onDelete: Cascade)
+  displayNumber       String
+  title               String
+  description         String?
+  imageUrl            String?
+  objectPosition      String            @default("50% 50%")
+  availableTrainsets  String[]          @default([])
+  availableByCar      Json              @default("{}")
+  howToOrder          String?
+  status              TrainRentalStatus @default(TERSEDIA)
+  monthlyRent         Float?
+  order               Int               @default(0)
+  isActive            Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   @@unique([trainId, displayNumber])
   @@index([trainId, isActive, order])

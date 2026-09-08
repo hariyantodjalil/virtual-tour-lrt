@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getS3ProxyUrl } from "@/lib/s3-utils";
+import { getS3ProxyUrl, shouldUnoptimizeImage } from "@/lib/s3-utils";
 import { cmsFetch } from "@/lib/cms-fetch";
 import { compressImageClient } from "@/lib/client-image-compression";
 import { ArrowLeft, Upload } from "lucide-react";
@@ -80,12 +80,17 @@ export default function StationEditClient({ initialStation }: { initialStation: 
         method: "POST",
         body: formData,
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (res.ok) {
         setStation({ ...station, imageUrl: data.imageUrl });
         setMessage("Foto berhasil diupload");
+        setIsError(false);
+      } else {
+        setIsError(true);
+        setMessage(data?.error ?? "Gagal upload foto stasiun.");
       }
     } catch {
+      setIsError(true);
       setMessage("Gagal upload foto stasiun");
     }
   }
@@ -243,6 +248,7 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                   fill
                   className="object-cover"
                   sizes="(max-width: 1024px) 100vw, 50vw"
+                  unoptimized={shouldUnoptimizeImage(getS3ProxyUrl(station.imageUrl))}
                 />
               </div>
             )}

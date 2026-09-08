@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getStationImage } from "@/lib/station-images";
+import { resolveStationCover, stationCoverUnoptimized } from "@/lib/station-images";
 
 type SpaceStats = {
   total: number;
@@ -28,7 +28,7 @@ export default function StationCard({
   order,
   imageUrl,
 }: StationCardProps) {
-  const image = imageUrl || getStationImage(slug, order);
+  const image = resolveStationCover(slug, order, imageUrl);
   const areaLabel = location?.trim() || address;
 
   return (
@@ -43,6 +43,7 @@ export default function StationCard({
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 200px"
           className="object-cover transition duration-500 group-hover:scale-105"
+          unoptimized={stationCoverUnoptimized(image)}
         />
       </div>
 

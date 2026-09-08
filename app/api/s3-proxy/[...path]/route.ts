@@ -56,6 +56,7 @@ const PUBLIC_PREFIXES = [
   "stations/covers/",
   "spaces/photos/",
   "spaces/train-rental/",
+  "misc/",
   "panoramas/",
   "floorplans/",
   "thumbnails/",

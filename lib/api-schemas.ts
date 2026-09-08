@@ -84,6 +84,11 @@ export const trainRentalSpaceMutationSchema = z.object({
   description: optionalText(5_000),
   imageUrl: nullableUrl,
   objectPosition: z.string().trim().min(1).max(32).default("50% 50%"),
+  availableTrainsets: z.array(z.string().trim().min(1).max(16)).max(40).default([]),
+  availableByCar: z.record(z.string(), z.array(z.string().trim().min(1).max(16)).max(40)).optional(),
+  howToOrder: optionalText(2_000),
+  status: z.enum(["TERSEDIA", "TERBATAS", "PENUH"]).default("TERSEDIA"),
+  monthlyRent: nonNegativeNumber.nullable().optional(),
   order: safeInteger.optional(),
   isActive: z.boolean().optional(),
 }).strict();
