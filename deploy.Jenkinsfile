@@ -70,14 +70,17 @@ pipeline {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
                     script {
-                        def qg = waitForQualityGate()
-
-                        if (qg.status != 'OK') {
+                        try {
+                            def qg = waitForQualityGate()
                             echo "Quality Gate status: ${qg.status}"
 
                             // Saat ini tidak menghentikan pipeline.
                             // Aktifkan jika Quality Gate wajib lolos:
                             // error "Quality Gate failed: ${qg.status}"
+                        } catch (err) {
+                            // Task Sonar FAILED (bukan gate ERROR) melempar exception
+                            // dan membatalkan deploy. Analisis tidak memblokir rilis.
+                            echo "Quality Gate dilewati: ${err}"
                         }
                     }
                 }
