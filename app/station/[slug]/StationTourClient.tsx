@@ -97,6 +97,61 @@ function buildRoute(sceneIds: string[], from: string, to: string) {
   return fi <= ti ? sceneIds.slice(fi, ti + 1) : sceneIds.slice(ti, fi + 1).reverse();
 }
 
+/** Urutan rute tetap, tapi tampilan dikelompokkan per level (Ground, Concourse, Peron). */
+function groupRouteByLevel(
+  route: string[],
+  levels: StationInfo["levels"],
+  scenes: StationInfo["scenes"]
+) {
+  const titleById = new Map(scenes.map((scene) => [scene.id, scene.title]));
+  const levelByScene = new Map<string, { id: string; label: string; order: number }>();
+
+  for (const level of levels) {
+    const sceneIds = new Set([
+      ...level.sceneIds,
+      ...level.areas.flatMap((area) => area.sceneIds),
+    ]);
+    for (const sceneId of sceneIds) {
+      levelByScene.set(sceneId, {
+        id: level.id,
+        label: level.label.trim() || "Level",
+        order: level.order,
+      });
+    }
+  }
+
+  const groups: Array<{
+    key: string;
+    label: string;
+    order: number;
+    items: Array<{ sceneId: string; title: string; index: number }>;
+  }> = [];
+  const byKey = new Map<string, (typeof groups)[number]>();
+
+  route.forEach((sceneId, index) => {
+    const level = levelByScene.get(sceneId);
+    const key = level?.id ?? "unassigned";
+    let group = byKey.get(key);
+    if (!group) {
+      group = {
+        key,
+        label: level?.label ?? "Lainnya",
+        order: level?.order ?? 9999,
+        items: [],
+      };
+      byKey.set(key, group);
+      groups.push(group);
+    }
+    group.items.push({
+      sceneId,
+      title: titleById.get(sceneId) ?? sceneId,
+      index,
+    });
+  });
+
+  return groups.sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
+}
+
 function ToolButton({
   active,
   onClick,
@@ -223,6 +278,7 @@ export default function StationTourClient({
   }
 
   const selectedRoute = buildRoute(sceneIds, routeFrom, routeTo);
+  const groupedRoute = groupRouteByLevel(selectedRoute, stationInfo.levels, stationInfo.scenes);
   const routeIdx = selectedRoute.indexOf(activeSceneId);
   const safeRouteIdx = routeIdx >= 0 ? routeIdx : 0;
   const nextStep = routeIdx >= 0 ? selectedRoute[routeIdx + 1] : undefined;
@@ -793,35 +849,41 @@ export default function StationTourClient({
               <Route className="h-3.5 w-3.5" />
               Mulai rute manual
             </button>
-            <div className="space-y-1.5 pt-1">
-              {selectedRoute.map((sceneId, idx) => {
-                const scene = stationInfo.scenes.find((s) => s.id === sceneId);
-                const isActive = sceneId === activeSceneId;
-                return (
-                  <button
-                    key={sceneId}
-                    type="button"
-                    onClick={() => handleSceneChange(sceneId)}
-                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs transition-all duration-300 ${
-                      isActive
-                        ? "bg-white font-bold text-[#1C0A0E]"
-                        : "bg-[#1C0A0E]/45 text-[#F8ECEE]/70 hover:bg-[#1C0A0E]/7"
-                    }`}
-                  >
-                    <span
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-display text-[10px] font-bold ${
-                        isActive ? "bg-[#E31E2D] text-white" : "bg-white/10 text-[#F8ECEE]/70"
-                      }`}
-                    >
-                      {idx + 1}
-                    </span>
-                    <span>{scene?.title ?? sceneId}</span>
-                    {isActive && (
-                      <CheckCircle2 className="ml-auto h-3.5 w-3.5 shrink-0 text-[#34d399]" />
-                    )}
-                  </button>
-                );
-              })}
+            <div className="space-y-3 pt-1">
+              {groupedRoute.map((group) => (
+                <div key={group.key} className="space-y-1.5">
+                  <p className="px-1 font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-[#ff8a93]">
+                    {group.label}
+                  </p>
+                  {group.items.map((item) => {
+                    const isActive = item.sceneId === activeSceneId;
+                    return (
+                      <button
+                        key={item.sceneId}
+                        type="button"
+                        onClick={() => handleSceneChange(item.sceneId)}
+                        className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs transition-all duration-300 ${
+                          isActive
+                            ? "bg-white font-bold text-[#1C0A0E]"
+                            : "bg-[#1C0A0E]/45 text-[#F8ECEE]/70 hover:bg-[#1C0A0E]/7"
+                        }`}
+                      >
+                        <span
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-display text-[10px] font-bold ${
+                            isActive ? "bg-[#E31E2D] text-white" : "bg-white/10 text-[#F8ECEE]/70"
+                          }`}
+                        >
+                          {item.index + 1}
+                        </span>
+                        <span>{item.title}</span>
+                        {isActive && (
+                          <CheckCircle2 className="ml-auto h-3.5 w-3.5 shrink-0 text-[#34d399]" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
 
             {guidedActive && nextStep && (
