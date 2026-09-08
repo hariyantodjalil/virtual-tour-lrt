@@ -538,8 +538,24 @@ body {
   transform-origin: center bottom;
 }
 
+.lrt-hotspot--info .lrt-pin-marker--info,
+.lrt-info-hotspot .lrt-pin-marker--info {
+  transform: scale(var(--lrt-hotspot-scale, 1));
+  transform-origin: center center;
+}
+
+.lrt-pin-marker--info .lrt-pin-marker__img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+  transition: filter 0.15s ease, transform 0.15s ease;
+  animation: lrt-pin-emphasize 2.5s ease-in-out infinite;
+}
+
 .lrt-pin-marker--info .lrt-pin-marker__disc {
-  background: #3b82f6;
+  background: #22c55e;
 }
 
 .lrt-pin-marker--ad .lrt-pin-marker__disc {
@@ -569,7 +585,7 @@ body {
 }
 
 .lrt-pin-marker--info .lrt-pin-marker__pulse {
-  border-color: rgba(59, 130, 246, 0.85);
+  border-color: rgba(34, 197, 94, 0.85);
 }
 
 .lrt-pin-marker--ad .lrt-pin-marker__pulse {
@@ -605,7 +621,7 @@ body {
 
 .lrt-pin-marker--info .lrt-pin-marker__disc.is-selected {
   box-shadow:
-    0 0 0 3px rgba(59, 130, 246, 0.55),
+    0 0 0 3px rgba(34, 197, 94, 0.55),
     0 0 0 6px rgba(0, 0, 0, 0.4),
     0 4px 14px rgba(0, 0, 0, 0.55);
 }

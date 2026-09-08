@@ -14,7 +14,7 @@ type AuthUser = {
 };
 
 const navItems = [
-  { href: "/", label: "Beranda", active: true },
+  { href: "/komersial", label: "Beranda", active: true },
   { href: "#kontak", label: "Hubungi Tim" },
   { href: "#area-komersial", label: "Area Komersial" },
 ] as const;
@@ -48,7 +48,7 @@ export default function Navbar({ variant = "light" }: { variant?: "light" | "dar
         }`}
       >
         <div className="relative mx-auto flex w-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 xl:px-10">
-          <Link href="/" className="relative z-10 flex shrink-0 items-center gap-1.5" aria-label="LRT Jabodebek">
+          <Link href="/" className="relative z-10 flex shrink-0 items-center gap-2.5 sm:gap-4" aria-label="LRT Jabodebek">
             <span className="relative h-10 w-[96px]">
               <Image
                 src="/brand/landing/logo-kai-nav.png"

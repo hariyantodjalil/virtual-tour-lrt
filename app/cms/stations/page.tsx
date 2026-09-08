@@ -71,7 +71,7 @@ export default async function CmsStationsPage() {
                 </Button>
                 <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-500">
                   <Link href={`/cms/virtual-tour/${station.id}`}>
-                    <Map className="h-3 w-3 mr-1" /> Virtual Tour
+                    <Map className="h-3 w-3 mr-1" /> Station Virtual Tour
                   </Link>
                 </Button>
               </div>
