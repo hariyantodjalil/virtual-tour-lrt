@@ -44,8 +44,7 @@ const FOOTER_LINKS = [
 ] as const;
 
 
-async function VirtualTourSection() {
-  const tourHref = await getDefaultTrainTourHref();
+async function VirtualTourSection({ tourHref }: { tourHref: string }) {
 
   return (
     <section id="virtual-tour" className="scroll-mt-28 bg-[#d32f2f] py-16 md:py-20">
@@ -100,7 +99,10 @@ async function VirtualTourSection() {
 }
 
 export default async function TrainVirtualTourLandingPage() {
-  const rentalSpaces = await getTrainRentalSpaces();
+  const [rentalSpaces, tourHref] = await Promise.all([
+    getTrainRentalSpaces(),
+    getDefaultTrainTourHref(),
+  ]);
 
   return (
     <HomeShell>
@@ -206,7 +208,7 @@ export default async function TrainVirtualTourLandingPage() {
         </div>
       </section>
 
-      <VirtualTourSection />
+      <VirtualTourSection tourHref={tourHref} />
 
       {/* Footer */}
       <footer id="kontak" className="relative overflow-hidden bg-white py-14 md:py-16">
