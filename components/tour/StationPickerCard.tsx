@@ -1,9 +1,8 @@
 import Image from "next/image";
-import { MapPin, Train, Users } from "lucide-react";
-import { getStationImage } from "@/lib/station-images";
+import { MapPin, Train } from "lucide-react";
+import { resolveStationCover, stationCoverUnoptimized } from "@/lib/station-images";
 import type { StationPickerItem } from "@/components/tour/StationPickerModal";
 import {
-  formatPassengersPerDay,
   splitStationLocation,
   stationLineLabel,
 } from "@/lib/station-picker-utils";
@@ -22,8 +21,8 @@ export default function StationPickerCard({
   className = "",
 }: Props) {
   const { area, city } = splitStationLocation(station);
-  const passengers = station.dailyPassengers ?? 0;
   const isDark = variant === "dark";
+  const coverSrc = resolveStationCover(station.slug, station.order, station.imageUrl);
 
   return (
     <article
@@ -39,11 +38,12 @@ export default function StationPickerCard({
     >
       <span className="relative block h-[140px] w-full shrink-0 overflow-hidden sm:h-[150px]">
         <Image
-          src={getStationImage(station.slug, station.order)}
+          src={coverSrc}
           alt={`Stasiun ${station.name}`}
           fill
           sizes="(max-width: 640px) 100vw, 320px"
           className="object-cover transition duration-500 group-hover:scale-105"
+          unoptimized={stationCoverUnoptimized(coverSrc)}
         />
         {isDark ? (
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
@@ -72,32 +72,14 @@ export default function StationPickerCard({
           </span>
         </span>
 
-        <span
-          className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${
-            isDark ? "bg-emerald-500/15 text-emerald-300" : "bg-[#e8f5e9] text-[#2e7d32]"
-          }`}
-        >
-          <Train className="size-3.5 shrink-0" strokeWidth={2.25} />
-          {stationLineLabel(station.line)}
-        </span>
-
-        <span className="mt-auto flex items-end justify-between gap-2 pt-1">
-          <span className="min-w-0">
-            <span
-              className={`flex items-center gap-1.5 text-[10px] ${
-                isDark ? "text-white/50" : "text-[#98a2b3]"
-              }`}
-            >
-              <Users className="size-3.5 shrink-0" strokeWidth={2.25} />
-              Rata-rata Penumpang
-            </span>
-            <span
-              className={`mt-0.5 block text-sm font-bold ${
-                isDark ? "text-[#ff8a8a]" : "text-[#D81435]"
-              }`}
-            >
-              {formatPassengersPerDay(passengers)}
-            </span>
+        <span className="mt-auto flex items-end justify-between gap-2 pt-0.5">
+          <span
+            className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+              isDark ? "bg-emerald-500/15 text-emerald-300" : "bg-[#e8f5e9] text-[#2e7d32]"
+            }`}
+          >
+            <Train className="size-3.5 shrink-0" strokeWidth={2.25} />
+            {stationLineLabel(station.line)}
           </span>
 
           <span

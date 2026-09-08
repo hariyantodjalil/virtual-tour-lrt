@@ -133,7 +133,7 @@ function ToolButton({
           </span>
         )}
       </button>
-      <span className="pointer-events-none ml-2 hidden -translate-x-1 rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/85 px-2.5 py-1 font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-[#F8ECEE]/80 opacity-0 backdrop-blur-md transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100 sm:block">
+      <span className="pointer-events-none ml-2 hidden -translate-x-1 rounded-full border border-white/12 bg-[#1c1c1e]/85 px-2.5 py-1 font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-white/80 opacity-0 backdrop-blur-md transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100 sm:block">
         {label}
       </span>
     </div>
@@ -477,14 +477,14 @@ export default function StationTourClient({
           <div className="pointer-events-none flex items-center gap-2">
             <div className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2">
               <span className="h-2 w-2 rounded-full bg-[#34d399]" />
-              <span className="font-display text-xs font-semibold text-[#F8ECEE]/85">
+              <span className="font-display text-xs font-semibold text-white">
                 {currentPlaceLabel}
               </span>
             </div>
             {availableCount > 0 && (
               <div className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2">
                 <span className="h-2 w-2 rounded-full bg-[#34d399]" />
-                <span className="font-display text-xs font-semibold text-[#F8ECEE]/85">
+                <span className="font-display text-xs font-semibold text-white">
                   {availableCount} unit tersedia
                 </span>
               </div>

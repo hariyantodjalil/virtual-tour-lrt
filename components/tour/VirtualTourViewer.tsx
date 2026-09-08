@@ -493,9 +493,7 @@ export default function VirtualTourViewer({
             className={`flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition-all duration-300 ${
               autoRotate
                 ? "bg-[#E31E2D] text-white shadow-[0_10px_24px_rgba(227,30,45,0.35)]"
-                : chromeTone === "maroon"
-                  ? "border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/75 text-[#F8ECEE] hover:bg-[#3A161C]"
-                  : "bg-black/50 text-white hover:bg-black/70"
+                : "border border-white/12 bg-[#1c1c1e]/78 text-white hover:bg-white/10"
             }`}
             title="Auto Putar"
           >

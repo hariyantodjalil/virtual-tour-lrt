@@ -35,6 +35,7 @@ type Props = {
   currentHotspots: HotspotItem[];
   currentSceneId: string | null;
   onJumpTo: (sceneId: string, hotspotIndex: number) => void;
+  hideKindFilters?: boolean;
 };
 
 export function CoveragePanel({
@@ -43,6 +44,7 @@ export function CoveragePanel({
   currentHotspots,
   currentSceneId,
   onJumpTo,
+  hideKindFilters = false,
 }: Props) {
   const [mode, setMode] = useState<"all" | "retail" | "media">("all");
   const [onlyMissing, setOnlyMissing] = useState(false);
@@ -107,18 +109,22 @@ export function CoveragePanel({
       </div>
 
       <div className="mb-2 flex flex-wrap gap-1">
-        {(["all", "retail", "media"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMode(m)}
-            className={`rounded-md px-2 py-1 text-[10px] font-medium ${
-              mode === m ? "bg-slate-700 text-white" : "text-slate-500 hover:bg-slate-800"
-            }`}
-          >
-            {m === "all" ? "Semua" : m === "retail" ? "Retail" : "Media"}
-          </button>
-        ))}
+        {hideKindFilters ? null : (
+          <>
+            {(["all", "retail", "media"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className={`rounded-md px-2 py-1 text-[10px] font-medium ${
+                  mode === m ? "bg-slate-700 text-white" : "text-slate-500 hover:bg-slate-800"
+                }`}
+              >
+                {m === "all" ? "Semua" : m === "retail" ? "Retail" : "Media"}
+              </button>
+            ))}
+          </>
+        )}
         <button
           type="button"
           onClick={() => setOnlyMissing((v) => !v)}

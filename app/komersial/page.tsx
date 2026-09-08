@@ -9,6 +9,7 @@ import CommercialSpaceGrid from "../CommercialSpaceGrid";
 import CommercialContactDetails from "@/components/commercial/CommercialContactDetails";
 import VirtualTourStartOverlay from "@/components/tour/VirtualTourStartOverlay";
 import { ArrowRight, Play } from "lucide-react";
+import SocialIconLinks from "@/components/home/SocialIconLinks";
 
 const TRANSPORT = [
   { label: "KRL", icon: "/brand/landing/icons/transport-krl.png" },
@@ -69,12 +70,6 @@ const FOOTER_LINKS = [
   { href: "#kontak", label: "Syarat Dan Ketentuan" },
 ] as const;
 
-const SOCIAL = [
-  { href: "https://www.instagram.com/", icon: "/brand/landing/social/instagram.svg", label: "Instagram" },
-  { href: "https://www.facebook.com/", icon: "/brand/landing/social/facebook.svg", label: "Facebook" },
-  { href: "https://www.tiktok.com/", icon: "/brand/landing/social/tiktok.svg", label: "TikTok" },
-  { href: "https://www.youtube.com/", icon: "/brand/landing/social/youtube.svg", label: "YouTube" },
-] as const;
 
 async function getCommercialListings() {
   try {
@@ -250,7 +245,7 @@ export default function HomePage() {
           <HomeReveal delayMs={180}>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <a
-                href="#area-komersial"
+                href="#virtual-tour"
                 className="inline-flex h-12 min-w-[180px] items-center justify-center gap-2 rounded-full bg-[#E31E2D] px-6 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(227,30,45,0.45)] transition hover:brightness-110"
               >
                 Jelajahi Sekarang
@@ -523,21 +518,7 @@ export default function HomePage() {
               Jelajahi stasiun LRT Jabodebek melalui Virtual Tour 360° untuk melihat fasilitas, area
               komersial, dan media promosi secara interaktif dalam satu platform.
             </p>
-            <div className="mt-5 flex items-center justify-center gap-3">
-              {SOCIAL.map((s) => (
-                <a
-                  key={s.label}
-                  href={s.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={s.label}
-                  className="flex size-10 items-center justify-center rounded-full border border-black/10 bg-white transition hover:border-[#d32f2f]"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.icon} alt="" width={20} height={20} className="size-5 object-contain" />
-                </a>
-              ))}
-            </div>
+            <SocialIconLinks />
           </div>
 
           <div className="md:text-right">

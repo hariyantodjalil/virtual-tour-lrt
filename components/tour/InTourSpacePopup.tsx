@@ -7,6 +7,8 @@ import {
   ArrowRight,
   BarChart3,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Eye,
   Heart,
@@ -137,32 +139,32 @@ export default function InTourSpacePopup({
   const statusConfig = {
     TERSEDIA: {
       label: "Tersedia",
-      className: "bg-emerald-50 text-emerald-700",
-      dot: "bg-emerald-500",
+      className: "border-emerald-400/30 bg-emerald-500/15 text-emerald-300",
+      dot: "bg-emerald-400",
       icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     },
     TERISI: {
       label: "Terisi",
-      className: "bg-red-50 text-red-700",
-      dot: "bg-red-500",
+      className: "border-[#E31E2D]/40 bg-[#E31E2D]/12 text-[#FF4D57]",
+      dot: "bg-[#E31E2D]",
       icon: <XCircle className="h-3.5 w-3.5" />,
     },
     RESERVED: {
       label: "Reserved",
-      className: "bg-indigo-50 text-indigo-700",
-      dot: "bg-indigo-500",
+      className: "border-indigo-400/30 bg-indigo-500/15 text-indigo-300",
+      dot: "bg-indigo-400",
       icon: <AlertCircle className="h-3.5 w-3.5" />,
     },
     FIT_OUT: {
       label: "Fit-Out",
-      className: "bg-violet-50 text-violet-700",
-      dot: "bg-violet-500",
+      className: "border-violet-400/30 bg-violet-500/15 text-violet-300",
+      dot: "bg-violet-400",
       icon: <AlertCircle className="h-3.5 w-3.5" />,
     },
     MAINTENANCE: {
       label: "Maintenance",
-      className: "bg-amber-50 text-amber-700",
-      dot: "bg-amber-500",
+      className: "border-amber-400/30 bg-amber-500/15 text-amber-300",
+      dot: "bg-amber-400",
       icon: <AlertCircle className="h-3.5 w-3.5" />,
     },
   }[space.status];
@@ -296,23 +298,26 @@ export default function InTourSpacePopup({
   };
 
   return (
-    <div className="pointer-events-auto absolute inset-x-3 bottom-4 top-20 z-50 overflow-hidden rounded-2xl border border-[color:rgb(255_214_218_/_0.14)] bg-white shadow-[0_24px_60px_rgba(28,10,14,0.5)] backdrop-blur-xl sm:inset-x-auto sm:right-6 sm:top-24 sm:bottom-6 sm:w-[410px] lg:w-[420px]">
+    <div className="tour-panel-in pointer-events-auto absolute inset-x-3 bottom-4 top-20 z-50 overflow-hidden rounded-2xl border border-white/10 bg-[#0F0F0F]/65 text-white shadow-[0_24px_60px_rgba(0,0,0,0.35)] backdrop-blur-md sm:inset-x-auto sm:right-6 sm:top-24 sm:bottom-6 sm:w-[410px] lg:w-[420px]">
       <div className="flex h-full max-h-[inherit] flex-col">
-        {/* Header merah — Figma */}
-        <div className="flex shrink-0 items-center justify-between bg-[#D81435] px-4 py-3 text-white">
+        <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
           <div className="flex min-w-0 items-center gap-2">
             {returnToList ? (
               <button
                 type="button"
                 onClick={onClose}
-                className="flex items-center gap-1.5 text-xs font-semibold text-white/90 transition hover:text-white"
+                className="flex min-w-0 items-center gap-2 text-left"
               >
-                <ArrowRight className="h-3.5 w-3.5 rotate-180" />
-                Kembali ke Daftar Unit
+                <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#E31E2D]/55 bg-[#161616]">
+                  <ChevronLeft className="size-4 text-[#E31E2D]" strokeWidth={2.4} />
+                </span>
+                <span className="truncate text-xs font-medium text-white">
+                  Kembali ke Daftar Unit
+                </span>
               </button>
             ) : (
               <>
-                <span className="flex size-7 items-center justify-center rounded-full bg-white/15">
+                <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-white/12 bg-[#1c1c1e]/78 text-white backdrop-blur-md">
                   <Info className="h-4 w-4" />
                 </span>
                 <span className="font-display text-sm font-semibold">Informasi</span>
@@ -322,16 +327,15 @@ export default function InTourSpacePopup({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-white/80 transition hover:bg-white/15 hover:text-white"
+            className="rounded-lg p-1.5 text-white/80 transition hover:bg-white/10 hover:text-white"
             aria-label="Tutup detail unit"
           >
-            <X className="h-5 w-5" />
+            <X className="size-4" strokeWidth={2.2} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          {/* Cover + Favorit */}
-          <div className="relative aspect-[16/9] w-full bg-slate-200">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 sm:px-4">
+          <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-[#1A1A1A]">
             <Image
               src={coverSrc}
               alt={space.name}
@@ -344,144 +348,134 @@ export default function InTourSpacePopup({
               type="button"
               onClick={handleToggleFavorite}
               disabled={!stationSlug}
-              className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 shadow-md transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-[#1c1c1e]/85 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Heart
-                className={`h-3.5 w-3.5 ${favorited ? "fill-[#D81435] text-[#D81435]" : "text-[#D81435]"}`}
+                className={`h-3.5 w-3.5 ${favorited ? "fill-[#E31E2D] text-[#E31E2D]" : "text-white"}`}
               />
               Favorit
             </button>
           </div>
 
-          <div className="space-y-4 p-4">
-            {/* Title + badges */}
+          <div className="mt-3 rounded-2xl bg-black/35 p-3 shadow-[0_0_0_1px_rgba(227,30,45,0.38),0_0_20px_rgba(227,30,45,0.14)]">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="font-display text-xl font-bold tracking-tight text-[#101828] uppercase">
+                <h3 className="font-display text-xl font-bold tracking-tight text-white uppercase">
                   {occupiedTenant || space.code}
                 </h3>
-                <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
-                  <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-white/55">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-white/70" />
                   <span className="truncate">
                     {space.location || space.floor}, Stasiun {stationName}
                   </span>
                 </p>
                 {occupiedTenant && (
-                  <p className="mt-1 text-sm font-semibold text-[#D81435]">
+                  <p className="mt-1 text-sm font-semibold text-[#FF4D57]">
                     Unit {space.code} · {space.name}
                   </p>
                 )}
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}
                 >
                   <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
                   {statusConfig.label}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700">
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/12 bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-white/80">
                   <Store className="h-3 w-3" />
                   {categoryLabel}
                 </span>
               </div>
             </div>
 
-            <p className="text-sm leading-relaxed text-slate-600">
+            <p className="mt-3 text-sm leading-relaxed text-white/60">
               {space.description?.trim() ||
                 `Area komersial strategis dengan mobilitas penumpang yang tinggi. Cocok untuk ${
                   isMedia ? "media iklan maupun promosi." : "retail maupun food & beverage."
                 }`}
             </p>
 
-            {/* Harga / Lokasi / Luas */}
-            <div className="grid grid-cols-3 divide-x divide-slate-200 rounded-xl border border-slate-200">
-              <div className="px-2.5 py-3">
-                <Tag className="mb-1.5 h-4 w-4 text-[#D81435]" />
-                <p className="text-[11px] font-semibold text-slate-800">Harga</p>
-                <p className="mt-0.5 text-xs font-bold leading-snug text-slate-700">{priceValue}</p>
-              </div>
-              <div className="px-2.5 py-3">
-                <MapPin className="mb-1.5 h-4 w-4 text-[#D81435]" />
-                <p className="text-[11px] font-semibold text-slate-800">Lokasi</p>
-                <p className="mt-0.5 text-xs font-bold leading-snug text-slate-700">
+            <div className="mt-3 grid grid-cols-2 gap-1.5">
+              <div className="rounded-xl bg-black/40 p-2.5">
+                <MapPin className="mb-1.5 h-4 w-4 text-[#E31E2D]" />
+                <p className="text-[11px] font-semibold text-white">Lokasi</p>
+                <p className="mt-0.5 text-xs font-bold leading-snug text-white/70">
                   {space.location || `Lantai ${space.floor}`}
                 </p>
               </div>
-              <div className="px-2.5 py-3">
-                <Maximize2 className="mb-1.5 h-4 w-4 text-[#D81435]" />
-                <p className="text-[11px] font-semibold text-slate-800">Luas</p>
-                <p className="mt-0.5 text-xs font-bold leading-snug text-slate-700">
+              <div className="rounded-xl bg-black/40 p-2.5">
+                <Maximize2 className="mb-1.5 h-4 w-4 text-[#E31E2D]" />
+                <p className="text-[11px] font-semibold text-white">Luas</p>
+                <p className="mt-0.5 text-xs font-bold leading-snug text-white/70">
                   {space.area} m²
                 </p>
               </div>
             </div>
+          </div>
 
-            {/* Potensi Area */}
-            <div className="overflow-hidden rounded-xl bg-[#f8e9ea]">
-              <div className="flex items-center gap-2 px-3.5 pt-3 pb-2">
-                <BarChart3 className="h-4 w-4 text-[#D81435]" />
-                <p className="text-sm font-bold text-[#D81435]">Potensi Area</p>
+          <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/35">
+            <div className="flex items-center gap-2 px-3.5 pt-3 pb-2">
+              <BarChart3 className="h-4 w-4 text-[#E31E2D]" />
+              <p className="text-sm font-bold text-white">Potensi Area</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 px-3.5 pb-3.5">
+              <div>
+                <Users className="mb-1 h-4 w-4 text-[#E31E2D]" />
+                <p className="text-[10px] leading-tight text-white/50">Mobilitas Penumpang</p>
+                <p className="mt-1 text-xs font-bold text-white">
+                  {formatNumber(Math.round(space.exposure))} orang/hari
+                </p>
               </div>
-              <div className="grid grid-cols-3 gap-2 px-3.5 pb-3.5">
-                <div>
-                  <Users className="mb-1 h-4 w-4 text-[#D81435]" />
-                  <p className="text-[10px] leading-tight text-slate-600">Mobilitas Penumpang</p>
-                  <p className="mt-1 text-xs font-bold text-slate-900">
-                    {formatNumber(Math.round(space.exposure))} orang/hari
-                  </p>
-                </div>
-                <div>
-                  <Eye className="mb-1 h-4 w-4 text-[#D81435]" />
-                  <p className="text-[10px] leading-tight text-slate-600">Visibilitas</p>
-                  <p className="mt-1 text-xs font-bold text-slate-900">
-                    {visibilityLabel(space.exposure)}
-                  </p>
-                </div>
-                <div>
-                  <CheckCircle2 className="mb-1 h-4 w-4 text-[#D81435]" />
-                  <p className="text-[10px] leading-tight text-slate-600">Keunggulan</p>
-                  <ul className="mt-1 space-y-0.5 text-[11px] font-semibold text-slate-900">
-                    {highlights.map((item) => (
-                      <li key={item} className="flex gap-1">
-                        <span className="text-[#D81435]">•</span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              <div>
+                <Eye className="mb-1 h-4 w-4 text-[#E31E2D]" />
+                <p className="text-[10px] leading-tight text-white/50">Visibilitas</p>
+                <p className="mt-1 text-xs font-bold text-white">
+                  {visibilityLabel(space.exposure)}
+                </p>
+              </div>
+              <div>
+                <CheckCircle2 className="mb-1 h-4 w-4 text-[#E31E2D]" />
+                <p className="text-[10px] leading-tight text-white/50">Keunggulan</p>
+                <ul className="mt-1 space-y-0.5 text-[11px] font-semibold text-white">
+                  {highlights.map((item) => (
+                    <li key={item} className="flex gap-1">
+                      <span className="text-[#E31E2D]">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
+          </div>
 
-            {/* Fasilitas Terdekat */}
-            <div>
-              <p className="mb-2 text-sm font-bold text-[#101828]">Fasilitas Terdekat</p>
-              <div className="grid grid-cols-5 gap-1.5">
-                {nearbyFacilities.map((f) => (
-                  <div
-                    key={f.label}
-                    className="flex flex-col items-center gap-1 rounded-xl border border-slate-200 bg-white px-1 py-2 text-center"
-                  >
-                    <span className="flex size-7 items-center justify-center text-[#D81435]">
-                      {f.icon}
-                    </span>
-                    <span className="text-[9px] font-medium leading-tight text-slate-500">
-                      {f.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
+          <div className="mt-3">
+            <p className="mb-2 text-sm font-bold text-white">Fasilitas Terdekat</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {nearbyFacilities.map((f) => (
+                <div
+                  key={f.label}
+                  className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-black/35 px-1 py-2 text-center"
+                >
+                  <span className="flex size-7 items-center justify-center text-[#E31E2D]">
+                    {f.icon}
+                  </span>
+                  <span className="text-[9px] font-medium leading-tight text-white/55">
+                    {f.label}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Footer actions */}
-        <div className="shrink-0 border-t border-slate-100 bg-white p-3">
+        <div className="shrink-0 border-t border-white/10 bg-black/30 p-3">
           {space.status === "TERSEDIA" ? (
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setShowInterestModal(true)}
-                className="col-span-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#D81435] px-2 py-2.5 text-xs font-bold text-white transition hover:brightness-110"
+                className="inline-flex h-11 items-center justify-center gap-1 rounded-xl bg-[#E31E2D] px-2 text-[11px] font-semibold text-white transition hover:brightness-110"
               >
                 <Tag className="h-3.5 w-3.5 shrink-0" />
                 Sewa Tenant
@@ -491,17 +485,17 @@ export default function InTourSpacePopup({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => trackEvent("WHATSAPP_CLICK")}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 py-2.5 text-xs font-bold text-slate-800 transition hover:bg-slate-50"
+                className="inline-flex h-11 items-center justify-center gap-1 rounded-xl border border-[#E31E2D]/45 bg-[#161616] px-2 text-[11px] font-semibold text-white transition hover:bg-[#1d1d1d]"
               >
-                <Phone className="h-3.5 w-3.5 shrink-0 text-[#D81435]" />
+                <Phone className="h-3.5 w-3.5 shrink-0 text-[#E31E2D]" />
                 Hubungi
               </a>
               <button
                 type="button"
                 onClick={handleDownloadSummary}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 py-2.5 text-xs font-bold text-slate-800 transition hover:bg-slate-50"
+                className="inline-flex h-11 items-center justify-center gap-1 rounded-xl border border-white/12 bg-[#161616] px-2 text-[11px] font-semibold text-white transition hover:bg-[#1d1d1d]"
               >
-                <Download className="h-3.5 w-3.5 shrink-0 text-[#D81435]" />
+                <Download className="h-3.5 w-3.5 shrink-0 text-[#E31E2D]" />
                 Unduh PDF
               </button>
             </div>
@@ -510,10 +504,11 @@ export default function InTourSpacePopup({
               href={waUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-800 transition hover:bg-slate-50"
+              className="inline-flex h-11 w-full items-center justify-between gap-1 rounded-xl border border-[#E31E2D]/45 bg-[#161616] px-3 text-sm font-semibold text-white transition hover:bg-[#1d1d1d]"
             >
-              <Phone className="h-4 w-4 text-[#D81435]" />
-              Tanya Tim Komersial
+              <Phone className="h-4 w-4 text-[#E31E2D]" />
+              <span className="flex-1 text-center">Tanya Tim Komersial</span>
+              <ChevronRight className="h-4 w-4 text-white/80" />
             </a>
           )}
         </div>
@@ -525,10 +520,10 @@ export default function InTourSpacePopup({
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-6">
             <div className="relative grid max-h-[min(920px,calc(100vh-24px))] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl md:grid-cols-[minmax(300px,0.95fr)_minmax(0,1.15fr)]">
               {/* Left — detail unit */}
-              <div className="relative hidden overflow-y-auto bg-[#D81435] text-white md:block">
+              <div className="relative hidden overflow-y-auto bg-[#111111] text-white md:block">
                 <div className="flex min-h-full flex-col p-5 pb-7 lg:p-6 lg:pb-8">
-                <div className="mb-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-[#22c55e] px-2.5 py-1 text-[11px] font-semibold text-white">
-                  {statusConfig.icon}
+                <div className={`mb-4 inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}>
+                  <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
                   {statusConfig.label}
                 </div>
 
@@ -571,33 +566,33 @@ export default function InTourSpacePopup({
                 </p>
 
                 <div className="mt-4 grid grid-cols-2 gap-2.5">
-                  <div className="rounded-xl bg-black/30 p-3 shadow-sm ring-1 ring-white/20">
-                    <Users className="mb-2 size-3.5 text-white/80" />
-                    <p className="text-[10px] font-medium text-white/70">Eksposur</p>
+                  <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
+                    <Users className="mb-2 size-3.5 text-[#E31E2D]" />
+                    <p className="text-[10px] font-medium text-white/60">Eksposur</p>
                     <p className="mt-1 text-[15px] leading-none font-bold text-white">
                       {formatNumber(Math.round(space.exposure))}
                     </p>
-                    <p className="mt-1 text-[10px] text-white/65">orang/hari</p>
+                    <p className="mt-1 text-[10px] text-white/55">orang/hari</p>
                   </div>
-                  <div className="rounded-xl bg-black/30 p-3 shadow-sm ring-1 ring-white/20">
-                    <MapPin className="mb-2 size-3.5 text-white/80" />
-                    <p className="text-[10px] font-medium text-white/70">Lokasi</p>
+                  <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
+                    <MapPin className="mb-2 size-3.5 text-[#E31E2D]" />
+                    <p className="text-[10px] font-medium text-white/60">Lokasi</p>
                     <p className="mt-1 truncate text-[15px] leading-none font-bold text-white">
                       {space.location || space.floor}
                     </p>
-                    <p className="mt-1 truncate text-[10px] text-white/65">
+                    <p className="mt-1 truncate text-[10px] text-white/55">
                       Stasiun {stationName}
                     </p>
                   </div>
-                  <div className="rounded-xl bg-black/30 p-3 shadow-sm ring-1 ring-white/20">
-                    <Maximize2 className="mb-2 size-3.5 text-white/80" />
-                    <p className="text-[10px] font-medium text-white/70">Luas</p>
+                  <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
+                    <Maximize2 className="mb-2 size-3.5 text-[#E31E2D]" />
+                    <p className="text-[10px] font-medium text-white/60">Luas</p>
                     <p className="mt-1 text-[15px] font-bold text-white">{space.area} m²</p>
                   </div>
-                  <div className="rounded-xl bg-black/30 p-3 shadow-sm ring-1 ring-white/20">
-                    <Store className="mb-2 size-3.5 text-white/80" />
-                    <p className="text-[10px] font-medium text-white/70">Status</p>
-                    <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[11px] font-semibold text-emerald-100 ring-1 ring-emerald-300/40">
+                  <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
+                    <Store className="mb-2 size-3.5 text-[#E31E2D]" />
+                    <p className="text-[10px] font-medium text-white/60">Status</p>
+                    <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}>
                       <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
                       {statusConfig.label}
                     </span>

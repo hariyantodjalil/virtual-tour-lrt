@@ -1,9 +1,11 @@
 import { getAllTrainsForPicker } from "@/lib/trains-data";
+import { DEFAULT_TRAIN_SLUG } from "@/lib/train-constants";
 
 export async function getDefaultTrainTourHref() {
   const trains = await getAllTrainsForPicker();
   if (trains.length === 1) return `/train/${trains[0].slug}`;
-  return "#pilih-kereta";
+  if (trains.length > 1) return "#pilih-kereta";
+  return `/train/${DEFAULT_TRAIN_SLUG}`;
 }
 
 export async function getTrainLandingStats() {

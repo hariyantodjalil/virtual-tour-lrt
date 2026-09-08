@@ -18,6 +18,7 @@ export async function getPickerStations(): Promise<StationPickerItem[]> {
         address: true,
         location: true,
         dailyPassengers: true,
+        imageUrl: true,
       },
     });
   } catch {

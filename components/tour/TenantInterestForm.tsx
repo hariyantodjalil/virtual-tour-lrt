@@ -60,9 +60,11 @@ type AuthUser = {
 };
 
 type Props = {
-  spaceId: string;
+  spaceId?: string;
+  trainRentalSpaceId?: string;
   spaceCode: string;
   stationName: string;
+  extraMessage?: string;
   onSuccess?: () => void;
   variant?: "default" | "modal";
 };
@@ -97,8 +99,10 @@ function fieldPad(filled: boolean) {
 
 export default function TenantInterestForm({
   spaceId,
+  trainRentalSpaceId,
   spaceCode,
   stationName,
+  extraMessage,
   onSuccess,
   variant = "default",
 }: Props) {
@@ -152,10 +156,16 @@ export default function TenantInterestForm({
   const onGuestSubmit = async (data: GuestFormValues) => {
     setIsLoading(true);
     try {
+      const message = [extraMessage?.trim(), data.message?.trim()].filter(Boolean).join("\n\n");
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, spaceId }),
+        body: JSON.stringify({
+          ...data,
+          ...(message ? { message } : {}),
+          ...(spaceId ? { spaceId } : {}),
+          ...(trainRentalSpaceId ? { trainRentalSpaceId } : {}),
+        }),
       });
 
       if (res.ok) {
@@ -176,10 +186,12 @@ export default function TenantInterestForm({
     setIsLoading(true);
     try {
       const payload: Record<string, string> = {
-        spaceId,
         businessType: data.businessType,
       };
-      if (data.message?.trim()) payload.message = data.message.trim();
+      if (trainRentalSpaceId) payload.trainRentalSpaceId = trainRentalSpaceId;
+      else if (spaceId) payload.spaceId = spaceId;
+      const message = [extraMessage?.trim(), data.message?.trim()].filter(Boolean).join("\n\n");
+      if (message) payload.message = message;
       if (data.companyName?.trim()) payload.companyName = data.companyName.trim();
       if (data.phone?.trim()) payload.phone = data.phone.trim();
       if (data.surveyPreference?.trim()) payload.surveyPreference = data.surveyPreference.trim();
@@ -224,7 +236,7 @@ export default function TenantInterestForm({
         <div>
           <p className="font-bold text-[#101828]">Minat Anda Tercatat!</p>
           <p className="mt-1 text-sm text-slate-500">
-            Pengajuan untuk unit {spaceCode} di Stasiun {stationName} sudah masuk Panel Mitra.
+            Pengajuan untuk {spaceCode} di {stationName} sudah masuk Panel Mitra.
           </p>
         </div>
         <Button asChild className="mt-2 bg-[#D81435] hover:bg-[#B8112D]">
