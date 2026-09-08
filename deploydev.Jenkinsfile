@@ -12,7 +12,7 @@ pipeline {
         APP_SERVER      = '192.168.64.12'
         CONT_PORT       = '5011'
         SSH_USER        = 'devops-lrt'
-        GIT_URL         = 'https://gitdev.kai.id/divisi-lrt/lrt-virtualtour.git'
+        GIT_URL         = 'https://gitdev.kai.id/lrt-app/lrt-virtualtour.git'
         GIT_BRANCH      = 'dev-jenkins'
         HARBOR_REGISTRY = 'hub.kai.id/lrt'
         DEPLOY_PATH     = "/opt/${APP_NAME}"
@@ -25,7 +25,7 @@ pipeline {
         stage('Checkout Git') {
             steps {
                 git branch: "${GIT_BRANCH}",
-                    credentialsId: 'gitdev-divisi-lrt-lrt-virtualtour',
+                    credentialsId: 'devops-lrt-gitlab',
                     url: "${GIT_URL}"
 
                 script {
@@ -122,6 +122,10 @@ pipeline {
                                     sed -i "s|^VIRTUALTOUR_HTTP_PORT=.*|VIRTUALTOUR_HTTP_PORT=${CONT_PORT}|" .env
                                 else
                                     echo "VIRTUALTOUR_HTTP_PORT=${CONT_PORT}" >> .env
+                                fi
+                                if grep -q "^DATABASE_URL=" .env && ! grep -qE "^DATABASE_URL=[^@]+@postgres:5432" .env; then
+                                    echo "Normalisasi DATABASE_URL ke postgres:5432 (network internal stack)"
+                                    sed -i -E "s|^(DATABASE_URL=[a-zA-Z]+://[^@]+@)[^/?]+|\\1postgres:5432|" .env
                                 fi
                                 set -a && . ./.env && set +a
                                 echo "${PASSWORD_HARBOR}" | sudo docker login -u "${USERNAME_HARBOR}" --password-stdin hub.kai.id

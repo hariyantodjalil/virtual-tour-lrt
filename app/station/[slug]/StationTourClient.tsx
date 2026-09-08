@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Eye,
   EyeOff,
@@ -19,6 +20,7 @@ import {
   Home,
   Info,
   MapPin,
+  MapPinned,
   Pause,
   Play,
   Route,
@@ -37,7 +39,6 @@ import ContactPersonFab from "@/components/tour/ContactPersonFab";
 import FacilityLegend from "@/components/tour/FacilityLegend";
 import TourLeftPanel from "@/components/tour/TourLeftPanel";
 import TourUnitsPanel from "@/components/tour/TourUnitsPanel";
-import { TourNavigationBar } from "@/components/tour/TourNavigationBar";
 import { GuidedRouteBar } from "@/components/tour/GuidedRouteBar";
 import { formatNumber, getWhatsAppUrl } from "@/lib/utils";
 import type { StationInfo } from "@/lib/stations-data";
@@ -45,8 +46,6 @@ import type { AdHotspotPayload } from "@/lib/pannellum-tour-config";
 import {
   findScenePlacement,
   firstSceneIdInLevel,
-  scenesForNav,
-  defaultAreaForLevel,
 } from "@/lib/public-tour-structure";
 import { findSpaceHotspotPlacement } from "@/lib/space-hotspot-locate";
 import { findFacilityHotspotPlacement } from "@/lib/facility-hotspot-locate";
@@ -98,6 +97,61 @@ function buildRoute(sceneIds: string[], from: string, to: string) {
   return fi <= ti ? sceneIds.slice(fi, ti + 1) : sceneIds.slice(ti, fi + 1).reverse();
 }
 
+/** Urutan rute tetap, tapi tampilan dikelompokkan per level (Ground, Concourse, Peron). */
+function groupRouteByLevel(
+  route: string[],
+  levels: StationInfo["levels"],
+  scenes: StationInfo["scenes"]
+) {
+  const titleById = new Map(scenes.map((scene) => [scene.id, scene.title]));
+  const levelByScene = new Map<string, { id: string; label: string; order: number }>();
+
+  for (const level of levels) {
+    const sceneIds = new Set([
+      ...level.sceneIds,
+      ...level.areas.flatMap((area) => area.sceneIds),
+    ]);
+    for (const sceneId of sceneIds) {
+      levelByScene.set(sceneId, {
+        id: level.id,
+        label: level.label.trim() || "Level",
+        order: level.order,
+      });
+    }
+  }
+
+  const groups: Array<{
+    key: string;
+    label: string;
+    order: number;
+    items: Array<{ sceneId: string; title: string; index: number }>;
+  }> = [];
+  const byKey = new Map<string, (typeof groups)[number]>();
+
+  route.forEach((sceneId, index) => {
+    const level = levelByScene.get(sceneId);
+    const key = level?.id ?? "unassigned";
+    let group = byKey.get(key);
+    if (!group) {
+      group = {
+        key,
+        label: level?.label ?? "Lainnya",
+        order: level?.order ?? 9999,
+        items: [],
+      };
+      byKey.set(key, group);
+      groups.push(group);
+    }
+    group.items.push({
+      sceneId,
+      title: titleById.get(sceneId) ?? sceneId,
+      index,
+    });
+  });
+
+  return groups.sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
+}
+
 function ToolButton({
   active,
   onClick,
@@ -117,12 +171,9 @@ function ToolButton({
 }) {
   return (
     <div
-      className={`tour-rail-pop pointer-events-auto group relative flex items-center justify-end`}
+      className="tour-rail-pop pointer-events-auto group relative flex items-center justify-start"
       style={{ animationDelay: `${delayMs}ms` }}
     >
-      <span className="pointer-events-none mr-2 hidden translate-x-1 rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/85 px-2.5 py-1 font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-[#F8ECEE]/80 opacity-0 backdrop-blur-md transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100 sm:block">
-        {label}
-      </span>
       <button
         type="button"
         onClick={onClick}
@@ -137,6 +188,9 @@ function ToolButton({
           </span>
         )}
       </button>
+      <span className="pointer-events-none ml-2 hidden -translate-x-1 rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/85 px-2.5 py-1 font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-[#F8ECEE]/80 opacity-0 backdrop-blur-md transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100 sm:block">
+        {label}
+      </span>
     </div>
   );
 }
@@ -180,6 +234,7 @@ export default function StationTourClient({
   const [infoOpen, setInfoOpen] = useState(false);
   const [unitsOpen, setUnitsOpen] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
+  const [facilityOpen, setFacilityOpen] = useState(false);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [uiCleared, setUiCleared] = useState(false);
   const [guidedActive, setGuidedActive] = useState(false);
@@ -195,6 +250,9 @@ export default function StationTourClient({
 
   const availableCount = spaces.filter((s) => s.status === "TERSEDIA").length;
   const occupiedCount = spaces.filter((s) => s.status === "TERISI").length;
+  const currentLevel =
+    stationInfo.levels.find((l) => l.id === activeLevelId) ?? stationInfo.levels[0];
+  const currentPlaceLabel = currentLevel?.label?.trim() || "Lokasi";
   const commercialContactPhone =
     stationInfo.commercialContactPhone || commercialProfile.whatsappNumber;
   const stationWaUrl = getWhatsAppUrl(
@@ -202,12 +260,6 @@ export default function StationTourClient({
     `Halo, saya tertarik dengan ruang komersial di Stasiun ${stationInfo.name}. Mohon informasi lebih lanjut.`
   );
   const sceneIds = stationInfo.scenes.map((s) => s.id);
-  const navSceneIds = scenesForNav(
-    stationInfo.levels,
-    sceneIds,
-    activeLevelId || stationInfo.levels[0]?.id,
-    activeAreaId
-  );
   // Nav tetap terlihat saat unit drawer kanan terbuka; sembunyi hanya saat detail unit / clear UI
   const showTourNav = !selectedSpace && !uiCleared;
 
@@ -225,33 +277,8 @@ export default function StationTourClient({
     setFocusToken(0);
   }
 
-  function selectLevel(levelId: string) {
-    clearCameraFocus();
-    const level = stationInfo.levels.find((l) => l.id === levelId);
-    if (!level) return;
-    const area = defaultAreaForLevel(level);
-    const sceneId = area?.sceneIds[0] ?? firstSceneIdInLevel(level);
-    if (sceneId) {
-      activateScene(sceneId);
-    } else {
-      setActiveLevelId(levelId);
-      setActiveAreaId(area?.id ?? null);
-    }
-  }
-
-  function selectArea(areaId: string) {
-    clearCameraFocus();
-    const level = stationInfo.levels.find((l) => l.id === activeLevelId);
-    const area = level?.areas.find((a) => a.id === areaId);
-    const sceneId = area?.sceneIds[0];
-    if (sceneId) {
-      activateScene(sceneId);
-    } else {
-      setActiveAreaId(areaId);
-    }
-  }
-
   const selectedRoute = buildRoute(sceneIds, routeFrom, routeTo);
+  const groupedRoute = groupRouteByLevel(selectedRoute, stationInfo.levels, stationInfo.scenes);
   const routeIdx = selectedRoute.indexOf(activeSceneId);
   const safeRouteIdx = routeIdx >= 0 ? routeIdx : 0;
   const nextStep = routeIdx >= 0 ? selectedRoute[routeIdx + 1] : undefined;
@@ -273,6 +300,7 @@ export default function StationTourClient({
     setRouteOpen(false);
     setInfoOpen(false);
     setUnitsOpen(false);
+    setFacilityOpen(false);
     setSelectedSpace(null);
     setSelectedAd(null);
     handleSceneChange(routeFrom);
@@ -353,6 +381,7 @@ export default function StationTourClient({
     setUnitsOpen(false);
     setRouteOpen(false);
     setInfoOpen(false);
+    setFacilityOpen(false);
 
     activateScene(placement.sceneId);
     setCameraFocus({
@@ -406,6 +435,7 @@ export default function StationTourClient({
     setInfoOpen(false);
     setRouteOpen(false);
     setUnitsOpen(false);
+    setFacilityOpen(false);
   };
 
   function closeStationPicker() {
@@ -450,21 +480,6 @@ export default function StationTourClient({
         chromeTone="maroon"
       />
 
-      {showTourNav && stationInfo.levels.length > 0 && !guidedActive && (
-        <TourNavigationBar
-          levels={stationInfo.levels}
-          scenes={stationInfo.scenes}
-          activeLevelId={activeLevelId || stationInfo.levels[0].id}
-          activeAreaId={activeAreaId}
-          activeSceneId={activeSceneId}
-          visibleSceneIds={navSceneIds}
-          onSelectLevel={selectLevel}
-          onSelectArea={selectArea}
-          onSelectScene={handleSceneChange}
-          offsetClassName={unitsOpen ? "sm:pl-[22rem]" : ""}
-        />
-      )}
-
       {guidedActive && showTourNav && (
         <GuidedRouteBar
           fromTitle={routeFromTitle}
@@ -492,10 +507,10 @@ export default function StationTourClient({
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[60] px-3 pt-4 sm:px-5 sm:pt-5">
         <div className="flex items-center justify-end gap-3">
           {!leftPanelOpen && (
-            <div className="pointer-events-auto mr-auto flex w-[min(calc(100vw-1rem),244px)] items-center gap-1.5 sm:w-[260px]">
+            <div className="pointer-events-auto mr-auto flex w-[min(calc(100vw-1rem),220px)] items-center gap-1.5 sm:w-[236px]">
               <Link
                 href="/"
-                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-black/60 text-white shadow-md backdrop-blur-sm transition hover:brightness-110"
+                className="flex size-8 shrink-0 items-center justify-center rounded-full border border-white/12 bg-[#1c1c1e]/78 text-white backdrop-blur-md transition hover:bg-white/10"
                 aria-label="Beranda"
               >
                 <Home className="size-3.5" strokeWidth={2.25} />
@@ -503,46 +518,40 @@ export default function StationTourClient({
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
-                className="flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-full bg-black/60 px-3 text-left text-xs font-semibold text-white shadow-md backdrop-blur-sm transition hover:brightness-110"
+                className="flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-full border border-white/12 bg-[#1c1c1e]/78 px-2.5 text-left text-[11px] font-semibold text-white backdrop-blur-md transition hover:bg-white/10"
                 aria-label="Pilih stasiun"
               >
                 <TrainFront className="size-3.5 shrink-0 opacity-90" />
-                <span className="flex-1 truncate font-display">Pilih Stasiun</span>
+                <span className="min-w-0 flex-1 truncate font-display">Pilih Stasiun</span>
+                <ChevronDown className="size-3.5 shrink-0 opacity-70" strokeWidth={2.5} />
               </button>
             </div>
           )}
 
-          {availableCount > 0 && (
-            <div className="tour-glass pointer-events-none inline-flex items-center gap-2 rounded-full px-3 py-2">
+          <div className="pointer-events-none flex items-center gap-2">
+            <div className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2">
               <span className="h-2 w-2 rounded-full bg-[#34d399]" />
               <span className="font-display text-xs font-semibold text-[#F8ECEE]/85">
-                {availableCount} unit tersedia
+                {currentPlaceLabel}
               </span>
             </div>
-          )}
+            {availableCount > 0 && (
+              <div className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2">
+                <span className="h-2 w-2 rounded-full bg-[#34d399]" />
+                <span className="font-display text-xs font-semibold text-[#F8ECEE]/85">
+                  {availableCount} unit tersedia
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       )}
 
       {!uiCleared && !selectedSpace && !selectedAd && !unitsOpen && (
         <TourLeftPanel
-          open={leftPanelOpen}
-          onToggle={() => setLeftPanelOpen((v) => !v)}
           stationName={stationInfo.name}
-          spaces={spaces}
-          typeLabels={TYPE_LABELS}
           onPickStation={() => setPickerOpen(true)}
-          onSelectSpace={(space) => {
-            const full = spaces.find((s) => s.id === space.id);
-            if (full) openSpaceFromList(full);
-          }}
-          onViewAll={() => {
-            setSelectedSpace(null);
-            setSelectedAd(null);
-            setInfoOpen(false);
-            setRouteOpen(false);
-            setUnitsOpen(true);
-          }}
           clearUiControl={
             leftPanelOpen ? (
               <button
@@ -551,9 +560,10 @@ export default function StationTourClient({
                   setInfoOpen(false);
                   setRouteOpen(false);
                   setUnitsOpen(false);
+                  setFacilityOpen(false);
                   setUiCleared(true);
                 }}
-                className="flex size-11 items-center justify-center rounded-full bg-black/60 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/75"
+                className="flex size-11 items-center justify-center rounded-full border border-white/12 bg-[#1c1c1e]/78 text-white backdrop-blur-md transition hover:bg-white/10"
                 aria-label="Sembunyikan UI"
                 title="Sembunyikan UI"
               >
@@ -561,72 +571,99 @@ export default function StationTourClient({
               </button>
             ) : undefined
           }
+          tools={
+            <>
+              <ToolButton
+                active={infoOpen}
+                label="Info"
+                title="Info stasiun"
+                delayMs={40}
+                onClick={() => {
+                  setInfoOpen((v) => !v);
+                  setRouteOpen(false);
+                  setUnitsOpen(false);
+                  setFacilityOpen(false);
+                }}
+              >
+                <Info className="h-5 w-5" />
+              </ToolButton>
+
+              {stationInfo.scenes.length > 1 && (
+                <ToolButton
+                  active={routeOpen || guidedActive}
+                  label="Rute"
+                  title="Guided route"
+                  delayMs={90}
+                  onClick={() => {
+                    if (guidedActive) {
+                      exitGuidedRoute();
+                      setRouteOpen(true);
+                      setInfoOpen(false);
+                      setUnitsOpen(false);
+                      setFacilityOpen(false);
+                      return;
+                    }
+                    setRouteOpen((v) => !v);
+                    setInfoOpen(false);
+                    setUnitsOpen(false);
+                    setFacilityOpen(false);
+                  }}
+                >
+                  <Route className="h-5 w-5" />
+                </ToolButton>
+              )}
+
+              <ToolButton
+                active={unitsOpen}
+                label="Unit"
+                title="Daftar unit"
+                badge={availableCount}
+                delayMs={140}
+                onClick={() => {
+                  setUnitsOpen((v) => !v);
+                  setInfoOpen(false);
+                  setRouteOpen(false);
+                  setFacilityOpen(false);
+                  if (unitsOpen) {
+                    setSelectedSpace(null);
+                    setOpenedFromUnitsList(false);
+                  }
+                }}
+              >
+                <Grid3X3 className="h-5 w-5" />
+              </ToolButton>
+
+              <ToolButton
+                active={facilityOpen}
+                label="Fasilitas"
+                title="Fasilitas stasiun"
+                delayMs={190}
+                onClick={() => {
+                  setFacilityOpen((v) => !v);
+                  setInfoOpen(false);
+                  setRouteOpen(false);
+                  setUnitsOpen(false);
+                }}
+              >
+                <MapPinned className="h-5 w-5" />
+              </ToolButton>
+            </>
+          }
         />
       )}
 
-      {/* RIGHT TOOL RAIL */}
-      {!uiCleared && (
-      <div className="pointer-events-none absolute right-3 top-1/2 z-[60] flex -translate-y-1/2 flex-col items-end gap-2.5 sm:right-5">
-        <ToolButton
-          active={infoOpen}
-          label="Info"
-          title="Info stasiun"
-          delayMs={40}
-          onClick={() => {
-            setInfoOpen((v) => !v);
-            setRouteOpen(false);
-            setUnitsOpen(false);
-          }}
-        >
-          <Info className="h-5 w-5" />
-        </ToolButton>
-
-        {stationInfo.scenes.length > 1 && (
-          <ToolButton
-            active={routeOpen || guidedActive}
-            label="Rute"
-            title="Guided route"
-            delayMs={90}
-            onClick={() => {
-              if (guidedActive) {
-                exitGuidedRoute();
-                setRouteOpen(true);
-                setInfoOpen(false);
-                setUnitsOpen(false);
-                return;
-              }
-              setRouteOpen((v) => !v);
-              setInfoOpen(false);
-              setUnitsOpen(false);
-            }}
-          >
-            <Route className="h-5 w-5" />
-          </ToolButton>
-        )}
-
-        <ToolButton
-          active={unitsOpen}
-          label="Unit"
-          title="Daftar unit"
-          badge={availableCount}
-          delayMs={140}
-          onClick={() => {
-            setUnitsOpen((v) => !v);
-            setInfoOpen(false);
-            setRouteOpen(false);
-            if (unitsOpen) {
-              setSelectedSpace(null);
-              setOpenedFromUnitsList(false);
-            }
-          }}
-        >
-          <Grid3X3 className="h-5 w-5" />
-        </ToolButton>
-      </div>
+      {/* Panel fasilitas — muncul di samping rail saat tombol diklik */}
+      {!uiCleared && facilityOpen && !selectedSpace && !selectedAd && !unitsOpen && (
+        <div className="pointer-events-auto absolute top-1/2 left-14 z-[65] -translate-y-1/2 sm:left-16">
+          <FacilityLegend
+            activeFacilityId={activeFacilityId}
+            onSelectFacility={focusOnFacility}
+          />
+        </div>
       )}
 
       {/* Backdrop soft close for side panels */}
-      {!uiCleared && (infoOpen || routeOpen) && !selectedSpace && (
+      {!uiCleared && (infoOpen || routeOpen || facilityOpen) && !selectedSpace && (
         <button
           type="button"
           aria-label="Tutup panel"
@@ -635,9 +672,15 @@ export default function StationTourClient({
         />
       )}
 
-      {/* INFO PANEL — kanan, di samping rail */}
+      {/* INFO PANEL — kiri, di samping rail */}
       {!uiCleared && infoOpen && !selectedSpace && (
-        <aside className="tour-glass-panel tour-panel-in pointer-events-auto absolute right-16 top-1/2 z-[65] w-[min(18.5rem,calc(100vw-5.5rem))] -translate-y-1/2 overflow-hidden rounded-2xl text-[#F8ECEE] sm:right-20">
+        <aside
+          className={`tour-glass-panel tour-panel-in pointer-events-auto absolute top-1/2 z-[65] w-[min(18.5rem,calc(100vw-5.5rem))] -translate-y-1/2 overflow-hidden rounded-2xl text-[#F8ECEE] ${
+            leftPanelOpen
+              ? "left-14 sm:left-16"
+              : "left-4 sm:left-5"
+          }`}
+        >
           <div className="flex items-center justify-between border-b border-[color:rgb(255_214_218_/_0.12)] px-4 py-3">
             <h2 className="font-display text-base font-semibold tracking-tight">{stationInfo.name}</h2>
             <button
@@ -705,7 +748,13 @@ export default function StationTourClient({
 
       {/* ROUTE PANEL */}
       {!uiCleared && routeOpen && !selectedSpace && stationInfo.scenes.length > 1 && (
-        <aside className="tour-glass-panel tour-panel-in pointer-events-auto absolute right-16 top-1/2 z-[65] w-[min(18.5rem,calc(100vw-5.5rem))] -translate-y-1/2 overflow-hidden rounded-2xl text-[#F8ECEE] sm:right-20">
+        <aside
+          className={`tour-glass-panel tour-panel-in pointer-events-auto absolute top-1/2 z-[65] w-[min(18.5rem,calc(100vw-5.5rem))] -translate-y-1/2 overflow-hidden rounded-2xl text-[#F8ECEE] ${
+            leftPanelOpen
+              ? "left-14 sm:left-16"
+              : "left-4 sm:left-5"
+          }`}
+        >
           <div className="flex items-center justify-between border-b border-[color:rgb(255_214_218_/_0.12)] px-4 py-3">
             <div className="flex items-center gap-2">
               <Route className="h-4 w-4 text-[#E31E2D]" />
@@ -800,35 +849,41 @@ export default function StationTourClient({
               <Route className="h-3.5 w-3.5" />
               Mulai rute manual
             </button>
-            <div className="space-y-1.5 pt-1">
-              {selectedRoute.map((sceneId, idx) => {
-                const scene = stationInfo.scenes.find((s) => s.id === sceneId);
-                const isActive = sceneId === activeSceneId;
-                return (
-                  <button
-                    key={sceneId}
-                    type="button"
-                    onClick={() => handleSceneChange(sceneId)}
-                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs transition-all duration-300 ${
-                      isActive
-                        ? "bg-white font-bold text-[#1C0A0E]"
-                        : "bg-[#1C0A0E]/45 text-[#F8ECEE]/70 hover:bg-[#1C0A0E]/7"
-                    }`}
-                  >
-                    <span
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-display text-[10px] font-bold ${
-                        isActive ? "bg-[#E31E2D] text-white" : "bg-white/10 text-[#F8ECEE]/70"
-                      }`}
-                    >
-                      {idx + 1}
-                    </span>
-                    <span>{scene?.title ?? sceneId}</span>
-                    {isActive && (
-                      <CheckCircle2 className="ml-auto h-3.5 w-3.5 shrink-0 text-[#34d399]" />
-                    )}
-                  </button>
-                );
-              })}
+            <div className="space-y-3 pt-1">
+              {groupedRoute.map((group) => (
+                <div key={group.key} className="space-y-1.5">
+                  <p className="px-1 font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-[#ff8a93]">
+                    {group.label}
+                  </p>
+                  {group.items.map((item) => {
+                    const isActive = item.sceneId === activeSceneId;
+                    return (
+                      <button
+                        key={item.sceneId}
+                        type="button"
+                        onClick={() => handleSceneChange(item.sceneId)}
+                        className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs transition-all duration-300 ${
+                          isActive
+                            ? "bg-white font-bold text-[#1C0A0E]"
+                            : "bg-[#1C0A0E]/45 text-[#F8ECEE]/70 hover:bg-[#1C0A0E]/7"
+                        }`}
+                      >
+                        <span
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-display text-[10px] font-bold ${
+                            isActive ? "bg-[#E31E2D] text-white" : "bg-white/10 text-[#F8ECEE]/70"
+                          }`}
+                        >
+                          {item.index + 1}
+                        </span>
+                        <span>{item.title}</span>
+                        {isActive && (
+                          <CheckCircle2 className="ml-auto h-3.5 w-3.5 shrink-0 text-[#34d399]" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
 
             {guidedActive && nextStep && (
@@ -926,13 +981,6 @@ export default function StationTourClient({
         />
       )}
 
-      {!uiCleared && !selectedSpace && !selectedAd && (
-        <FacilityLegend
-          activeFacilityId={activeFacilityId}
-          onSelectFacility={focusOnFacility}
-        />
-      )}
-
       {/* Clear / restore UI — di bawah mini map saat panel terbuka; floating saat UI disembunyikan / panel tertutup */}
       {(uiCleared || !leftPanelOpen || selectedSpace || selectedAd || unitsOpen) && (
         <button
@@ -943,11 +991,12 @@ export default function StationTourClient({
                 setInfoOpen(false);
                 setRouteOpen(false);
                 setUnitsOpen(false);
+                setFacilityOpen(false);
               }
               return !v;
             });
           }}
-          className="pointer-events-auto absolute bottom-24 left-3 z-[70] flex size-11 items-center justify-center rounded-full bg-black/60 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/75 sm:bottom-28 sm:left-5"
+          className="pointer-events-auto absolute bottom-24 left-3 z-[70] flex size-11 items-center justify-center rounded-full border border-white/12 bg-[#1c1c1e]/78 text-white backdrop-blur-md transition hover:bg-white/10 sm:bottom-28 sm:left-5"
           aria-label={uiCleared ? "Tampilkan UI" : "Sembunyikan UI"}
           title={uiCleared ? "Tampilkan UI" : "Sembunyikan UI"}
         >

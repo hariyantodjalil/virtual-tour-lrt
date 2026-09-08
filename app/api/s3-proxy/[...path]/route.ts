@@ -55,6 +55,7 @@ const PUBLIC_PREFIXES = [
   "virtual-tour/ad-creatives/",
   "stations/covers/",
   "spaces/photos/",
+  "spaces/train-rental/",
   "panoramas/",
   "floorplans/",
   "thumbnails/",

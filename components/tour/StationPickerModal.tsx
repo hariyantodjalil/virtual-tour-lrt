@@ -2,9 +2,8 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useRef } from "react";
-import Image from "next/image";
-import { MapPin, Train, Users, X } from "lucide-react";
-import { getStationImage } from "@/lib/station-images";
+import { X } from "lucide-react";
+import StationPickerCard from "@/components/tour/StationPickerCard";
 
 export type StationPickerItem = {
   slug: string;
@@ -14,6 +13,7 @@ export type StationPickerItem = {
   address?: string;
   location?: string | null;
   dailyPassengers?: number;
+  imageUrl?: string | null;
 };
 
 type Props = {
@@ -26,42 +26,6 @@ type Props = {
 const MODAL_W = 920;
 const MODAL_H = 720;
 const HEADER_H = 56;
-
-function formatPassengersPerDay(n: number): string {
-  if (n >= 1000) {
-    const k = n / 1000;
-    const label = Number.isInteger(k) ? String(k) : k.toFixed(1).replace(/\.0$/, "");
-    return `${label}K / hari`;
-  }
-  return `${n} / hari`;
-}
-
-function splitLocation(station: StationPickerItem): { area: string; city: string } {
-  const location = station.location?.trim() || "";
-  const address = station.address?.trim() || "";
-
-  if (address.includes(",")) {
-    const [area, ...rest] = address.split(",").map((p) => p.trim());
-    return {
-      area: area || location || "LRT Jabodebek",
-      city: rest.join(", ") || location || "",
-    };
-  }
-
-  if (address && location && address !== location) {
-    return { area: address, city: location };
-  }
-
-  return {
-    area: address || location || "LRT Jabodebek",
-    city: location && location !== address ? location : "",
-  };
-}
-
-function lineLabel(line: string): string {
-  const trimmed = line.trim() || "Jabodebek";
-  return /line/i.test(trimmed) ? trimmed : `${trimmed} Line`;
-}
 
 export default function StationPickerModal({
   stations,
@@ -118,74 +82,20 @@ export default function StationPickerModal({
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5"
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {stations.map((station) => {
-              const active = station.slug === currentSlug;
-              const { area, city } = splitLocation(station);
-              const passengers = station.dailyPassengers ?? 0;
-
-              return (
-                <button
-                  key={station.slug}
-                  type="button"
-                  onClick={() => onSelect(station.slug)}
-                  className={`group flex w-full flex-col overflow-hidden rounded-2xl bg-white text-left shadow-[0_2px_12px_rgba(16,24,40,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(16,24,40,0.14)] ${
-                    active ? "ring-2 ring-[#D81435]" : ""
-                  }`}
-                >
-                  <span className="relative block h-[140px] w-full shrink-0 overflow-hidden sm:h-[150px]">
-                    <Image
-                      src={getStationImage(station.slug, station.order)}
-                      alt={`Stasiun ${station.name}`}
-                      fill
-                      sizes="280px"
-                      className="object-cover transition duration-500 group-hover:scale-105"
-                    />
-                  </span>
-
-                  <span className="flex flex-1 flex-col gap-2.5 px-3.5 pt-3 pb-3.5">
-                    <span className="block text-[15px] leading-snug font-bold text-[#101828]">
-                      {station.name}
-                    </span>
-
-                    <span className="flex items-start gap-1.5 text-[11px] leading-4 text-[#667085]">
-                      <MapPin className="mt-0.5 size-3.5 shrink-0 text-[#D81435]" strokeWidth={2.25} />
-                      <span className="min-w-0">
-                        <span className="block truncate">{area}</span>
-                        {city ? <span className="block truncate">{city}</span> : null}
-                      </span>
-                    </span>
-
-                    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#e8f5e9] px-2.5 py-1 text-[11px] font-medium text-[#2e7d32]">
-                      <Train className="size-3.5 shrink-0" strokeWidth={2.25} />
-                      {lineLabel(station.line)}
-                    </span>
-
-                    <span className="mt-auto flex items-end justify-between gap-2 pt-1">
-                      <span className="min-w-0">
-                        <span className="flex items-center gap-1.5 text-[10px] text-[#98a2b3]">
-                          <Users className="size-3.5 shrink-0" strokeWidth={2.25} />
-                          Rata-rata Penumpang
-                        </span>
-                        <span className="mt-0.5 block text-sm font-bold text-[#D81435]">
-                          {formatPassengersPerDay(passengers)}
-                        </span>
-                      </span>
-
-                      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[#D81435] transition group-hover:bg-[#B8112D]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src="/brand/landing/icons/card-arrow.svg"
-                          alt=""
-                          width={16}
-                          height={16}
-                          className="size-4"
-                        />
-                      </span>
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
+            {stations.map((station) => (
+              <button
+                key={station.slug}
+                type="button"
+                onClick={() => onSelect(station.slug)}
+                className="text-left"
+              >
+                <StationPickerCard
+                  station={station}
+                  active={station.slug === currentSlug}
+                  variant="light"
+                />
+              </button>
+            ))}
           </div>
 
           {stations.length === 0 && (

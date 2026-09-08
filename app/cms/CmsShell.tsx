@@ -11,11 +11,13 @@ import {
   Users,
   UserCircle,
   Train,
+  TrainFront,
   PanelLeftClose,
   PanelLeft,
   Building2,
   PhoneCall,
   Sliders,
+  LayoutGrid,
   type LucideIcon,
 } from "lucide-react";
 import CmsNotifications from "@/components/cms/CmsNotifications";
@@ -37,7 +39,9 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/cms/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/cms/stations", label: "Stasiun", icon: Train },
-  { href: "/cms/virtual-tour", label: "Virtual Tour", icon: Map },
+  { href: "/cms/virtual-tour", label: "Station Virtual Tour", icon: Map },
+  { href: "/cms/virtual-train", label: "Train Virtual Tour", icon: TrainFront },
+  { href: "/cms/train-spaces", label: "Train Rental Space", icon: LayoutGrid },
   { href: "/cms/spaces", label: "Ruang Komersial", icon: Store },
   { href: "/cms/tenants", label: "Penyewa Aktif", icon: Building2 },
   { href: "/cms/leads", label: "Pengajuan & Site Visit", icon: UserCircle },
@@ -72,7 +76,11 @@ function getSidebarServerSnapshot() {
 }
 
 function isFullWidthPage(pathname: string) {
-  return pathname.startsWith("/cms/virtual-tour/") && pathname !== "/cms/virtual-tour";
+  return (
+    pathname === "/cms/virtual-train" ||
+    (pathname.startsWith("/cms/virtual-tour/") && pathname !== "/cms/virtual-tour") ||
+    (pathname.startsWith("/cms/virtual-train/") && pathname !== "/cms/virtual-train")
+  );
 }
 
 function getPageMeta(pathname: string) {
@@ -92,10 +100,19 @@ function getPageMeta(pathname: string) {
     return { title: "Stasiun", subtitle: "Master data stasiun LRT Jabodebek" };
   }
   if (pathname.startsWith("/cms/virtual-tour/")) {
-    return { title: "Editor Virtual Tour", subtitle: "Atur panorama, hotspot, dan alur tur 360" };
+    return { title: "Editor Station Virtual Tour", subtitle: "Atur panorama, hotspot, dan alur tur 360 stasiun" };
   }
   if (pathname.startsWith("/cms/virtual-tour")) {
-    return { title: "Virtual Tour", subtitle: "Daftar konfigurasi tur 360 setiap stasiun" };
+    return { title: "Station Virtual Tour", subtitle: "Daftar konfigurasi tur 360 setiap stasiun" };
+  }
+  if (pathname.startsWith("/cms/virtual-train")) {
+    return { title: "Train Virtual Tour", subtitle: "Kelola panorama 360° interior kereta LRT Jabodebek" };
+  }
+  if (pathname.startsWith("/cms/train-spaces")) {
+    return {
+      title: "Train Rental Space",
+      subtitle: "Kelola kartu carousel ruang iklan di landing train virtual tour",
+    };
   }
   if (pathname.startsWith("/cms/spaces/")) {
     return { title: "Ruang Komersial", subtitle: "Kelola unit sewa per stasiun" };

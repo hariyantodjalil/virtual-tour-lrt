@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Layers, MapPinned } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Layers } from "lucide-react";
 import type { TourLevelPublic } from "@/lib/tour-types";
 import type { PanoramaScene } from "@/lib/tour-types";
 
@@ -22,11 +22,9 @@ export function TourNavigationBar({
   levels,
   scenes,
   activeLevelId,
-  activeAreaId,
   activeSceneId,
   visibleSceneIds,
   onSelectLevel,
-  onSelectArea,
   onSelectScene,
   offsetClassName = "",
 }: Props) {
@@ -34,7 +32,6 @@ export function TourNavigationBar({
   const menuRef = useRef<HTMLDivElement>(null);
   const listId = useId();
   const activeLevel = levels.find((l) => l.id === activeLevelId) ?? levels[0];
-  const showAreaRow = (activeLevel?.areas.length ?? 0) >= 1;
   const sceneTitle = (id: string) => scenes.find((s) => s.id === id)?.title ?? id;
   const sceneIndex = Math.max(0, visibleSceneIds.indexOf(activeSceneId));
   const hasScenes = visibleSceneIds.length > 0;
@@ -76,11 +73,6 @@ export function TourNavigationBar({
   function pickLevel(levelId: string) {
     setSceneMenuOpen(false);
     onSelectLevel(levelId);
-  }
-
-  function pickArea(areaId: string) {
-    setSceneMenuOpen(false);
-    onSelectArea(areaId);
   }
 
   return (
@@ -175,50 +167,6 @@ export function TourNavigationBar({
                   );
                 })}
               </div>
-            </div>
-          )}
-
-          {/* Area — select native jika banyak, chip jika sedikit */}
-          {showAreaRow && activeLevel && (
-            <div className="mb-1.5 flex items-center gap-2 px-1">
-              <MapPinned className="h-3.5 w-3.5 shrink-0 text-[#C4A8AD]" aria-hidden />
-              {activeLevel.areas.length > 4 ? (
-                <label className="relative min-w-0 flex-1">
-                  <span className="sr-only">Pilih area</span>
-                  <select
-                    value={activeAreaId ?? activeLevel.areas[0]?.id ?? ""}
-                    onChange={(e) => pickArea(e.target.value)}
-                    className="h-9 w-full appearance-none rounded-xl border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/55 py-1.5 pr-8 pl-3 font-display text-xs font-semibold text-[#F8ECEE] outline-none focus:border-[#E31E2D]/50"
-                  >
-                    {activeLevel.areas.map((area) => (
-                      <option key={area.id} value={area.id} className="bg-[#1C0A0E]">
-                        {area.label} ({area.sceneIds.length})
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-[#C4A8AD]" />
-                </label>
-              ) : (
-                <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {activeLevel.areas.map((area) => {
-                    const isActive = area.id === activeAreaId;
-                    return (
-                      <button
-                        key={area.id}
-                        type="button"
-                        onClick={() => pickArea(area.id)}
-                        className={`shrink-0 rounded-full px-3 py-1.5 font-display text-[11px] font-semibold transition-all duration-300 ${
-                          isActive
-                            ? "bg-white text-[#1C0A0E]"
-                            : "text-[#F8ECEE]/60 hover:bg-white/8 hover:text-white"
-                        }`}
-                      >
-                        {area.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           )}
 

@@ -78,6 +78,16 @@ export const spaceMutationSchema = z.object({
   tenantId: id.nullable().optional(),
 }).strict();
 
+export const trainRentalSpaceMutationSchema = z.object({
+  displayNumber: z.string().trim().min(1).max(8).regex(/^\d{2}$/, "Nomor tampilan harus 2 digit, mis. 01"),
+  title: shortText,
+  description: optionalText(5_000),
+  imageUrl: nullableUrl,
+  objectPosition: z.string().trim().min(1).max(32).default("50% 50%"),
+  order: safeInteger.optional(),
+  isActive: z.boolean().optional(),
+}).strict();
+
 export const userCreateSchema = z.object({
   email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
   name: shortText,

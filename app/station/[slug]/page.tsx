@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { getStationBySlug, getStationMetaBySlug } from "@/lib/stations-data";
+import { getPickerStations } from "@/lib/station-picker-data";
 import StationTourClient from "./StationTourClient";
 
 // Selalu render fresh dari DB — tidak pakai static generation
@@ -41,32 +42,6 @@ async function getStationData(slug: string) {
     });
   } catch {
     return null;
-  }
-}
-
-/** Daftar stasiun untuk popup pilih stasiun (Figma 234:7240) */
-async function getPickerStations() {
-  try {
-    const stations = await prisma.station.findMany({
-      where: {
-        isActive: true,
-        virtualTourScenes: { some: { isActive: true } },
-      },
-      orderBy: { order: "asc" },
-      select: {
-        slug: true,
-        name: true,
-        order: true,
-        line: true,
-        address: true,
-        location: true,
-        dailyPassengers: true,
-      },
-    });
-
-    return stations;
-  } catch {
-    return [];
   }
 }
 
