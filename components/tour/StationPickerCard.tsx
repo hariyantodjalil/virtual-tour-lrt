@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { MapPin, Train, Users } from "lucide-react";
 import { getStationImage } from "@/lib/station-images";
+import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { StationPickerItem } from "@/components/tour/StationPickerModal";
 import {
   formatPassengersPerDay,
@@ -39,7 +40,11 @@ export default function StationPickerCard({
     >
       <span className="relative block h-[140px] w-full shrink-0 overflow-hidden sm:h-[150px]">
         <Image
-          src={getStationImage(station.slug, station.order)}
+          src={
+            station.imageUrl
+              ? getS3ProxyUrl(station.imageUrl)
+              : getStationImage(station.slug, station.order)
+          }
           alt={`Stasiun ${station.name}`}
           fill
           sizes="(max-width: 640px) 100vw, 320px"

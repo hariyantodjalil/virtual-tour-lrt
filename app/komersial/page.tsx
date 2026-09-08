@@ -10,6 +10,10 @@ import CommercialContactDetails from "@/components/commercial/CommercialContactD
 import VirtualTourStartOverlay from "@/components/tour/VirtualTourStartOverlay";
 import { ArrowRight, Play } from "lucide-react";
 
+// Wajib dinamis: data unit komersial diambil dari database saat runtime,
+// bukan saat build (DB tidak tersedia di dalam docker build).
+export const dynamic = "force-dynamic";
+
 const TRANSPORT = [
   { label: "KRL", icon: "/brand/landing/icons/transport-krl.png" },
   { label: "MRT", icon: "/brand/landing/icons/transport-mrt.png" },

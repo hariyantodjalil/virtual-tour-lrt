@@ -13,6 +13,7 @@ export type StationPickerItem = {
   address?: string;
   location?: string | null;
   dailyPassengers?: number;
+  imageUrl?: string | null;
 };
 
 type Props = {
