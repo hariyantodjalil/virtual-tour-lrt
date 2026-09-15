@@ -17,7 +17,7 @@
   --shadow: rgba(28, 10, 14, 0.55);
 }
 
-@theme inline {
+@theme inline { /* NOSONAR */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-void: var(--void);
