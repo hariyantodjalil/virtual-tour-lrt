@@ -5,6 +5,7 @@ import { findSpaceStatus, type SpaceAvailabilityStatus } from "@/lib/space-avail
 import { SCENE_FADE_MS } from "@/lib/pannellum-tour-dive";
 import { PANNELLUM_HFOV, PANNELLUM_INTERACTION, PANNELLUM_PITCH_LIMITS } from "@/lib/pannellum-viewer-defaults";
 import { preloadPanoramaUrl, preloadPanoramaUrls } from "@/lib/panorama-preload";
+import type { PannellumMultiRes } from "@/lib/panorama-multires";
 
 export type AdHotspotPayload = {
   spaceCode?: string;
@@ -97,6 +98,26 @@ export function panoramaUrlForScene(scenes: PanoramaScene[], sceneId: string) {
   return scene ? getS3ProxyUrl(scene.panoramaUrl) : "";
 }
 
+const PREVIEW_FACES = ["f", "r", "b", "l", "u", "d"];
+
+function proxyMultiRes(multiRes: PannellumMultiRes) {
+  return {
+    ...multiRes,
+    basePath: getS3ProxyUrl(multiRes.basePath).replace(/\/$/, ""),
+  };
+}
+
+/** Tile tingkat rendah saja. Scene tanpa tile tetap memakai WebP utuh. */
+export function scenePreviewUrls(scene: PanoramaScene | undefined) {
+  if (!scene) return [];
+  if (scene.multiRes) {
+    const base = proxyMultiRes(scene.multiRes).basePath;
+    return PREVIEW_FACES.map((face) => `${base}/1/${face}0_0.${scene.multiRes?.extension ?? "jpg"}`);
+  }
+  const url = getS3ProxyUrl(scene.panoramaUrl);
+  return url ? [url] : [];
+}
+
 export function linkedSceneIds(scene: PanoramaScene) {
   return scene.hotspots
     .filter((h) => h.type === "scene" && h.sceneId)
@@ -105,7 +126,7 @@ export function linkedSceneIds(scene: PanoramaScene) {
 
 export function preloadInitialPanorama(scenes: PanoramaScene[], sceneId?: string) {
   const initial = scenes.find((scene) => scene.id === sceneId) ?? scenes[0];
-  if (initial) void preloadPanoramaUrl(getS3ProxyUrl(initial.panoramaUrl));
+  void preloadPanoramaUrls(scenePreviewUrls(initial));
 }
 
 export function preloadLinkedScenes(scenes: PanoramaScene[], fromSceneId: string) {
@@ -113,8 +134,7 @@ export function preloadLinkedScenes(scenes: PanoramaScene[], fromSceneId: string
   if (!scene) return;
   const urls = linkedSceneIds(scene)
     .slice(0, 2)
-    .map((id) => panoramaUrlForScene(scenes, id))
-    .filter(Boolean);
+    .flatMap((id) => scenePreviewUrls(scenes.find((item) => item.id === id)));
   void preloadPanoramaUrls(urls);
 }
 
@@ -128,8 +148,9 @@ export function buildPannellumTourConfig(
   for (const scene of scenes) {
     const view = scene.initialView;
     sceneMap[scene.id] = {
-      type: "equirectangular",
-      panorama: getS3ProxyUrl(scene.panoramaUrl),
+      ...(scene.multiRes
+        ? { type: "multires", multiRes: proxyMultiRes(scene.multiRes) }
+        : { type: "equirectangular", panorama: getS3ProxyUrl(scene.panoramaUrl) }),
       hotSpots: buildHotSpots(scene, scenes, handlers),
       ...(view
         ? {
@@ -157,4 +178,4 @@ export function buildPannellumTourConfig(
   };
 }
 
-export { preloadPanoramaUrl };
+export { preloadPanoramaUrl, preloadPanoramaUrls };

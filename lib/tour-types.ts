@@ -1,5 +1,6 @@
 import type { PrivacyBlur } from "./privacy-blur-types";
 import type { FacilityIconId } from "./facility-icons";
+import type { PannellumMultiRes } from "./panorama-multires";
 
 export type Hotspot = {
   pitch: number;
@@ -35,6 +36,7 @@ export type PanoramaScene = {
   id: string;
   title: string;
   panoramaUrl: string;
+  multiRes?: PannellumMultiRes;
   hotspots: Hotspot[];
   privacyBlurs?: PrivacyBlur[];
   initialView?: SceneInitialView;

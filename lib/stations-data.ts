@@ -4,6 +4,7 @@ import type { StationInfo } from "@/lib/tour-types";
 import { normalizeHotspots } from "@/lib/hotspot-normalize";
 import { extractPrivacyBlursFromCanvasData } from "@/lib/privacy-blur-normalize";
 import { extractInitialViewFromCanvasData } from "@/lib/scene-initial-view";
+import { extractMultiResFromCanvasData } from "@/lib/panorama-multires";
 import { sortScenesByTourOrder } from "@/lib/virtual-tour-structure";
 import { buildPublicTourLevels } from "@/lib/public-tour-structure";
 
@@ -59,6 +60,7 @@ async function mapStationToInfo(station: StationRow): Promise<StationInfo> {
       id: scene.sceneId,
       title: scene.title,
       panoramaUrl: scene.panoramaUrl,
+      multiRes: extractMultiResFromCanvasData(scene.canvasData),
       thumbnailUrl: scene.thumbnailUrl ?? undefined,
       levelId: scene.levelId,
       areaId: scene.areaId,

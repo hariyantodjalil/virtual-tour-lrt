@@ -1,7 +1,7 @@
 /** Transisi scene — preload dulu, lalu crossfade ringan (tanpa loading UI). */
 
-export const SCENE_FADE_MS = 1600;
-export const SCENE_SWAP_MS = 260;
+export const SCENE_FADE_MS = 600;
+export const SCENE_SWAP_MS = 140;
 /** Masuk scene baru di zoom out maksimal (sama dengan PANNELLUM_HFOV.hfov). */
 export const SCENE_ENTRY_HFOV = 120;
 

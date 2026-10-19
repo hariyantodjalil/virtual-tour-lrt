@@ -8,9 +8,9 @@ import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { findSpaceStatus } from "@/lib/space-availability";
 import {
   buildPannellumTourConfig,
-  panoramaUrlForScene,
   preloadLinkedScenes,
-  preloadPanoramaUrl,
+  preloadPanoramaUrls,
+  scenePreviewUrls,
   preloadInitialPanorama,
 } from "@/lib/pannellum-tour-config";
 import {
@@ -59,14 +59,14 @@ function loadPannellum(): Promise<void> {
       const link = document.createElement("link");
       link.id = "pannellum-css";
       link.rel = "stylesheet";
-      link.href = "https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css";
+      link.href = "https://cdn.jsdelivr.net/npm/pannellum@2.5.7/build/pannellum.css";
       document.head.appendChild(link);
     }
 
     if (!document.getElementById("pannellum-js")) {
       const script = document.createElement("script");
       script.id = "pannellum-js";
-      script.src = "https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js";
+      script.src = "https://cdn.jsdelivr.net/npm/pannellum@2.5.7/build/pannellum.js";
       script.onload = () => resolve();
       script.onerror = () => reject(new Error("Gagal memuat Pannellum dari CDN"));
       document.body.appendChild(script);
@@ -190,14 +190,15 @@ export default function VirtualTourViewer({
     try {
       stopViewerAutoRotate(viewer);
       setAutoRotate(false);
-      viewer.lookAt(target.pitch, target.yaw, target.hfov ?? 82, 900);
+      viewer.lookAt(target.pitch, target.yaw, target.hfov ?? 82, 320);
     } catch {
       /* ignore */
     }
   }, []);
 
   const ensureSceneReady = useCallback(
-    (sceneId: string) => preloadPanoramaUrl(panoramaUrlForScene(scenesRef.current, sceneId)),
+    (sceneId: string) =>
+      preloadPanoramaUrls(scenePreviewUrls(scenesRef.current.find((scene) => scene.id === sceneId))),
     []
   );
 

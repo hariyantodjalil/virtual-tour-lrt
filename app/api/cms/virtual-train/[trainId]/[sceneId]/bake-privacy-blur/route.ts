@@ -8,6 +8,7 @@ import {
   generateS3Key,
   uploadToS3,
 } from "@/lib/s3";
+import { uploadPanoramaTiles } from "@/lib/panorama-tile-upload";
 import { formatBytes } from "@/lib/image-processor";
 import sharp from "sharp";
 import {
@@ -129,7 +130,10 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const panoramaUrl = `/${panoramaKey}`;
   const thumbnailUrl = `/${thumbKey}`;
-  const canvasData = markPrivacyBlurBaked(scene.canvasData, blurs, sourcePanoramaUrl) as Prisma.InputJsonValue;
+  const canvasData = {
+    ...markPrivacyBlurBaked(scene.canvasData, blurs, sourcePanoramaUrl),
+    multiRes: await uploadPanoramaTiles(panoramaBuffer, trainSlug, sceneId),
+  } as Prisma.InputJsonValue;
 
   const updated = await prisma.trainTourScene.update({
     where: { trainId_sceneId: { trainId, sceneId } },

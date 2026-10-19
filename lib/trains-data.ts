@@ -4,6 +4,7 @@ import type { PanoramaScene, TourLevelPublic } from "@/lib/tour-types";
 import { normalizeHotspots } from "@/lib/hotspot-normalize";
 import { extractPrivacyBlursFromCanvasData } from "@/lib/privacy-blur-normalize";
 import { extractInitialViewFromCanvasData } from "@/lib/scene-initial-view";
+import { extractMultiResFromCanvasData } from "@/lib/panorama-multires";
 import { sortTrainScenesByTourOrder, ensureTrainTourStructure } from "@/lib/train-tour-structure";
 import { buildPublicTrainTourLevels } from "@/lib/public-train-tour-structure";
 
@@ -60,6 +61,7 @@ async function mapTrainToInfo(train: TrainRow): Promise<TrainInfo> {
       id: scene.sceneId,
       title: scene.title,
       panoramaUrl: scene.panoramaUrl,
+      multiRes: extractMultiResFromCanvasData(scene.canvasData),
       thumbnailUrl: scene.thumbnailUrl ?? undefined,
       levelId: scene.carId,
       areaId: scene.zoneId,
