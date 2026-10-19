@@ -1,43 +1,62 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import {
-  AlertCircle,
   ArrowRight,
-  Building2,
-  CheckCircle,
+  BarChart3,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Download,
-  Droplets,
+  Eye,
+  Heart,
+  Info,
   MapPin,
-  MessageCircle,
+  Maximize2,
+  Phone,
+  Store,
+  Tag,
+  Train,
   Users,
-  Wind,
   X,
-  XCircle,
   Zap,
+  Droplets,
+  Wind,
+  AlertCircle,
+  XCircle,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { formatNumber, formatRupiah, getWhatsAppUrl } from "@/lib/utils";
+import { getS3ProxyUrl } from "@/lib/s3-utils";
+import {
+  isFavoriteSpace,
+  toggleFavoriteSpace,
+} from "@/lib/favorite-spaces";
+import { FACILITY_ICONS, isFacilityIconId } from "@/lib/facility-icons";
 import TenantInterestForm from "./TenantInterestForm";
+import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
+import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 
 type CommercialSpace = {
   id: string;
   code: string;
   name: string;
   type: string;
-  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  status: SpaceAvailabilityStatus;
   area: number;
+  monthlyRent?: number;
   deposit: number;
   floor: string;
   location: string;
   nearestExit: string | null;
+  nearbyFacilities?: string[];
   exposure: number;
   powerSupply: string | null;
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;
+  panoramaUrl?: string | null;
   tenantBrand?: string | null;
 };
 
@@ -50,36 +69,167 @@ const TYPE_LABELS: Record<string, string> = {
   AREA_PROMOSI: "Area Promosi",
 };
 
+const MEDIA_TYPES = new Set(["MEDIA_IKLAN", "AREA_PROMOSI"]);
+
 type Props = {
   space: CommercialSpace;
   stationName: string;
+  stationSlug?: string;
   contactPhone?: string;
   onClose: () => void;
   returnToList?: boolean;
 };
 
-export default function InTourSpacePopup({ space, stationName, contactPhone = "628118012012", onClose, returnToList = false }: Props) {
+function visibilityLabel(exposure: number) {
+  if (exposure >= 4000) return "Tinggi";
+  if (exposure >= 1500) return "Sedang";
+  return "Rendah";
+}
+
+export default function InTourSpacePopup({
+  space,
+  stationName,
+  stationSlug,
+  contactPhone,
+  onClose,
+  returnToList = false,
+}: Props) {
+  const commercialProfile = useCommercialProfile();
+  const resolvedContactPhone =
+    contactPhone || commercialProfile.whatsappNumber;
   const [showInterestModal, setShowInterestModal] = useState(false);
+  const [favorited, setFavorited] = useState(() => isFavoriteSpace(space.id));
+
+  function handleToggleFavorite() {
+    if (!stationSlug) return;
+    const next = toggleFavoriteSpace({
+      spaceId: space.id,
+      code: space.code,
+      name: space.name,
+      type: space.type,
+      status: space.status,
+      area: space.area,
+      monthlyRent: space.monthlyRent,
+      location: space.location,
+      floor: space.floor,
+      panoramaUrl: space.panoramaUrl,
+      stationSlug,
+      stationName,
+    });
+    setFavorited(next);
+  }
+
   const waMessage = `Halo, saya tertarik dengan unit komersial ${space.code} (${space.name}) di Stasiun ${stationName}. Mohon informasi lebih lanjut.`;
-  const waUrl = getWhatsAppUrl(contactPhone, waMessage);
+  const waUrl = getWhatsAppUrl(resolvedContactPhone, waMessage);
+  const isMedia = MEDIA_TYPES.has(space.type);
+  const occupiedTenant =
+    space.status === "TERISI" ? space.tenantBrand?.trim() : "";
+  const categoryLabel = isMedia ? "Media" : "Tenant";
+  const priceValue =
+    space.monthlyRent && space.monthlyRent > 0
+      ? `${formatRupiah(space.monthlyRent)} / bulan`
+      : space.deposit > 0
+        ? `Deposit ${formatRupiah(space.deposit)}`
+        : "Hubungi tim";
+
+  const coverSrc = space.panoramaUrl
+    ? getS3ProxyUrl(space.panoramaUrl)
+    : "/brand/landing/space-card.jpg";
 
   const statusConfig = {
     TERSEDIA: {
       label: "Tersedia",
-      variant: "available" as const,
-      icon: <CheckCircle className="h-3.5 w-3.5" />,
+      className: "border-emerald-400/30 bg-emerald-500/15 text-emerald-300",
+      dot: "bg-emerald-400",
+      icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     },
     TERISI: {
       label: "Terisi",
-      variant: "occupied" as const,
+      className: "border-[#E31E2D]/40 bg-[#E31E2D]/12 text-[#FF4D57]",
+      dot: "bg-[#E31E2D]",
       icon: <XCircle className="h-3.5 w-3.5" />,
+    },
+    RESERVED: {
+      label: "Reserved",
+      className: "border-indigo-400/30 bg-indigo-500/15 text-indigo-300",
+      dot: "bg-indigo-400",
+      icon: <AlertCircle className="h-3.5 w-3.5" />,
+    },
+    FIT_OUT: {
+      label: "Fit-Out",
+      className: "border-violet-400/30 bg-violet-500/15 text-violet-300",
+      dot: "bg-violet-400",
+      icon: <AlertCircle className="h-3.5 w-3.5" />,
     },
     MAINTENANCE: {
       label: "Maintenance",
-      variant: "maintenance" as const,
+      className: "border-amber-400/30 bg-amber-500/15 text-amber-300",
+      dot: "bg-amber-400",
       icon: <AlertCircle className="h-3.5 w-3.5" />,
     },
   }[space.status];
+
+  const highlights = useMemo(() => {
+    const items: string[] = [];
+    if (space.nearestExit) items.push(`Dekat ${space.nearestExit}`);
+    if (space.floor) items.push(`Area ${space.floor}`);
+    if (space.location) items.push(space.location.split(",")[0]?.trim() || space.location);
+    if (items.length < 3 && space.exposure > 0) items.push("Mudah Terlihat");
+    return items.slice(0, 3);
+  }, [space.nearestExit, space.floor, space.location, space.exposure]);
+
+  const nearbyFacilities = useMemo(() => {
+    const fromCms = (space.nearbyFacilities ?? [])
+      .filter(isFacilityIconId)
+      .map((id) => {
+        const def = FACILITY_ICONS.find((f) => f.id === id);
+        if (!def) return null;
+        return {
+          label: def.label,
+          icon: (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={def.src} alt="" className="h-5 w-5 object-contain" />
+          ),
+        };
+      })
+      .filter(Boolean) as { label: string; icon: ReactNode }[];
+
+    if (fromCms.length > 0) {
+      const extras: { label: string; icon: ReactNode }[] = [];
+      if (space.powerSupply) extras.push({ label: "Listrik", icon: <Zap className="h-4 w-4" /> });
+      if (space.waterAccess) extras.push({ label: "Air", icon: <Droplets className="h-4 w-4" /> });
+      if (space.airConditioning) extras.push({ label: "AC", icon: <Wind className="h-4 w-4" /> });
+      return [...fromCms, ...extras].slice(0, 6);
+    }
+
+    const items: { label: string; icon: ReactNode }[] = [
+      { label: "Eskalator", icon: <Train className="h-4 w-4" /> },
+      {
+        label: "Toilet",
+        icon: (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/brand/tour-pins/toilet.png" alt="" className="h-5 w-5 object-contain" />
+        ),
+      },
+      {
+        label: "Mushola",
+        icon: (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/brand/tour-pins/mushola.png" alt="" className="h-5 w-5 object-contain" />
+        ),
+      },
+      { label: "Peron", icon: <Train className="h-4 w-4" /> },
+    ];
+    if (space.powerSupply) items.push({ label: "Listrik", icon: <Zap className="h-4 w-4" /> });
+    if (space.waterAccess) items.push({ label: "Air", icon: <Droplets className="h-4 w-4" /> });
+    if (space.airConditioning) items.push({ label: "AC", icon: <Wind className="h-4 w-4" /> });
+    return items.slice(0, 5);
+  }, [
+    space.nearbyFacilities,
+    space.powerSupply,
+    space.waterAccess,
+    space.airConditioning,
+  ]);
 
   const trackEvent = async (eventType: string) => {
     await fetch("/api/analytics", {
@@ -106,7 +256,7 @@ export default function InTourSpacePopup({ space, stationName, contactPhone = "6
           <title>Ringkasan ${space.code} - ${stationName}</title>
           <style>
             body { font-family: Arial, sans-serif; color: #111827; margin: 40px; }
-            .brand { color: #E31E2D; font-weight: 800; letter-spacing: .08em; font-size: 12px; text-transform: uppercase; }
+            .brand { color: #D81435; font-weight: 800; letter-spacing: .08em; font-size: 12px; text-transform: uppercase; }
             h1 { margin: 8px 0 4px; font-size: 30px; color: #17355f; }
             .muted { color: #6b7280; }
             .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 24px 0; }
@@ -125,7 +275,8 @@ export default function InTourSpacePopup({ space, stationName, contactPhone = "6
           <div class="muted">${space.code} - Stasiun ${stationName} - ${TYPE_LABELS[space.type] ?? space.type}</div>
           <div class="grid">
             <div class="box"><div class="label">Status</div><div class="value">${statusConfig.label}</div></div>
-            <div class="box"><div class="label">Luas</div><div class="value">${space.area} m2</div></div>
+            <div class="box"><div class="label">Luas</div><div class="value">${space.area} m²</div></div>
+            <div class="box"><div class="label">Harga</div><div class="value">${priceValue}</div></div>
             <div class="box"><div class="label">Eksposur</div><div class="value">${formatNumber(Math.round(space.exposure))} orang/hari</div></div>
           </div>
           <table>
@@ -138,7 +289,7 @@ export default function InTourSpacePopup({ space, stationName, contactPhone = "6
             <tr><td>AC</td><td>${space.airConditioning ? "Tersedia" : "Tidak tersedia"}</td></tr>
             <tr><td>Catatan</td><td>${space.description ?? "Unit siap dievaluasi melalui virtual tour 360."}</td></tr>
           </table>
-          <div class="cta">Hubungi tim komersial: ${contactPhone}. Ringkasan ini dibuat otomatis dari data aset virtual tour.</div>
+          <div class="cta">Hubungi ${commercialProfile.teamName}: ${resolvedContactPhone}. Ringkasan ini dibuat otomatis dari data aset virtual tour.</div>
           <script>window.onload = () => setTimeout(() => window.print(), 250);</script>
         </body>
       </html>
@@ -147,217 +298,343 @@ export default function InTourSpacePopup({ space, stationName, contactPhone = "6
   };
 
   return (
-    <div className="pointer-events-auto absolute inset-x-3 bottom-4 top-20 z-50 overflow-hidden rounded-2xl border border-[color:rgb(255_214_218_/_0.14)] bg-[#F8ECEE] shadow-[0_24px_60px_rgba(28,10,14,0.5)] backdrop-blur-xl sm:inset-x-auto sm:right-6 sm:top-24 sm:bottom-6 sm:w-[410px] lg:w-[420px]">
+    <div className="tour-panel-in pointer-events-auto absolute inset-x-3 bottom-4 top-20 z-50 overflow-hidden rounded-2xl border border-white/10 bg-[#0F0F0F]/65 text-white shadow-[0_24px_60px_rgba(0,0,0,0.35)] backdrop-blur-md sm:inset-x-auto sm:right-6 sm:top-24 sm:bottom-6 sm:w-[410px] lg:w-[420px]">
       <div className="flex h-full max-h-[inherit] flex-col">
-        <div className="flex items-start justify-between bg-[#1C0A0E] px-5 py-4 text-[#F8ECEE]">
-          <div className="min-w-0 flex-1">
-            {returnToList && (
+        <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
+          <div className="flex min-w-0 items-center gap-2">
+            {returnToList ? (
               <button
                 type="button"
                 onClick={onClose}
-                className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-white/70 transition-colors hover:text-white"
+                className="flex min-w-0 items-center gap-2 text-left"
               >
-                <ArrowRight className="h-3.5 w-3.5 rotate-180" />
-                Kembali ke Daftar Unit
+                <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#E31E2D]/55 bg-[#161616]">
+                  <ChevronLeft className="size-4 text-[#E31E2D]" strokeWidth={2.4} />
+                </span>
+                <span className="truncate text-xs font-medium text-white">
+                  Kembali ke Daftar Unit
+                </span>
               </button>
+            ) : (
+              <>
+                <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-white/12 bg-[#1c1c1e]/78 text-white backdrop-blur-md">
+                  <Info className="h-4 w-4" />
+                </span>
+                <span className="font-display text-sm font-semibold">Informasi</span>
+              </>
             )}
-            <div className="mb-2 flex items-center gap-2">
-              <Badge variant={statusConfig.variant} className="flex items-center gap-1 border-white/20 bg-white/95">
-                {statusConfig.icon}
-                {statusConfig.label}
-              </Badge>
-              <span className="font-mono text-xs text-white/60">{space.code}</span>
-            </div>
-            <h3 className="text-xl font-black leading-tight">{space.name}</h3>
-            {space.tenantBrand && space.status === "TERISI" && (
-              <p className="mt-1 text-sm font-semibold text-[#E31E2D]">
-                Tenant: {space.tenantBrand}
-              </p>
-            )}
-            <p className="text-sm text-white/70">{stationName}</p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-full p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            className="rounded-lg p-1.5 text-white/80 transition hover:bg-white/10 hover:text-white"
             aria-label="Tutup detail unit"
           >
-            <X className="h-5 w-5" />
+            <X className="size-4" strokeWidth={2.2} />
           </button>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-5">
-          {space.description && <p className="text-sm leading-relaxed text-gray-600">{space.description}</p>}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-gray-50 p-3">
-              <p className="text-xs text-gray-500">Luas</p>
-              <p className="text-lg font-black text-gray-900">{space.area} m2</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-3">
-              <p className="text-xs text-gray-500">Lantai</p>
-              <p className="text-lg font-black text-gray-900">Lantai {space.floor}</p>
-            </div>
-            {space.deposit > 0 && (
-              <div className="col-span-2 rounded-xl bg-gray-50 p-3">
-                <p className="text-xs text-gray-500">Deposit</p>
-                <p className="text-lg font-black text-gray-900">{formatRupiah(space.deposit)}</p>
-              </div>
-            )}
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 sm:px-4">
+          <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-[#1A1A1A]">
+            <Image
+              src={coverSrc}
+              alt={space.name}
+              fill
+              sizes="420px"
+              className="object-cover"
+              unoptimized={coverSrc.startsWith("/api/")}
+            />
+            <button
+              type="button"
+              onClick={handleToggleFavorite}
+              disabled={!stationSlug}
+              className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-[#1c1c1e]/85 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Heart
+                className={`h-3.5 w-3.5 ${favorited ? "fill-[#E31E2D] text-[#E31E2D]" : "text-white"}`}
+              />
+              Favorit
+            </button>
           </div>
 
-          <div className="grid gap-3 text-sm">
-            <div className="flex items-center gap-3 text-gray-600">
-              <Building2 className="h-4 w-4 shrink-0 text-[#17355f]" />
-              <div>
-                <span className="block text-xs text-gray-400">Tipe</span>
-                <span className="font-medium">{TYPE_LABELS[space.type] ?? space.type}</span>
+          <div className="mt-3 rounded-2xl bg-black/35 p-3 shadow-[0_0_0_1px_rgba(227,30,45,0.38),0_0_20px_rgba(227,30,45,0.14)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="font-display text-xl font-bold tracking-tight text-white uppercase">
+                  {occupiedTenant || space.code}
+                </h3>
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-white/55">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-white/70" />
+                  <span className="truncate">
+                    {space.location || space.floor}, Stasiun {stationName}
+                  </span>
+                </p>
+                {occupiedTenant && (
+                  <p className="mt-1 text-sm font-semibold text-[#FF4D57]">
+                    Unit {space.code} · {space.name}
+                  </p>
+                )}
               </div>
-            </div>
-            <div className="flex items-center gap-3 text-gray-600">
-              <MapPin className="h-4 w-4 shrink-0 text-[#17355f]" />
-              <div>
-                <span className="block text-xs text-gray-400">Lokasi</span>
-                <span className="font-medium">
-                  {space.location}
-                  {space.nearestExit && ` - ${space.nearestExit}`}
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}
+                >
+                  <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
+                  {statusConfig.label}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/12 bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-white/80">
+                  <Store className="h-3 w-3" />
+                  {categoryLabel}
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-3 text-gray-600">
-              <Users className="h-4 w-4 shrink-0 text-[#E31E2D]" />
-              <div>
-                <span className="block text-xs text-gray-400">Eksposur Penumpang</span>
-                <span className="font-black text-[#E31E2D]">{formatNumber(Math.round(space.exposure))} orang/hari</span>
+
+            <p className="mt-3 text-sm leading-relaxed text-white/60">
+              {space.description?.trim() ||
+                `Area komersial strategis dengan mobilitas penumpang yang tinggi. Cocok untuk ${
+                  isMedia ? "media iklan maupun promosi." : "retail maupun food & beverage."
+                }`}
+            </p>
+
+            <div className="mt-3 grid grid-cols-2 gap-1.5">
+              <div className="rounded-xl bg-black/40 p-2.5">
+                <MapPin className="mb-1.5 h-4 w-4 text-[#E31E2D]" />
+                <p className="text-[11px] font-semibold text-white">Lokasi</p>
+                <p className="mt-0.5 text-xs font-bold leading-snug text-white/70">
+                  {space.location || `Lantai ${space.floor}`}
+                </p>
+              </div>
+              <div className="rounded-xl bg-black/40 p-2.5">
+                <Maximize2 className="mb-1.5 h-4 w-4 text-[#E31E2D]" />
+                <p className="text-[11px] font-semibold text-white">Luas</p>
+                <p className="mt-0.5 text-xs font-bold leading-snug text-white/70">
+                  {space.area} m²
+                </p>
               </div>
             </div>
           </div>
 
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Fasilitas</p>
-            <div className="flex flex-wrap gap-2">
-              {space.powerSupply && (
-                <div className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">
-                  <Zap className="h-3 w-3" />
-                  {space.powerSupply}
-                </div>
-              )}
-              {space.waterAccess && (
-                <div className="flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">
-                  <Droplets className="h-3 w-3" />
-                  Air Bersih
-                </div>
-              )}
-              {space.airConditioning && (
-                <div className="flex items-center gap-1.5 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-medium text-cyan-700">
-                  <Wind className="h-3 w-3" />
-                  AC
-                </div>
-              )}
+          <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/35">
+            <div className="flex items-center gap-2 px-3.5 pt-3 pb-2">
+              <BarChart3 className="h-4 w-4 text-[#E31E2D]" />
+              <p className="text-sm font-bold text-white">Potensi Area</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 px-3.5 pb-3.5">
+              <div>
+                <Users className="mb-1 h-4 w-4 text-[#E31E2D]" />
+                <p className="text-[10px] leading-tight text-white/50">Mobilitas Penumpang</p>
+                <p className="mt-1 text-xs font-bold text-white">
+                  {formatNumber(Math.round(space.exposure))} orang/hari
+                </p>
+              </div>
+              <div>
+                <Eye className="mb-1 h-4 w-4 text-[#E31E2D]" />
+                <p className="text-[10px] leading-tight text-white/50">Visibilitas</p>
+                <p className="mt-1 text-xs font-bold text-white">
+                  {visibilityLabel(space.exposure)}
+                </p>
+              </div>
+              <div>
+                <CheckCircle2 className="mb-1 h-4 w-4 text-[#E31E2D]" />
+                <p className="text-[10px] leading-tight text-white/50">Keunggulan</p>
+                <ul className="mt-1 space-y-0.5 text-[11px] font-semibold text-white">
+                  {highlights.map((item) => (
+                    <li key={item} className="flex gap-1">
+                      <span className="text-[#E31E2D]">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
 
+          <div className="mt-3">
+            <p className="mb-2 text-sm font-bold text-white">Fasilitas Terdekat</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {nearbyFacilities.map((f) => (
+                <div
+                  key={f.label}
+                  className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-black/35 px-1 py-2 text-center"
+                >
+                  <span className="flex size-7 items-center justify-center text-[#E31E2D]">
+                    {f.icon}
+                  </span>
+                  <span className="text-[9px] font-medium leading-tight text-white/55">
+                    {f.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-2 border-t border-gray-100 bg-white p-4">
+        <div className="shrink-0 border-t border-white/10 bg-black/30 p-3">
           {space.status === "TERSEDIA" ? (
-            <>
-              <Button
-                className="w-full"
-                onClick={() => {
-                  setShowInterestModal(true);
-                }}
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setShowInterestModal(true)}
+                className="inline-flex h-11 items-center justify-center gap-1 rounded-xl bg-[#E31E2D] px-2 text-[11px] font-semibold text-white transition hover:brightness-110"
               >
-                Ajukan Minat Sewa
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="whatsapp" size="sm" asChild>
-                  <a href={waUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent("WHATSAPP_CLICK")}>
-                    <MessageCircle className="h-4 w-4" />
-                    WhatsApp
-                  </a>
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleDownloadSummary}>
-                  <Download className="h-4 w-4" />
-                  Unduh PDF
-                </Button>
-              </div>
-            </>
-          ) : (
-            <Button variant="outline" className="w-full" asChild>
-              <a href={waUrl} target="_blank" rel="noopener noreferrer">
-                <MessageCircle className="h-4 w-4" />
-                Tanya Tim Komersial
+                <Tag className="h-3.5 w-3.5 shrink-0" />
+                Sewa Tenant
+              </button>
+              <a
+                href={waUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackEvent("WHATSAPP_CLICK")}
+                className="inline-flex h-11 items-center justify-center gap-1 rounded-xl border border-[#E31E2D]/45 bg-[#161616] px-2 text-[11px] font-semibold text-white transition hover:bg-[#1d1d1d]"
+              >
+                <Phone className="h-3.5 w-3.5 shrink-0 text-[#E31E2D]" />
+                Hubungi
               </a>
-            </Button>
+              <button
+                type="button"
+                onClick={handleDownloadSummary}
+                className="inline-flex h-11 items-center justify-center gap-1 rounded-xl border border-white/12 bg-[#161616] px-2 text-[11px] font-semibold text-white transition hover:bg-[#1d1d1d]"
+              >
+                <Download className="h-3.5 w-3.5 shrink-0 text-[#E31E2D]" />
+                Unduh PDF
+              </button>
+            </div>
+          ) : (
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 w-full items-center justify-between gap-1 rounded-xl border border-[#E31E2D]/45 bg-[#161616] px-3 text-sm font-semibold text-white transition hover:bg-[#1d1d1d]"
+            >
+              <Phone className="h-4 w-4 text-[#E31E2D]" />
+              <span className="flex-1 text-center">Tanya Tim Komersial</span>
+              <ChevronRight className="h-4 w-4 text-white/80" />
+            </a>
           )}
         </div>
       </div>
 
-      {showInterestModal && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#020817]/78 p-4 backdrop-blur-md sm:p-6">
-          <div className="relative grid max-h-[calc(100vh-48px)] w-full max-w-6xl overflow-hidden rounded-[28px] border border-white/20 bg-white shadow-2xl md:grid-cols-[390px_minmax(0,1fr)]">
-            <div className="hidden bg-[#102a4d] p-8 text-white md:block">
-              <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/12 px-3 py-1 text-xs font-black text-emerald-200">
-                {statusConfig.icon}
-                {statusConfig.label}
-              </div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-white/45">Formulir Tenant</p>
-              <h2 className="mt-3 text-4xl font-black leading-tight">{space.name}</h2>
-              {space.tenantBrand && space.status === "TERISI" && (
-                <p className="mt-2 text-lg font-semibold text-[#E31E2D]">
-                  Tenant: {space.tenantBrand}
-                </p>
-              )}
-              <p className="mt-4 text-lg leading-relaxed text-white/68">
-                {space.code} - Stasiun {stationName}
-              </p>
-
-              <div className="mt-10 space-y-4">
-                <div className="rounded-2xl bg-white/10 p-5">
-                  <p className="text-sm text-white/50">Luas</p>
-                  <p className="text-3xl font-black">{space.area} m2</p>
+      {showInterestModal &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-6">
+            <div className="relative grid max-h-[min(920px,calc(100vh-24px))] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl md:grid-cols-[minmax(300px,0.95fr)_minmax(0,1.15fr)]">
+              {/* Left — detail unit */}
+              <div className="relative hidden overflow-y-auto bg-[#111111] text-white md:block">
+                <div className="flex min-h-full flex-col p-5 pb-7 lg:p-6 lg:pb-8">
+                <div className={`mb-4 inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}>
+                  <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
+                  {statusConfig.label}
                 </div>
-                <div className="rounded-2xl bg-white/10 p-5">
-                  <p className="text-sm text-white/50">Eksposur</p>
-                  <p className="text-3xl font-black">{formatNumber(Math.round(space.exposure))}</p>
-                  <p className="text-lg font-black">orang/hari</p>
+
+                <div className="relative mb-5 aspect-[16/10] overflow-hidden rounded-xl">
+                  <Image
+                    src={coverSrc}
+                    alt={space.name}
+                    fill
+                    sizes="420px"
+                    className="object-cover"
+                    unoptimized={coverSrc.startsWith("http") || coverSrc.includes("/api/")}
+                  />
+                  {stationSlug ? (
+                    <a
+                      href={`/station/${stationSlug}?unit=${space.id}`}
+                      className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-lg bg-black/65 px-3 py-2 text-[11px] font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src="/brand/landing/icons/tour-360.svg"
+                        alt=""
+                        width={14}
+                        height={14}
+                        className="size-3.5 brightness-0 invert"
+                      />
+                      Lihat Virtual Tour
+                      <ArrowRight className="size-3" />
+                    </a>
+                  ) : null}
+                </div>
+
+                <p className="text-[10px] font-semibold tracking-[0.18em] text-white/55 uppercase">
+                  Formulir Tenant
+                </p>
+                <h2 className="mt-1.5 text-2xl leading-tight font-bold lg:text-[28px]">
+                  {space.name}
+                </h2>
+                <p className="mt-1 text-sm text-white/70">
+                  {space.code} - Stasiun {stationName}
+                </p>
+
+                <div className="mt-4 grid grid-cols-2 gap-2.5">
+                  <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
+                    <Users className="mb-2 size-3.5 text-[#E31E2D]" />
+                    <p className="text-[10px] font-medium text-white/60">Eksposur</p>
+                    <p className="mt-1 text-[15px] leading-none font-bold text-white">
+                      {formatNumber(Math.round(space.exposure))}
+                    </p>
+                    <p className="mt-1 text-[10px] text-white/55">orang/hari</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
+                    <MapPin className="mb-2 size-3.5 text-[#E31E2D]" />
+                    <p className="text-[10px] font-medium text-white/60">Lokasi</p>
+                    <p className="mt-1 truncate text-[15px] leading-none font-bold text-white">
+                      {space.location || space.floor}
+                    </p>
+                    <p className="mt-1 truncate text-[10px] text-white/55">
+                      Stasiun {stationName}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
+                    <Maximize2 className="mb-2 size-3.5 text-[#E31E2D]" />
+                    <p className="text-[10px] font-medium text-white/60">Luas</p>
+                    <p className="mt-1 text-[15px] font-bold text-white">{space.area} m²</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
+                    <Store className="mb-2 size-3.5 text-[#E31E2D]" />
+                    <p className="text-[10px] font-medium text-white/60">Status</p>
+                    <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}>
+                      <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
+                      {statusConfig.label}
+                    </span>
+                  </div>
+                </div>
                 </div>
               </div>
 
-              <p className="mt-10 text-base leading-relaxed text-white/65">
-                Isi data kontak di sebelah kanan. Setelah terkirim, lead akan tersimpan di database dan masuk pipeline CMS.
-              </p>
-            </div>
+              {/* Right — form */}
+              <div className="relative max-h-[min(920px,calc(100vh-24px))] overflow-y-auto bg-white p-5 sm:p-7 lg:p-8">
+                <button
+                  type="button"
+                  onClick={() => setShowInterestModal(false)}
+                  className="absolute top-4 right-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Tutup formulir minat"
+                >
+                  <X className="h-5 w-5" />
+                </button>
 
-            <div className="max-h-[calc(100vh-48px)] overflow-y-auto p-6 sm:p-8 lg:p-10">
-              <button
-                type="button"
-                onClick={() => setShowInterestModal(false)}
-                className="absolute right-5 top-5 rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
-                aria-label="Tutup formulir minat"
-              >
-                <X className="h-5 w-5" />
-              </button>
+                <div className="mb-5 pr-8">
+                  <p className="text-[11px] font-bold tracking-[0.16em] text-[#D81435] uppercase">
+                    Ajukan Minat Sewa
+                  </p>
+                  <h3 className="mt-1.5 text-2xl font-bold text-[#101828] sm:text-[28px]">
+                    Data Calon Tenant
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                    Form ini khusus untuk unit {space.code} di Stasiun {stationName}.
+                  </p>
+                </div>
 
-              <div className="mb-8 pr-10">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#E31E2D]">Ajukan Minat Sewa</p>
-                <h3 className="mt-2 text-4xl font-black leading-tight text-gray-950">Data Calon Tenant</h3>
-                <p className="mt-3 max-w-xl text-base leading-relaxed text-gray-500">
-                  Form ini khusus untuk unit {space.code} di Stasiun {stationName}.
-                </p>
+                <TenantInterestForm
+                  spaceId={space.id}
+                  spaceCode={space.code}
+                  stationName={stationName}
+                  variant="modal"
+                />
               </div>
-
-              <TenantInterestForm
-                spaceId={space.id}
-                spaceCode={space.code}
-                stationName={stationName}
-              />
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

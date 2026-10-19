@@ -11,11 +11,16 @@ import {
   Users,
   UserCircle,
   Train,
+  TrainFront,
   PanelLeftClose,
   PanelLeft,
   Building2,
+  PhoneCall,
+  Sliders,
+  LayoutGrid,
   type LucideIcon,
 } from "lucide-react";
+import CmsNotifications from "@/components/cms/CmsNotifications";
 
 export type CmsUser = {
   id: string;
@@ -34,11 +39,20 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/cms/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/cms/stations", label: "Stasiun", icon: Train },
-  { href: "/cms/virtual-tour", label: "Virtual Tour", icon: Map },
+  { href: "/cms/virtual-tour", label: "Station Virtual Tour", icon: Map },
+  { href: "/cms/virtual-train", label: "Train Virtual Tour", icon: TrainFront },
+  { href: "/cms/train-spaces", label: "Train Rental Space", icon: LayoutGrid },
   { href: "/cms/spaces", label: "Ruang Komersial", icon: Store },
-  { href: "/cms/tenants", label: "Tenant", icon: Building2 },
-  { href: "/cms/leads", label: "Leads", icon: UserCircle },
+  { href: "/cms/tenants", label: "Penyewa Aktif", icon: Building2 },
+  { href: "/cms/leads", label: "Pengajuan & Site Visit", icon: UserCircle },
+  {
+    href: "/cms/commercial-profile",
+    label: "Profil Tim Komersial",
+    icon: PhoneCall,
+    adminOnly: true,
+  },
   { href: "/cms/users", label: "Users", icon: Users, adminOnly: true },
+  { href: "/cms/settings", label: "Pengaturan Sistem", icon: Sliders, adminOnly: true },
 ];
 
 const SIDEBAR_STORAGE_KEY = "cms-sidebar-collapsed";
@@ -62,10 +76,20 @@ function getSidebarServerSnapshot() {
 }
 
 function isFullWidthPage(pathname: string) {
-  return pathname.startsWith("/cms/virtual-tour/") && pathname !== "/cms/virtual-tour";
+  return (
+    pathname === "/cms/virtual-train" ||
+    (pathname.startsWith("/cms/virtual-tour/") && pathname !== "/cms/virtual-tour") ||
+    (pathname.startsWith("/cms/virtual-train/") && pathname !== "/cms/virtual-train")
+  );
 }
 
 function getPageMeta(pathname: string) {
+  if (pathname.startsWith("/cms/settings")) {
+    return {
+      title: "Pengaturan Sistem",
+      subtitle: "Kelola status mode maintenance dan konfigurasi sistem",
+    };
+  }
   if (pathname.startsWith("/cms/dashboard")) {
     return { title: "Dashboard", subtitle: "Ringkasan performa komersial dan aktivitas tenant" };
   }
@@ -76,10 +100,19 @@ function getPageMeta(pathname: string) {
     return { title: "Stasiun", subtitle: "Master data stasiun LRT Jabodebek" };
   }
   if (pathname.startsWith("/cms/virtual-tour/")) {
-    return { title: "Editor Virtual Tour", subtitle: "Atur panorama, hotspot, dan alur tur 360" };
+    return { title: "Editor Station Virtual Tour", subtitle: "Atur panorama, hotspot, dan alur tur 360 stasiun" };
   }
   if (pathname.startsWith("/cms/virtual-tour")) {
-    return { title: "Virtual Tour", subtitle: "Daftar konfigurasi tur 360 setiap stasiun" };
+    return { title: "Station Virtual Tour", subtitle: "Daftar konfigurasi tur 360 setiap stasiun" };
+  }
+  if (pathname.startsWith("/cms/virtual-train")) {
+    return { title: "Train Virtual Tour", subtitle: "Kelola panorama 360° interior kereta LRT Jabodebek" };
+  }
+  if (pathname.startsWith("/cms/train-spaces")) {
+    return {
+      title: "Train Rental Space",
+      subtitle: "Kelola kartu carousel ruang iklan di landing train virtual tour",
+    };
   }
   if (pathname.startsWith("/cms/spaces/")) {
     return { title: "Ruang Komersial", subtitle: "Kelola unit sewa per stasiun" };
@@ -88,10 +121,22 @@ function getPageMeta(pathname: string) {
     return { title: "Ruang Komersial", subtitle: "Inventori tenant, kios, media, dan area promosi" };
   }
   if (pathname.startsWith("/cms/tenants")) {
-    return { title: "Tenant", subtitle: "Tenant aktif yang mengisi unit komersial" };
+    return {
+      title: "Penyewa Aktif",
+      subtitle: "Brand atau mitra yang sedang mengisi unit komersial",
+    };
   }
   if (pathname.startsWith("/cms/leads")) {
-    return { title: "Leads", subtitle: "Pipeline calon tenant dari public virtual tour" };
+    return {
+      title: "Pengajuan & Site Visit",
+      subtitle: "Pipeline calon mitra dari inquiry hingga operasional komersial",
+    };
+  }
+  if (pathname.startsWith("/cms/commercial-profile")) {
+    return {
+      title: "Profil Tim Komersial",
+      subtitle: "Sumber kontak utama untuk seluruh kanal komersial",
+    };
   }
   if (pathname.startsWith("/cms/users")) {
     return { title: "Users", subtitle: "Akses pengguna dan peran admin CMS" };
@@ -122,7 +167,7 @@ export default function CmsShell({
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    router.push("/");
   }
 
   const fullWidth = isFullWidthPage(pathname);
@@ -224,6 +269,8 @@ export default function CmsShell({
             <div className="min-w-0">
               <h1 className="truncate text-base font-black text-white sm:text-lg">{pageMeta.title}</h1>
             </div>
+
+            <CmsNotifications />
           </div>
         </header>
 

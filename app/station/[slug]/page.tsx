@@ -2,7 +2,9 @@ import { after } from "next/server";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { getStationBySlug, getStationMetaBySlug } from "@/lib/stations-data";
+import { getPickerStations } from "@/lib/station-picker-data";
 import StationTourClient from "./StationTourClient";
 
 // Selalu render fresh dari DB — tidak pakai static generation
@@ -43,29 +45,6 @@ async function getStationData(slug: string) {
   }
 }
 
-/** Daftar stasiun untuk popup pilih stasiun (Figma 234:7240) */
-async function getPickerStations() {
-  try {
-    const stations = await prisma.station.findMany({
-      where: {
-        isActive: true,
-        virtualTourScenes: { some: { isActive: true } },
-      },
-      orderBy: { order: "asc" },
-      select: {
-        slug: true,
-        name: true,
-        order: true,
-        line: true,
-      },
-    });
-
-    return stations;
-  } catch {
-    return [];
-  }
-}
-
 export default async function StationPage({ params }: Props) {
   const { slug } = await params;
   const [stationInfo, stationData, pickerStations] = await Promise.all([
@@ -103,17 +82,20 @@ export default async function StationPage({ params }: Props) {
             code: s.code,
             name: s.name,
             type: s.type,
-            status: s.status as "TERSEDIA" | "TERISI" | "MAINTENANCE",
+            status: s.status as SpaceAvailabilityStatus,
             area: s.area,
+            monthlyRent: s.monthlyRent,
             deposit: s.deposit,
             floor: s.floor,
             location: s.location,
             nearestExit: s.nearestExit,
+            nearbyFacilities: Array.isArray(s.nearbyFacilities) ? s.nearbyFacilities : [],
             exposure: s.exposure,
             powerSupply: s.powerSupply,
             waterAccess: s.waterAccess,
             airConditioning: s.airConditioning,
             description: s.description,
+            panoramaUrl: s.panoramaUrl,
             tenantBrand:
               s.occupancy?.tenant?.isActive !== false
                 ? s.occupancy?.tenant?.brandName ?? null

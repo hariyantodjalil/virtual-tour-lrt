@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Building2, Plus, Trash2, Link2, Unlink } from "lucide-react";
+import { Building2, Plus, Trash2, Link2, Unlink, Pencil, Save, X } from "lucide-react";
 import { cmsFetch } from "@/lib/cms-fetch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +68,9 @@ export default function TenantsClient({
     spaceId: "",
   });
   const [linkSpaceId, setLinkSpaceId] = useState<Record<string, string>>({});
+  const [editingName, setEditingName] = useState<{ id: string; value: string } | null>(
+    null
+  );
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -162,16 +165,37 @@ export default function TenantsClient({
     await load();
   }
 
+  async function saveTenantName() {
+    if (!editingName?.value.trim()) return;
+    setBusy(true);
+    try {
+      const res = await cmsFetch(`/api/cms/tenants/${editingName.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandName: editingName.value.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Gagal mengubah nama mitra.");
+        return;
+      }
+      setEditingName(null);
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Tenant Aktif</h1>
-          <p className="text-sm text-slate-400">Brand yang mengisi unit TERISI di stasiun</p>
+          <h1 className="text-2xl font-bold">Penyewa Aktif</h1>
+          <p className="text-sm text-slate-400">Brand atau mitra yang mengisi unit di stasiun</p>
         </div>
         <Button onClick={() => setShowForm((v) => !v)} className="bg-emerald-600 hover:bg-emerald-500">
           <Plus className="mr-1.5 h-4 w-4" />
-          Tambah Tenant
+          Tambah Penyewa
         </Button>
       </div>
 
@@ -274,7 +298,18 @@ export default function TenantsClient({
                     <div>
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-emerald-400" />
-                        <p className="font-semibold text-white">{tenant.brandName}</p>
+                        {editingName?.id === tenant.id ? (
+                          <Input
+                            autoFocus
+                            value={editingName.value}
+                            onChange={(event) =>
+                              setEditingName({ id: tenant.id, value: event.target.value })
+                            }
+                            className="h-8 w-56 border-slate-700 bg-slate-800"
+                          />
+                        ) : (
+                          <p className="font-semibold text-white">{tenant.brandName}</p>
+                        )}
                         <Badge variant="outline">{tenant.isActive ? "Aktif" : "Nonaktif"}</Badge>
                       </div>
                       <p className="mt-1 text-sm text-slate-400">{tenant.station.name}</p>
@@ -283,14 +318,49 @@ export default function TenantsClient({
                           "Tanpa kontak"}
                       </p>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-red-800 text-red-300 hover:bg-red-950"
-                      onClick={() => deleteTenant(tenant)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex gap-2">
+                      {editingName?.id === tenant.id ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={saveTenantName}
+                            disabled={busy || !editingName.value.trim()}
+                            aria-label="Simpan nama mitra"
+                          >
+                            <Save className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEditingName(null)}
+                            aria-label="Batal edit"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setEditingName({ id: tenant.id, value: tenant.brandName })
+                          }
+                          aria-label="Edit nama mitra"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-800 text-red-300 hover:bg-red-950"
+                        onClick={() => deleteTenant(tenant)}
+                        aria-label="Hapus penyewa"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="mt-3 space-y-2">

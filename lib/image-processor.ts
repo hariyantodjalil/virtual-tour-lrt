@@ -36,7 +36,7 @@ export async function processPanorama(input: Buffer): Promise<ProcessResult> {
 
   const buffer = await image
     .resize({ width: 6000, height: 3000, fit: "inside", withoutEnlargement: true })
-    .webp({ quality: 82, effort: 5 })
+    .webp({ quality: 82, effort: 3 })
     .toBuffer();
 
   const out = await sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
@@ -177,6 +177,30 @@ export async function processSpacePhoto(input: Buffer): Promise<ProcessResult> {
       kernel: sharp.kernel.lanczos3,
     })
     .webp({ quality: 83, effort: 4 })
+    .toBuffer();
+
+  const out = await sharp(buffer).metadata();
+
+  return {
+    buffer,
+    contentType: "image/webp",
+    width: out.width ?? 0,
+    height: out.height ?? 0,
+    sizeBytes: buffer.length,
+  };
+}
+
+// ─── Avatar profil ───────────────────────────────────────────────────────────
+// Target: square 512×512 WebP q85
+export async function processAvatarPhoto(input: Buffer): Promise<ProcessResult> {
+  const buffer = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
+    .resize(512, 512, {
+      fit: "cover",
+      position: "centre",
+      withoutEnlargement: false,
+      kernel: sharp.kernel.lanczos3,
+    })
+    .webp({ quality: 85, effort: 4 })
     .toBuffer();
 
   const out = await sharp(buffer).metadata();

@@ -24,6 +24,16 @@ export function getS3ProxyUrl(s3Url: string): string {
   return s3Url;
 }
 
+export function resolvePublicAssetUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith("/brand/") || url.startsWith("/images/")) return url;
+  return getS3ProxyUrl(url);
+}
+
+export function shouldUnoptimizeImage(url: string): boolean {
+  return url.startsWith("/api/") || url.startsWith("http://") || url.startsWith("https://");
+}
+
 export function getImageUrl(s3Url: string): string {
   return getS3ProxyUrl(s3Url);
 }

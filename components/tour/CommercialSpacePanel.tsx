@@ -9,13 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatRupiah, formatNumber, getWhatsAppUrl } from "@/lib/utils";
 import TenantInterestForm from "./TenantInterestForm";
+import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
+import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 
 type CommercialSpace = {
   id: string;
   code: string;
   name: string;
   type: string;
-  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  status: SpaceAvailabilityStatus;
   area: number;
   deposit: number;
   floor: string;
@@ -44,11 +46,14 @@ type Props = {
   onClose: () => void;
 };
 
-export default function CommercialSpacePanel({ space, stationName, contactPhone = "628118012012", onClose }: Props) {
+export default function CommercialSpacePanel({ space, stationName, contactPhone, onClose }: Props) {
+  const commercialProfile = useCommercialProfile();
+  const resolvedContactPhone =
+    contactPhone || commercialProfile.whatsappNumber;
   const [showForm, setShowForm] = useState(false);
 
   const waMessage = `Halo, saya tertarik dengan unit komersial ${space.code} (${space.name}) di Stasiun ${stationName}. Mohon informasi lebih lanjut.`;
-  const waUrl = getWhatsAppUrl(contactPhone, waMessage);
+  const waUrl = getWhatsAppUrl(resolvedContactPhone, waMessage);
   const statusConfig = {
     TERSEDIA: {
       label: "Tersedia",
@@ -61,6 +66,18 @@ export default function CommercialSpacePanel({ space, stationName, contactPhone 
       variant: "occupied" as const,
       icon: <XCircle className="h-3.5 w-3.5" />,
       color: "text-red-600",
+    },
+    RESERVED: {
+      label: "Reserved",
+      variant: "occupied" as const,
+      icon: <AlertCircle className="h-3.5 w-3.5" />,
+      color: "text-indigo-600",
+    },
+    FIT_OUT: {
+      label: "Fit-Out",
+      variant: "maintenance" as const,
+      icon: <AlertCircle className="h-3.5 w-3.5" />,
+      color: "text-violet-600",
     },
     MAINTENANCE: {
       label: "Maintenance",
@@ -95,7 +112,7 @@ export default function CommercialSpacePanel({ space, stationName, contactPhone 
           <title>Ringkasan ${space.code} - ${stationName}</title>
           <style>
             body { font-family: Arial, sans-serif; color: #111827; margin: 40px; }
-            .brand { color: #E31E2D; font-weight: 800; letter-spacing: .08em; font-size: 12px; text-transform: uppercase; }
+            .brand { color: #D81435; font-weight: 800; letter-spacing: .08em; font-size: 12px; text-transform: uppercase; }
             h1 { margin: 8px 0 4px; font-size: 30px; color: #17355f; }
             .muted { color: #6b7280; }
             .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 24px 0; }
@@ -129,7 +146,7 @@ export default function CommercialSpacePanel({ space, stationName, contactPhone 
             <tr><td>Catatan</td><td>${space.description ?? "Unit siap dievaluasi melalui virtual tour 360."}</td></tr>
           </table>
           <div class="cta">
-            Hubungi tim komersial: ${contactPhone}. Ringkasan ini dibuat otomatis dari data aset virtual tour.
+            Hubungi ${commercialProfile.teamName}: ${resolvedContactPhone}. Ringkasan ini dibuat otomatis dari data aset virtual tour.
           </div>
           <script>window.onload = () => setTimeout(() => window.print(), 250);</script>
         </body>
@@ -206,10 +223,10 @@ export default function CommercialSpacePanel({ space, stationName, contactPhone 
             </div>
           </div>
           <div className="flex items-center gap-3 text-gray-600">
-            <Users className="h-4 w-4 shrink-0 text-[#E31E2D]" />
+            <Users className="h-4 w-4 shrink-0 text-[#D81435]" />
             <div>
               <span className="text-xs text-gray-400 block">Eksposur Penumpang</span>
-              <span className="font-bold text-[#E31E2D]">{formatNumber(Math.round(space.exposure))} orang/hari</span>
+              <span className="font-bold text-[#D81435]">{formatNumber(Math.round(space.exposure))} orang/hari</span>
             </div>
           </div>
         </div>

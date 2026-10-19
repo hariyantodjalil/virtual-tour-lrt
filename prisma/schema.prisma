@@ -11,9 +11,11 @@ model User {
   email       String       @unique
   password    String
   name        String
+  avatarUrl   String?
   role        UserRole     @default(EDITOR)
   isActive    Boolean      @default(true)
   tenantLeads TenantLead[]
+  tenants     Tenant[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -34,7 +36,7 @@ model Station {
   longitude              Float?
   imageUrl               String?
   description            String?
-  commercialContactPhone String?             @default("628118012012")
+  commercialContactPhone String?
   order                  Int                 @default(0)
   isActive               Boolean             @default(true)
   commercialSpaces       CommercialSpace[]
@@ -49,6 +51,33 @@ model Station {
 
   @@index([isActive, order])
   @@map("stations")
+}
+
+/** Singleton profil kontak yang menjadi sumber utama seluruh kanal komersial publik. */
+model CommercialProfile {
+  id                     String   @id @default("default")
+  teamName               String   @default("Tim Komersial LRT Jabodebek")
+  contactPersonName      String?
+  whatsappNumber         String   @default("628118012012")
+  phoneNumber            String?
+  email                  String?
+  officeAddress          String?
+  defaultWhatsappMessage String   @default("Halo, saya tertarik ruang komersial LRT Jabodebek. Mohon info lebih lanjut.")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("commercial_profiles")
+}
+
+/** Singleton pengaturan sistem dan mode pemeliharaan (maintenance mode). */
+model SystemSetting {
+  id                 String   @id @default("default")
+  isMaintenanceMode  Boolean  @default(false)
+  maintenanceMessage String?  @default("Situs Virtual Tour LRT Jabodebek sedang dalam pemeliharaan sistem. Silakan kembali beberapa saat lagi.")
+  updatedBy          String?
+  updatedAt          DateTime @updatedAt
+
+  @@map("system_settings")
 }
 
 // Agregat konfigurasi virtual tour per stasiun — paralel station_floorplans di portal-lrt.
@@ -143,6 +172,7 @@ model CommercialSpace {
   floor           String       @default("G")
   location        String
   nearestExit     String?
+  nearbyFacilities String[]      @default([])
   exposure        Int          @default(0)
   powerSupply     String?
   waterAccess     Boolean      @default(false)
@@ -162,6 +192,8 @@ model CommercialSpace {
 /** Tenant aktif (brand yang mengisi unit TERISI) — beda dari TenantLead (pipeline calon). */
 model Tenant {
   id          String           @id @default(cuid())
+  userId      String?
+  user        User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   stationId   String
   station     Station          @relation(fields: [stationId], references: [id], onDelete: Cascade)
   brandName   String
@@ -176,6 +208,7 @@ model Tenant {
   updatedAt   DateTime         @updatedAt
 
   @@index([stationId])
+  @@index([userId])
   @@map("tenants")
 }
 
@@ -207,6 +240,9 @@ model TenantLead {
   email            String
   businessType     String
   spaceRequirement String?
+  surveyPreference String?
+  siteVisitStatus  SiteVisitStatus @default(NONE)
+  siteVisitScheduledAt DateTime?
   message          String?
   status           LeadStatus       @default(NEW)
   notes            String?
@@ -256,21 +292,165 @@ enum SpaceStatus {
   TERSEDIA
   TERISI
   MAINTENANCE
+  RESERVED
+  FIT_OUT
 }
 
 enum LeadStatus {
   NEW
   CONTACTED
   NEGOTIATING
+  PKS
+  FIT_OUT_HANDOVER
+  COMMERCIAL_OPERATION
   CLOSED_WON
   CLOSED_LOST
+}
+
+enum SiteVisitStatus {
+  NONE
+  REQUESTED
+  SCHEDULED
+  COMPLETED
+  CANCELLED
 }
 
 enum EventType {
   STATION_VIEW
   SPACE_VIEW
+  TRAIN_VIEW
   TOUR_START
   FORM_SUBMIT
   WHATSAPP_CLICK
   PDF_DOWNLOAD
+}
+
+enum TrainRentalStatus {
+  TERSEDIA
+  TERBATAS
+  PENUH
+}
+
+// ─── Virtual Train (parallel stack — mirip virtual tour stasiun) ─────────────
+
+model Train {
+  id              String            @id @default(cuid())
+  name            String
+  slug            String            @unique
+  description     String?
+  formation       String?
+  imageUrl        String?
+  order           Int               @default(0)
+  isActive        Boolean           @default(true)
+  trainTourCars   TrainTourCar[]
+  trainTourZones  TrainTourZone[]
+  trainTourScenes TrainTourScene[]
+  virtualTour     TrainVirtualTour?
+  rentalSpaces    TrainRentalSpace[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([isActive, order])
+  @@map("trains")
+}
+
+model TrainVirtualTour {
+  id        String   @id @default(cuid())
+  trainId   String   @unique
+  train     Train    @relation(fields: [trainId], references: [id], onDelete: Cascade)
+  data      Json     @default("{}")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("train_virtual_tours")
+}
+
+/** Gerbong kereta — paralel VirtualTourLevel */
+model TrainTourCar {
+  id        String           @id @default(cuid())
+  trainId   String
+  train     Train            @relation(fields: [trainId], references: [id], onDelete: Cascade)
+  slug      String
+  label     String
+  color     String           @default("#3b82f6")
+  hint      String?
+  order     Int              @default(0)
+  isActive  Boolean          @default(true)
+  zones     TrainTourZone[]
+  scenes    TrainTourScene[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([trainId, slug])
+  @@map("train_tour_cars")
+}
+
+/** Zona dalam gerbong — paralel VirtualTourArea */
+model TrainTourZone {
+  id        String           @id @default(cuid())
+  trainId   String
+  train     Train            @relation(fields: [trainId], references: [id], onDelete: Cascade)
+  carId     String
+  car       TrainTourCar     @relation(fields: [carId], references: [id], onDelete: Cascade)
+  slug      String
+  label     String
+  order     Int              @default(0)
+  isActive  Boolean          @default(true)
+  scenes    TrainTourScene[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([trainId, slug])
+  @@map("train_tour_zones")
+}
+
+model TrainTourScene {
+  id                  String         @id @default(cuid())
+  trainId             String
+  train               Train          @relation(fields: [trainId], references: [id], onDelete: Cascade)
+  carId               String?
+  carRef              TrainTourCar?  @relation(fields: [carId], references: [id], onDelete: SetNull)
+  zoneId              String?
+  zoneRef             TrainTourZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  sceneId             String
+  title               String
+  panoramaUrl         String
+  originalPanoramaUrl String?
+  car                 String         @default("gerbong-1")
+  thumbnailUrl        String?
+  order               Int            @default(0)
+  hotspots            Json           @default("[]")
+  canvasData          Json?
+  isActive            Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@unique([trainId, sceneId])
+  @@map("train_tour_scenes")
+}
+
+/** Ruang sewa iklan di interior kereta — carousel landing train */
+model TrainRentalSpace {
+  id                  String            @id @default(cuid())
+  trainId             String
+  train               Train             @relation(fields: [trainId], references: [id], onDelete: Cascade)
+  displayNumber       String
+  title               String
+  description         String?
+  imageUrl            String?
+  objectPosition      String            @default("50% 50%")
+  availableTrainsets  String[]          @default([])
+  availableByCar      Json              @default("{}")
+  howToOrder          String?
+  status              TrainRentalStatus @default(TERSEDIA)
+  monthlyRent         Float?
+  order               Int               @default(0)
+  isActive            Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@unique([trainId, displayNumber])
+  @@index([trainId, isActive, order])
+  @@map("train_rental_spaces")
 }

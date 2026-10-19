@@ -6,6 +6,12 @@ const optionalText = (max: number) => z.string().trim().max(max).nullable().opti
 const safeInteger = z.number().int().min(0).max(1_000_000);
 const nonNegativeNumber = z.number().finite().min(0).max(1_000_000_000_000);
 const nullableUrl = z.string().trim().max(2_048).nullable().optional();
+const contactNumber = z
+  .string()
+  .trim()
+  .min(8)
+  .max(32)
+  .regex(/^[+0-9()\s.-]+$/, "Format nomor kontak tidak valid");
 const optionalDate = z.string().trim().max(64).refine(
   (value) => !Number.isNaN(Date.parse(value)),
   "Tanggal tidak valid"
@@ -35,23 +41,56 @@ export const stationUpdateSchema = z.object(stationFields).partial().strict().re
   "Minimal satu field harus diisi"
 );
 
+export const commercialProfileUpdateSchema = z
+  .object({
+    teamName: shortText.optional(),
+    contactPersonName: optionalText(160),
+    whatsappNumber: contactNumber.optional(),
+    phoneNumber: contactNumber.nullable().optional(),
+    email: z.string().trim().email().max(254).nullable().optional(),
+    officeAddress: optionalText(500),
+    defaultWhatsappMessage: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, "Minimal satu field harus diisi");
+
 export const spaceMutationSchema = z.object({
   code: z.string().trim().min(1).max(64),
   name: shortText,
   type: z.enum(["KIOS", "RUKO", "ATM", "VENDING", "MEDIA_IKLAN", "AREA_PROMOSI"]),
-  status: z.enum(["TERSEDIA", "TERISI", "MAINTENANCE"]),
+  status: z.enum(["TERSEDIA", "RESERVED", "FIT_OUT", "TERISI", "MAINTENANCE"]),
   area: nonNegativeNumber,
   monthlyRent: nonNegativeNumber,
   deposit: nonNegativeNumber,
   floor: z.string().trim().min(1).max(64),
   location: z.string().trim().min(1).max(300),
   nearestExit: optionalText(160),
+  nearbyFacilities: z
+    .array(z.enum(["toilet", "mushola", "escalator", "lift", "gate"]))
+    .max(10)
+    .default([]),
   exposure: z.number().int().min(0).max(1_000_000),
   powerSupply: optionalText(160),
   waterAccess: z.boolean(),
   airConditioning: z.boolean(),
   description: optionalText(5_000),
   panoramaUrl: nullableUrl,
+  tenantId: id.nullable().optional(),
+}).strict();
+
+export const trainRentalSpaceMutationSchema = z.object({
+  displayNumber: z.string().trim().min(1).max(8).regex(/^\d{2}$/, "Nomor tampilan harus 2 digit, mis. 01"),
+  title: shortText,
+  description: optionalText(5_000),
+  imageUrl: nullableUrl,
+  objectPosition: z.string().trim().min(1).max(32).default("50% 50%"),
+  availableTrainsets: z.array(z.string().trim().min(1).max(16)).max(40).default([]),
+  availableByCar: z.record(z.string(), z.array(z.string().trim().min(1).max(16)).max(40)).optional(),
+  howToOrder: optionalText(2_000),
+  status: z.enum(["TERSEDIA", "TERBATAS", "PENUH"]).default("TERSEDIA"),
+  monthlyRent: nonNegativeNumber.nullable().optional(),
+  order: safeInteger.optional(),
+  isActive: z.boolean().optional(),
 }).strict();
 
 export const userCreateSchema = z.object({
@@ -104,7 +143,24 @@ export const occupancySchema = z.object({
 
 export const leadUpdateSchema = z.object({
   id,
-  status: z.enum(["NEW", "CONTACTED", "NEGOTIATING", "CLOSED_WON", "CLOSED_LOST"]).optional(),
+  status: z.enum([
+    "NEW",
+    "CONTACTED",
+    "NEGOTIATING",
+    "PKS",
+    "FIT_OUT_HANDOVER",
+    "COMMERCIAL_OPERATION",
+    "CLOSED_WON",
+    "CLOSED_LOST",
+  ]).optional(),
+  siteVisitStatus: z.enum([
+    "NONE",
+    "REQUESTED",
+    "SCHEDULED",
+    "COMPLETED",
+    "CANCELLED",
+  ]).optional(),
+  siteVisitScheduledAt: optionalDate,
   notes: optionalText(5_000),
   followUpAt: optionalDate,
 }).strict().refine((value) => Object.keys(value).length > 1, "Minimal satu perubahan harus diisi");
@@ -178,3 +234,9 @@ export const privacyBlurBakeSchema = z.object({
   viewerHeight: z.number().finite().positive().max(20_000).optional(),
   hfov: z.number().finite().positive().max(180).optional(),
 }).strict();
+
+export const googleAuthSchema = z.object({
+  credential: z.string().trim().min(10).max(4096),
+  remember: z.boolean().optional(),
+}).strict();
+

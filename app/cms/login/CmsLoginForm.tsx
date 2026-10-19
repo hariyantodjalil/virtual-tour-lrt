@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 
 export default function CmsLoginForm() {
   const router = useRouter();
@@ -88,6 +89,29 @@ export default function CmsLoginForm() {
               {loading ? "Memproses..." : "Login"}
             </Button>
           </form>
+
+          <div className="my-4 flex items-center gap-2">
+            <div className="h-px flex-1 bg-slate-800" />
+            <span className="text-xs font-medium whitespace-nowrap text-slate-500">
+              atau masuk dengan
+            </span>
+            <div className="h-px flex-1 bg-slate-800" />
+          </div>
+
+          <GoogleSignInButton
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-800 text-xs font-medium text-slate-200 transition hover:bg-slate-700"
+            label="Masuk dengan Google"
+            onSuccess={(u, redirect) => {
+              if (u.role === "MITRA") {
+                router.push("/partner");
+                return;
+              }
+              const target = searchParams.get("redirect") || redirect || "/cms/dashboard";
+              router.push(target);
+            }}
+            onError={(err) => setError(err)}
+            disabled={loading}
+          />
         </CardContent>
       </Card>
     </div>

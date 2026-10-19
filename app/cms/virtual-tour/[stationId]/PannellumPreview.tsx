@@ -7,7 +7,10 @@ import type { HotspotItem } from "@/lib/hotspot-types";
 import type { PrivacyBlurItem } from "@/lib/privacy-blur-types";
 import type { PanoramaScene, TourLevelPublic } from "@/lib/tour-types";
 import { setupHotspotElement, resolveSceneHotspotTitle } from "@/lib/pannellum-hotspot";
-import { findSpaceStatus } from "@/lib/space-availability";
+import {
+  findSpaceStatus,
+  type SpaceAvailabilityStatus,
+} from "@/lib/space-availability";
 import { PANNELLUM_HFOV, PANNELLUM_INTERACTION, PANNELLUM_PITCH_LIMITS } from "@/lib/pannellum-viewer-defaults";
 import { formatNumber } from "@/lib/utils";
 import { TourNavigationBar } from "@/components/tour/TourNavigationBar";
@@ -19,7 +22,7 @@ type CommercialSpace = {
   code: string;
   name: string;
   type: string;
-  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  status: SpaceAvailabilityStatus;
   area: number;
   monthlyRent: number;
   deposit: number;
@@ -31,6 +34,8 @@ type CommercialSpace = {
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;
+  panoramaUrl?: string | null;
+  tenantBrand?: string | null;
 };
 
 type PreviewScene = {

@@ -122,103 +122,112 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   return NextResponse.json({ message: "Scene dihapus" });
 }
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 120;
+
 // POST — upload panorama, auto-convert ke WebP + generate thumbnail
 export async function POST(request: NextRequest, { params }: Params) {
   const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const { stationId, sceneId } = await params;
-  const formData = await request.formData();
-  const file = formData.get("file") as File | null;
-  if (!file) return NextResponse.json({ error: "File wajib diisi" }, { status: 400 });
+  try {
+    const { stationId, sceneId } = await params;
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+    if (!file) return NextResponse.json({ error: "File wajib diisi" }, { status: 400 });
 
-  // Ambil slug stasiun
-  const station = await prisma.station.findUnique({
-    where: { id: stationId },
-    select: { slug: true },
-  });
-  const stationSlug = station?.slug ?? stationId;
+    // Ambil slug stasiun
+    const station = await prisma.station.findUnique({
+      where: { id: stationId },
+      select: { slug: true },
+    });
+    const stationSlug = station?.slug ?? stationId;
 
-  // Baca buffer original
-  const upload = await readValidatedImageUpload(file, MAX_PANORAMA_UPLOAD_BYTES);
-  if ("error" in upload) return NextResponse.json({ error: upload.error }, { status: 400 });
-  const originalBuffer = upload.buffer;
-  const originalSize = originalBuffer.length;
+    // Baca buffer original
+    const upload = await readValidatedImageUpload(file, MAX_PANORAMA_UPLOAD_BYTES);
+    if ("error" in upload) return NextResponse.json({ error: upload.error }, { status: 400 });
+    const originalBuffer = upload.buffer;
+    const originalSize = originalBuffer.length;
 
-  // ── Konversi panorama ke WebP (resize max 6000×3000, q82) ─────────────────
-  const extension = panoramaExtension(file);
-  const contentType = normalizedImageContentType(file);
-  const panoramaResult = await processPanorama(originalBuffer);
+    // ── Konversi panorama ke WebP (resize max 6000×3000, q82) ─────────────────
+    const extension = panoramaExtension(file);
+    const contentType = normalizedImageContentType(file);
+    const panoramaResult = await processPanorama(originalBuffer);
 
-  const originalKey = generateS3Key("originals", `${sceneId}.${extension}`, { stationSlug });
-  await uploadToS3(originalBuffer, originalKey, contentType, {
-    "station-id": stationId,
-    "scene-id": sceneId,
-    "station-slug": stationSlug,
-    "original-size": String(originalSize),
-    "stored-size": String(originalSize),
-    "storage-mode": "master-original",
-  });
+    const originalKey = generateS3Key("originals", `${sceneId}.${extension}`, { stationSlug });
+    await uploadToS3(originalBuffer, originalKey, contentType, {
+      "station-id": stationId,
+      "scene-id": sceneId,
+      "station-slug": stationSlug,
+      "original-size": String(originalSize),
+      "stored-size": String(originalSize),
+      "storage-mode": "master-original",
+    });
 
-  const panoramaKey = generateS3Key("panoramas", `${sceneId}.webp`, { stationSlug });
-  await uploadToS3(panoramaResult.buffer, panoramaKey, panoramaResult.contentType, {
-    "station-id": stationId,
-    "scene-id": sceneId,
-    "station-slug": stationSlug,
-    "original-size": String(originalSize),
-    "display-size": String(panoramaResult.sizeBytes),
-    "display-format": "webp",
-    "display-quality": "82",
-    "dimensions": `${panoramaResult.width}x${panoramaResult.height}`,
-  });
+    const panoramaKey = generateS3Key("panoramas", `${sceneId}.webp`, { stationSlug });
+    await uploadToS3(panoramaResult.buffer, panoramaKey, panoramaResult.contentType, {
+      "station-id": stationId,
+      "scene-id": sceneId,
+      "station-slug": stationSlug,
+      "original-size": String(originalSize),
+      "display-size": String(panoramaResult.sizeBytes),
+      "display-format": "webp",
+      "display-quality": "82",
+      "dimensions": `${panoramaResult.width}x${panoramaResult.height}`,
+    });
 
-  // ── Generate thumbnail (900×450, q78) ─────────────────────────────────────
-  const thumbResult = await generatePanoramaThumbnail(originalBuffer);
+    // ── Generate thumbnail (900×450, q78) ─────────────────────────────────────
+    const thumbResult = await generatePanoramaThumbnail(originalBuffer);
 
-  const thumbKey = generateS3Key("thumbnails", `${sceneId}.webp`, { stationSlug });
-  await uploadToS3(thumbResult.buffer, thumbKey, "image/webp", {
-    "station-id": stationId,
-    "scene-id": sceneId,
-    "station-slug": stationSlug,
-    "type": "thumbnail",
-  });
+    const thumbKey = generateS3Key("thumbnails", `${sceneId}.webp`, { stationSlug });
+    await uploadToS3(thumbResult.buffer, thumbKey, "image/webp", {
+      "station-id": stationId,
+      "scene-id": sceneId,
+      "station-slug": stationSlug,
+      "type": "thumbnail",
+    });
 
-  const panoramaUrl = `/${panoramaKey}`;
-  const originalPanoramaUrl = `/${originalKey}`;
-  const thumbnailUrl = `/${thumbKey}`;
+    const panoramaUrl = `/${panoramaKey}`;
+    const originalPanoramaUrl = `/${originalKey}`;
+    const thumbnailUrl = `/${thumbKey}`;
 
-  const existing = await prisma.virtualTourScene.findUnique({
-    where: { stationId_sceneId: { stationId, sceneId } },
-    select: { canvasData: true },
-  });
-  const canvasData = resetPrivacyBlurForNewPanorama(
-    existing?.canvasData,
-    panoramaUrl
-  ) as Prisma.InputJsonValue;
+    const existing = await prisma.virtualTourScene.findUnique({
+      where: { stationId_sceneId: { stationId, sceneId } },
+      select: { canvasData: true },
+    });
+    const canvasData = resetPrivacyBlurForNewPanorama(
+      existing?.canvasData,
+      panoramaUrl
+    ) as Prisma.InputJsonValue;
 
-  const scene = await prisma.virtualTourScene.update({
-    where: { stationId_sceneId: { stationId, sceneId } },
-    data: { panoramaUrl, originalPanoramaUrl, thumbnailUrl, canvasData },
-    select: sceneSelect,
-  });
-  const displayDelta = originalSize - panoramaResult.sizeBytes;
+    const scene = await prisma.virtualTourScene.update({
+      where: { stationId_sceneId: { stationId, sceneId } },
+      data: { panoramaUrl, originalPanoramaUrl, thumbnailUrl, canvasData },
+      select: sceneSelect,
+    });
+    const displayDelta = originalSize - panoramaResult.sizeBytes;
 
-  return NextResponse.json({
-    message: "Panorama original disimpan dan display WebP full-res dibuat",
-    scene,
-    panoramaUrl,
-    originalPanoramaUrl,
-    thumbnailUrl,
-    optimization: {
-      original: formatBytes(originalSize),
-      panorama: formatBytes(panoramaResult.sizeBytes),
-      thumbnail: formatBytes(thumbResult.sizeBytes),
-      saved:
-        displayDelta >= 0
-          ? `${formatBytes(displayDelta)} lebih kecil dari original`
-          : `${formatBytes(Math.abs(displayDelta))} lebih besar dari original`,
-      format: "WEBP",
-      dimensions: `${panoramaResult.width}x${panoramaResult.height}`,
-    },
-  });
+    return NextResponse.json({
+      message: "Panorama original disimpan dan display WebP full-res dibuat",
+      scene,
+      panoramaUrl,
+      originalPanoramaUrl,
+      thumbnailUrl,
+      optimization: {
+        original: formatBytes(originalSize),
+        panorama: formatBytes(panoramaResult.sizeBytes),
+        thumbnail: formatBytes(thumbResult.sizeBytes),
+        saved:
+          displayDelta >= 0
+            ? `${formatBytes(displayDelta)} lebih kecil dari original`
+            : `${formatBytes(Math.abs(displayDelta))} lebih besar dari original`,
+        format: "WEBP",
+        dimensions: `${panoramaResult.width}x${panoramaResult.height}`,
+      },
+    });
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : "Terjadi kesalahan saat memproses upload panorama";
+    console.error("Panorama upload error:", err);
+    return NextResponse.json({ error: errorMsg }, { status: 500 });
+  }
 }

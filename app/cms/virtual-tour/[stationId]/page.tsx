@@ -39,7 +39,11 @@ import {
   Megaphone,
 } from "lucide-react";
 import { hotspotColor, hotspotLabel, HOTSPOT_SCALE_MIN, HOTSPOT_SCALE_MAX, HOTSPOT_SCALE_DEFAULT, DIRECTION_COMPASS, DIRECTION_LABELS, DIRECTION_ROTATE_DEG, type HotspotDirection } from "@/lib/hotspot-types";
-import { findSpaceStatus, spaceStatusColor } from "@/lib/space-availability";
+import {
+  findSpaceStatus,
+  spaceStatusColor,
+  type SpaceAvailabilityStatus,
+} from "@/lib/space-availability";
 import { normalizeHotspots } from "@/lib/hotspot-normalize";
 import {
   BLUR_HEIGHT_DEFAULT,
@@ -74,7 +78,6 @@ import type { TourLevelPublic } from "@/lib/tour-types";
 
 import type { AddMode, HotspotItem } from "@/lib/hotspot-types";
 import {
-  DEFAULT_FACILITY_ICON,
   FACILITY_ICONS,
   type FacilityIconId,
 } from "@/lib/facility-icons";
@@ -87,6 +90,10 @@ import { TourStructureSidebar } from "./TourStructureSidebar";
 import { ManageLevelsDialog } from "./ManageLevelsDialog";
 import { ManageAreaDialog, type AreaDialogState } from "./ManageAreaDialog";
 import { SceneTargetPicker } from "./SceneTargetPicker";
+import {
+  compressPanoramaClient,
+  compressImageClient,
+} from "@/lib/client-image-compression";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -98,6 +105,7 @@ type Scene = {
   levelId?: string | null;
   areaId?: string | null;
   panoramaUrl: string;
+  originalPanoramaUrl?: string | null;
   thumbnailUrl?: string | null;
   order: number;
   hotspots: Omit<HotspotItem, "_id">[];
@@ -116,7 +124,7 @@ type CommercialSpace = {
   code: string;
   name: string;
   type: string;
-  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  status: SpaceAvailabilityStatus;
   area: number;
   monthlyRent: number;
   deposit: number;
@@ -128,6 +136,8 @@ type CommercialSpace = {
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;
+  panoramaUrl?: string | null;
+  tenantBrand?: string | null;
 };
 
 function getLevelConfig(levelSlug: string | undefined, levels: TourLevel[]) {
@@ -439,10 +449,11 @@ export default function VirtualTourEditorPage() {
 
   // ─── Load data ───────────────────────────────────────────────────────────
   async function load(keepIndex?: number) {
+    const timestamp = Date.now();
     const [stRes, structRes, spRes] = await Promise.all([
-      cmsFetch(`/api/cms/stations/${stationId}`),
-      cmsFetch(`/api/cms/virtual-tour/${stationId}/structure`),
-      cmsFetch(`/api/cms/spaces/station/${stationId}`),
+      cmsFetch(`/api/cms/stations/${stationId}?_t=${timestamp}`),
+      cmsFetch(`/api/cms/virtual-tour/${stationId}/structure?_t=${timestamp}`),
+      cmsFetch(`/api/cms/spaces/station/${stationId}?_t=${timestamp}`),
     ]);
 
     if (!structRes.ok) {
@@ -624,7 +635,7 @@ export default function VirtualTourEditorPage() {
                 : "Info baru",
         scale: HOTSPOT_SCALE_DEFAULT,
         ...(type === "info"
-          ? { description: "", facilityIcon: DEFAULT_FACILITY_ICON }
+          ? { description: "" }
           : {}),
       };
       setHotspots((prev) => [...prev, newH]);
@@ -815,19 +826,43 @@ export default function VirtualTourEditorPage() {
 
   // ─── Upload panorama ─────────────────────────────────────────────────────
   async function uploadPanorama(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !currentScene) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile || !currentScene) return;
     setUploading(true);
-    const fd = new FormData();
-    fd.append("file", file);
     try {
+      const file = await compressPanoramaClient(rawFile);
+      const fd = new FormData();
+      fd.append("file", file);
       const res = await cmsFetch(
         `/api/cms/virtual-tour/${stationId}/${currentScene.sceneId}`,
         { method: "POST", body: fd }
       );
       if (res.ok) {
+        const payload = await res.json().catch(() => null);
+        if (payload?.scene) {
+          setScenes((prev) =>
+            prev.map((s) =>
+              s.sceneId === currentScene.sceneId
+                ? {
+                    ...s,
+                    panoramaUrl: payload.scene.panoramaUrl,
+                    originalPanoramaUrl: payload.scene.originalPanoramaUrl,
+                    thumbnailUrl: payload.scene.thumbnailUrl,
+                    canvasData: payload.scene.canvasData ?? s.canvasData,
+                  }
+                : s
+            )
+          );
+          rememberSavedScene({
+            ...currentScene,
+            panoramaUrl: payload.scene.panoramaUrl,
+            originalPanoramaUrl: payload.scene.originalPanoramaUrl,
+            thumbnailUrl: payload.scene.thumbnailUrl,
+            canvasData: payload.scene.canvasData ?? currentScene.canvasData,
+          });
+        }
         showToast("ok", "Panorama diupload ke S3");
-        load(selectedSceneIndex);
+        await load(selectedSceneIndex);
       } else {
         const data = await res.json().catch(() => ({}));
         showToast("err", data.error ?? "Upload gagal");
@@ -1124,13 +1159,23 @@ export default function VirtualTourEditorPage() {
             delete next.creativeUrl;
             delete next.creativeTitle;
             if (!next.description) next.description = "";
-            if (!next.facilityIcon) next.facilityIcon = DEFAULT_FACILITY_ICON;
+            // Tanpa facilityIcon → pin informasi (info.png)
           } else if (newType === "ad") {
             delete next.sceneId;
             delete next.direction;
             delete next.description;
             delete next.facilityIcon;
           }
+          return next;
+        })
+      );
+    } else if (field === "facilityIcon" && value === undefined) {
+      pushHistory();
+      setHotspots((prev) =>
+        prev.map((h) => {
+          if (h._id !== selectedHotspotId) return h;
+          const next = { ...h };
+          delete next.facilityIcon;
           return next;
         })
       );
@@ -1232,12 +1277,17 @@ export default function VirtualTourEditorPage() {
   }
 
   async function uploadAdCreative(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !selectedHotspotId) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile || !selectedHotspotId) return;
     setUploadingCreative(true);
-    const fd = new FormData();
-    fd.append("file", file);
     try {
+      const file = await compressImageClient(rawFile, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.85,
+      });
+      const fd = new FormData();
+      fd.append("file", file);
       const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}/ad-creative`, {
         method: "POST",
         body: fd,
@@ -1396,24 +1446,39 @@ export default function VirtualTourEditorPage() {
         prev.map((r) => (r.key === row.key ? { ...r, status: "uploading" } : r))
       );
 
-      const fd = new FormData();
-      fd.append("file", row.file);
-      const uploadRes = await cmsFetch(
-        `/api/cms/virtual-tour/${stationId}/${row.sceneId}`,
-        { method: "POST", body: fd }
-      );
-
-      if (uploadRes.ok) {
-        anySucceeded = true;
-        setBulkRows((prev) =>
-          prev.map((r) => (r.key === row.key ? { ...r, status: "done" } : r))
+      try {
+        const compressedFile = await compressPanoramaClient(row.file);
+        const fd = new FormData();
+        fd.append("file", compressedFile);
+        const uploadRes = await cmsFetch(
+          `/api/cms/virtual-tour/${stationId}/${row.sceneId}`,
+          { method: "POST", body: fd }
         );
-      } else {
-        const data = await uploadRes.json().catch(() => ({}));
+
+        if (uploadRes.ok) {
+          anySucceeded = true;
+          setBulkRows((prev) =>
+            prev.map((r) => (r.key === row.key ? { ...r, status: "done" } : r))
+          );
+        } else {
+          const data = await uploadRes.json().catch(() => ({}));
+          setBulkRows((prev) =>
+            prev.map((r) =>
+              r.key === row.key
+                ? { ...r, status: "error", error: data.error ?? "Gagal upload panorama" }
+                : r
+            )
+          );
+        }
+      } catch (err) {
         setBulkRows((prev) =>
           prev.map((r) =>
             r.key === row.key
-              ? { ...r, status: "error", error: data.error ?? "Gagal upload panorama" }
+              ? {
+                  ...r,
+                  status: "error",
+                  error: err instanceof Error ? err.message : "Error upload panorama",
+                }
               : r
           )
         );
@@ -1441,7 +1506,7 @@ export default function VirtualTourEditorPage() {
         <div className="h-5 w-px bg-slate-700" />
 
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-slate-400 text-sm shrink-0">Virtual Tour</span>
+          <span className="text-slate-400 text-sm shrink-0">Station Virtual Tour</span>
           <span className="text-slate-600">›</span>
           <span className="text-slate-100 text-sm font-semibold truncate">
             {station?.name ?? "…"}
@@ -1664,7 +1729,7 @@ export default function VirtualTourEditorPage() {
               /* Edit — Pannellum 3D statis (no auto-rotate), klik untuk pasang hotspot */
               <PannellumEditor
                 ref={editorRef}
-                key={`editor-${currentScene.sceneId}`}
+                key={`editor-${currentScene.sceneId}-${currentScene.panoramaUrl || "none"}`}
                 panoramaUrl={currentScene.panoramaUrl}
                 hotspots={hotspots}
                 privacyBlurs={privacyBlurs}
@@ -2273,13 +2338,34 @@ export default function VirtualTourEditorPage() {
                     <>
                       <div>
                         <Label className="text-xs text-slate-500 mb-1.5 block">
-                          Ikon Fasilitas
+                          Ikon Hotspot
                         </Label>
-                        <div className="grid grid-cols-5 gap-1.5">
+                        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+                          <button
+                            type="button"
+                            title="Informasi"
+                            onClick={() => updateHotspot("facilityIcon", undefined)}
+                            className={`flex flex-col items-center gap-1 rounded-lg border p-1.5 transition ${
+                              !selectedHotspot.facilityIcon
+                                ? "border-blue-500 bg-blue-500/15"
+                                : "border-slate-700 hover:bg-slate-800"
+                            }`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src="/brand/tour-pins/info.png"
+                              alt="Informasi"
+                              width={36}
+                              height={39}
+                              className="h-[39px] w-9 object-contain"
+                            />
+                            <span className="text-[9px] font-medium text-slate-400">
+                              Info
+                            </span>
+                          </button>
                           {FACILITY_ICONS.map((icon) => {
                             const active =
-                              (selectedHotspot.facilityIcon ?? DEFAULT_FACILITY_ICON) ===
-                              icon.id;
+                              selectedHotspot.facilityIcon === icon.id;
                             return (
                               <button
                                 key={icon.id}
@@ -2526,9 +2612,24 @@ export default function VirtualTourEditorPage() {
                                 );
                               })()}
                               {h.type === "space" && h.spaceCode && (
-                                <p className="truncate text-[10px] text-slate-500 font-mono">
-                                  {h.spaceCode}
-                                </p>
+                                (() => {
+                                  const linkedSpace = stationSpaces.find(
+                                    (space) => space.code === h.spaceCode
+                                  );
+                                  return (
+                                    <>
+                                      {linkedSpace?.status === "TERISI" &&
+                                        linkedSpace.tenantBrand && (
+                                          <p className="truncate text-[10px] font-semibold text-emerald-400">
+                                            {linkedSpace.tenantBrand}
+                                          </p>
+                                        )}
+                                      <p className="truncate font-mono text-[10px] text-slate-500">
+                                        {h.spaceCode}
+                                      </p>
+                                    </>
+                                  );
+                                })()
                               )}
                               {h.type === "ad" && h.spaceCode && (
                                 <p className="truncate text-[10px] text-slate-500 font-mono">

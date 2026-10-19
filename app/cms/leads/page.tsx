@@ -12,15 +12,28 @@ async function getLeads(): Promise<LeadItem[]> {
 
     return leads.map((lead) => ({
       id: lead.id,
+      userId: lead.userId,
       companyName: lead.companyName,
       contactName: lead.contactName,
       phone: lead.phone,
       email: lead.email,
       businessType: lead.businessType,
       status: lead.status,
+      message: lead.message,
+      surveyPreference: lead.surveyPreference,
+      siteVisitStatus: lead.siteVisitStatus,
+      siteVisitScheduledAt: lead.siteVisitScheduledAt?.toISOString() ?? null,
+      notes: lead.notes,
+      followUpAt: lead.followUpAt?.toISOString() ?? null,
       createdAt: lead.createdAt.toISOString(),
       space: lead.space
-        ? { code: lead.space.code, station: { name: lead.space.station.name } }
+        ? {
+            id: lead.space.id,
+            code: lead.space.code,
+            name: lead.space.name,
+            status: lead.space.status,
+            station: { name: lead.space.station.name },
+          }
         : null,
     }));
   } catch {

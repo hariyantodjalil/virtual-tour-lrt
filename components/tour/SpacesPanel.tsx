@@ -3,13 +3,14 @@
 import { AlertCircle, CheckCircle, ChevronRight, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber } from "@/lib/utils";
+import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 
 type Space = {
   id: string;
   code: string;
   name: string;
   type: string;
-  status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
+  status: SpaceAvailabilityStatus;
   area: number;
   exposure: number;
   floor: string;
@@ -32,6 +33,8 @@ const TYPE_LABELS: Record<string, string> = {
 
 const statusIcon = (s: string) => ({
   TERSEDIA: <CheckCircle className="h-4 w-4 text-emerald-500" />,
+  RESERVED: <AlertCircle className="h-4 w-4 text-indigo-500" />,
+  FIT_OUT: <AlertCircle className="h-4 w-4 text-violet-500" />,
   TERISI: <XCircle className="h-4 w-4 text-red-500" />,
   MAINTENANCE: <AlertCircle className="h-4 w-4 text-amber-500" />,
 }[s] ?? null);

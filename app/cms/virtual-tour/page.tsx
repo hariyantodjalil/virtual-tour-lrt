@@ -27,7 +27,7 @@ export default async function CmsVirtualTourIndexPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Virtual Tour Editor</h1>
+      <h1 className="text-2xl font-bold mb-6">Station Virtual Tour Editor</h1>
       <div className="grid gap-3 md:grid-cols-2">
         {stations.map((s) => (
           <Card key={s.id} className="bg-slate-900 border-slate-800">

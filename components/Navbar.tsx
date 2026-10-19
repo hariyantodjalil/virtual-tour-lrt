@@ -14,7 +14,7 @@ type AuthUser = {
 };
 
 const navItems = [
-  { href: "/", label: "Beranda", active: true },
+  { href: "/komersial", label: "Beranda", active: true },
   { href: "#kontak", label: "Hubungi Tim" },
   { href: "#area-komersial", label: "Area Komersial" },
 ] as const;
@@ -47,8 +47,8 @@ export default function Navbar({ variant = "light" }: { variant?: "light" | "dar
           scrolled ? "bg-black/70 py-3 shadow-lg backdrop-blur-md" : "bg-transparent py-5"
         }`}
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 md:px-10">
-          <Link href="/" className="flex shrink-0 items-center gap-1.5" aria-label="LRT Jabodebek">
+        <div className="relative mx-auto flex w-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 xl:px-10">
+          <Link href="/" className="relative z-10 flex shrink-0 items-center gap-2.5 sm:gap-4" aria-label="LRT Jabodebek">
             <span className="relative h-10 w-[96px]">
               <Image
                 src="/brand/landing/logo-kai-nav.png"
@@ -72,15 +72,17 @@ export default function Navbar({ variant = "light" }: { variant?: "light" | "dar
           </Link>
 
           <nav
-            className="hidden items-center rounded-xl bg-[#fffcfc] py-1.5 pr-6 pl-1.5 md:flex"
+            className="absolute top-1/2 left-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center rounded-xl bg-[#fffcfc] py-1.5 pr-6 pl-1.5 md:flex"
             aria-label="Navigasi utama"
           >
             {navItems.map((item) => (
               <a
                 key={item.label}
                 href={item.href}
-                className={`rounded-xl px-6 py-2.5 text-xs font-medium transition ${
-                  item.active ? "bg-[#d32f2f] text-white" : "text-[#d32f2f] hover:bg-[#d32f2f]/10"
+                className={`rounded-[6px] px-6 py-2.5 text-xs font-medium transition ${
+                  "active" in item && item.active
+                    ? "bg-[#d32f2f] text-white"
+                    : "text-[#d32f2f] hover:bg-[#d32f2f]/10"
                 }`}
               >
                 {item.label}
@@ -88,7 +90,7 @@ export default function Navbar({ variant = "light" }: { variant?: "light" | "dar
             ))}
           </nav>
 
-          <nav className="flex items-center gap-1 md:hidden" aria-label="Navigasi cepat">
+          <nav className="relative z-10 flex items-center gap-1 md:hidden" aria-label="Navigasi cepat">
             {navItems.slice(1).map((item) => (
               <a
                 key={item.label}
@@ -100,40 +102,42 @@ export default function Navbar({ variant = "light" }: { variant?: "light" | "dar
             ))}
           </nav>
 
-          {user ? (
-            user.role === "MITRA" ? (
-              <Link
-                href={panelHref}
-                aria-label={`Profil ${user.name || "Mitra"}`}
-                title={user.name || "Panel Mitra"}
-                className="inline-flex size-12 items-center justify-center rounded-xl text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110"
+          <div className="relative z-10 ml-auto shrink-0">
+            {user ? (
+              user.role === "MITRA" ? (
+                <Link
+                  href={panelHref}
+                  aria-label={`Profil ${user.name || "Mitra"}`}
+                  title={user.name || "Panel Mitra"}
+                  className="inline-flex size-12 items-center justify-center rounded-xl text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110"
+                  style={{ backgroundImage: "linear-gradient(155deg, #d32f2f 0%, #b71c1c 100%)" }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/brand/landing/icons/user.svg" alt="" width={18} height={18} className="size-[18px]" />
+                </Link>
+              ) : (
+                <Link
+                  href={panelHref}
+                  title={user.name}
+                  className="inline-flex h-12 max-w-[180px] items-center justify-center rounded-xl px-5 text-xs font-semibold tracking-wide text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110"
+                  style={{ backgroundImage: "linear-gradient(155deg, #d32f2f 0%, #b71c1c 100%)" }}
+                >
+                  <span className="truncate">{user.name || "Akun"}</span>
+                </Link>
+              )
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAuthView("login")}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-xs font-semibold tracking-wide text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110"
                 style={{ backgroundImage: "linear-gradient(155deg, #d32f2f 0%, #b71c1c 100%)" }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/brand/landing/icons/user.svg" alt="" width={18} height={18} className="size-[18px]" />
-              </Link>
-            ) : (
-              <Link
-                href={panelHref}
-                title={user.name}
-                className="inline-flex h-12 max-w-[180px] items-center justify-center rounded-xl px-5 text-xs font-semibold tracking-wide text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110"
-                style={{ backgroundImage: "linear-gradient(155deg, #d32f2f 0%, #b71c1c 100%)" }}
-              >
-                <span className="truncate">{user.name || "Akun"}</span>
-              </Link>
-            )
-          ) : (
-            <button
-              type="button"
-              onClick={() => setAuthView("login")}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-xs font-semibold tracking-wide text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110"
-              style={{ backgroundImage: "linear-gradient(155deg, #d32f2f 0%, #b71c1c 100%)" }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/landing/icons/user.svg" alt="" width={16} height={16} className="size-4" />
-              Login
-            </button>
-          )}
+                <img src="/brand/landing/icons/user.svg" alt="" width={16} height={16} className="size-4" />
+                Login
+              </button>
+            )}
+          </div>
         </div>
       </header>
 

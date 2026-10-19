@@ -1,9 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { getStationImage } from "@/lib/station-images";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import CommercialSpaceCard from "@/components/commercial/CommercialSpaceCard";
+import CommercialSpacesBrowseModal from "@/components/commercial/CommercialSpacesBrowseModal";
+import {
+  FAVORITES_UPDATED_EVENT,
+  isFavoriteSpace,
+  toggleFavoriteSpace,
+} from "@/lib/favorite-spaces";
 
 export type SpaceListing = {
   id: string;
@@ -11,42 +16,113 @@ export type SpaceListing = {
   code: string;
   type: string;
   status: string;
+  area: number;
+  monthlyRent: number;
   stationName: string;
   stationSlug: string;
   stationOrder: number;
+  stationLine: string;
+  tenantBrand?: string | null;
+};
+
+export type StationFilterOption = {
+  slug: string;
+  name: string;
+  order: number;
 };
 
 const FILTERS = [
-  { value: "all", label: "Semua", icon: "/brand/landing/icons/filter-semua.svg" },
-  { value: "KIOS", label: "Kios", icon: "/brand/landing/icons/filter-kios.svg" },
-  { value: "VENDING", label: "Vending machine", icon: "/brand/landing/icons/filter-vending.svg" },
-  { value: "MEDIA_IKLAN", label: "Iklan", icon: "/brand/landing/icons/filter-iklan.svg" },
+  { value: "all", label: "Semua" },
+  { value: "KIOS", label: "Kios" },
+  { value: "RUKO", label: "Ruko" },
+  { value: "ATM", label: "ATM" },
+  { value: "VENDING", label: "Vending machine" },
+  { value: "MEDIA_IKLAN", label: "Iklan" },
+  { value: "AREA_PROMOSI", label: "Area Promosi" },
 ] as const;
 
-const TYPE_LABEL: Record<string, string> = {
-  KIOS: "Tenant",
-  RUKO: "Ruko",
-  ATM: "ATM",
-  VENDING: "Vending",
-  MEDIA_IKLAN: "Iklan",
-  AREA_PROMOSI: "Promosi",
+const PREVIEW_LIMIT = 10;
+
+const STATUS_ORDER: Record<string, number> = {
+  TERSEDIA: 0,
+  RESERVED: 1,
+  FIT_OUT: 2,
+  MAINTENANCE: 3,
+  TERISI: 4,
 };
+
+function sortByAvailability(spaces: SpaceListing[]): SpaceListing[] {
+  return [...spaces].sort((a, b) => {
+    const orderA = STATUS_ORDER[a.status] ?? 99;
+    const orderB = STATUS_ORDER[b.status] ?? 99;
+    if (orderA !== orderB) return orderA - orderB;
+    if (a.stationOrder !== b.stationOrder) return a.stationOrder - b.stationOrder;
+    return (a.code || a.name).localeCompare(b.code || b.name, "id");
+  });
+}
+
+function buildPreview(spaces: SpaceListing[]): SpaceListing[] {
+  const sorted = sortByAvailability(spaces);
+  const available = sorted.filter((s) => s.status !== "TERISI");
+  const pool = available.length > 0 ? available : sorted;
+  return pool.slice(0, PREVIEW_LIMIT);
+}
 
 export default function CommercialSpaceGrid({
   spaces,
+  stations,
   totalSpaces,
   totalStations,
 }: {
   spaces: SpaceListing[];
+  stations: StationFilterOption[];
   totalSpaces: number;
   totalStations: number;
 }) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["value"]>("all");
+  const [stationFilter, setStationFilter] = useState("all");
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [browseOpen, setBrowseOpen] = useState(false);
+
+  useEffect(() => {
+    function refreshFavorites() {
+      setFavoriteIds(new Set(spaces.filter((s) => isFavoriteSpace(s.id)).map((s) => s.id)));
+    }
+    refreshFavorites();
+    window.addEventListener(FAVORITES_UPDATED_EVENT, refreshFavorites);
+    return () => window.removeEventListener(FAVORITES_UPDATED_EVENT, refreshFavorites);
+  }, [spaces]);
 
   const filtered = useMemo(() => {
-    if (filter === "all") return spaces;
-    return spaces.filter((s) => s.type === filter);
-  }, [spaces, filter]);
+    let list = spaces;
+    if (stationFilter !== "all") {
+      list = list.filter((s) => s.stationSlug === stationFilter);
+    }
+    if (filter !== "all") {
+      list = list.filter((s) => s.type === filter);
+    }
+    return list;
+  }, [spaces, filter, stationFilter]);
+
+  const sortedFiltered = useMemo(() => sortByAvailability(filtered), [filtered]);
+  const preview = useMemo(() => buildPreview(filtered), [filtered]);
+  const hasMore = sortedFiltered.length > preview.length;
+
+  function handleFavorite(e: React.MouseEvent, space: SpaceListing) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFavoriteSpace({
+      spaceId: space.id,
+      code: space.code,
+      name: space.name,
+      type: space.type,
+      status: space.status,
+      area: space.area,
+      monthlyRent: space.monthlyRent,
+      stationSlug: space.stationSlug,
+      stationName: space.stationName,
+    });
+  }
 
   return (
     <div>
@@ -61,10 +137,9 @@ export default function CommercialSpaceGrid({
           </p>
         </div>
 
-        {/* Stats — kartu putih sesuai Figma update */}
-        <div className="flex w-full max-w-[565px] shrink-0 items-center gap-4 rounded-xl bg-white px-5 py-4 shadow-sm sm:gap-6 sm:px-6">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <span className="relative size-[56px] shrink-0 overflow-hidden rounded-full sm:size-[70px]">
+        <div className="flex w-full max-w-[565px] shrink-0 flex-col gap-3 sm:flex-row sm:gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3 rounded-xl bg-white px-4 py-3.5 shadow-sm">
+            <span className="relative size-12 shrink-0 overflow-hidden rounded-full sm:size-14">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/brand/landing/icons/stats-spaces.png"
@@ -72,123 +147,120 @@ export default function CommercialSpaceGrid({
                 className="size-full object-contain"
               />
             </span>
-            <div className="min-w-0">
-              <p className="font-display text-2xl font-bold leading-none text-[#d32f2f] sm:text-[32px]">
-                {totalSpaces}+
-              </p>
-              <p className="mt-1 text-sm font-bold text-black sm:text-[16px]">Area Komersial</p>
-              <p className="text-[13px] text-black/80">yang tersedia</p>
-            </div>
+            <p className="min-w-0 text-sm leading-snug font-semibold text-[#101828] sm:text-[15px]">
+              <span className="text-[#d32f2f]">{totalSpaces}+</span> Area Komersial yang tersedia
+            </p>
           </div>
 
-          <div className="h-[75px] w-px shrink-0 bg-[#d32f2f]/40" aria-hidden />
-
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <span className="relative size-[56px] shrink-0 overflow-hidden rounded-full sm:size-[70px]">
+          <div className="flex min-w-0 flex-1 items-center gap-3 rounded-xl bg-white px-4 py-3.5 shadow-sm">
+            <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-[#d32f2f] sm:size-14">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/brand/landing/icons/stats-spaces.png"
+                src="/brand/landing/icons/business.svg"
                 alt=""
-                className="size-full object-contain"
+                width={22}
+                height={26}
+                className="size-5 sm:size-6"
               />
             </span>
-            <div className="min-w-0">
-              <p className="font-display text-2xl font-bold leading-none text-[#d32f2f] sm:text-[32px]">
-                {totalStations}
-              </p>
-              <p className="mt-1 text-sm font-bold text-black sm:text-[16px]">Stasiun</p>
-              <p className="text-[13px] text-black/80">LRT Jabodebek</p>
-            </div>
+            <p className="min-w-0 text-sm leading-snug font-semibold text-[#101828] sm:text-[15px]">
+              <span className="text-[#d32f2f]">{totalStations}</span> Stasiun LRT Jabodebek
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        {FILTERS.map((item) => {
-          const active = filter === item.value;
-          return (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => setFilter(item.value)}
-              className={`inline-flex h-[29px] items-center gap-2 rounded-[5px] px-4 text-xs font-medium transition ${
-                active
-                  ? "border border-white bg-transparent text-white"
-                  : "bg-[#f8f8f8] text-black hover:bg-white"
-              }`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.icon}
-                alt=""
-                width={16}
-                height={16}
-                className={`size-4 object-contain ${active ? "brightness-0 invert" : ""}`}
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="relative w-full sm:w-auto sm:min-w-[220px]">
+          <label htmlFor="station-filter" className="sr-only">
+            Filter stasiun
+          </label>
+          <select
+            id="station-filter"
+            value={stationFilter}
+            onChange={(e) => setStationFilter(e.target.value)}
+            className="h-9 w-full appearance-none rounded-full border border-white/80 bg-white py-0 pr-9 pl-4 text-xs font-medium text-[#d32f2f] shadow-sm transition hover:bg-white/95 focus:outline-none focus:ring-2 focus:ring-white/50"
+          >
+            <option value="all">Semua Stasiun</option>
+            {stations.map((st) => (
+              <option key={st.slug} value={st.slug}>
+                {st.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-[#d32f2f]"
+            aria-hidden
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map((item) => {
+            const active = filter === item.value;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setFilter(item.value)}
+                className={`inline-flex h-9 items-center rounded-full px-4 text-xs font-medium transition ${
+                  active
+                    ? "bg-[#b71c1c] text-white shadow-sm"
+                    : "border border-white/80 bg-white text-[#d32f2f] hover:bg-white/95"
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {preview.length > 0 ? (
+        <>
+          <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            {preview.map((space) => (
+              <CommercialSpaceCard
+                key={space.id}
+                space={space}
+                favorited={favoriteIds.has(space.id)}
+                onFavorite={handleFavorite}
               />
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
+            ))}
+          </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {filtered.map((space) => {
-          const available = space.status === "TERSEDIA";
-          return (
-            <Link
-              key={space.id}
-              href={`/station/${space.stationSlug}`}
-              className="group overflow-hidden rounded-2xl bg-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
-            >
-              <div className="relative aspect-[200/176] overflow-hidden">
-                <Image
-                  src={getStationImage(space.stationSlug, space.stationOrder)}
-                  alt={`${space.name} di ${space.stationName}`}
-                  fill
-                  sizes="(max-width: 640px) 100vw, 25vw"
-                  className="object-cover transition duration-500 group-hover:scale-105"
-                />
-                <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold text-white ${
-                      available ? "bg-[#00cc00]" : "bg-[#d32f2f]"
-                    }`}
-                  >
-                    {available ? "Tersedia" : "Terisi"}
-                  </span>
-                  <span className="rounded-full bg-[#00cc00]/90 px-2.5 py-0.5 text-[9px] font-bold text-white">
-                    {TYPE_LABEL[space.type] ?? space.type}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-3 border border-t-0 border-[#f3f4f6] px-4 py-3">
-                <div className="min-w-0">
-                  <h3 className="truncate text-sm font-semibold text-[#101828]">
-                    {space.code || space.name}
-                  </h3>
-                  <p className="mt-0.5 truncate text-xs text-[#6a7282]">Stasiun {space.stationName}</p>
-                </div>
-                <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#c41230]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/brand/landing/icons/card-arrow.svg"
-                    alt=""
-                    width={14}
-                    height={14}
-                    className="size-3.5"
-                  />
-                </span>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      {filtered.length === 0 && (
+          {hasMore && (
+            <div className="mt-8 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setBrowseOpen(true)}
+                className="inline-flex h-11 items-center rounded-full border border-white/80 bg-white px-6 text-sm font-semibold text-[#d32f2f] shadow-sm transition hover:bg-white/95"
+              >
+                Lihat semua area komersial
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
         <p className="mt-8 rounded-2xl border border-dashed border-white/30 px-6 py-10 text-center text-sm text-white/80">
-          Tidak ada unit untuk filter ini.
+          Tidak ada unit untuk filter ini
+          {stationFilter !== "all"
+            ? ` di ${stations.find((s) => s.slug === stationFilter)?.name ?? "stasiun terpilih"}`
+            : ""}
+          .
         </p>
       )}
+
+      <CommercialSpacesBrowseModal
+        open={browseOpen}
+        onClose={() => setBrowseOpen(false)}
+        spaces={sortedFiltered}
+        stations={stations}
+        filter={filter}
+        stationFilter={stationFilter}
+        favoriteIds={favoriteIds}
+        onFavorite={handleFavorite}
+        totalCount={sortedFiltered.length}
+      />
     </div>
   );
 }

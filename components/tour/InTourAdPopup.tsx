@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Megaphone, MessageCircle, X } from "lucide-react";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import { getWhatsAppUrl } from "@/lib/utils";
+import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 
 type Props = {
   title: string;
@@ -26,12 +27,15 @@ export default function InTourAdPopup({
   spaceName,
   brandName,
   stationName,
-  contactPhone = "628118012012",
+  contactPhone,
   onClose,
 }: Props) {
+  const commercialProfile = useCommercialProfile();
+  const resolvedContactPhone =
+    contactPhone || commercialProfile.whatsappNumber;
   const displayTitle = creativeTitle || title || spaceName || "Media Iklan";
   const waMessage = `Halo, saya tertarik dengan slot media iklan${spaceCode ? ` ${spaceCode}` : ""} di Stasiun ${stationName}. Mohon informasi lebih lanjut.`;
-  const waUrl = getWhatsAppUrl(contactPhone, waMessage);
+  const waUrl = getWhatsAppUrl(resolvedContactPhone, waMessage);
   const imageSrc = creativeUrl ? getS3ProxyUrl(creativeUrl) : null;
 
   if (typeof document === "undefined") return null;
@@ -83,8 +87,8 @@ export default function InTourAdPopup({
           </div>
 
           <p className="text-sm text-[#F8ECEE]/70">
-            Slot media di Stasiun {stationName}. Hubungi tim komersial untuk ketersediaan dan paket
-            penempatan.
+            Slot media di Stasiun {stationName}. Hubungi {commercialProfile.teamName} untuk
+            ketersediaan dan paket penempatan.
           </p>
 
           <a

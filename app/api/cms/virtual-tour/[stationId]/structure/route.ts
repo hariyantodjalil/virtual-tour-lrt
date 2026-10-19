@@ -24,6 +24,9 @@ const sceneSelect = {
   updatedAt: true,
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(request: NextRequest, { params }: Params) {
   const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -49,7 +52,14 @@ export async function GET(request: NextRequest, { params }: Params) {
       return scene;
     });
 
-    return NextResponse.json({ ...structure, scenes });
+    return NextResponse.json(
+      { ...structure, scenes },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        },
+      }
+    );
   } catch (err) {
     console.error("[structure GET]", err);
     return NextResponse.json(
