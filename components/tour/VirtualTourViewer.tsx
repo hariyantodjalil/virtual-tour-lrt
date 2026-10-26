@@ -313,12 +313,12 @@ export default function VirtualTourViewer({
         return;
       }
 
-      viewer.on("load", () => {
+      viewerRef.current = viewer;
+
+      const revealLoadedScene = () => {
         if (!isMounted.current || epoch !== initEpochRef.current || viewerRef.current !== viewer) return;
         setViewerReady(true);
-        requestAnimationFrame(() => {
-          if (epoch === initEpochRef.current) setPanoramaVisible(true);
-        });
+        setPanoramaVisible(true);
         requestAnimationFrame(() => {
           if (epoch === initEpochRef.current) {
             bindPrivacyBlursInContainer(viewer, containerRef.current);
@@ -333,7 +333,12 @@ export default function VirtualTourViewer({
         if (focusCameraRef.current && focusTokenRef.current) {
           applyCameraFocus(viewer);
         }
-      });
+      };
+
+      viewer.on("load", revealLoadedScene);
+      if (typeof viewer.isLoaded === "function" && viewer.isLoaded()) {
+        revealLoadedScene();
+      }
 
       viewer.on("error", (err: string) => {
         console.error("Pannellum error:", err);
@@ -341,8 +346,6 @@ export default function VirtualTourViewer({
           setError("Gagal memuat panorama. Periksa koneksi internet.");
         }
       });
-
-      viewerRef.current = viewer;
     } catch (e) {
       console.error("Viewer init error:", e);
       if (isMounted.current && epoch === initEpochRef.current) {
@@ -427,13 +430,11 @@ export default function VirtualTourViewer({
   return (
     <div className="lrt-vt-viewer relative h-full w-full overflow-hidden bg-[#0a0f18]">
       <div
-        className={`lrt-vt-panorama-wrap absolute inset-0 transition-opacity duration-700 ease-out ${
-          panoramaVisible ? "opacity-100" : "opacity-0"
-        }`}
+        className="lrt-vt-panorama-wrap absolute inset-0"
         style={{
+          opacity: panoramaVisible ? 1 : 0,
           filter: overlay.blur > 0 ? `blur(${overlay.blur}px)` : undefined,
           transform: overlay.vignette > 0 ? `scale(${1 + overlay.vignette * 0.06})` : undefined,
-          transition: "opacity 700ms ease-out, filter 80ms linear, transform 80ms linear",
         }}
       >
         <div ref={containerRef} className="absolute inset-0" />
