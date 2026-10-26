@@ -51,6 +51,7 @@ function validateS3Key(pathSegments: string[]): string | null {
 
 const PUBLIC_PREFIXES = [
   "virtual-tour/panoramas/",
+  "virtual-tour/panorama-tiles/",
   "virtual-tour/thumbnails/",
   "virtual-tour/ad-creatives/",
   "stations/covers/",
