@@ -67,7 +67,7 @@ const STATUS_COLOR_LIGHT: Record<Space["status"], string> = {
 };
 
 export default function HomepageDashboardClient({ stations }: Props) {
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme] = useState<"dark" | "light">("dark");
   const [activeStationIdx, setActiveStationIdx] = useState(0);
   const [activeSceneId, setActiveSceneId] = useState(() => stations[0]?.scenes[0]?.id ?? "");
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,10 +79,6 @@ export default function HomepageDashboardClient({ stations }: Props) {
 
   const activeStation = stations[activeStationIdx];
   const isDark = theme === "dark";
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-  };
 
   // Filter stations
   const filteredStations = stations.filter((s) => {
@@ -118,7 +114,7 @@ export default function HomepageDashboardClient({ stations }: Props) {
     }`}>
       
       {/* ── NAVBAR (Floating Capsule Header) ── */}
-      <Navbar variant={theme} onToggleTheme={toggleTheme} />
+      <Navbar variant={theme} />
 
       {/* ── MAIN DASHBOARD VIEWPORT (Full-Screen VR Underneath) ── */}
       <div className="absolute inset-0 w-full h-full z-0">
