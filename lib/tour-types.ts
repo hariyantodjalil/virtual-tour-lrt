@@ -37,6 +37,7 @@ export type PanoramaScene = {
   title: string;
   panoramaUrl: string;
   multiRes?: PannellumMultiRes;
+  hotspots: Hotspot[];
   privacyBlurs?: PrivacyBlur[];
   initialView?: SceneInitialView;
   thumbnailUrl?: string;

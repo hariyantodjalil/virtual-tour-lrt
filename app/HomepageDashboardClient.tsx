@@ -80,10 +80,6 @@ export default function HomepageDashboardClient({ stations }: Props) {
   const activeStation = stations[activeStationIdx];
   const isDark = theme === "dark";
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-  };
-
   // Filter stations
   const filteredStations = stations.filter((s) => {
     const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -118,7 +114,7 @@ export default function HomepageDashboardClient({ stations }: Props) {
     }`}>
       
       {/* ── NAVBAR (Floating Capsule Header) ── */}
-      <Navbar variant={theme} onToggleTheme={toggleTheme} />
+      <Navbar variant={theme} />
 
       {/* ── MAIN DASHBOARD VIEWPORT (Full-Screen VR Underneath) ── */}
       <div className="absolute inset-0 w-full h-full z-0">

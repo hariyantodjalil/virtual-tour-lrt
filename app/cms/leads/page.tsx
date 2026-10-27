@@ -25,6 +25,8 @@ async function getLeads(): Promise<LeadItem[]> {
       siteVisitScheduledAt: lead.siteVisitScheduledAt?.toISOString() ?? null,
       notes: lead.notes,
       followUpAt: lead.followUpAt?.toISOString() ?? null,
+      rdsOfferNo: lead.rdsOfferNo,
+      baNegotiationNo: lead.baNegotiationNo,
       createdAt: lead.createdAt.toISOString(),
       space: lead.space
         ? {

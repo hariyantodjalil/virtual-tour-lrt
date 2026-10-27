@@ -98,7 +98,7 @@ function statusBadge(status: string) {
 function currentStepIndex(status: string): number {
   if (status === "CLOSED_LOST") return -1;
   if (status === "CLOSED_WON") return STEPS.length - 1;
-  const index = LEAD_PIPELINE_STATUSES.indexOf(status as CommercialLeadStatus);
+  const index = LEAD_PIPELINE_STATUSES.findIndex((step) => step === status);
   return index >= 0 ? index : 0;
 }
 

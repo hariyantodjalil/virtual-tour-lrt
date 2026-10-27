@@ -69,13 +69,13 @@ export function leadStageIndex(status: string) {
   if (status === "CLOSED_WON") {
     return LEAD_PIPELINE_STATUSES.indexOf("COMMERCIAL_OPERATION");
   }
-  return LEAD_PIPELINE_STATUSES.indexOf(status as CommercialLeadStatus);
+  return LEAD_PIPELINE_STATUSES.findIndex((step) => step === status);
 }
 
 export function isAtOrAfterLeadStage(status: string, gate: CommercialLeadStatus) {
   if (status === "CLOSED_LOST") return false;
   const current = leadStageIndex(status);
-  const target = LEAD_PIPELINE_STATUSES.indexOf(gate);
+  const target = LEAD_PIPELINE_STATUSES.findIndex((step) => step === gate);
   return current >= 0 && target >= 0 && current >= target;
 }
 
