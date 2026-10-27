@@ -218,6 +218,8 @@ pipeline {
                         sudo chmod 777 -R "$WORKSPACE"
 
                         sudo docker build \
+                            --no-cache \
+                            --pull \
                             -t "$HARBOR_REGISTRY/$APP_NAME:$TAG" \
                             .
                     '''
