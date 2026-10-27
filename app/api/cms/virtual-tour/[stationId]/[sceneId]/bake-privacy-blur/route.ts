@@ -136,6 +136,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     ...markPrivacyBlurBaked(scene.canvasData, blurs, sourcePanoramaUrl),
     multiRes: await uploadPanoramaTiles(panoramaBuffer, stationSlug, sceneId),
   } as Prisma.InputJsonValue;
+
+  const updated = await prisma.virtualTourScene.update({
+    where: { stationId_sceneId: { stationId, sceneId } },
     data: { panoramaUrl, thumbnailUrl, canvasData },
     select: sceneSelect,
   });
