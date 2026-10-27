@@ -34,6 +34,14 @@ export const ACTIVE_LEAD_STATUSES: CommercialLeadStatus[] = [
   "FIT_OUT_HANDOVER",
 ];
 
+export const PUBLIC_LEASING_STEPS = [
+  { n: "01", title: "Jelajahi ruang", detail: "Lihat lokasi lewat tur 360°." },
+  { n: "02", title: "Ajukan minat", detail: "Isi data usaha untuk ruang yang dipilih." },
+  { n: "03", title: "Terima penawaran", detail: "Tim KAI meninjau dan mengirim penawaran resmi." },
+  { n: "04", title: "Verifikasi lokasi", detail: "Cek batas area setelah kesepakatan awal." },
+  { n: "05", title: "Perjanjian", detail: "BA Negosiasi, review desain, lalu PKS dan serah terima." },
+] as const;
+
 export const SITE_VISIT_STATUS_VALUES = [
   "NONE",
   "REQUESTED",

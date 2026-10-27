@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { PUBLIC_LEASING_STEPS } from "@/lib/commercial-pipeline";
 import { cn } from "@/lib/utils";
 
 const guestSchema = z.object({
@@ -231,17 +232,32 @@ export default function TenantInterestForm({
 
   if (submitted) {
     return (
-      <div className="flex flex-col items-center gap-3 py-8 text-center">
-        <CheckCircle className="h-10 w-10 text-emerald-500" />
-        <div>
-          <p className="font-bold text-[#101828]">Minat Anda Tercatat!</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Pengajuan untuk {spaceCode} di {stationName} sudah masuk Panel Mitra.
-          </p>
+      <div className="py-6 text-[#101828]">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <CheckCircle className="h-10 w-10 text-emerald-500" />
+          <div>
+            <p className="font-bold">Minat Anda Tercatat</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Pengajuan untuk {spaceCode} di {stationName} sudah masuk. Tim KAI meninjau sebelum ada penawaran resmi.
+            </p>
+          </div>
         </div>
-        <Button asChild className="mt-2 bg-[#D81435] hover:bg-[#B8112D]">
-          <Link href="/partner">Buka Panel Mitra</Link>
-        </Button>
+        <ol className="mt-5 space-y-3 text-left">
+          {PUBLIC_LEASING_STEPS.slice(2).map((step) => (
+            <li key={step.n} className="flex gap-3">
+              <span className="font-display text-xs font-bold text-[#E31E2D]">{step.n}</span>
+              <span>
+                <span className="block text-sm font-semibold">{step.title}</span>
+                <span className="block text-xs text-slate-500">{step.detail}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-5 flex justify-center">
+          <Button asChild className="bg-[#E31E2D] hover:bg-[#c41926]">
+            <Link href="/partner">Buka Panel Mitra</Link>
+          </Button>
+        </div>
       </div>
     );
   }

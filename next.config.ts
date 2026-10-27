@@ -6,8 +6,10 @@ const nextConfig: NextConfig = {
   experimental: {
     proxyClientMaxBodySize: "40mb",
   },
-  // Seed demo panoramas memakai URL pannellum.org
+  // Cloudflare WAF memblokir /_next/image?url=... (403 di jalur internet).
+  // Asset lokal & proxy S3 dilayani langsung tanpa image optimizer.
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",

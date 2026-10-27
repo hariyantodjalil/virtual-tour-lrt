@@ -883,6 +883,21 @@ body {
   animation: tour-panel-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@keyframes tour-spec-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tour-spec-row {
+  animation: tour-spec-row-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .tour-drawer-in {
   animation: tour-drawer-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -940,7 +955,8 @@ body {
   .tour-drawer-in,
   .tour-drawer-in-left,
   .tour-rail-pop,
-  .tour-nav-rise {
+  .tour-nav-rise,
+  .tour-spec-row {
     animation: none;
   }
 

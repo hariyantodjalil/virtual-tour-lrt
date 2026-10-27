@@ -1,42 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import {
   ArrowRight,
-  BarChart3,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  Eye,
-  Heart,
-  Info,
+  CalendarDays,
+  Check,
+  Copy,
   MapPin,
   Maximize2,
-  Phone,
+  MessageSquare,
   Store,
-  Tag,
-  Train,
   Users,
+  Wrench,
   X,
   Zap,
-  Droplets,
-  Wind,
   AlertCircle,
+  CheckCircle2,
   XCircle,
+  ChevronLeft,
 } from "lucide-react";
-import { formatNumber, formatRupiah, getWhatsAppUrl } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
-import {
-  isFavoriteSpace,
-  toggleFavoriteSpace,
-} from "@/lib/favorite-spaces";
-import { FACILITY_ICONS, isFacilityIconId } from "@/lib/facility-icons";
 import TenantInterestForm from "./TenantInterestForm";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
-import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 
 type CommercialSpace = {
   id: string;
@@ -69,7 +57,13 @@ const TYPE_LABELS: Record<string, string> = {
   AREA_PROMOSI: "Area Promosi",
 };
 
-const MEDIA_TYPES = new Set(["MEDIA_IKLAN", "AREA_PROMOSI"]);
+type SpecRow = {
+  id: string;
+  label: string;
+  value: string;
+  hint?: string | null;
+  icon: ReactNode;
+};
 
 type Props = {
   space: CommercialSpace;
@@ -80,57 +74,19 @@ type Props = {
   returnToList?: boolean;
 };
 
-function visibilityLabel(exposure: number) {
-  if (exposure >= 4000) return "Tinggi";
-  if (exposure >= 1500) return "Sedang";
-  return "Rendah";
-}
-
 export default function InTourSpacePopup({
   space,
   stationName,
   stationSlug,
-  contactPhone,
   onClose,
   returnToList = false,
 }: Props) {
-  const commercialProfile = useCommercialProfile();
-  const resolvedContactPhone =
-    contactPhone || commercialProfile.whatsappNumber;
   const [showInterestModal, setShowInterestModal] = useState(false);
-  const [favorited, setFavorited] = useState(() => isFavoriteSpace(space.id));
-
-  function handleToggleFavorite() {
-    if (!stationSlug) return;
-    const next = toggleFavoriteSpace({
-      spaceId: space.id,
-      code: space.code,
-      name: space.name,
-      type: space.type,
-      status: space.status,
-      area: space.area,
-      monthlyRent: space.monthlyRent,
-      location: space.location,
-      floor: space.floor,
-      panoramaUrl: space.panoramaUrl,
-      stationSlug,
-      stationName,
-    });
-    setFavorited(next);
-  }
-
-  const waMessage = `Halo, saya tertarik dengan unit komersial ${space.code} (${space.name}) di Stasiun ${stationName}. Mohon informasi lebih lanjut.`;
-  const waUrl = getWhatsAppUrl(resolvedContactPhone, waMessage);
-  const isMedia = MEDIA_TYPES.has(space.type);
+  const [copied, setCopied] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const occupiedTenant =
     space.status === "TERISI" ? space.tenantBrand?.trim() : "";
-  const categoryLabel = isMedia ? "Media" : "Tenant";
-  const priceValue =
-    space.monthlyRent && space.monthlyRent > 0
-      ? `${formatRupiah(space.monthlyRent)} / bulan`
-      : space.deposit > 0
-        ? `Deposit ${formatRupiah(space.deposit)}`
-        : "Hubungi tim";
+  const typeLabel = TYPE_LABELS[space.type] ?? space.type;
 
   const coverSrc = space.panoramaUrl
     ? getS3ProxyUrl(space.panoramaUrl)
@@ -169,67 +125,77 @@ export default function InTourSpacePopup({
     },
   }[space.status];
 
-  const highlights = useMemo(() => {
-    const items: string[] = [];
-    if (space.nearestExit) items.push(`Dekat ${space.nearestExit}`);
-    if (space.floor) items.push(`Area ${space.floor}`);
-    if (space.location) items.push(space.location.split(",")[0]?.trim() || space.location);
-    if (items.length < 3 && space.exposure > 0) items.push("Mudah Terlihat");
-    return items.slice(0, 3);
-  }, [space.nearestExit, space.floor, space.location, space.exposure]);
+  const locationValue = space.location?.trim() || space.floor?.trim() || "-";
+  const locationHint =
+    space.location?.trim() &&
+    space.floor?.trim() &&
+    space.location.trim() !== space.floor.trim()
+      ? space.floor.trim()
+      : space.nearestExit?.trim()
+        ? `Exit terdekat: ${space.nearestExit.trim()}`
+        : null;
 
-  const nearbyFacilities = useMemo(() => {
-    const fromCms = (space.nearbyFacilities ?? [])
-      .filter(isFacilityIconId)
-      .map((id) => {
-        const def = FACILITY_ICONS.find((f) => f.id === id);
-        if (!def) return null;
-        return {
-          label: def.label,
-          icon: (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={def.src} alt="" className="h-5 w-5 object-contain" />
-          ),
-        };
-      })
-      .filter(Boolean) as { label: string; icon: ReactNode }[];
+  const utilityValue = [
+    space.waterAccess ? "Air" : null,
+    space.airConditioning ? "AC / ventilasi" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-    if (fromCms.length > 0) {
-      const extras: { label: string; icon: ReactNode }[] = [];
-      if (space.powerSupply) extras.push({ label: "Listrik", icon: <Zap className="h-4 w-4" /> });
-      if (space.waterAccess) extras.push({ label: "Air", icon: <Droplets className="h-4 w-4" /> });
-      if (space.airConditioning) extras.push({ label: "AC", icon: <Wind className="h-4 w-4" /> });
-      return [...fromCms, ...extras].slice(0, 6);
-    }
+  const facilitiesHint =
+    space.nearbyFacilities && space.nearbyFacilities.length > 0
+      ? space.nearbyFacilities.join(" · ")
+      : null;
 
-    const items: { label: string; icon: ReactNode }[] = [
-      { label: "Eskalator", icon: <Train className="h-4 w-4" /> },
-      {
-        label: "Toilet",
-        icon: (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src="/brand/tour-pins/toilet.png" alt="" className="h-5 w-5 object-contain" />
-        ),
-      },
-      {
-        label: "Mushola",
-        icon: (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src="/brand/tour-pins/mushola.png" alt="" className="h-5 w-5 object-contain" />
-        ),
-      },
-      { label: "Peron", icon: <Train className="h-4 w-4" /> },
-    ];
-    if (space.powerSupply) items.push({ label: "Listrik", icon: <Zap className="h-4 w-4" /> });
-    if (space.waterAccess) items.push({ label: "Air", icon: <Droplets className="h-4 w-4" /> });
-    if (space.airConditioning) items.push({ label: "AC", icon: <Wind className="h-4 w-4" /> });
-    return items.slice(0, 5);
-  }, [
-    space.nearbyFacilities,
-    space.powerSupply,
-    space.waterAccess,
-    space.airConditioning,
-  ]);
+  const breadcrumb = [stationName, space.floor, space.location]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" | ");
+
+  const rows: SpecRow[] = [
+    {
+      id: "area",
+      label: "Luas Lantai",
+      value: `${space.area} m²`,
+      hint: null,
+      icon: <Maximize2 className="size-[18px]" strokeWidth={1.8} />,
+    },
+    {
+      id: "location",
+      label: "Lokasi Toko",
+      value: locationValue,
+      hint: locationHint,
+      icon: <MapPin className="size-[18px]" strokeWidth={1.8} />,
+    },
+    {
+      id: "type",
+      label: "Jenis Ruang",
+      value: typeLabel,
+      hint: space.description?.trim() || null,
+      icon: <Store className="size-[18px]" strokeWidth={1.8} />,
+    },
+    {
+      id: "power",
+      label: "Pasokan Listrik",
+      value: space.powerSupply?.trim() || "-",
+      hint: null,
+      icon: <Zap className="size-[18px]" strokeWidth={1.8} />,
+    },
+    {
+      id: "utilities",
+      label: "Utilitas",
+      value: utilityValue || "-",
+      hint: facilitiesHint,
+      icon: <Wrench className="size-[18px]" strokeWidth={1.8} />,
+    },
+    {
+      id: "availability",
+      label: "Ketersediaan",
+      value: statusConfig.label,
+      hint: occupiedTenant ? `Penyewa: ${occupiedTenant}` : null,
+      icon: <CalendarDays className="size-[18px]" strokeWidth={1.8} />,
+    },
+  ];
 
   const trackEvent = async (eventType: string) => {
     await fetch("/api/analytics", {
@@ -239,278 +205,172 @@ export default function InTourSpacePopup({
     }).catch(() => null);
   };
 
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(space.code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
+
   useEffect(() => {
     trackEvent("SPACE_VIEW");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [space.id]);
 
-  const handleDownloadSummary = () => {
-    trackEvent("PDF_DOWNLOAD");
-    const popup = window.open("", "_blank", "width=900,height=1200");
-    if (!popup) return;
-
-    popup.document.write(`
-      <!doctype html>
-      <html>
-        <head>
-          <title>Ringkasan ${space.code} - ${stationName}</title>
-          <style>
-            body { font-family: Arial, sans-serif; color: #111827; margin: 40px; }
-            .brand { color: #D81435; font-weight: 800; letter-spacing: .08em; font-size: 12px; text-transform: uppercase; }
-            h1 { margin: 8px 0 4px; font-size: 30px; color: #17355f; }
-            .muted { color: #6b7280; }
-            .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 24px 0; }
-            .box { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
-            .label { color: #6b7280; font-size: 12px; margin-bottom: 4px; }
-            .value { font-size: 18px; font-weight: 800; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            td { border-bottom: 1px solid #e5e7eb; padding: 10px 0; }
-            td:first-child { color: #6b7280; width: 38%; }
-            .cta { margin-top: 28px; padding: 18px; background: #17355f; color: white; border-radius: 14px; }
-          </style>
-        </head>
-        <body>
-          <div class="brand">LRT Jabodebek - Virtual Tour Komersial</div>
-          <h1>${space.name}</h1>
-          <div class="muted">${space.code} - Stasiun ${stationName} - ${TYPE_LABELS[space.type] ?? space.type}</div>
-          <div class="grid">
-            <div class="box"><div class="label">Status</div><div class="value">${statusConfig.label}</div></div>
-            <div class="box"><div class="label">Luas</div><div class="value">${space.area} m²</div></div>
-            <div class="box"><div class="label">Harga</div><div class="value">${priceValue}</div></div>
-            <div class="box"><div class="label">Eksposur</div><div class="value">${formatNumber(Math.round(space.exposure))} orang/hari</div></div>
-          </div>
-          <table>
-            <tr><td>Lokasi</td><td>${space.location}</td></tr>
-            <tr><td>Lantai</td><td>${space.floor}</td></tr>
-            <tr><td>Exit Terdekat</td><td>${space.nearestExit ?? "-"}</td></tr>
-            <tr><td>Deposit</td><td>${formatRupiah(space.deposit)}</td></tr>
-            <tr><td>Daya Listrik</td><td>${space.powerSupply ?? "-"}</td></tr>
-            <tr><td>Air Bersih</td><td>${space.waterAccess ? "Tersedia" : "Tidak tersedia"}</td></tr>
-            <tr><td>AC</td><td>${space.airConditioning ? "Tersedia" : "Tidak tersedia"}</td></tr>
-            <tr><td>Catatan</td><td>${space.description ?? "Unit siap dievaluasi melalui virtual tour 360."}</td></tr>
-          </table>
-          <div class="cta">Hubungi ${commercialProfile.teamName}: ${resolvedContactPhone}. Ringkasan ini dibuat otomatis dari data aset virtual tour.</div>
-          <script>window.onload = () => setTimeout(() => window.print(), 250);</script>
-        </body>
-      </html>
-    `);
-    popup.document.close();
-  };
+  useEffect(() => {
+    const blockTourKeys = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest("input, textarea, select, [contenteditable='true']")
+      ) {
+        return;
+      }
+      if (
+        event.key === "ArrowUp" ||
+        event.key === "ArrowDown" ||
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowRight" ||
+        event.key === "PageUp" ||
+        event.key === "PageDown" ||
+        event.key === " "
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    window.addEventListener("keydown", blockTourKeys, true);
+    closeRef.current?.focus();
+    return () => window.removeEventListener("keydown", blockTourKeys, true);
+  }, []);
 
   return (
-    <div className="tour-panel-in pointer-events-auto absolute inset-x-3 bottom-4 top-20 z-50 overflow-hidden rounded-2xl border border-white/10 bg-[#0F0F0F]/65 text-white shadow-[0_24px_60px_rgba(0,0,0,0.35)] backdrop-blur-md sm:inset-x-auto sm:right-6 sm:top-24 sm:bottom-6 sm:w-[410px] lg:w-[420px]">
-      <div className="flex h-full max-h-[inherit] flex-col">
-        <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
-          <div className="flex min-w-0 items-center gap-2">
-            {returnToList ? (
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex min-w-0 items-center gap-2 text-left"
-              >
-                <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#E31E2D]/55 bg-[#161616]">
-                  <ChevronLeft className="size-4 text-[#E31E2D]" strokeWidth={2.4} />
-                </span>
-                <span className="truncate text-xs font-medium text-white">
-                  Kembali ke Daftar Unit
-                </span>
-              </button>
-            ) : (
-              <>
-                <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-white/12 bg-[#1c1c1e]/78 text-white backdrop-blur-md">
-                  <Info className="h-4 w-4" />
-                </span>
-                <span className="font-display text-sm font-semibold">Informasi</span>
-              </>
-            )}
-          </div>
+    <div
+      className="absolute inset-0 z-[80] flex items-center justify-center bg-[#1C0A0E]/72 p-3 backdrop-blur-[2px] sm:p-5 lg:p-8"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tour-space-popup-title"
+    >
+      <div className="tour-glass-panel tour-panel-in flex max-h-full min-h-0 w-full max-w-[440px] flex-col overflow-hidden rounded-2xl text-[#F8ECEE] lg:h-[min(88%,820px)] lg:max-w-[min(100%,1360px)]">
+        <div className="flex shrink-0 items-center justify-end gap-1 border-b border-[rgba(255,214,218,0.14)] px-4 py-3 sm:px-5 lg:px-8 lg:py-4">
+          {returnToList ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="mr-auto inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-left text-xs font-medium text-[#F8ECEE] transition hover:bg-white/5"
+            >
+              <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-[#E31E2D]/55 bg-[#261015]">
+                <ChevronLeft className="size-4 text-[#E31E2D]" strokeWidth={2.4} />
+              </span>
+              Kembali ke Daftar Unit
+            </button>
+          ) : null}
           <button
+            ref={closeRef}
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-white/80 transition hover:bg-white/10 hover:text-white"
+            className="inline-flex size-11 items-center justify-center rounded-full text-[#C4A8AD] transition hover:bg-white/10 hover:text-[#F8ECEE] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]"
             aria-label="Tutup detail unit"
           >
             <X className="size-4" strokeWidth={2.2} />
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 sm:px-4">
-          <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-[#1A1A1A]">
-            <Image
-              src={coverSrc}
-              alt={space.name}
-              fill
-              sizes="420px"
-              className="object-cover"
-              unoptimized={coverSrc.startsWith("/api/")}
-            />
-            <button
-              type="button"
-              onClick={handleToggleFavorite}
-              disabled={!stationSlug}
-              className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-[#1c1c1e]/85 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Heart
-                className={`h-3.5 w-3.5 ${favorited ? "fill-[#E31E2D] text-[#E31E2D]" : "text-white"}`}
-              />
-              Favorit
-            </button>
-          </div>
-
-          <div className="mt-3 rounded-2xl bg-black/35 p-3 shadow-[0_0_0_1px_rgba(227,30,45,0.38),0_0_20px_rgba(227,30,45,0.14)]">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="font-display text-xl font-bold tracking-tight text-white uppercase">
-                  {occupiedTenant || space.code}
+        <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
+          <div className="lg:grid lg:h-full lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)_auto] lg:overflow-hidden">
+            <div className="px-5 pt-5 sm:px-6 lg:overflow-y-auto lg:px-10 lg:pt-10 lg:pr-8">
+              <p className="text-[11px] font-semibold tracking-[0.16em] text-[#C4A8AD] uppercase lg:text-xs">
+                Ruang Komersial
+              </p>
+              <div className="mt-3 flex min-w-0 items-center gap-2.5 lg:mt-5">
+                <h3
+                  id="tour-space-popup-title"
+                  className="font-display truncate text-2xl leading-tight font-semibold tracking-[-0.02em] text-[#F8ECEE] lg:text-[2.65rem]"
+                >
+                  {space.code}
                 </h3>
-                <p className="mt-1 flex items-center gap-1.5 text-sm text-white/55">
-                  <MapPin className="h-3.5 w-3.5 shrink-0 text-white/70" />
-                  <span className="truncate">
-                    {space.location || space.floor}, Stasiun {stationName}
-                  </span>
-                </p>
-                {occupiedTenant && (
-                  <p className="mt-1 text-sm font-semibold text-[#FF4D57]">
-                    Unit {space.code} · {space.name}
-                  </p>
-                )}
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}
+                <button
+                  type="button"
+                  onClick={copyCode}
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[#FF6B4A] transition hover:bg-[#E31E2D]/15 hover:text-[#FF8A70] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D] lg:size-10"
+                  aria-label={copied ? "Kode disalin" : "Salin kode unit"}
+                  title={copied ? "Disalin" : "Salin kode"}
                 >
-                  <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
-                  {statusConfig.label}
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/12 bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-white/80">
-                  <Store className="h-3 w-3" />
-                  {categoryLabel}
-                </span>
+                  {copied ? (
+                    <Check className="size-4 lg:size-5" strokeWidth={2.4} />
+                  ) : (
+                    <Copy className="size-4 lg:size-5" strokeWidth={2} />
+                  )}
+                </button>
               </div>
+              {breadcrumb ? (
+                <p className="mt-2 text-sm leading-snug text-[#C4A8AD] lg:mt-3 lg:text-base">
+                  {breadcrumb}
+                </p>
+              ) : null}
+              {occupiedTenant ? (
+                <p className="mt-3 text-sm font-semibold text-[#FF6B4A] lg:text-base">
+                  Penyewa saat ini: {occupiedTenant}
+                </p>
+              ) : null}
             </div>
 
-            <p className="mt-3 text-sm leading-relaxed text-white/60">
-              {space.description?.trim() ||
-                `Area komersial strategis dengan mobilitas penumpang yang tinggi. Cocok untuk ${
-                  isMedia ? "media iklan maupun promosi." : "retail maupun food & beverage."
-                }`}
-            </p>
-
-            <div className="mt-3 grid grid-cols-2 gap-1.5">
-              <div className="rounded-xl bg-black/40 p-2.5">
-                <MapPin className="mb-1.5 h-4 w-4 text-[#E31E2D]" />
-                <p className="text-[11px] font-semibold text-white">Lokasi</p>
-                <p className="mt-0.5 text-xs font-bold leading-snug text-white/70">
-                  {space.location || `Lantai ${space.floor}`}
-                </p>
-              </div>
-              <div className="rounded-xl bg-black/40 p-2.5">
-                <Maximize2 className="mb-1.5 h-4 w-4 text-[#E31E2D]" />
-                <p className="text-[11px] font-semibold text-white">Luas</p>
-                <p className="mt-0.5 text-xs font-bold leading-snug text-white/70">
-                  {space.area} m²
-                </p>
-              </div>
+            <div className="mt-4 border-t border-[rgba(255,214,218,0.14)] px-5 pt-2 sm:px-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:overflow-y-auto lg:border-t-0 lg:border-l lg:border-[rgba(255,214,218,0.14)] lg:px-10 lg:pt-10 lg:pb-8">
+              <ul className="divide-y divide-[rgba(255,214,218,0.10)]">
+                {rows.map((row, index) => (
+                  <li
+                    key={row.id}
+                    className="tour-spec-row flex items-start gap-3.5 py-3.5 lg:gap-4 lg:py-4"
+                    style={{ animationDelay: `${index * 40}ms` }}
+                  >
+                    <span className="mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-[#E31E2D]/28 bg-[#E31E2D]/12 text-[#FF6B4A] lg:size-11">
+                      {row.icon}
+                    </span>
+                    <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)] items-start gap-2 lg:gap-4">
+                      <p className="pt-2 text-sm text-[#C4A8AD] lg:text-base">{row.label}</p>
+                      <div className="min-w-0 text-right lg:text-left">
+                        <p className="text-sm font-semibold text-[#F8ECEE] lg:text-lg">
+                          {row.value}
+                        </p>
+                        {row.hint ? (
+                          <p className="mt-0.5 text-xs leading-snug text-[#C4A8AD]/90 lg:text-sm">
+                            {row.hint}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
 
-          <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/35">
-            <div className="flex items-center gap-2 px-3.5 pt-3 pb-2">
-              <BarChart3 className="h-4 w-4 text-[#E31E2D]" />
-              <p className="text-sm font-bold text-white">Potensi Area</p>
-            </div>
-            <div className="grid grid-cols-3 gap-2 px-3.5 pb-3.5">
-              <div>
-                <Users className="mb-1 h-4 w-4 text-[#E31E2D]" />
-                <p className="text-[10px] leading-tight text-white/50">Mobilitas Penumpang</p>
-                <p className="mt-1 text-xs font-bold text-white">
-                  {formatNumber(Math.round(space.exposure))} orang/hari
-                </p>
-              </div>
-              <div>
-                <Eye className="mb-1 h-4 w-4 text-[#E31E2D]" />
-                <p className="text-[10px] leading-tight text-white/50">Visibilitas</p>
-                <p className="mt-1 text-xs font-bold text-white">
-                  {visibilityLabel(space.exposure)}
-                </p>
-              </div>
-              <div>
-                <CheckCircle2 className="mb-1 h-4 w-4 text-[#E31E2D]" />
-                <p className="text-[10px] leading-tight text-white/50">Keunggulan</p>
-                <ul className="mt-1 space-y-0.5 text-[11px] font-semibold text-white">
-                  {highlights.map((item) => (
-                    <li key={item} className="flex gap-1">
-                      <span className="text-[#E31E2D]">•</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <p className="mb-2 text-sm font-bold text-white">Fasilitas Terdekat</p>
-            <div className="grid grid-cols-5 gap-1.5">
-              {nearbyFacilities.map((f) => (
-                <div
-                  key={f.label}
-                  className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-black/35 px-1 py-2 text-center"
-                >
-                  <span className="flex size-7 items-center justify-center text-[#E31E2D]">
-                    {f.icon}
-                  </span>
-                  <span className="text-[9px] font-medium leading-tight text-white/55">
-                    {f.label}
-                  </span>
-                </div>
-              ))}
+            <div className="hidden px-10 pt-2 pb-8 lg:block">
+              <button
+                type="button"
+                onClick={() => setShowInterestModal(true)}
+                disabled={space.status !== "TERSEDIA"}
+                className="inline-flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#E31E2D] px-4 text-base font-bold text-white shadow-[0_10px_28px_rgba(227,30,45,0.28)] transition hover:bg-[#c41926] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF6B4A] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+              >
+                <MessageSquare className="size-4" strokeWidth={2.2} />
+                {space.status === "TERSEDIA" ? "Ajukan Minat Sewa" : "Ruang belum tersedia"}
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="shrink-0 border-t border-white/10 bg-black/30 p-3">
-          {space.status === "TERSEDIA" ? (
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setShowInterestModal(true)}
-                className="inline-flex h-11 items-center justify-center gap-1 rounded-xl bg-[#E31E2D] px-2 text-[11px] font-semibold text-white transition hover:brightness-110"
-              >
-                <Tag className="h-3.5 w-3.5 shrink-0" />
-                Sewa Tenant
-              </button>
-              <a
-                href={waUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => trackEvent("WHATSAPP_CLICK")}
-                className="inline-flex h-11 items-center justify-center gap-1 rounded-xl border border-[#E31E2D]/45 bg-[#161616] px-2 text-[11px] font-semibold text-white transition hover:bg-[#1d1d1d]"
-              >
-                <Phone className="h-3.5 w-3.5 shrink-0 text-[#E31E2D]" />
-                Hubungi
-              </a>
-              <button
-                type="button"
-                onClick={handleDownloadSummary}
-                className="inline-flex h-11 items-center justify-center gap-1 rounded-xl border border-white/12 bg-[#161616] px-2 text-[11px] font-semibold text-white transition hover:bg-[#1d1d1d]"
-              >
-                <Download className="h-3.5 w-3.5 shrink-0 text-[#E31E2D]" />
-                Unduh PDF
-              </button>
-            </div>
-          ) : (
-            <a
-              href={waUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-11 w-full items-center justify-between gap-1 rounded-xl border border-[#E31E2D]/45 bg-[#161616] px-3 text-sm font-semibold text-white transition hover:bg-[#1d1d1d]"
-            >
-              <Phone className="h-4 w-4 text-[#E31E2D]" />
-              <span className="flex-1 text-center">Tanya Tim Komersial</span>
-              <ChevronRight className="h-4 w-4 text-white/80" />
-            </a>
-          )}
+        <div className="shrink-0 border-t border-[rgba(255,214,218,0.14)] px-5 pt-4 pb-5 sm:px-6 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setShowInterestModal(true)}
+            disabled={space.status !== "TERSEDIA"}
+            className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-[#E31E2D] px-4 text-sm font-bold text-white shadow-[0_10px_28px_rgba(227,30,45,0.28)] transition hover:bg-[#c41926] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF6B4A] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+          >
+            <MessageSquare className="size-4" strokeWidth={2.2} />
+            {space.status === "TERSEDIA" ? "Ajukan Minat Sewa" : "Ruang belum tersedia"}
+          </button>
         </div>
       </div>
 
@@ -519,89 +379,91 @@ export default function InTourSpacePopup({
         createPortal(
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-6">
             <div className="relative grid max-h-[min(920px,calc(100vh-24px))] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl md:grid-cols-[minmax(300px,0.95fr)_minmax(0,1.15fr)]">
-              {/* Left — detail unit */}
               <div className="relative hidden overflow-y-auto bg-[#111111] text-white md:block">
                 <div className="flex min-h-full flex-col p-5 pb-7 lg:p-6 lg:pb-8">
-                <div className={`mb-4 inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}>
-                  <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
-                  {statusConfig.label}
-                </div>
+                  <div
+                    className={`mb-4 inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}
+                  >
+                    <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
+                    {statusConfig.label}
+                  </div>
 
-                <div className="relative mb-5 aspect-[16/10] overflow-hidden rounded-xl">
-                  <Image
-                    src={coverSrc}
-                    alt={space.name}
-                    fill
-                    sizes="420px"
-                    className="object-cover"
-                    unoptimized={coverSrc.startsWith("http") || coverSrc.includes("/api/")}
-                  />
-                  {stationSlug ? (
-                    <a
-                      href={`/station/${stationSlug}?unit=${space.id}`}
-                      className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-lg bg-black/65 px-3 py-2 text-[11px] font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src="/brand/landing/icons/tour-360.svg"
-                        alt=""
-                        width={14}
-                        height={14}
-                        className="size-3.5 brightness-0 invert"
-                      />
-                      Lihat Virtual Tour
-                      <ArrowRight className="size-3" />
-                    </a>
-                  ) : null}
-                </div>
+                  <div className="relative mb-5 aspect-[16/10] overflow-hidden rounded-xl">
+                    <Image
+                      src={coverSrc}
+                      alt={space.name}
+                      fill
+                      sizes="420px"
+                      className="object-cover"
+                      unoptimized={coverSrc.startsWith("http") || coverSrc.includes("/api/")}
+                    />
+                    {stationSlug ? (
+                      <a
+                        href={`/station/${stationSlug}?unit=${space.id}`}
+                        className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-lg bg-black/65 px-3 py-2 text-[11px] font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/brand/landing/icons/tour-360.svg"
+                          alt=""
+                          width={14}
+                          height={14}
+                          className="size-3.5 brightness-0 invert"
+                        />
+                        Lihat Virtual Tour
+                        <ArrowRight className="size-3" />
+                      </a>
+                    ) : null}
+                  </div>
 
-                <p className="text-[10px] font-semibold tracking-[0.18em] text-white/55 uppercase">
-                  Formulir Tenant
-                </p>
-                <h2 className="mt-1.5 text-2xl leading-tight font-bold lg:text-[28px]">
-                  {space.name}
-                </h2>
-                <p className="mt-1 text-sm text-white/70">
-                  {space.code} - Stasiun {stationName}
-                </p>
+                  <p className="text-[10px] font-semibold tracking-[0.18em] text-white/55 uppercase">
+                    Formulir Tenant
+                  </p>
+                  <h2 className="mt-1.5 text-2xl leading-tight font-bold lg:text-[28px]">
+                    {space.name}
+                  </h2>
+                  <p className="mt-1 text-sm text-white/70">
+                    {space.code} - Stasiun {stationName}
+                  </p>
 
-                <div className="mt-4 grid grid-cols-2 gap-2.5">
-                  <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
-                    <Users className="mb-2 size-3.5 text-[#E31E2D]" />
-                    <p className="text-[10px] font-medium text-white/60">Eksposur</p>
-                    <p className="mt-1 text-[15px] leading-none font-bold text-white">
-                      {formatNumber(Math.round(space.exposure))}
-                    </p>
-                    <p className="mt-1 text-[10px] text-white/55">orang/hari</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2.5">
+                    <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
+                      <Users className="mb-2 size-3.5 text-[#E31E2D]" />
+                      <p className="text-[10px] font-medium text-white/60">Eksposur</p>
+                      <p className="mt-1 text-[15px] leading-none font-bold text-white">
+                        {formatNumber(Math.round(space.exposure))}
+                      </p>
+                      <p className="mt-1 text-[10px] text-white/55">orang/hari</p>
+                    </div>
+                    <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
+                      <MapPin className="mb-2 size-3.5 text-[#E31E2D]" />
+                      <p className="text-[10px] font-medium text-white/60">Lokasi</p>
+                      <p className="mt-1 truncate text-[15px] leading-none font-bold text-white">
+                        {space.location || space.floor}
+                      </p>
+                      <p className="mt-1 truncate text-[10px] text-white/55">
+                        Stasiun {stationName}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
+                      <Maximize2 className="mb-2 size-3.5 text-[#E31E2D]" />
+                      <p className="text-[10px] font-medium text-white/60">Luas</p>
+                      <p className="mt-1 text-[15px] font-bold text-white">{space.area} m²</p>
+                    </div>
+                    <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
+                      <Store className="mb-2 size-3.5 text-[#E31E2D]" />
+                      <p className="text-[10px] font-medium text-white/60">Status</p>
+                      <span
+                        className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}
+                      >
+                        <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
+                        {statusConfig.label}
+                      </span>
+                    </div>
                   </div>
-                  <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
-                    <MapPin className="mb-2 size-3.5 text-[#E31E2D]" />
-                    <p className="text-[10px] font-medium text-white/60">Lokasi</p>
-                    <p className="mt-1 truncate text-[15px] leading-none font-bold text-white">
-                      {space.location || space.floor}
-                    </p>
-                    <p className="mt-1 truncate text-[10px] text-white/55">
-                      Stasiun {stationName}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
-                    <Maximize2 className="mb-2 size-3.5 text-[#E31E2D]" />
-                    <p className="text-[10px] font-medium text-white/60">Luas</p>
-                    <p className="mt-1 text-[15px] font-bold text-white">{space.area} m²</p>
-                  </div>
-                  <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
-                    <Store className="mb-2 size-3.5 text-[#E31E2D]" />
-                    <p className="text-[10px] font-medium text-white/60">Status</p>
-                    <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}>
-                      <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
-                      {statusConfig.label}
-                    </span>
-                  </div>
-                </div>
                 </div>
               </div>
 
-              {/* Right — form */}
               <div className="relative max-h-[min(920px,calc(100vh-24px))] overflow-y-auto bg-white p-5 sm:p-7 lg:p-8">
                 <button
                   type="button"

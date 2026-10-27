@@ -975,7 +975,7 @@ export default function StationTourClient({
       )}
 
       {/* Clear / restore UI — di bawah mini map saat panel terbuka; floating saat UI disembunyikan / panel tertutup */}
-      {(uiCleared || !leftPanelOpen || selectedSpace || selectedAd || unitsOpen) && (
+      {(uiCleared || !leftPanelOpen || selectedAd || unitsOpen) && !selectedSpace && (
         <button
           type="button"
           onClick={() => {
