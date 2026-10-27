@@ -1,7 +1,7 @@
 import type { HotspotType, HotspotDirection } from "./hotspot-types";
 import type { SpaceAvailabilityStatus } from "./space-availability";
 import type { FacilityIconId } from "./facility-icons";
-import { spaceStatusPinClass } from "./space-availability";
+import { spaceStatusCssVariant, spaceStatusPinClass } from "./space-availability";
 import { clampHotspotScale, hotspotColor, DIRECTION_ROTATE_DEG } from "./hotspot-types";
 import { facilityIconSrc } from "./facility-icons";
 
@@ -43,6 +43,8 @@ export type HotspotVisualOptions = {
   direction?: HotspotDirection;
   /** Warna pin unit — dari status retail */
   spaceStatus?: SpaceAvailabilityStatus;
+  /** Kode unit pada hotspot ruang */
+  spaceCode?: string;
   /** Ikon fasilitas untuk hotspot info */
   facilityIcon?: FacilityIconId;
 };
@@ -79,7 +81,14 @@ function hotspotTypeClass(type: HotspotType) {
 }
 
 export function applyHotspotScale(div: HTMLDivElement, scale?: number) {
-  div.style.setProperty("--lrt-hotspot-scale", String(clampHotspotScale(scale)));
+  const s = clampHotspotScale(scale);
+  div.style.setProperty("--lrt-hotspot-scale", String(s));
+  // Inline transform agar footprint unit & pin langsung ikut slider CMS
+  // (beberapa shell Pannellum tidak mewariskan var ke child dengan andal).
+  div.querySelectorAll<HTMLElement>(".lrt-space-mark, .lrt-pin-marker").forEach((el) => {
+    el.style.setProperty("transform", `scale(${s})`);
+    el.style.setProperty("transform-origin", "center center");
+  });
 }
 
 /** Shell luar transparan — unit & info (ukuran tetap). */
@@ -87,9 +96,9 @@ function applyPinHotspotOuterShell(div: HTMLDivElement, opts: HotspotVisualOptio
   const scale = clampHotspotScale(opts.scale);
   const isFacility = opts.type === "info" && !!opts.facilityIcon;
   const isInfoPin = opts.type === "info" && !opts.facilityIcon;
-  const w = isFacility ? "75px" : isInfoPin ? `${INFO_PIN_W}px` : "88px";
-  const h = isFacility ? "81px" : isInfoPin ? `${INFO_PIN_H}px` : "88px";
-
+  const isSpace = opts.type === "space";
+  const w = isSpace ? "auto" : isFacility ? "75px" : isInfoPin ? `${INFO_PIN_W}px` : "88px";
+  const h = isSpace ? "auto" : isFacility ? "81px" : isInfoPin ? `${INFO_PIN_H}px` : "88px";
   Object.assign(div.style, {
     width: w,
     height: h,
@@ -157,6 +166,27 @@ function buildInfoPinHtml(selected: boolean): string {
   return `<div class="lrt-pin-marker lrt-pin-marker--info"><img class="${PIN_MARKER_IMG_CLASS}${sel}" src="${src}" alt="" width="${INFO_PIN_W}" height="${INFO_PIN_H}" draggable="false" /></div>`;
 }
 
+function spaceMarkCaption(status?: SpaceAvailabilityStatus, code?: string): string {
+  const variant = spaceStatusCssVariant(status);
+  const title =
+    variant === "available"
+      ? "RUANG TERSEDIA"
+      : variant === "occupied"
+        ? "RUANG TERISI"
+        : variant === "maintenance"
+          ? "TIDAK AKTIF"
+          : "RUANG KOMERSIAL";
+  const id = code?.trim();
+  return id ? `${title} · ${id}` : title;
+}
+
+function buildSpaceFootprintHtml(status?: SpaceAvailabilityStatus, code?: string, selected?: boolean): string {
+  const variant = spaceStatusPinClass(status);
+  const sel = selected ? " is-selected" : "";
+  const caption = escapeHtml(spaceMarkCaption(status, code));
+  return `<div class="lrt-space-mark ${variant}"><div class="lrt-space-mark__label">${caption}</div><div class="${PIN_MARKER_DISC_CLASS} lrt-space-mark__box${sel}"></div></div>`;
+}
+
 function buildPinMarkerHtml(
   type: HotspotType,
   selected: boolean,
@@ -181,15 +211,23 @@ function applySceneHotspotStyle(div: HTMLDivElement, opts: HotspotVisualOptions)
 
 function applyPinHotspotStyle(div: HTMLDivElement, opts: HotspotVisualOptions) {
   applyPinHotspotOuterShell(div, opts);
+  if (opts.type === "space") {
+    div.innerHTML = buildSpaceFootprintHtml(opts.spaceStatus, opts.spaceCode, opts.selected ?? false);
+    applyHotspotScale(div, opts.scale);
+    return;
+  }
   if (opts.type === "info" && opts.facilityIcon) {
     div.innerHTML = buildFacilityPinHtml(opts.facilityIcon, opts.selected ?? false);
+    applyHotspotScale(div, opts.scale);
     return;
   }
   if (opts.type === "info") {
     div.innerHTML = buildInfoPinHtml(opts.selected ?? false);
+    applyHotspotScale(div, opts.scale);
     return;
   }
   div.innerHTML = buildPinMarkerHtml(opts.type, opts.selected ?? false, opts.spaceStatus);
+  applyHotspotScale(div, opts.scale);
 }
 
 /** Style dasar hotspot Pannellum — pola seragam: shell transparan + marker di child. */

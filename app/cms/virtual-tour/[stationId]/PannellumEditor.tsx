@@ -80,6 +80,7 @@ function buildEditorHotspotEl(
     selected: isSelected,
     scale: h.scale,
     spaceStatus,
+    spaceCode: h.type === "space" ? h.spaceCode : undefined,
     facilityIcon: h.type === "info" ? h.facilityIcon : undefined,
     sceneTitle:
       h.type === "scene" ? getSceneTitle(h.sceneId, h.text) : undefined,
@@ -483,8 +484,12 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
 
   useEffect(() => {
     if (!viewerReadyRef.current || !viewerRef.current) return;
-    syncAllOverlays(viewerRef.current);
-  }, [hotspotsSig, blursSig, spacesSig, syncAllOverlays]);
+    // Pakai state terkini (bukan hanya ref) agar yaw/pitch/scale unit langsung ikut.
+    hotspotsRef.current = hotspots;
+    privacyBlursRef.current = privacyBlurs;
+    syncHotspots(viewerRef.current, hotspots);
+    syncPrivacyBlurs(viewerRef.current, privacyBlurs);
+  }, [hotspotsSig, blursSig, spacesSig, hotspots, privacyBlurs, syncHotspots, syncPrivacyBlurs]);
 
   const scaleSig = hotspots.map((h) => `${h._id}:${h.scale ?? 1}`).join("|");
   useEffect(() => {
@@ -614,11 +619,11 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
 
   return (
     <div className="cms-vt-panorama relative h-full min-h-0 w-full overflow-hidden overscroll-none select-none">
-      <div ref={containerRef} className="absolute inset-0" style={{ background: "#0f172a" }} />
+      <div ref={containerRef} className="absolute inset-0" style={{ background: "#1C0A0E" }} />
 
       {dragging && (
         <div className="absolute inset-0 z-50 pointer-events-none">
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur border border-amber-500/60 text-amber-300 text-xs px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#261015]/90 backdrop-blur border border-amber-500/60 text-amber-300 text-xs px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
             <span className="text-base">✥</span>
             Lepas untuk menetapkan posisi baru
           </div>
@@ -629,10 +634,10 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         <div
           className={`absolute top-4 left-1/2 -translate-x-1/2 text-sm px-5 py-2.5 rounded-full pointer-events-none flex items-center gap-2 shadow-lg z-20 backdrop-blur border ${
             addMode === "blur"
-              ? "bg-slate-900/95 border-purple-500/70 text-purple-300"
+              ? "bg-[#261015]/95 border-purple-500/70 text-purple-300"
               : addMode === "ad"
-                ? "bg-slate-900/95 border-purple-400/70 text-purple-200"
-                : "bg-slate-900/95 border-emerald-500/70 text-emerald-300"
+                ? "bg-[#261015]/95 border-purple-400/70 text-purple-200"
+                : "bg-[#261015]/95 border-emerald-500/70 text-emerald-300"
           }`}
         >
           <span className="text-base">
@@ -651,17 +656,17 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
       )}
 
       <div className="absolute bottom-4 left-4 flex items-center gap-3 pointer-events-none z-20">
-        <div className="hidden bg-slate-900/80 backdrop-blur text-slate-400 text-xs px-3 py-1.5 rounded-full border border-slate-700 items-center gap-1.5">
+        <div className="hidden bg-[#261015]/80 backdrop-blur text-[#C4A8AD] text-xs px-3 py-1.5 rounded-full border border-[rgba(255,214,218,0.18)] items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
           Edit 3D — drag untuk lihat sekeliling
         </div>
-        <div className="bg-slate-900/80 backdrop-blur text-slate-500 text-xs px-2.5 py-1.5 rounded-full border border-slate-700">
+        <div className="bg-[#261015]/80 backdrop-blur text-[#C4A8AD] text-xs px-2.5 py-1.5 rounded-full border border-[rgba(255,214,218,0.18)]">
           {hotspots.length} hotspot · {privacyBlurs.length} blur
         </div>
       </div>
 
       {!panoramaUrl && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-slate-500 z-30">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1C0A0E] text-[#C4A8AD] z-30">
           <div className="text-5xl mb-3">🌐</div>
           <p className="text-sm">Upload panorama equirectangular untuk mulai edit</p>
         </div>

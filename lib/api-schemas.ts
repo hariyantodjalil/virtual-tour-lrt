@@ -146,8 +146,13 @@ export const leadUpdateSchema = z.object({
   status: z.enum([
     "NEW",
     "CONTACTED",
+    "RDS_OFFER",
     "NEGOTIATING",
+    "SITE_CHECK",
+    "BA_SIGNED",
+    "DESIGN_REVIEW",
     "PKS",
+    "BILLING",
     "FIT_OUT_HANDOVER",
     "COMMERCIAL_OPERATION",
     "CLOSED_WON",
@@ -163,6 +168,8 @@ export const leadUpdateSchema = z.object({
   siteVisitScheduledAt: optionalDate,
   notes: optionalText(5_000),
   followUpAt: optionalDate,
+  rdsOfferNo: optionalText(80),
+  baNegotiationNo: optionalText(80),
 }).strict().refine((value) => Object.keys(value).length > 1, "Minimal satu perubahan harus diisi");
 
 const orderItem = z.object({ sceneId: id, order: safeInteger }).strict();

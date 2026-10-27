@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { isCommercialOperation } from "@/lib/commercial-pipeline";
+import { isCommercialOperation, SPACE_HOLD_STATUSES } from "@/lib/commercial-pipeline";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -35,12 +35,12 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       if (
         lead.space &&
         !lead.space.occupancy &&
-        ["PKS", "FIT_OUT_HANDOVER"].includes(lead.status)
+        [...SPACE_HOLD_STATUSES, "FIT_OUT_HANDOVER"].includes(lead.status)
       ) {
         const otherReservation = await tx.tenantLead.findFirst({
           where: {
             spaceId: lead.space.id,
-            status: { in: ["PKS", "FIT_OUT_HANDOVER"] },
+            status: { in: [...SPACE_HOLD_STATUSES, "FIT_OUT_HANDOVER"] },
           },
           select: { status: true },
           orderBy: { updatedAt: "desc" },

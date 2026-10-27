@@ -101,9 +101,9 @@ export function CoveragePanel({
 
   return (
     <section>
-      <div className="mb-2 flex items-center justify-between gap-2 border-b border-slate-800 pb-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Coverage</h3>
-        <span className="text-[10px] text-slate-500">
+      <div className="mb-2 flex items-center justify-between gap-2 border-b border-[rgba(255,214,218,0.14)] pb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[#C4A8AD]">Coverage</h3>
+        <span className="text-[10px] text-[#C4A8AD]">
           {coveredCount}/{mode === "all" ? spaces.length : totalShown + (onlyMissing ? coveredCount : 0)}
         </span>
       </div>
@@ -117,7 +117,7 @@ export function CoveragePanel({
                 type="button"
                 onClick={() => setMode(m)}
                 className={`rounded-md px-2 py-1 text-[10px] font-medium ${
-                  mode === m ? "bg-slate-700 text-white" : "text-slate-500 hover:bg-slate-800"
+                  mode === m ? "bg-[#4A1F28] text-white" : "text-[#C4A8AD] hover:bg-[#3A161C]"
                 }`}
               >
                 {m === "all" ? "Semua" : m === "retail" ? "Retail" : "Media"}
@@ -129,7 +129,7 @@ export function CoveragePanel({
           type="button"
           onClick={() => setOnlyMissing((v) => !v)}
           className={`ml-auto rounded-md px-2 py-1 text-[10px] font-medium ${
-            onlyMissing ? "bg-amber-900/60 text-amber-200" : "text-slate-500 hover:bg-slate-800"
+            onlyMissing ? "bg-amber-900/60 text-amber-200" : "text-[#C4A8AD] hover:bg-[#3A161C]"
           }`}
         >
           Belum saja
@@ -138,12 +138,12 @@ export function CoveragePanel({
 
       <div className="max-h-56 space-y-1 overflow-y-auto">
         {rows.length === 0 ? (
-          <p className="py-3 text-center text-[11px] text-slate-500">Tidak ada data</p>
+          <p className="py-3 text-center text-[11px] text-[#C4A8AD]">Tidak ada data</p>
         ) : (
           rows.map(({ space, placements, covered }) => (
             <div
               key={space.id}
-              className="rounded-lg border border-slate-800 bg-slate-900/50 px-2 py-1.5"
+              className="rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#261015]/50 px-2 py-1.5"
             >
               <div className="flex items-start gap-2">
                 {covered ? (
@@ -157,7 +157,7 @@ export function CoveragePanel({
                       className="h-1.5 w-1.5 shrink-0 rounded-full"
                       style={{ background: spaceStatusColor(space.status) }}
                     />
-                    <p className="truncate font-mono text-[11px] text-slate-200">{space.code}</p>
+                    <p className="truncate font-mono text-[11px] text-[#F8ECEE]">{space.code}</p>
                   </div>
                   {space.status === "TERISI" && space.tenantBrand ? (
                     <>
@@ -167,7 +167,7 @@ export function CoveragePanel({
                       <p className="truncate text-[9px] text-slate-600">{space.name}</p>
                     </>
                   ) : (
-                    <p className="truncate text-[10px] text-slate-500">{space.name}</p>
+                    <p className="truncate text-[10px] text-[#C4A8AD]">{space.name}</p>
                   )}
                   {covered ? (
                     <div className="mt-1 flex flex-wrap gap-1">
@@ -176,12 +176,12 @@ export function CoveragePanel({
                           key={`${p.sceneId}-${p.hotspotIndex}`}
                           type="button"
                           onClick={() => onJumpTo(p.sceneId, p.hotspotIndex)}
-                          className="inline-flex items-center gap-0.5 rounded bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-300 hover:bg-slate-700"
+                          className="inline-flex items-center gap-0.5 rounded bg-[#3A161C] px-1.5 py-0.5 text-[9px] text-[#F0DDE1] hover:bg-[#4A1F28]"
                           title={`Buka di ${p.sceneTitle}`}
                         >
                           <MapPin className="h-2.5 w-2.5" />
                           {p.sceneTitle}
-                          <span className="text-slate-500">({p.hotspotType})</span>
+                          <span className="text-[#C4A8AD]">({p.hotspotType})</span>
                         </button>
                       ))}
                     </div>

@@ -5,7 +5,9 @@ import { parseJsonRequest } from "@/lib/api-validation";
 import { leadUpdateSchema } from "@/lib/api-schemas";
 import {
   ACTIVE_LEAD_STATUSES,
+  isAtOrAfterLeadStage,
   isCommercialOperation,
+  SPACE_HOLD_STATUSES,
 } from "@/lib/commercial-pipeline";
 
 export async function GET(request: NextRequest) {
@@ -32,6 +34,8 @@ export async function PATCH(request: NextRequest) {
     siteVisitScheduledAt,
     notes,
     followUpAt,
+    rdsOfferNo,
+    baNegotiationNo,
   } = parsed.data;
   const targetStatus = status === "CLOSED_WON" ? "COMMERCIAL_OPERATION" : status;
 
@@ -89,12 +93,38 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
+  const nextRdsOfferNo = (rdsOfferNo !== undefined ? rdsOfferNo : existing.rdsOfferNo)?.trim() || "";
+  const nextBaNumber = (baNegotiationNo !== undefined ? baNegotiationNo : existing.baNegotiationNo)?.trim() || "";
+  const nextVisit = nextSiteVisitStatus ?? existing.siteVisitStatus;
+
+  if (targetStatus && isAtOrAfterLeadStage(targetStatus, "RDS_OFFER") && !nextRdsOfferNo) {
+    return NextResponse.json(
+      { error: "Nomor penawaran resmi wajib diisi sebelum tahap ini." },
+      { status: 400 }
+    );
+  }
+  if (targetStatus && isAtOrAfterLeadStage(targetStatus, "BA_SIGNED")) {
+    if (nextVisit !== "COMPLETED") {
+      return NextResponse.json(
+        { error: "Verifikasi lokasi harus selesai sebelum BA Negosiasi." },
+        { status: 400 }
+      );
+    }
+    if (!nextBaNumber) {
+      return NextResponse.json(
+        { error: "Nomor BA Negosiasi wajib diisi sebelum review desain dan perjanjian." },
+        { status: 400 }
+      );
+    }
+  }
+
   try {
     const lead = await prisma.$transaction(async (tx) => {
       const spaceId = existing.spaceId;
       const space = existing.space;
 
-      if (targetStatus === "PKS" || targetStatus === "FIT_OUT_HANDOVER") {
+      const holdsSpace = targetStatus ? SPACE_HOLD_STATUSES.includes(targetStatus) : false;
+      if (holdsSpace || targetStatus === "FIT_OUT_HANDOVER") {
         if (!spaceId || !space) {
           throw new Error("SPACE_REQUIRED");
         }
@@ -107,7 +137,7 @@ export async function PATCH(request: NextRequest) {
             spaceId,
             id: { not: id },
             status: {
-              in: ["PKS", "FIT_OUT_HANDOVER", "COMMERCIAL_OPERATION", "CLOSED_WON"],
+              in: [...SPACE_HOLD_STATUSES, "FIT_OUT_HANDOVER", "COMMERCIAL_OPERATION", "CLOSED_WON"],
             },
           },
           select: { id: true },
@@ -119,11 +149,11 @@ export async function PATCH(request: NextRequest) {
         await tx.commercialSpace.update({
           where: { id: spaceId },
           data: {
-            status: targetStatus === "PKS" ? "RESERVED" : "FIT_OUT",
+            status: targetStatus === "FIT_OUT_HANDOVER" ? "FIT_OUT" : "RESERVED",
           },
         });
 
-        if (targetStatus === "PKS") {
+        if (holdsSpace || targetStatus === "FIT_OUT_HANDOVER") {
           await tx.tenantLead.updateMany({
             where: {
               spaceId,
@@ -218,16 +248,26 @@ export async function PATCH(request: NextRequest) {
 
       if (
         targetStatus &&
-        ["NEW", "CONTACTED", "NEGOTIATING", "CLOSED_LOST"].includes(targetStatus) &&
+        !isAtOrAfterLeadStage(targetStatus, "BA_SIGNED") &&
         spaceId &&
         space &&
         !space.occupancy &&
         ["RESERVED", "FIT_OUT"].includes(space.status)
       ) {
-        await tx.commercialSpace.update({
-          where: { id: spaceId },
-          data: { status: "TERSEDIA" },
+        const otherHold = await tx.tenantLead.findFirst({
+          where: {
+            spaceId,
+            id: { not: id },
+            status: { in: [...SPACE_HOLD_STATUSES, "FIT_OUT_HANDOVER"] },
+          },
+          select: { status: true },
         });
+        if (!otherHold) {
+          await tx.commercialSpace.update({
+            where: { id: spaceId },
+            data: { status: "TERSEDIA" },
+          });
+        }
       }
 
       return tx.tenantLead.update({
@@ -242,6 +282,8 @@ export async function PATCH(request: NextRequest) {
           ...(siteVisitScheduledAt !== undefined && {
             siteVisitScheduledAt: scheduledAt,
           }),
+          ...(rdsOfferNo !== undefined && { rdsOfferNo: nextRdsOfferNo || null }),
+          ...(baNegotiationNo !== undefined && { baNegotiationNo: nextBaNumber || null }),
         },
         include: { space: { include: { station: true } } },
       });

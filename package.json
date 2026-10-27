@@ -3,16 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build --webpack",
-    "start": "next start",
-    "lint": "eslint",
-    "db:generate": "prisma generate",
-    "db:deploy": "prisma migrate deploy",
+    "dev": "node scripts/bin.mjs next dev",
+    "build": "node scripts/bin.mjs next build --webpack",
+    "start": "node scripts/bin.mjs next start",
+    "lint": "node scripts/bin.mjs eslint",
+    "db:generate": "node scripts/bin.mjs prisma generate",
+    "db:deploy": "node scripts/bin.mjs prisma migrate deploy",
     "db:deploy:recover": "sh scripts/prisma-migrate-deploy.sh",
-    "db:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:migrate": "node scripts/bin.mjs prisma migrate dev",
+    "db:seed": "node scripts/bin.mjs tsx prisma/seed.ts",
+    "db:studio": "node scripts/bin.mjs prisma studio"
   },
   "overrides": {
     "sharp": "$sharp",

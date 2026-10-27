@@ -62,7 +62,6 @@ async function mapTrainToInfo(train: TrainRow): Promise<TrainInfo> {
       title: scene.title,
       panoramaUrl: scene.panoramaUrl,
       multiRes: extractMultiResFromCanvasData(scene.canvasData),
-      thumbnailUrl: scene.thumbnailUrl ?? undefined,
       levelId: scene.carId,
       areaId: scene.zoneId,
       levelSlug: scene.car,

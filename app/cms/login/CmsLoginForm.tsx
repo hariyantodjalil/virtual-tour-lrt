@@ -47,11 +47,11 @@ export default function CmsLoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-      <Card className="w-full max-w-md bg-slate-900 border-slate-800 text-slate-100">
+    <div className="min-h-screen flex items-center justify-center bg-[#1C0A0E] p-4">
+      <Card className="w-full max-w-md border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
         <CardHeader>
           <CardTitle>CMS Virtual Tour</CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardDescription className="text-[#C4A8AD]">
             Masuk untuk mengelola konten LRT Jabodebek
           </CardDescription>
         </CardHeader>
@@ -69,7 +69,7 @@ export default function CmsLoginForm() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="bg-slate-800 border-slate-700"
+                className="border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE]"
                 required
               />
             </div>
@@ -80,26 +80,26 @@ export default function CmsLoginForm() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="bg-slate-800 border-slate-700"
+                className="border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE]"
                 required
               />
             </div>
             {error && <p className="text-sm text-red-400">{error}</p>}
-            <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500" disabled={loading}>
+            <Button type="submit" className="w-full bg-[#E31E2D] hover:bg-[#c41926]" disabled={loading}>
               {loading ? "Memproses..." : "Login"}
             </Button>
           </form>
 
           <div className="my-4 flex items-center gap-2">
-            <div className="h-px flex-1 bg-slate-800" />
-            <span className="text-xs font-medium whitespace-nowrap text-slate-500">
+            <div className="h-px flex-1 bg-[rgba(255,214,218,0.14)]" />
+            <span className="text-xs font-medium whitespace-nowrap text-[#C4A8AD]">
               atau masuk dengan
             </span>
-            <div className="h-px flex-1 bg-slate-800" />
+            <div className="h-px flex-1 bg-[rgba(255,214,218,0.14)]" />
           </div>
 
           <GoogleSignInButton
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-800 text-xs font-medium text-slate-200 transition hover:bg-slate-700"
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[rgba(255,214,218,0.14)] bg-[#261015] text-xs font-medium text-[#F8ECEE] transition hover:bg-[#3A161C]"
             label="Masuk dengan Google"
             onSuccess={(u, redirect) => {
               if (u.role === "MITRA") {

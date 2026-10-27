@@ -1496,24 +1496,24 @@ export default function VirtualTourEditorPage() {
   return (
     <div className="cms-vt-editor flex h-full min-h-0 w-full flex-col overflow-hidden">
       {/* ── Top Toolbar ─────────────────────────────────────────────────── */}
-      <div className="relative z-30 flex shrink-0 items-center gap-3 px-4 py-3 bg-slate-900 border-b border-slate-800">
-        <Button asChild variant="ghost" size="sm" className="text-slate-400 hover:text-slate-200 shrink-0">
+      <div className="relative z-30 flex shrink-0 items-center gap-3 px-4 py-3 bg-[#261015] border-b border-[rgba(255,214,218,0.14)]">
+        <Button asChild variant="ghost" size="sm" className="text-[#C4A8AD] hover:text-[#F8ECEE] shrink-0">
           <Link href="/cms/virtual-tour">
             <ArrowLeft className="h-4 w-4 mr-1" /> Kembali
           </Link>
         </Button>
 
-        <div className="h-5 w-px bg-slate-700" />
+        <div className="h-5 w-px bg-[#4A1F28]" />
 
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-slate-400 text-sm shrink-0">Station Virtual Tour</span>
-          <span className="text-slate-600">›</span>
-          <span className="text-slate-100 text-sm font-semibold truncate">
+          <span className="text-[#C4A8AD] text-sm shrink-0">Station Virtual Tour</span>
+          <span className="text-[#A88990]">›</span>
+          <span className="text-[#F8ECEE] text-sm font-semibold truncate">
             {station?.name ?? "…"}
           </span>
           {currentScene && (
             <>
-              <span className="text-slate-600">›</span>
+              <span className="text-[#A88990]">›</span>
               <span
                 className="text-sm font-medium truncate"
                 style={{ color: getLevelConfig(currentScene.level, levels).color }}
@@ -1527,10 +1527,10 @@ export default function VirtualTourEditorPage() {
         <div className="flex-1" />
 
         {/* Mode toolbar */}
-        <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+        <div className="flex items-center gap-1 bg-[#3A161C] rounded-lg p-1">
           <button
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "none" ? "bg-slate-600 text-white" : "text-slate-400 hover:text-slate-200"
+              addMode === "none" ? "bg-[#E31E2D] text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
             }`}
             onClick={() => setAddMode("none")}
             title="Mode Seleksi"
@@ -1539,7 +1539,7 @@ export default function VirtualTourEditorPage() {
           </button>
           <button
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "scene" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-200"
+              addMode === "scene" ? "bg-emerald-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
             }`}
             onClick={() => setAddMode((m) => (m === "scene" ? "none" : "scene"))}
             title="Tambah hotspot scene"
@@ -1548,7 +1548,7 @@ export default function VirtualTourEditorPage() {
           </button>
           <button
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "space" ? "bg-amber-600 text-white" : "text-slate-400 hover:text-slate-200"
+              addMode === "space" ? "bg-amber-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
             }`}
             onClick={() => setAddMode((m) => (m === "space" ? "none" : "space"))}
             title="Tambah hotspot unit"
@@ -1557,7 +1557,7 @@ export default function VirtualTourEditorPage() {
           </button>
           <button
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "info" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"
+              addMode === "info" ? "bg-blue-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
             }`}
             onClick={() => setAddMode((m) => (m === "info" ? "none" : "info"))}
             title="Tambah hotspot info"
@@ -1566,7 +1566,7 @@ export default function VirtualTourEditorPage() {
           </button>
           <button
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "ad" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-slate-200"
+              addMode === "ad" ? "bg-purple-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
             }`}
             onClick={() => setAddMode((m) => (m === "ad" ? "none" : "ad"))}
             title="Tambah hotspot iklan"
@@ -1575,7 +1575,7 @@ export default function VirtualTourEditorPage() {
           </button>
           <button
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "blur" ? "bg-slate-600 text-white ring-1 ring-purple-500/50" : "text-slate-400 hover:text-slate-200"
+              addMode === "blur" ? "bg-[#E31E2D] text-white ring-1 ring-purple-500/50" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
             }`}
             onClick={() => setAddMode((m) => (m === "blur" ? "none" : "blur"))}
             title="Tambah blur privasi (wajah, dll.)"
@@ -1584,11 +1584,11 @@ export default function VirtualTourEditorPage() {
           </button>
         </div>
 
-        <div className="h-5 w-px bg-slate-700" />
+        <div className="h-5 w-px bg-[#4A1F28]" />
 
-        <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+        <div className="flex items-center gap-1 bg-[#3A161C] rounded-lg p-1">
           <button
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:opacity-30 disabled:pointer-events-none"
             onClick={undo}
             disabled={!canUndo}
             title="Undo (Ctrl+Z)"
@@ -1596,7 +1596,7 @@ export default function VirtualTourEditorPage() {
             <Undo2 className="h-3.5 w-3.5" />
           </button>
           <button
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:opacity-30 disabled:pointer-events-none"
             onClick={redo}
             disabled={!canRedo}
             title="Redo (Ctrl+Y)"
@@ -1604,7 +1604,7 @@ export default function VirtualTourEditorPage() {
             <Redo2 className="h-3.5 w-3.5" />
           </button>
           <button
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:opacity-30 disabled:pointer-events-none"
             onClick={duplicateSelected}
             disabled={!selectedHotspot && !selectedBlur}
             title="Duplikat hotspot/blur terpilih"
@@ -1612,7 +1612,7 @@ export default function VirtualTourEditorPage() {
             <Copy className="h-3.5 w-3.5" />
           </button>
           <button
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:opacity-30 disabled:pointer-events-none"
             onClick={handleSetInitialView}
             disabled={!currentScene || isPreview}
             title="Set view awal dari posisi kamera"
@@ -1620,7 +1620,7 @@ export default function VirtualTourEditorPage() {
             <Crosshair className="h-3.5 w-3.5" />
           </button>
           <button
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-slate-200"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE]"
             onClick={() => setShowConnectionMap(true)}
             title="Peta koneksi antar scene"
           >
@@ -1628,14 +1628,14 @@ export default function VirtualTourEditorPage() {
           </button>
         </div>
 
-        <div className="h-5 w-px bg-slate-700" />
+        <div className="h-5 w-px bg-[#4A1F28]" />
 
         {/* Preview toggle — Edit = Pannellum 3D editor, Preview = Pannellum full preview */}
         <button
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
             isPreview
               ? "bg-purple-600 border-purple-500 text-white"
-              : "bg-slate-800 border-slate-700 text-slate-300 hover:border-purple-500 hover:text-purple-300"
+              : "bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F0DDE1] hover:border-purple-500 hover:text-purple-300"
           }`}
           onClick={() => {
             setIsPreview((p) => !p);
@@ -1657,7 +1657,7 @@ export default function VirtualTourEditorPage() {
           variant="outline"
           onClick={resetChanges}
           disabled={!hasUnsaved || saving || !currentScene}
-          className="border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white shrink-0 disabled:opacity-40"
+          className="border-[rgba(255,214,218,0.22)] bg-[#3A161C] text-[#F8ECEE] hover:bg-[#4A1F28] hover:text-white shrink-0 disabled:opacity-40"
           title="Buang perubahan yang belum disimpan"
         >
           <span className="flex items-center gap-1.5">
@@ -1751,7 +1751,7 @@ export default function VirtualTourEditorPage() {
               />
             )
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center bg-slate-950 text-slate-500">
+            <div className="flex-1 flex flex-col items-center justify-center bg-[#1C0A0E] text-[#C4A8AD]">
               <div className="text-5xl mb-3">📷</div>
               <p>Pilih atau tambah scene</p>
             </div>
@@ -1759,47 +1759,47 @@ export default function VirtualTourEditorPage() {
         </div>
 
         {/* ── Right: Properties Panel ──────────────────────────────── */}
-        <aside className="w-72 bg-slate-900 border-l border-slate-800 flex flex-col flex-none overflow-hidden">
+        <aside className="w-72 bg-[#261015] border-l border-[rgba(255,214,218,0.14)] flex flex-col flex-none overflow-hidden">
           <div className="overflow-y-auto flex-1 px-3 py-3 space-y-5">
 
             {/* Scene Properties */}
             {currentScene && (
               <section>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 pb-2 border-b border-slate-800">
+                <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider mb-3 pb-2 border-b border-[rgba(255,214,218,0.14)]">
                   Scene
                 </h3>
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Judul</Label>
+                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Judul</Label>
                     <Input
                       value={currentScene.title}
                       onChange={(e) => updateSelectedScene("title", e.target.value)}
-                      className="bg-slate-800 border-slate-700 text-slate-100 text-sm h-8"
+                      className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-sm h-8"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Scene ID</Label>
+                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Scene ID</Label>
                     <Input
                       value={currentScene.sceneId}
                       readOnly
-                      className="bg-slate-800 border-slate-700 text-slate-400 text-xs h-8 font-mono"
+                      className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#C4A8AD] text-xs h-8 font-mono"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Level</Label>
+                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Level</Label>
                     <p
-                      className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm font-medium"
+                      className="rounded-md border border-[rgba(255,214,218,0.18)] bg-[#3A161C] px-2 py-1.5 text-sm font-medium"
                       style={{ color: getLevelConfig(currentScene.level, levels).color }}
                     >
                       {getLevelConfig(currentScene.level, levels).label}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Area</Label>
+                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Area</Label>
                     <select
                       value={currentScene.areaId ?? ""}
                       onChange={(e) => handleSceneAreaChange(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-md h-8 px-2 text-sm text-slate-100"
+                      className="w-full bg-[#3A161C] border border-[rgba(255,214,218,0.18)] rounded-md h-8 px-2 text-sm text-[#F8ECEE]"
                     >
                       <option value="">— pilih area —</option>
                       {levels.map((level) => (
@@ -1814,20 +1814,20 @@ export default function VirtualTourEditorPage() {
                     </select>
                   </div>
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-slate-500">Urutan</Label>
+                    <Label className="text-xs text-[#C4A8AD]">Urutan</Label>
                     <Input
                       type="number"
                       value={currentScene.order}
                       onChange={(e) => updateSelectedScene("order", Number(e.target.value))}
-                      className="bg-slate-800 border-slate-700 text-slate-100 text-sm h-8 w-20 text-right"
+                      className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-sm h-8 w-20 text-right"
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-slate-500">Aktif</Label>
+                    <Label className="text-xs text-[#C4A8AD]">Aktif</Label>
                     <button
                       onClick={() => updateSelectedScene("isActive", !currentScene.isActive)}
                       className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${
-                        currentScene.isActive ? "bg-emerald-600" : "bg-slate-700"
+                        currentScene.isActive ? "bg-emerald-600" : "bg-[#4A1F28]"
                       }`}
                     >
                       <span
@@ -1839,12 +1839,12 @@ export default function VirtualTourEditorPage() {
                   </div>
 
                   {/* Connection info */}
-                  <div className="bg-slate-800/60 rounded-lg px-3 py-2 text-xs text-slate-500 space-y-1">
+                  <div className="bg-[#3A161C]/60 rounded-lg px-3 py-2 text-xs text-[#C4A8AD] space-y-1">
                     {(() => {
                       const iv = extractInitialViewFromCanvasData(currentScene.canvasData);
                       if (!iv) return null;
                       return (
-                        <div className="mb-1 border-b border-slate-700/60 pb-1 text-[11px] text-slate-400">
+                        <div className="mb-1 border-b border-[rgba(255,214,218,0.18)]/60 pb-1 text-[11px] text-[#C4A8AD]">
                           View awal: yaw {iv.yaw.toFixed(1)}°, pitch {iv.pitch.toFixed(1)}°, hfov{" "}
                           {(iv.hfov ?? 0).toFixed(0)}°
                         </div>
@@ -1854,7 +1854,7 @@ export default function VirtualTourEditorPage() {
                       <span className="flex items-center gap-1.5">
                         <ArrowRightLeft className="h-3 w-3" /> Mengarah ke
                       </span>
-                      <span className="text-slate-300">
+                      <span className="text-[#F0DDE1]">
                         {hotspots.filter((h) => h.type === "scene").length} scene
                       </span>
                     </div>
@@ -1862,7 +1862,7 @@ export default function VirtualTourEditorPage() {
                       <span className="flex items-center gap-1.5">
                         <Link2 className="h-3 w-3" /> Ditautkan dari
                       </span>
-                      <span className="text-slate-300">
+                      <span className="text-[#F0DDE1]">
                         {incomingMap.get(currentScene.sceneId) ?? 0} scene
                       </span>
                     </div>
@@ -1870,9 +1870,9 @@ export default function VirtualTourEditorPage() {
 
                   {/* Panorama upload */}
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Panorama</Label>
+                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Panorama</Label>
                     {currentScene.panoramaUrl && (
-                      <div className="relative h-20 rounded-lg overflow-hidden mb-2 bg-slate-800">
+                      <div className="relative h-20 rounded-lg overflow-hidden mb-2 bg-[#3A161C]">
                         <Image
                           src={getS3ProxyUrl(currentScene.panoramaUrl)}
                           alt="panorama"
@@ -1884,7 +1884,7 @@ export default function VirtualTourEditorPage() {
                     )}
                     {currentScene.panoramaUrl && (
                       <div className="mb-2 space-y-0.5">
-                        <p className="text-[10px] text-slate-600 font-mono break-all leading-relaxed">
+                        <p className="text-[10px] text-[#A88990] font-mono break-all leading-relaxed">
                           {currentScene.panoramaUrl}
                         </p>
                         {currentScene.thumbnailUrl && (
@@ -1897,8 +1897,8 @@ export default function VirtualTourEditorPage() {
                     <label
                       className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg p-2.5 text-xs transition-colors ${
                         uploading
-                          ? "border-slate-700 text-slate-600"
-                          : "border-slate-600 text-slate-400 hover:border-emerald-500 hover:text-emerald-400"
+                          ? "border-[rgba(255,214,218,0.18)] text-[#A88990]"
+                          : "border-[rgba(255,214,218,0.22)] text-[#C4A8AD] hover:border-emerald-500 hover:text-emerald-400"
                       }`}
                     >
                       {uploading ? (
@@ -1924,7 +1924,7 @@ export default function VirtualTourEditorPage() {
             {/* Blur privasi */}
             {selectedBlur && (
               <section>
-                <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-[rgba(255,214,218,0.14)]">
                   <h3 className="text-xs font-semibold text-purple-400 uppercase tracking-wider">
                     Blur Privasi
                   </h3>
@@ -1937,7 +1937,7 @@ export default function VirtualTourEditorPage() {
                   </button>
                 </div>
                 <div className="space-y-3">
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <p className="text-xs text-[#C4A8AD] leading-relaxed">
                     {privacyBlurGuideOnly
                       ? "Panorama sudah pernah dibake. Kotak ungu = area edit; blur asli ada di gambar. Setelah ubah posisi/ukuran/skala, simpan scene lalu klik «Bake ke panorama» lagi."
                       : "Preview overlay CSS di editor. Klik «Bake ke panorama» agar blur permanen di gambar (tetap bisa diedit & re-bake)."}
@@ -1945,14 +1945,14 @@ export default function VirtualTourEditorPage() {
 
                   <div>
                     <div className="mb-1.5 flex items-center justify-between">
-                      <Label className="text-xs text-slate-500">Ukuran (px)</Label>
+                      <Label className="text-xs text-[#C4A8AD]">Ukuran (px)</Label>
                       <button
                         type="button"
                         onClick={() => setBlurSizeLinked((v) => !v)}
                         className={`p-1 rounded transition-colors ${
                           blurSizeLinked
                             ? "text-purple-400 hover:text-purple-300"
-                            : "text-slate-500 hover:text-slate-400"
+                            : "text-[#C4A8AD] hover:text-[#C4A8AD]"
                         }`}
                         title={
                           blurSizeLinked
@@ -1969,25 +1969,25 @@ export default function VirtualTourEditorPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <Label className="text-xs text-slate-500 mb-1.5 block">Lebar</Label>
+                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Lebar</Label>
                         <Input
                           type="number"
                           min={24}
                           max={320}
                           value={selectedBlur.width ?? BLUR_WIDTH_DEFAULT}
                           onChange={(e) => updateBlurSize("width", Number(e.target.value))}
-                          className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
+                          className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-8 font-mono"
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-slate-500 mb-1.5 block">Tinggi</Label>
+                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Tinggi</Label>
                         <Input
                           type="number"
                           min={24}
                           max={320}
                           value={selectedBlur.height ?? BLUR_HEIGHT_DEFAULT}
                           onChange={(e) => updateBlurSize("height", Number(e.target.value))}
-                          className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
+                          className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-8 font-mono"
                         />
                       </div>
                     </div>
@@ -1995,7 +1995,7 @@ export default function VirtualTourEditorPage() {
 
                   <div>
                     <div className="mb-1.5 flex items-center justify-between gap-2">
-                      <Label className="text-xs text-slate-500 shrink-0">Intensitas Blur</Label>
+                      <Label className="text-xs text-[#C4A8AD] shrink-0">Intensitas Blur</Label>
                       <div className="flex items-center gap-1">
                         <Input
                           type="number"
@@ -2004,9 +2004,9 @@ export default function VirtualTourEditorPage() {
                           step={1}
                           value={selectedBlur.intensity ?? BLUR_INTENSITY_DEFAULT}
                           onChange={(e) => updateBlur("intensity", Number(e.target.value))}
-                          className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-7 w-14 font-mono px-2"
+                          className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-7 w-14 font-mono px-2"
                         />
-                        <span className="text-xs text-slate-500">px</span>
+                        <span className="text-xs text-[#C4A8AD]">px</span>
                       </div>
                     </div>
                     <input
@@ -2022,7 +2022,7 @@ export default function VirtualTourEditorPage() {
 
                   <div>
                     <div className="mb-1.5 flex items-center justify-between gap-2">
-                      <Label className="text-xs text-slate-500 shrink-0">Radius Sudut</Label>
+                      <Label className="text-xs text-[#C4A8AD] shrink-0">Radius Sudut</Label>
                       <div className="flex items-center gap-1">
                         <Input
                           type="number"
@@ -2031,9 +2031,9 @@ export default function VirtualTourEditorPage() {
                           step={1}
                           value={selectedBlur.radius ?? BLUR_RADIUS_DEFAULT}
                           onChange={(e) => updateBlur("radius", Number(e.target.value))}
-                          className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-7 w-14 font-mono px-2"
+                          className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-7 w-14 font-mono px-2"
                         />
-                        <span className="text-xs text-slate-500">px</span>
+                        <span className="text-xs text-[#C4A8AD]">px</span>
                       </div>
                     </div>
                     <input
@@ -2048,7 +2048,7 @@ export default function VirtualTourEditorPage() {
                       onChange={(e) => updateBlur("radius", Number(e.target.value))}
                       className="w-full accent-purple-500"
                     />
-                    <p className="text-[10px] text-slate-600 mt-1 leading-snug">
+                    <p className="text-[10px] text-[#A88990] mt-1 leading-snug">
                       Membulatkan sudut area blur. Naikkan hingga maks (½ sisi terpendek) untuk bentuk
                       lingkaran atau kapsul.
                     </p>
@@ -2056,7 +2056,7 @@ export default function VirtualTourEditorPage() {
 
                   <div>
                     <div className="mb-1.5 flex items-center justify-between gap-2">
-                      <Label className="text-xs text-slate-500 shrink-0">Skala</Label>
+                      <Label className="text-xs text-[#C4A8AD] shrink-0">Skala</Label>
                       <div className="flex items-center gap-1">
                         <Input
                           type="number"
@@ -2067,9 +2067,9 @@ export default function VirtualTourEditorPage() {
                           onChange={(e) =>
                             updateBlur("scale", Number(e.target.value) / 100)
                           }
-                          className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-7 w-14 font-mono px-2"
+                          className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-7 w-14 font-mono px-2"
                         />
-                        <span className="text-xs text-slate-500">%</span>
+                        <span className="text-xs text-[#C4A8AD]">%</span>
                       </div>
                     </div>
                     <input
@@ -2085,7 +2085,7 @@ export default function VirtualTourEditorPage() {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Yaw (°)</Label>
+                      <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Yaw (°)</Label>
                       <Input
                         type="number"
                         step="0.1"
@@ -2093,11 +2093,11 @@ export default function VirtualTourEditorPage() {
                         max="180"
                         value={selectedBlur.yaw}
                         onChange={(e) => updateBlur("yaw", Number(e.target.value))}
-                        className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
+                        className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-8 font-mono"
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Pitch (°)</Label>
+                      <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Pitch (°)</Label>
                       <Input
                         type="number"
                         step="0.1"
@@ -2105,7 +2105,7 @@ export default function VirtualTourEditorPage() {
                         max="90"
                         value={selectedBlur.pitch}
                         onChange={(e) => updateBlur("pitch", Number(e.target.value))}
-                        className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
+                        className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-8 font-mono"
                       />
                     </div>
                   </div>
@@ -2116,8 +2116,8 @@ export default function VirtualTourEditorPage() {
             {/* Hotspot Properties */}
             {selectedHotspot && (
               <section>
-                <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-[rgba(255,214,218,0.14)]">
+                  <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider">
                     Hotspot
                   </h3>
                   <button
@@ -2130,7 +2130,7 @@ export default function VirtualTourEditorPage() {
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Tipe</Label>
+                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Tipe</Label>
                     <div className="grid grid-cols-2 gap-1.5">
                       {(["scene", "space", "info", "ad"] as const).map((t) => (
                         <button
@@ -2145,7 +2145,7 @@ export default function VirtualTourEditorPage() {
                                   : t === "ad"
                                     ? "bg-purple-600 border-purple-500 text-white"
                                     : "bg-blue-600 border-blue-500 text-white"
-                              : "border-slate-700 text-slate-400 hover:bg-slate-800"
+                              : "border-[rgba(255,214,218,0.18)] text-[#C4A8AD] hover:bg-[#3A161C]"
                           }`}
                         >
                           {t === "scene"
@@ -2161,11 +2161,11 @@ export default function VirtualTourEditorPage() {
                   </div>
 
                   <div>
-                    <Label className="text-xs text-slate-500 mb-1.5 block">Label</Label>
+                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Label</Label>
                     <Input
                       value={selectedHotspot.text}
                       onChange={(e) => updateHotspot("text", e.target.value)}
-                      className="bg-slate-800 border-slate-700 text-slate-100 text-sm h-8"
+                      className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-sm h-8"
                       placeholder="Nama hotspot"
                     />
                   </div>
@@ -2173,7 +2173,7 @@ export default function VirtualTourEditorPage() {
                   {selectedHotspot.type === "scene" ? (
                     <>
                       <div>
-                        <Label className="text-xs text-slate-500 mb-1.5 block">Target Scene</Label>
+                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Target Scene</Label>
                         {currentScene && (
                           <SceneTargetPicker
                             levels={levels}
@@ -2189,18 +2189,18 @@ export default function VirtualTourEditorPage() {
                       </div>
                       <div>
                         <div className="mb-1.5 flex items-center justify-between gap-2">
-                          <Label className="text-xs text-slate-500">Arah Panah</Label>
-                          <span className="text-[10px] text-slate-400">
+                          <Label className="text-xs text-[#C4A8AD]">Arah Panah</Label>
+                          <span className="text-[10px] text-[#C4A8AD]">
                             {DIRECTION_LABELS[(selectedHotspot.direction ?? "right") as HotspotDirection]}
                           </span>
                         </div>
-                        <div className="inline-grid grid-cols-3 gap-1 rounded-xl border border-slate-700 bg-slate-900/60 p-1.5">
+                        <div className="inline-grid grid-cols-3 gap-1 rounded-xl border border-[rgba(255,214,218,0.18)] bg-[#261015]/60 p-1.5">
                           {DIRECTION_COMPASS.map((d, i) => {
                             if (!d) {
                               return (
                                 <div
                                   key={`center-${i}`}
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800/80"
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3A161C]/80"
                                   aria-hidden
                                 >
                                   <span
@@ -2222,7 +2222,7 @@ export default function VirtualTourEditorPage() {
                                 className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
                                   active
                                     ? "border-red-700 bg-red-950 text-white"
-                                    : "border-transparent text-slate-500 hover:border-slate-600 hover:bg-slate-800 hover:text-slate-200"
+                                    : "border-transparent text-[#C4A8AD] hover:border-[rgba(255,214,218,0.22)] hover:bg-[#3A161C] hover:text-[#F8ECEE]"
                                 }`}
                               >
                                 <span
@@ -2237,7 +2237,7 @@ export default function VirtualTourEditorPage() {
                     </>
                   ) : selectedHotspot.type === "space" ? (
                     <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Kode Unit</Label>
+                      <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Kode Unit</Label>
                       <UnitPicker
                         spaces={stationSpaces}
                         value={selectedHotspot.spaceCode}
@@ -2256,7 +2256,7 @@ export default function VirtualTourEditorPage() {
                   ) : selectedHotspot.type === "ad" ? (
                     <>
                       <div>
-                        <Label className="text-xs text-slate-500 mb-1.5 block">Unit Media</Label>
+                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Unit Media</Label>
                         <UnitPicker
                           spaces={stationSpaces}
                           value={selectedHotspot.spaceCode}
@@ -2273,18 +2273,18 @@ export default function VirtualTourEditorPage() {
                           )}
                       </div>
                       <div>
-                        <Label className="text-xs text-slate-500 mb-1.5 block">Judul Kreatif</Label>
+                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Judul Kreatif</Label>
                         <Input
                           value={selectedHotspot.creativeTitle ?? ""}
                           onChange={(e) => updateHotspot("creativeTitle", e.target.value)}
-                          className="bg-slate-800 border-slate-700 text-slate-100 text-sm h-8"
+                          className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-sm h-8"
                           placeholder="Judul iklan / kampanye"
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-slate-500 mb-1.5 block">Aset Kreatif</Label>
+                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Aset Kreatif</Label>
                         {selectedHotspot.creativeUrl && (
-                          <div className="relative mb-2 h-24 overflow-hidden rounded-lg bg-slate-800">
+                          <div className="relative mb-2 h-24 overflow-hidden rounded-lg bg-[#3A161C]">
                             <Image
                               src={getS3ProxyUrl(selectedHotspot.creativeUrl)}
                               alt="Kreatif iklan"
@@ -2298,8 +2298,8 @@ export default function VirtualTourEditorPage() {
                           <label
                             className={`flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed p-2 text-xs transition-colors ${
                               uploadingCreative
-                                ? "border-slate-700 text-slate-600"
-                                : "border-slate-600 text-slate-400 hover:border-purple-500 hover:text-purple-400"
+                                ? "border-[rgba(255,214,218,0.18)] text-[#A88990]"
+                                : "border-[rgba(255,214,218,0.22)] text-[#C4A8AD] hover:border-purple-500 hover:text-purple-400"
                             }`}
                           >
                             {uploadingCreative ? (
@@ -2322,7 +2322,7 @@ export default function VirtualTourEditorPage() {
                               type="button"
                               size="sm"
                               variant="outline"
-                              className="h-auto border-slate-600 px-2 text-xs text-slate-400"
+                              className="h-auto border-[rgba(255,214,218,0.22)] px-2 text-xs text-[#C4A8AD]"
                               onClick={() => {
                                 pushHistory();
                                 updateHotspot("creativeUrl", undefined);
@@ -2337,7 +2337,7 @@ export default function VirtualTourEditorPage() {
                   ) : (
                     <>
                       <div>
-                        <Label className="text-xs text-slate-500 mb-1.5 block">
+                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">
                           Ikon Hotspot
                         </Label>
                         <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
@@ -2348,7 +2348,7 @@ export default function VirtualTourEditorPage() {
                             className={`flex flex-col items-center gap-1 rounded-lg border p-1.5 transition ${
                               !selectedHotspot.facilityIcon
                                 ? "border-blue-500 bg-blue-500/15"
-                                : "border-slate-700 hover:bg-slate-800"
+                                : "border-[rgba(255,214,218,0.18)] hover:bg-[#3A161C]"
                             }`}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2359,7 +2359,7 @@ export default function VirtualTourEditorPage() {
                               height={39}
                               className="h-[39px] w-9 object-contain"
                             />
-                            <span className="text-[9px] font-medium text-slate-400">
+                            <span className="text-[9px] font-medium text-[#C4A8AD]">
                               Info
                             </span>
                           </button>
@@ -2377,7 +2377,7 @@ export default function VirtualTourEditorPage() {
                                 className={`flex flex-col items-center gap-1 rounded-lg border p-1.5 transition ${
                                   active
                                     ? "border-blue-500 bg-blue-500/15"
-                                    : "border-slate-700 hover:bg-slate-800"
+                                    : "border-[rgba(255,214,218,0.18)] hover:bg-[#3A161C]"
                                 }`}
                               >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2388,7 +2388,7 @@ export default function VirtualTourEditorPage() {
                                   height={39}
                                   className="h-[39px] w-9 object-contain"
                                 />
-                                <span className="text-[9px] font-medium text-slate-400">
+                                <span className="text-[9px] font-medium text-[#C4A8AD]">
                                   {icon.label}
                                 </span>
                               </button>
@@ -2397,14 +2397,14 @@ export default function VirtualTourEditorPage() {
                         </div>
                       </div>
                       <div>
-                        <Label className="text-xs text-slate-500 mb-1.5 block">
+                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">
                           Deskripsi Info
                         </Label>
                         <textarea
                           value={selectedHotspot.description ?? ""}
                           onChange={(e) => updateHotspot("description", e.target.value)}
                           rows={4}
-                          className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                          className="w-full resize-none rounded-md border border-[rgba(255,214,218,0.18)] bg-[#3A161C] px-3 py-2 text-sm text-[#F8ECEE]"
                           placeholder="Teks yang muncul di modal info saat diklik pengunjung"
                         />
                       </div>
@@ -2413,8 +2413,8 @@ export default function VirtualTourEditorPage() {
 
                   <div>
                     <div className="mb-1.5 flex items-center justify-between">
-                      <Label className="text-xs text-slate-500">Ukuran Hotspot</Label>
-                      <span className="text-xs font-mono text-slate-400">
+                      <Label className="text-xs text-[#C4A8AD]">Ukuran Hotspot</Label>
+                      <span className="text-xs font-mono text-[#F8ECEE]">
                         {Math.round((selectedHotspot.scale ?? HOTSPOT_SCALE_DEFAULT) * 100)}%
                       </span>
                     </div>
@@ -2425,9 +2425,9 @@ export default function VirtualTourEditorPage() {
                       step={0.05}
                       value={selectedHotspot.scale ?? HOTSPOT_SCALE_DEFAULT}
                       onChange={(e) => updateHotspot("scale", Number(e.target.value))}
-                      className="w-full accent-emerald-500"
+                      className="w-full accent-[#E31E2D]"
                     />
-                    <div className="mt-1 flex justify-between text-[10px] text-slate-600">
+                    <div className="mt-1 flex justify-between text-[10px] text-[#C4A8AD]/80">
                       <span>Kecil (50%)</span>
                       <span>Normal</span>
                       <span>Besar (200%)</span>
@@ -2437,38 +2437,95 @@ export default function VirtualTourEditorPage() {
                   {/* Coordinates */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Yaw (°)</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        min="-180"
-                        max="180"
-                        value={selectedHotspot.yaw}
-                        onChange={(e) => updateHotspot("yaw", Number(e.target.value))}
-                        className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
-                      />
+                      <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Yaw (°)</Label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="flex h-8 w-7 items-center justify-center rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] hover:bg-[#E31E2D]"
+                          onClick={() => updateHotspot("yaw", wrapYaw(selectedHotspot.yaw - 1))}
+                          title="Yaw −1°"
+                        >
+                          −
+                        </button>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="-180"
+                          max="180"
+                          value={selectedHotspot.yaw}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            if (Number.isFinite(n)) updateHotspot("yaw", wrapYaw(n));
+                          }}
+                          className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-xs text-[#F8ECEE]"
+                        />
+                        <button
+                          type="button"
+                          className="flex h-8 w-7 items-center justify-center rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] hover:bg-[#E31E2D]"
+                          onClick={() => updateHotspot("yaw", wrapYaw(selectedHotspot.yaw + 1))}
+                          title="Yaw +1°"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                     <div>
-                      <Label className="text-xs text-slate-500 mb-1.5 block">Pitch (°)</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        min="-90"
-                        max="90"
-                        value={selectedHotspot.pitch}
-                        onChange={(e) => updateHotspot("pitch", Number(e.target.value))}
-                        className="bg-slate-800 border-slate-700 text-slate-100 text-xs h-8 font-mono"
-                      />
+                      <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Pitch (°)</Label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="flex h-8 w-7 items-center justify-center rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] hover:bg-[#E31E2D]"
+                          onClick={() =>
+                            updateHotspot(
+                              "pitch",
+                              Math.max(-90, Math.min(90, Math.round((selectedHotspot.pitch - 1) * 10) / 10))
+                            )
+                          }
+                          title="Pitch −1°"
+                        >
+                          −
+                        </button>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="-90"
+                          max="90"
+                          value={selectedHotspot.pitch}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            if (Number.isFinite(n)) {
+                              updateHotspot("pitch", Math.max(-90, Math.min(90, n)));
+                            }
+                          }}
+                          className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-xs text-[#F8ECEE]"
+                        />
+                        <button
+                          type="button"
+                          className="flex h-8 w-7 items-center justify-center rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] hover:bg-[#E31E2D]"
+                          onClick={() =>
+                            updateHotspot(
+                              "pitch",
+                              Math.max(-90, Math.min(90, Math.round((selectedHotspot.pitch + 1) * 10) / 10))
+                            )
+                          }
+                          title="Pitch +1°"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                   </div>
+                  <p className="text-[10px] leading-relaxed text-[#C4A8AD]">
+                    Drag pin di kanvas, atau pakai yaw/pitch di sini. Ukuran mengatur footprint unit.
+                  </p>
                 </div>
               </section>
             )}
 
             {currentScene && privacyBlurs.length > 0 && (
               <section>
-                <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-800 gap-2">
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <div className="flex items-center justify-between mb-2 pb-2 border-b border-[rgba(255,214,218,0.14)] gap-2">
+                  <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider">
                     Blur Privasi ({privacyBlurs.length})
                   </h3>
                   <Button
@@ -2499,14 +2556,14 @@ export default function VirtualTourEditorPage() {
                       className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-colors ${
                         b._id === selectedBlurId
                           ? "bg-purple-950/50 border-purple-700"
-                          : "border-transparent hover:bg-slate-800"
+                          : "border-transparent hover:bg-[#3A161C]"
                       }`}
                       onClick={() => handleBlurSelect(b._id)}
                     >
                       <span className="w-4 h-4 rounded-md flex-none bg-purple-600/40 border border-purple-500/60 backdrop-blur-sm" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-slate-200 truncate">Blur #{index + 1}</p>
-                        <p className="text-xs text-slate-500 font-mono">
+                        <p className="text-xs text-[#F8ECEE] truncate">Blur #{index + 1}</p>
+                        <p className="text-xs text-[#C4A8AD] font-mono">
                           {b.yaw.toFixed(1)}°, {b.pitch.toFixed(1)}°
                         </p>
                       </div>
@@ -2515,7 +2572,7 @@ export default function VirtualTourEditorPage() {
                           e.stopPropagation();
                           handleBlurDelete(b._id);
                         }}
-                        className="text-slate-600 hover:text-red-400 transition-colors"
+                        className="text-[#A88990] hover:text-red-400 transition-colors"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -2542,7 +2599,7 @@ export default function VirtualTourEditorPage() {
             {/* Hotspot list — dikategorikan per tipe */}
             {currentScene && hotspots.length > 0 && (
               <section className="space-y-4">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-800">
+                <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider pb-2 border-b border-[rgba(255,214,218,0.14)]">
                   Hotspot ({hotspots.length})
                 </h3>
 
@@ -2575,8 +2632,8 @@ export default function VirtualTourEditorPage() {
                             key={h._id}
                             className={`flex items-center gap-2 rounded-lg border p-2 cursor-pointer transition-colors ${
                               h._id === selectedHotspotId
-                                ? "border-slate-600 bg-slate-700"
-                                : "border-transparent hover:bg-slate-800"
+                                ? "border-[rgba(255,214,218,0.22)] bg-[#4A1F28]"
+                                : "border-transparent hover:bg-[#3A161C]"
                             }`}
                             onClick={() => {
                               setSelectedHotspotId(h._id);
@@ -2595,15 +2652,15 @@ export default function VirtualTourEditorPage() {
                               {h.type === "scene" ? "›" : h.type === "space" ? "●" : h.type === "ad" ? "📢" : "i"}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs text-slate-200">{h.text}</p>
+                              <p className="truncate text-xs text-[#F8ECEE]">{h.text}</p>
                               {h.type === "scene" && h.sceneId && (() => {
                                 const tgt = scenes.find((s) => s.sceneId === h.sceneId);
                                 const loc = tgt?.areaId ? findArea(levels, tgt.areaId) : null;
                                 return (
-                                  <p className="truncate text-[10px] text-slate-500">
+                                  <p className="truncate text-[10px] text-[#C4A8AD]">
                                     → {tgt?.title ?? h.sceneId}
                                     {loc && (
-                                      <span className="text-slate-600">
+                                      <span className="text-[#A88990]">
                                         {" "}
                                         · {loc.level.label} › {loc.area.label}
                                       </span>
@@ -2624,7 +2681,7 @@ export default function VirtualTourEditorPage() {
                                             {linkedSpace.tenantBrand}
                                           </p>
                                         )}
-                                      <p className="truncate font-mono text-[10px] text-slate-500">
+                                      <p className="truncate font-mono text-[10px] text-[#C4A8AD]">
                                         {h.spaceCode}
                                       </p>
                                     </>
@@ -2632,12 +2689,12 @@ export default function VirtualTourEditorPage() {
                                 })()
                               )}
                               {h.type === "ad" && h.spaceCode && (
-                                <p className="truncate text-[10px] text-slate-500 font-mono">
+                                <p className="truncate text-[10px] text-[#C4A8AD] font-mono">
                                   {h.spaceCode}
                                   {h.creativeTitle ? ` · ${h.creativeTitle}` : ""}
                                 </p>
                               )}
-                              <p className="font-mono text-[10px] text-slate-500">
+                              <p className="font-mono text-[10px] text-[#C4A8AD]">
                                 {h.yaw.toFixed(1)}°, {h.pitch.toFixed(1)}°
                               </p>
                             </div>
@@ -2646,7 +2703,7 @@ export default function VirtualTourEditorPage() {
                                 e.stopPropagation();
                                 handleHotspotDelete(h._id);
                               }}
-                              className="text-slate-600 transition-colors hover:text-red-400"
+                              className="text-[#A88990] transition-colors hover:text-red-400"
                             >
                               <Trash2 className="h-3 w-3" />
                             </button>
@@ -2660,11 +2717,11 @@ export default function VirtualTourEditorPage() {
             )}
 
             {/* Legend */}
-            <section className="hidden border-t border-slate-800 pt-4">
-              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+            <section className="hidden border-t border-[rgba(255,214,218,0.14)] pt-4">
+              <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider mb-2">
                 Panduan
               </h3>
-              <ul className="space-y-1.5 text-xs text-slate-500">
+              <ul className="space-y-1.5 text-xs text-[#C4A8AD]">
                 <li className="flex items-center gap-2">
                   <span className="w-4 h-4 rounded-full bg-emerald-600 flex-none" />
                   Hotspot scene — pindah ke scene lain
@@ -2705,17 +2762,17 @@ export default function VirtualTourEditorPage() {
       {/* ── Add Scene Dialog ─────────────────────────────────────────────── */}
       {showAddScene && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
-            <h2 className="font-bold text-slate-100 mb-5 flex items-center gap-2">
+          <div className="bg-[#261015] border border-[rgba(255,214,218,0.18)] rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <h2 className="font-bold text-[#F8ECEE] mb-5 flex items-center gap-2">
               <Plus className="h-5 w-5 text-emerald-400" /> Tambah Scene
             </h2>
             <form onSubmit={addScene} className="space-y-4">
               <div>
-                <Label className="text-xs text-slate-400 mb-1.5 block">Area</Label>
+                <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Area</Label>
                 <select
                   value={newSceneAreaId}
                   onChange={(e) => handleNewSceneAreaChange(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-md h-10 px-3 text-sm text-slate-100"
+                  className="w-full bg-[#3A161C] border border-[rgba(255,214,218,0.18)] rounded-md h-10 px-3 text-sm text-[#F8ECEE]"
                   required
                 >
                   <option value="">— pilih area —</option>
@@ -2731,25 +2788,25 @@ export default function VirtualTourEditorPage() {
                 </select>
               </div>
               <div>
-                <Label className="text-xs text-slate-400 mb-1.5 block">Judul Scene</Label>
+                <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Judul Scene</Label>
                 <Input
                   value={newSceneTitle}
                   onChange={(e) => handleNewSceneTitleChange(e.target.value)}
                   placeholder="contoh: Concourse Utama"
-                  className="bg-slate-800 border-slate-700"
+                  className="bg-[#3A161C] border-[rgba(255,214,218,0.18)]"
                   required
                 />
               </div>
               <div>
-                <Label className="text-xs text-slate-400 mb-1.5 block">Scene ID</Label>
+                <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Scene ID</Label>
                 <Input
                   value={newSceneId}
                   onChange={(e) => setNewSceneId(e.target.value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""))}
                   placeholder="concourse-01"
-                  className="bg-slate-800 border-slate-700 font-mono"
+                  className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] font-mono"
                   required
                 />
-                <p className="text-xs text-slate-600 mt-1">Huruf kecil, tanpa spasi — auto-generated, bisa diubah</p>
+                <p className="text-xs text-[#A88990] mt-1">Huruf kecil, tanpa spasi — auto-generated, bisa diubah</p>
                 {scenes.some((s) => s.sceneId === newSceneId) && (
                   <p className="text-xs text-red-400 mt-1">Scene ID ini sudah digunakan</p>
                 )}
@@ -2779,15 +2836,15 @@ export default function VirtualTourEditorPage() {
       {/* ── Bulk Import Dialog ───────────────────────────────────────────── */}
       {showBulkImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[85vh]">
+          <div className="bg-[#261015] border border-[rgba(255,214,218,0.18)] rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[85vh]">
             {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-800">
-              <h2 className="font-bold text-slate-100 flex items-center gap-2">
+            <div className="flex items-center justify-between p-5 border-b border-[rgba(255,214,218,0.14)]">
+              <h2 className="font-bold text-[#F8ECEE] flex items-center gap-2">
                 <Package className="h-5 w-5 text-sky-400" /> Bulk Import Panorama
               </h2>
               <button
                 onClick={() => setShowBulkImport(false)}
-                className="text-slate-500 hover:text-slate-300 transition-colors"
+                className="text-[#C4A8AD] hover:text-[#F0DDE1] transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -2796,11 +2853,11 @@ export default function VirtualTourEditorPage() {
             {/* Body */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {/* File picker */}
-              <label className="flex items-center gap-3 cursor-pointer border-2 border-dashed border-slate-700 rounded-xl p-5 text-slate-400 hover:border-sky-600 hover:text-sky-400 transition-colors">
+              <label className="flex items-center gap-3 cursor-pointer border-2 border-dashed border-[rgba(255,214,218,0.18)] rounded-xl p-5 text-[#C4A8AD] hover:border-sky-600 hover:text-sky-400 transition-colors">
                 <Upload className="h-6 w-6 shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Pilih beberapa file panorama sekaligus</p>
-                  <p className="text-xs text-slate-500 mt-0.5">JPEG/PNG equirectangular (2:1 ratio)</p>
+                  <p className="text-xs text-[#C4A8AD] mt-0.5">JPEG/PNG equirectangular (2:1 ratio)</p>
                 </div>
                 <input
                   ref={bulkFileInputRef}
@@ -2815,7 +2872,7 @@ export default function VirtualTourEditorPage() {
               {/* Rows */}
               {bulkRows.length > 0 && (
                 <div className="space-y-2">
-                  <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 text-[10px] text-slate-500 uppercase tracking-wider px-1">
+                  <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 text-[10px] text-[#C4A8AD] uppercase tracking-wider px-1">
                     <span>Judul Scene</span>
                     <span>Scene ID</span>
                     <span>Area</span>
@@ -2829,14 +2886,14 @@ export default function VirtualTourEditorPage() {
                           ? "border-emerald-800/50 bg-emerald-900/10"
                           : row.status === "error"
                           ? "border-red-800/50 bg-red-900/10"
-                          : "border-slate-800 bg-slate-800/50"
+                          : "border-[rgba(255,214,218,0.14)] bg-[#3A161C]/50"
                       }`}
                     >
                       <Input
                         value={row.title}
                         onChange={(e) => updateBulkRow(row.key, "title", e.target.value)}
                         disabled={row.status !== "pending"}
-                        className="bg-slate-900 border-slate-700 text-slate-100 text-xs h-7 px-2"
+                        className="bg-[#261015] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-7 px-2"
                         placeholder="Judul scene"
                       />
                       <Input
@@ -2849,14 +2906,14 @@ export default function VirtualTourEditorPage() {
                           )
                         }
                         disabled={row.status !== "pending"}
-                        className="bg-slate-900 border-slate-700 text-slate-400 text-xs h-7 px-2 font-mono"
+                        className="bg-[#261015] border-[rgba(255,214,218,0.18)] text-[#C4A8AD] text-xs h-7 px-2 font-mono"
                         placeholder="scene-id"
                       />
                       <select
                         value={row.areaId}
                         onChange={(e) => updateBulkRow(row.key, "areaId", e.target.value)}
                         disabled={row.status !== "pending"}
-                        className="bg-slate-900 border border-slate-700 rounded h-7 px-1.5 text-xs text-slate-100 min-w-[110px]"
+                        className="bg-[#261015] border border-[rgba(255,214,218,0.18)] rounded h-7 px-1.5 text-xs text-[#F8ECEE] min-w-[110px]"
                       >
                         {levels.map((level) => (
                           <optgroup key={level.id} label={level.label}>
@@ -2876,7 +2933,7 @@ export default function VirtualTourEditorPage() {
                         ) : row.status === "creating" || row.status === "uploading" ? (
                           <Loader2 className="h-4 w-4 text-sky-400 animate-spin" />
                         ) : (
-                          <span className="w-2 h-2 rounded-full bg-slate-600" />
+                          <span className="w-2 h-2 rounded-full bg-[#E31E2D]" />
                         )}
                       </span>
                     </div>
@@ -2885,15 +2942,15 @@ export default function VirtualTourEditorPage() {
               )}
 
               {bulkRows.length === 0 && (
-                <p className="text-center text-slate-600 text-sm py-4">
+                <p className="text-center text-[#A88990] text-sm py-4">
                   Pilih file di atas untuk mulai konfigurasi bulk import
                 </p>
               )}
             </div>
 
             {/* Footer */}
-            <div className="p-5 border-t border-slate-800 flex items-center justify-between gap-3">
-              <p className="text-xs text-slate-500">
+            <div className="p-5 border-t border-[rgba(255,214,218,0.14)] flex items-center justify-between gap-3">
+              <p className="text-xs text-[#C4A8AD]">
                 {bulkRows.filter((r) => r.status === "done").length}/{bulkRows.length} selesai
               </p>
               <div className="flex gap-2">

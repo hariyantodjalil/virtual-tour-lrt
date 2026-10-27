@@ -24,7 +24,10 @@ import { useCommercialProfile } from "@/components/commercial/CommercialProfileP
 import {
   ACTIVE_LEAD_STATUSES,
   isCommercialOperation,
+  LEAD_PIPELINE_STATUSES,
+  LEAD_STATUS_LABELS,
   SITE_VISIT_STATUS_LABELS,
+  type CommercialLeadStatus,
 } from "@/lib/commercial-pipeline";
 
 export type PartnerLead = {
@@ -79,56 +82,24 @@ const TYPE_LABELS: Record<string, string> = {
   AREA_PROMOSI: "Area Promosi",
 };
 
-const STEPS = [
-  "Inquiry",
-  "Dihubungi",
-  "Negosiasi",
-  "Perjanjian Kerja Sama",
-  "Fit-Out & Serah Terima",
-  "Operasional Komersial",
-] as const;
+const STEPS = LEAD_PIPELINE_STATUSES.filter((status) => status !== "CLOSED_LOST").map(
+  (status) => LEAD_STATUS_LABELS[status]
+);
 
 function statusBadge(status: string) {
-  switch (status) {
-    case "CONTACTED":
-      return { label: "Sedang Direview", className: "bg-amber-500 text-white" };
-    case "NEGOTIATING":
-      return { label: "Negosiasi", className: "bg-violet-600 text-white" };
-    case "PKS":
-      return { label: "PKS", className: "bg-indigo-600 text-white" };
-    case "FIT_OUT_HANDOVER":
-      return { label: "Fit-Out & Serah Terima", className: "bg-fuchsia-600 text-white" };
-    case "COMMERCIAL_OPERATION":
-    case "CLOSED_WON":
-      return { label: "Operasional Komersial", className: "bg-emerald-600 text-white" };
-    case "CLOSED_LOST":
-      return { label: "Ditolak", className: "bg-red-600 text-white" };
-    default:
-      return { label: "Baru Diajukan", className: "bg-sky-600 text-white" };
+  const label = LEAD_STATUS_LABELS[status as CommercialLeadStatus] ?? "Baru Diajukan";
+  if (status === "CLOSED_LOST") return { label, className: "bg-red-600 text-white" };
+  if (isCommercialOperation(status)) {
+    return { label: "Operasional Komersial", className: "bg-emerald-600 text-white" };
   }
+  return { label, className: "bg-[#1C0A0E] text-white" };
 }
 
-/** Index langkah aktif (0–4). CLOSED_LOST = -1. */
 function currentStepIndex(status: string): number {
-  switch (status) {
-    case "NEW":
-      return 0;
-    case "CONTACTED":
-      return 1;
-    case "NEGOTIATING":
-      return 2;
-    case "PKS":
-      return 3;
-    case "FIT_OUT_HANDOVER":
-      return 4;
-    case "COMMERCIAL_OPERATION":
-    case "CLOSED_WON":
-      return 5;
-    case "CLOSED_LOST":
-      return -1;
-    default:
-      return 0;
-  }
+  if (status === "CLOSED_LOST") return -1;
+  if (status === "CLOSED_WON") return STEPS.length - 1;
+  const index = LEAD_PIPELINE_STATUSES.indexOf(status as CommercialLeadStatus);
+  return index >= 0 ? index : 0;
 }
 
 function matchesFilter(status: string, filter: FilterTab) {
@@ -450,12 +421,13 @@ export default function ApplicationsSection({
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="text-base font-bold text-[#101828]">Panduan Penyewaan</h3>
-          <div className="mt-4 grid gap-3 sm:grid-cols-4">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {[
-              { n: "1", t: "Jelajahi", d: "Virtual tour stasiun" },
-              { n: "2", t: "Pilih Unit", d: "Cek spesifikasi" },
-              { n: "3", t: "Ajukan", d: "Kirim minat sewa" },
-              { n: "4", t: "DiHubungi", d: "Tim leasing follow-up" },
+              { n: "1", t: "Jelajahi", d: "Tur 360° stasiun" },
+              { n: "2", t: "Ajukan", d: "Kirim minat sewa" },
+              { n: "3", t: "Penawaran", d: "KAI mengirim penawaran resmi" },
+              { n: "4", t: "Verifikasi", d: "Cek lokasi setelah kesepakatan" },
+              { n: "5", t: "Perjanjian", d: "BA, desain, PKS, serah terima" },
             ].map((step) => (
               <div
                 key={step.n}

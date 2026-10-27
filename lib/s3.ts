@@ -17,11 +17,14 @@ export type S3AssetType =
   | "train-rental-spaces" // spaces/train-rental/
   | "misc";           // misc/
 
+let s3Client: S3Client | undefined;
+
 function getS3Client() {
+  if (s3Client) return s3Client;
   if (!process.env.S3_ENDPOINT || !process.env.S3_ACCESS_KEY_ID || !process.env.S3_SECRET_ACCESS_KEY) {
     throw new Error("S3 configuration is missing");
   }
-  return new S3Client({
+  s3Client = new S3Client({
     endpoint: process.env.S3_ENDPOINT,
     region: process.env.S3_REGION || "us-east-1",
     credentials: {
@@ -30,6 +33,7 @@ function getS3Client() {
     },
     forcePathStyle: true,
   });
+  return s3Client;
 }
 
 function getBucketName() {

@@ -226,19 +226,19 @@ export function TourStructureSidebar({
   }
 
   return (
-    <aside className="flex w-72 flex-none flex-col overflow-hidden border-r border-slate-800 bg-slate-900">
+    <aside className="flex w-72 flex-none flex-col overflow-hidden border-r border-[rgba(255,214,218,0.14)] bg-[#261015]">
       {/* Header */}
-      <div className="border-b border-slate-800 px-3 py-2.5">
+      <div className="border-b border-[rgba(255,214,218,0.14)] px-3 py-2.5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <Layers className="h-3.5 w-3.5 text-slate-500" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Struktur Tur</span>
-            <span className="text-xs text-slate-600">({scenes.length})</span>
+            <Layers className="h-3.5 w-3.5 text-[#C4A8AD]" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#C4A8AD]">Struktur Tur</span>
+            <span className="text-xs text-[#A88990]">({scenes.length})</span>
           </div>
           <div className="flex items-center gap-1">
             <button
               onClick={allExpanded ? collapseAll : expandAll}
-              className="p-0.5 text-slate-500 transition-colors hover:text-slate-200"
+              className="p-0.5 text-[#C4A8AD] transition-colors hover:text-[#F8ECEE]"
               title={allExpanded ? "Tutup semua" : "Buka semua"}
             >
               {allExpanded ? (
@@ -249,7 +249,7 @@ export function TourStructureSidebar({
             </button>
             <button
               onClick={onManageLevels}
-              className="flex items-center gap-1 rounded-md border border-slate-700 px-2 py-1 text-[10px] font-medium text-slate-400 transition-colors hover:border-emerald-700 hover:text-emerald-400"
+              className="flex items-center gap-1 rounded-md border border-[rgba(255,214,218,0.18)] px-2 py-1 text-[10px] font-medium text-[#C4A8AD] transition-colors hover:border-emerald-700 hover:text-emerald-400"
               title="Tambah / edit / hapus level"
             >
               <Layers className="h-3 w-3" />
@@ -257,7 +257,7 @@ export function TourStructureSidebar({
             </button>
             <button
               onClick={onBulkImport}
-              className="p-0.5 text-slate-500 transition-colors hover:text-sky-400"
+              className="p-0.5 text-[#C4A8AD] transition-colors hover:text-sky-400"
               title="Bulk import panorama"
             >
               <Package className="h-3.5 w-3.5" />
@@ -266,19 +266,19 @@ export function TourStructureSidebar({
         </div>
 
         {selectionPath && (
-          <div className="mt-2 rounded-md border border-slate-800 bg-slate-800/50 px-2 py-1.5">
-            <p className="text-[9px] uppercase tracking-wider text-slate-500">Sedang diedit</p>
-            <p className="mt-0.5 truncate text-[11px] font-medium text-slate-200">
+          <div className="mt-2 rounded-md border border-[rgba(255,214,218,0.14)] bg-[#3A161C]/50 px-2 py-1.5">
+            <p className="text-[9px] uppercase tracking-wider text-[#C4A8AD]">Sedang diedit</p>
+            <p className="mt-0.5 truncate text-[11px] font-medium text-[#F8ECEE]">
               <span style={{ color: selectionPath.level.color }}>{selectionPath.level.label}</span>
               {selectionPath.area && (
                 <>
-                  <span className="text-slate-600"> › </span>
+                  <span className="text-[#A88990]"> › </span>
                   <span>{selectionPath.area.label}</span>
                 </>
               )}
               {selectedScene && (
                 <>
-                  <span className="text-slate-600"> › </span>
+                  <span className="text-[#A88990]"> › </span>
                   <span className="text-emerald-400">{selectedScene.title}</span>
                 </>
               )}
@@ -302,8 +302,8 @@ export function TourStructureSidebar({
               <div
                 onDragOver={(e) => handleLevelDragOver(e, level.id)}
                 onDrop={() => handleLevelDrop(level.id)}
-                className={`flex items-center gap-0.5 rounded-lg pr-1 transition-colors hover:bg-slate-800/60 ${
-                  selectedScene?.levelId === level.id ? "bg-slate-800/40" : ""
+                className={`flex items-center gap-0.5 rounded-lg pr-1 transition-colors hover:bg-[#3A161C]/60 ${
+                  selectedScene?.levelId === level.id ? "bg-[#3A161C]/40" : ""
                 } ${dragLevelId === level.id ? "opacity-40" : ""} ${
                   dropLevelId === level.id ? "ring-1 ring-emerald-500/70 bg-emerald-950/30" : ""
                 }`}
@@ -317,7 +317,7 @@ export function TourStructureSidebar({
                     handleLevelDragStart(level.id);
                   }}
                   onDragEnd={handleLevelDragEnd}
-                  className="shrink-0 cursor-grab rounded p-1 text-slate-600 active:cursor-grabbing hover:bg-slate-700 hover:text-slate-300"
+                  className="shrink-0 cursor-grab rounded p-1 text-[#A88990] active:cursor-grabbing hover:bg-[#4A1F28] hover:text-[#F0DDE1]"
                   title="Drag untuk ubah urutan level (tab publik)"
                   aria-label={`Geser urutan level ${level.label}`}
                 >
@@ -330,9 +330,9 @@ export function TourStructureSidebar({
                   aria-expanded={levelOpen}
                 >
                   {levelOpen ? (
-                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#C4A8AD]" />
                   ) : (
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#C4A8AD]" />
                   )}
                   <span
                     className="h-2 w-2 shrink-0 rounded-full"
@@ -345,14 +345,14 @@ export function TourStructureSidebar({
                     >
                       {level.label}
                     </p>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-[10px] text-[#C4A8AD]">
                       {level.areas.length} area · {levelSceneCount} scene
                     </p>
                   </div>
                 </button>
                 <button
                   onClick={() => onAddArea(level.id, level.label)}
-                  className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-700 hover:text-emerald-400"
+                  className="shrink-0 rounded p-1 text-[#C4A8AD] hover:bg-[#4A1F28] hover:text-emerald-400"
                   title={`Tambah area di ${level.label}`}
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -361,7 +361,7 @@ export function TourStructureSidebar({
 
               {/* Areas */}
               {levelOpen && (
-                <div className="ml-3 border-l border-slate-800 pl-1">
+                <div className="ml-3 border-l border-[rgba(255,214,218,0.14)] pl-1">
                   {level.areas.map((area) => {
                     const areaOpen = expandedAreas.has(area.id);
                     const areaScenes = scenesByArea(area.id);
@@ -370,8 +370,8 @@ export function TourStructureSidebar({
                       <div key={area.id} className="mb-0.5">
                         {/* Area row */}
                         <div
-                          className={`flex items-center gap-0.5 rounded-lg pr-0.5 transition-colors hover:bg-slate-800/50 ${
-                            selectedScene?.areaId === area.id ? "bg-slate-800/30" : ""
+                          className={`flex items-center gap-0.5 rounded-lg pr-0.5 transition-colors hover:bg-[#3A161C]/50 ${
+                            selectedScene?.areaId === area.id ? "bg-[#3A161C]/30" : ""
                           }`}
                         >
                           <button
@@ -381,15 +381,15 @@ export function TourStructureSidebar({
                             aria-expanded={areaOpen}
                           >
                             {areaOpen ? (
-                              <ChevronDown className="h-3 w-3 shrink-0 text-slate-500" />
+                              <ChevronDown className="h-3 w-3 shrink-0 text-[#C4A8AD]" />
                             ) : (
-                              <ChevronRight className="h-3 w-3 shrink-0 text-slate-500" />
+                              <ChevronRight className="h-3 w-3 shrink-0 text-[#C4A8AD]" />
                             )}
-                            <MapPin className="h-3 w-3 shrink-0 text-slate-500" />
-                            <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-slate-300">
+                            <MapPin className="h-3 w-3 shrink-0 text-[#C4A8AD]" />
+                            <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[#F0DDE1]">
                               {area.label}
                             </span>
-                            <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-500">
+                            <span className="shrink-0 rounded bg-[#3A161C] px-1.5 py-0.5 text-[9px] text-[#C4A8AD]">
                               {areaScenes.length}
                             </span>
                           </button>
@@ -397,7 +397,7 @@ export function TourStructureSidebar({
                             {areaScenes.length >= 2 && (
                               <button
                                 onClick={() => onAutoWalkPath(area.id)}
-                                className="rounded p-1 text-slate-500 hover:text-sky-400"
+                                className="rounded p-1 text-[#C4A8AD] hover:text-sky-400"
                                 title="Tautkan jalur jalan"
                               >
                                 <Route className="h-3 w-3" />
@@ -405,14 +405,14 @@ export function TourStructureSidebar({
                             )}
                             <button
                               onClick={() => onEditArea(area, level.label)}
-                              className="rounded px-1 py-1 text-[9px] text-slate-500 hover:text-slate-300"
+                              className="rounded px-1 py-1 text-[9px] text-[#C4A8AD] hover:text-[#F0DDE1]"
                               title="Edit area"
                             >
                               ✎
                             </button>
                             <button
                               onClick={() => onDeleteArea(area, level.label)}
-                              className="rounded p-1 text-slate-600 hover:text-red-400"
+                              className="rounded p-1 text-[#A88990] hover:text-red-400"
                               title="Hapus area"
                             >
                               <Trash2 className="h-3 w-3" />
@@ -422,7 +422,7 @@ export function TourStructureSidebar({
 
                         {/* Scenes */}
                         {areaOpen && (
-                          <div className="ml-4 space-y-0.5 border-l border-slate-800/80 pl-2 py-0.5">
+                          <div className="ml-4 space-y-0.5 border-l border-[rgba(255,214,218,0.14)]/80 pl-2 py-0.5">
                             {areaScenes.map(({ scene, index }, posInArea) => {
                               const isSelected = index === selectedSceneIndex;
                               const incomingCount = incomingMap.get(scene.sceneId) ?? 0;
@@ -437,12 +437,12 @@ export function TourStructureSidebar({
                                   className={`group relative flex cursor-pointer items-center gap-2 rounded-md border px-1.5 py-1.5 transition-all ${
                                     isSelected
                                       ? "border-emerald-500/50 bg-emerald-600/15"
-                                      : "border-transparent hover:border-slate-700 hover:bg-slate-800/80"
+                                      : "border-transparent hover:border-[rgba(255,214,218,0.18)] hover:bg-[#3A161C]/80"
                                   }`}
                                   onClick={() => onSelectScene(index)}
                                 >
                                   {thumb ? (
-                                    <div className="relative h-8 w-10 shrink-0 overflow-hidden rounded bg-slate-800">
+                                    <div className="relative h-8 w-10 shrink-0 overflow-hidden rounded bg-[#3A161C]">
                                       <Image
                                         src={getS3ProxyUrl(thumb)}
                                         alt=""
@@ -456,17 +456,17 @@ export function TourStructureSidebar({
                                       </span>
                                     </div>
                                   ) : (
-                                    <div className="flex h-8 w-10 shrink-0 flex-col items-center justify-center rounded bg-slate-800/80">
-                                      <ImageIcon className="h-3 w-3 text-slate-600" />
-                                      <span className="text-[8px] font-mono text-slate-500">{posInArea + 1}</span>
+                                    <div className="flex h-8 w-10 shrink-0 flex-col items-center justify-center rounded bg-[#3A161C]/80">
+                                      <ImageIcon className="h-3 w-3 text-[#A88990]" />
+                                      <span className="text-[8px] font-mono text-[#C4A8AD]">{posInArea + 1}</span>
                                     </div>
                                   )}
 
                                   <div className="min-w-0 flex-1">
-                                    <p className={`truncate text-[11px] font-medium leading-tight ${isSelected ? "text-white" : "text-slate-300"}`}>
+                                    <p className={`truncate text-[11px] font-medium leading-tight ${isSelected ? "text-white" : "text-[#F0DDE1]"}`}>
                                       {scene.title}
                                     </p>
-                                    <div className="flex items-center gap-2 text-[9px] text-slate-500">
+                                    <div className="flex items-center gap-2 text-[9px] text-[#C4A8AD]">
                                       <span className="font-mono truncate">{scene.sceneId}</span>
                                       <span className="flex items-center gap-0.5">
                                         <ArrowRightLeft className="h-2 w-2" />
@@ -486,7 +486,7 @@ export function TourStructureSidebar({
                                         onMoveScene(index, "up");
                                       }}
                                       disabled={first}
-                                      className="rounded p-0.5 text-slate-400 hover:text-white disabled:opacity-20"
+                                      className="rounded p-0.5 text-[#C4A8AD] hover:text-white disabled:opacity-20"
                                     >
                                       <ChevronUp className="h-2.5 w-2.5" />
                                     </button>
@@ -496,7 +496,7 @@ export function TourStructureSidebar({
                                         onMoveScene(index, "down");
                                       }}
                                       disabled={last}
-                                      className="rounded p-0.5 text-slate-400 hover:text-white disabled:opacity-20"
+                                      className="rounded p-0.5 text-[#C4A8AD] hover:text-white disabled:opacity-20"
                                     >
                                       <ChevronDown className="h-2.5 w-2.5" />
                                     </button>
@@ -516,7 +516,7 @@ export function TourStructureSidebar({
 
                             <button
                               onClick={() => onAddScene(area.id, level.slug)}
-                              className="flex w-full items-center gap-1 rounded-md border border-dashed border-slate-800 px-2 py-1.5 text-[10px] text-slate-600 transition-colors hover:border-emerald-800/60 hover:text-emerald-400"
+                              className="flex w-full items-center gap-1 rounded-md border border-dashed border-[rgba(255,214,218,0.14)] px-2 py-1.5 text-[10px] text-[#A88990] transition-colors hover:border-emerald-800/60 hover:text-emerald-400"
                             >
                               <Plus className="h-3 w-3" />
                               Tambah scene
@@ -528,7 +528,7 @@ export function TourStructureSidebar({
                   })}
 
                   {level.areas.length === 0 && (
-                    <p className="px-2 py-2 text-[10px] text-slate-600">Belum ada area</p>
+                    <p className="px-2 py-2 text-[10px] text-[#A88990]">Belum ada area</p>
                   )}
                 </div>
               )}
@@ -537,7 +537,7 @@ export function TourStructureSidebar({
         })}
 
         {levels.length === 0 && (
-          <div className="py-8 text-center text-xs text-slate-600">
+          <div className="py-8 text-center text-xs text-[#A88990]">
             <p>Belum ada level.</p>
             <button
               onClick={onManageLevels}
@@ -552,11 +552,11 @@ export function TourStructureSidebar({
 
       {/* Footer: kelola level */}
       {levels.length > 0 && (
-        <div className="border-t border-slate-800 p-2">
+        <div className="border-t border-[rgba(255,214,218,0.14)] p-2">
           <button
             type="button"
             onClick={onManageLevels}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-700 py-2 text-[11px] font-medium text-slate-400 transition-colors hover:border-emerald-800 hover:text-emerald-400"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[rgba(255,214,218,0.18)] py-2 text-[11px] font-medium text-[#C4A8AD] transition-colors hover:border-emerald-800 hover:text-emerald-400"
           >
             <Layers className="h-3.5 w-3.5" />
             Kelola Level (tambah / hapus)

@@ -42,6 +42,8 @@ import {
 import {
   ACTIVE_LEAD_STATUSES,
   isCommercialOperation,
+  LEAD_STATUS_LABELS,
+  type CommercialLeadStatus,
 } from "@/lib/commercial-pipeline";
 import { formatRupiah } from "@/lib/utils";
 
@@ -613,7 +615,10 @@ function applicationBadge(status: string, createdAt: string) {
     case "CONTACTED":
       return { label: `Direview · ${dateLabel}`, className: "bg-[#1e293b] text-white" };
     default:
-      return { label: `Diajukan: ${dateLabel}`, className: "bg-[#1e293b] text-white" };
+      return {
+        label: `${LEAD_STATUS_LABELS[status as CommercialLeadStatus] ?? "Diajukan"} · ${dateLabel}`,
+        className: "bg-[#1C0A0E] text-white",
+      };
   }
 }
 

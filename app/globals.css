@@ -633,9 +633,80 @@ body {
     0 4px 14px rgba(0, 0, 0, 0.55);
 }
 
-.lrt-hotspot--space .lrt-pin-marker__disc,
-.lrt-space-hotspot .lrt-pin-marker__disc {
-  animation: lrt-pin-emphasize 2.2s ease-in-out infinite;
+.lrt-space-mark {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transform: scale(var(--lrt-hotspot-scale, 1));
+  transform-origin: center bottom;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.lrt-space-mark__label {
+  background: #fff;
+  border: 1px solid #a2dac0;
+  color: #166c4a;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px #0002;
+  white-space: nowrap;
+}
+
+.lrt-space-mark__label::after {
+  content: " \2198";
+}
+
+.lrt-space-mark .lrt-space-mark__box {
+  width: 74px;
+  height: 112px;
+  border-radius: 6px;
+  border: 3px dashed #14b969;
+  background: #37c47a33;
+  box-shadow: 0 0 0 6px #0a7c4219;
+  animation: lrt-space-pulse 2s ease-in-out infinite;
+}
+
+.lrt-space-mark.lrt-pin-marker--space-occupied .lrt-space-mark__label {
+  border-color: #f3c3c3;
+  color: #9f1239;
+}
+
+.lrt-space-mark.lrt-pin-marker--space-occupied .lrt-space-mark__box {
+  border-color: #ef4444;
+  background: #ef444433;
+  box-shadow: 0 0 0 6px #7f1d1d19;
+}
+
+.lrt-space-mark.lrt-pin-marker--space-maintenance .lrt-space-mark__label,
+.lrt-space-mark.lrt-pin-marker--space-unknown .lrt-space-mark__label {
+  border-color: #d5dde3;
+  color: #52616c;
+}
+
+.lrt-space-mark.lrt-pin-marker--space-maintenance .lrt-space-mark__box,
+.lrt-space-mark.lrt-pin-marker--space-unknown .lrt-space-mark__box {
+  border-color: #94a3b8;
+  background: #94a3b833;
+  box-shadow: 0 0 0 6px #64748b19;
+}
+
+.lrt-space-mark .lrt-space-mark__box.is-selected {
+  outline: 3px solid #f59e0b;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 6px #0a7c4230;
+}
+
+@keyframes lrt-space-pulse {
+  50% {
+    box-shadow: 0 0 0 12px #0a7c4210;
+  }
 }
 
 .lrt-hotspot--ad .lrt-pin-marker__disc,
@@ -773,7 +844,7 @@ body {
   to {
     opacity: 1;
     transform: translateX(0) scale(1);
-    filter: blur(0);
+    filter: none;
   }
 }
 
@@ -832,10 +903,40 @@ body {
 }
 
 .tour-glass-panel {
-  border: 1px solid rgba(255, 214, 218, 0.14);
-  background: rgba(58, 22, 28, 0.92);
-  box-shadow: 0 22px 50px rgba(28, 10, 14, 0.5);
-  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background:
+    linear-gradient(
+      165deg,
+      rgba(40, 40, 44, 0.52) 0%,
+      rgba(18, 18, 22, 0.4) 100%
+    );
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.28),
+    0 2px 8px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(48px) saturate(1.8);
+  -webkit-backdrop-filter: blur(48px) saturate(1.8);
+}
+
+/* Apple-style frosted light glass — translucent, vivid blur, soft rim */
+.tour-glass-panel--light {
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background:
+    linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.74) 0%,
+      rgba(255, 255, 255, 0.6) 48%,
+      rgba(246, 248, 252, 0.56) 100%
+    );
+  box-shadow:
+    0 20px 50px rgba(15, 23, 42, 0.18),
+    0 4px 16px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -0.5px 0 rgba(15, 23, 42, 0.04);
+  backdrop-filter: blur(56px) saturate(1.85);
+  -webkit-backdrop-filter: blur(56px) saturate(1.85);
+  color: #101828;
 }
 
 .tour-tool-btn {

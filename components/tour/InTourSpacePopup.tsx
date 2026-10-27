@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import Image from "next/image";
 import {
-  ArrowRight,
   CalendarDays,
   Check,
   Copy,
@@ -12,7 +9,6 @@ import {
   Maximize2,
   MessageSquare,
   Store,
-  Users,
   Wrench,
   X,
   Zap,
@@ -21,10 +17,48 @@ import {
   XCircle,
   ChevronLeft,
 } from "lucide-react";
-import { formatNumber } from "@/lib/utils";
-import { getS3ProxyUrl } from "@/lib/s3-utils";
 import TenantInterestForm from "./TenantInterestForm";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
+import { cn } from "@/lib/utils";
+
+/** Temporary A/B: "light" frost white vs "dark" black glass. Flip to compare. */
+const PANEL_TONE: "dark" | "light" = "light";
+
+const PANEL_UI = {
+  dark: {
+    panel: "tour-glass-panel text-white backdrop-blur-[48px] backdrop-saturate-[1.8]",
+    hairline: "border-white/10",
+    hairlineStrong: "border-white/15",
+    text: "text-white",
+    muted: "text-white/55",
+    faint: "text-white/50",
+    soft: "text-white/60",
+    softHover: "hover:bg-white/10 hover:text-white",
+    chip: "border-white/15 bg-white/5",
+    chipHover: "hover:bg-white/5",
+    iconRing: "border-white/12 bg-white/8 text-white/85",
+    accentLabel: "text-[#FF5A66]",
+    occupied: "text-[#FF8A8A]",
+    backLabel: "text-white/90",
+  },
+  light: {
+    panel:
+      "border border-black/8 bg-[#F7F8FA] text-[#0B1220] shadow-[0_24px_64px_rgba(15,23,42,0.22),0_4px_16px_rgba(15,23,42,0.08)]",
+    hairline: "border-black/10",
+    hairlineStrong: "border-black/12",
+    text: "text-[#0B1220]",
+    muted: "text-slate-600",
+    faint: "text-slate-500",
+    soft: "text-slate-600",
+    softHover: "hover:bg-black/5 hover:text-[#101828]",
+    chip: "border-black/10 bg-white shadow-sm shadow-black/5",
+    chipHover: "hover:bg-white",
+    iconRing: "border-black/10 bg-white text-slate-700 shadow-sm shadow-black/5",
+    accentLabel: "text-[#E31E2D]",
+    occupied: "text-[#C41926]",
+    backLabel: "text-[#101828]",
+  },
+} as const;
 
 type CommercialSpace = {
   id: string;
@@ -77,31 +111,39 @@ type Props = {
 export default function InTourSpacePopup({
   space,
   stationName,
-  stationSlug,
   onClose,
   returnToList = false,
 }: Props) {
-  const [showInterestModal, setShowInterestModal] = useState(false);
+  const [view, setView] = useState<"detail" | "form">("detail");
   const [copied, setCopied] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const formHeadingRef = useRef<HTMLHeadingElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [hasSwitched, setHasSwitched] = useState(false);
+  const [lockedHeight, setLockedHeight] = useState<number | null>(null);
+  const isForm = view === "form";
+  const canApply = space.status === "TERSEDIA";
+  const ui = PANEL_UI[PANEL_TONE];
   const occupiedTenant =
     space.status === "TERISI" ? space.tenantBrand?.trim() : "";
   const typeLabel = TYPE_LABELS[space.type] ?? space.type;
 
-  const coverSrc = space.panoramaUrl
-    ? getS3ProxyUrl(space.panoramaUrl)
-    : "/brand/landing/space-card.jpg";
-
   const statusConfig = {
     TERSEDIA: {
       label: "Tersedia",
-      className: "border-emerald-400/30 bg-emerald-500/15 text-emerald-300",
-      dot: "bg-emerald-400",
+      className:
+        PANEL_TONE === "light"
+          ? "border-emerald-600/25 bg-emerald-500/10 text-emerald-700"
+          : "border-emerald-400/30 bg-emerald-500/15 text-emerald-300",
+      dot: PANEL_TONE === "light" ? "bg-emerald-600" : "bg-emerald-400",
       icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     },
     TERISI: {
       label: "Terisi",
-      className: "border-[#E31E2D]/40 bg-[#E31E2D]/12 text-[#FF4D57]",
+      className:
+        PANEL_TONE === "light"
+          ? "border-[#E31E2D]/30 bg-[#E31E2D]/8 text-[#C41926]"
+          : "border-[#E31E2D]/40 bg-[#E31E2D]/12 text-[#FF4D57]",
       dot: "bg-[#E31E2D]",
       icon: <XCircle className="h-3.5 w-3.5" />,
     },
@@ -247,23 +289,76 @@ export default function InTourSpacePopup({
     return () => window.removeEventListener("keydown", blockTourKeys, true);
   }, []);
 
+  useEffect(() => {
+    if (!hasSwitched) return;
+    if (isForm) {
+      formHeadingRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    const cta = Array.from(
+      panelRef.current?.querySelectorAll<HTMLButtonElement>("[data-apply-cta]") ?? []
+    ).find((button) => button.offsetParent !== null);
+    cta?.focus({ preventScroll: true });
+  }, [isForm, hasSwitched]);
+
+  useEffect(() => {
+    if (!isForm) return;
+    const backOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setView("detail");
+    };
+    window.addEventListener("keydown", backOnEscape, true);
+    return () => window.removeEventListener("keydown", backOnEscape, true);
+  }, [isForm]);
+
+  const switchView = (next: "detail" | "form") => {
+    setLockedHeight(next === "form" ? (panelRef.current?.offsetHeight ?? null) : null);
+    setHasSwitched(true);
+    setView(next);
+  };
+
   return (
     <div
-      className="absolute inset-0 z-[80] flex items-center justify-center bg-[#1C0A0E]/72 p-3 backdrop-blur-[2px] sm:p-5 lg:p-8"
+      className={cn(
+        "absolute inset-0 z-[80] flex items-center justify-center overflow-hidden p-3 sm:p-5 lg:p-8",
+        PANEL_TONE === "light"
+          ? "bg-black/25 backdrop-blur-[2px]"
+          : "bg-black/45 backdrop-blur-md"
+      )}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="tour-space-popup-title"
+      aria-labelledby={isForm ? "tour-space-form-title" : "tour-space-popup-title"}
     >
-      <div className="tour-glass-panel tour-panel-in flex max-h-full min-h-0 w-full max-w-[440px] flex-col overflow-hidden rounded-2xl text-[#F8ECEE] lg:h-[min(88%,820px)] lg:max-w-[min(100%,1360px)]">
-        <div className="flex shrink-0 items-center justify-end gap-1 border-b border-[rgba(255,214,218,0.14)] px-4 py-3 sm:px-5 lg:px-8 lg:py-4">
-          {returnToList ? (
+      <div
+        ref={panelRef}
+        className={cn(ui.panel, "tour-panel-in flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[440px] flex-col overflow-hidden rounded-2xl sm:max-h-[calc(100dvh-2.5rem)] lg:max-w-[min(100%,1200px)]")}
+        style={isForm && lockedHeight ? { height: lockedHeight } : undefined}
+      >
+        <div className={cn("flex shrink-0 items-center justify-end gap-1 border-b px-4 py-3 sm:px-5 lg:px-8 lg:py-4", ui.hairline)}>
+          {isForm ? (
+            <button
+              type="button"
+              onClick={() => switchView("detail")}
+              className={cn("mr-auto inline-flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-1 text-left text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]", ui.backLabel, ui.chipHover)}
+            >
+              <span className={cn("inline-flex size-11 shrink-0 items-center justify-center rounded-lg border", ui.chip)}>
+                <ChevronLeft className={cn("size-4", ui.text)} strokeWidth={2.4} />
+              </span>
+              <span className="min-w-0">
+                <span className="block">Kembali ke detail</span>
+                <span className={cn("block truncate text-[11px]", ui.faint)}>{space.code}</span>
+              </span>
+            </button>
+          ) : returnToList ? (
             <button
               type="button"
               onClick={onClose}
-              className="mr-auto inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-left text-xs font-medium text-[#F8ECEE] transition hover:bg-white/5"
+              className={cn("mr-auto inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-left text-xs font-medium transition", ui.backLabel, ui.chipHover)}
             >
-              <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-[#E31E2D]/55 bg-[#261015]">
-                <ChevronLeft className="size-4 text-[#E31E2D]" strokeWidth={2.4} />
+              <span className={cn("inline-flex size-11 shrink-0 items-center justify-center rounded-lg border", ui.chip)}>
+                <ChevronLeft className={cn("size-4", ui.text)} strokeWidth={2.4} />
               </span>
               Kembali ke Daftar Unit
             </button>
@@ -272,30 +367,68 @@ export default function InTourSpacePopup({
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="inline-flex size-11 items-center justify-center rounded-full text-[#C4A8AD] transition hover:bg-white/10 hover:text-[#F8ECEE] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]"
-            aria-label="Tutup detail unit"
+            className={cn("inline-flex size-11 items-center justify-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]", ui.soft, ui.softHover)}
+            aria-label={isForm ? "Tutup formulir" : "Tutup detail unit"}
           >
             <X className="size-4" strokeWidth={2.2} />
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
-          <div className="lg:grid lg:h-full lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)_auto] lg:overflow-hidden">
-            <div className="px-5 pt-5 sm:px-6 lg:overflow-y-auto lg:px-10 lg:pt-10 lg:pr-8">
-              <p className="text-[11px] font-semibold tracking-[0.16em] text-[#C4A8AD] uppercase lg:text-xs">
+        {isForm ? (
+          <div key="form" className="tour-drawer-in flex min-h-0 flex-1 flex-col">
+            <TenantInterestForm
+              spaceId={space.id}
+              spaceCode={space.code}
+              stationName={stationName}
+              variant="modal"
+              tone={PANEL_TONE}
+              layout="ledger"
+              aside={
+                <div className="@container">
+                  <p className={cn("text-[11px] font-semibold tracking-[0.16em] uppercase lg:text-xs", ui.accentLabel)}>
+                    Ajukan Minat Sewa
+                  </p>
+                  <h3
+                    id="tour-space-form-title"
+                    ref={formHeadingRef}
+                    tabIndex={-1}
+                    className={cn("font-display mt-3 text-[clamp(1.375rem,7cqi,2.5rem)] leading-[1.1] font-semibold tracking-[-0.02em] outline-none lg:mt-5", ui.text)}
+                  >
+                    Data Calon Tenant
+                  </h3>
+                  <p className={cn("mt-2 text-sm leading-snug lg:mt-3 lg:text-base", ui.muted)}>
+                    Unit <span className={cn("font-semibold", ui.text)}>{space.code}</span>
+                    {breadcrumb ? (
+                      <span className="hidden sm:inline"> · {breadcrumb}</span>
+                    ) : null}
+                  </p>
+                </div>
+              }
+            />
+          </div>
+        ) : (
+        <div
+          key="detail"
+          className={`grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-2 ${
+            hasSwitched ? "tour-drawer-in-left" : ""
+          }`}
+        >
+          <div className={cn("flex shrink-0 flex-col justify-between gap-6 border-b px-5 py-5 sm:px-6 lg:border-r lg:border-b-0 lg:px-10 lg:pt-10 lg:pb-8", ui.hairline)}>
+            <div className="@container">
+              <p className={cn("text-[11px] font-semibold tracking-[0.16em] uppercase lg:text-xs", ui.muted)}>
                 Ruang Komersial
               </p>
-              <div className="mt-3 flex min-w-0 items-center gap-2.5 lg:mt-5">
+              <div className="mt-3 flex min-w-0 items-start gap-2.5 lg:mt-5">
                 <h3
                   id="tour-space-popup-title"
-                  className="font-display truncate text-2xl leading-tight font-semibold tracking-[-0.02em] text-[#F8ECEE] lg:text-[2.65rem]"
+                  className={cn("font-display min-w-0 text-[clamp(1.25rem,6.8cqi,2.5rem)] leading-[1.1] font-semibold tracking-[-0.02em] [overflow-wrap:anywhere]", ui.text)}
                 >
                   {space.code}
                 </h3>
                 <button
                   type="button"
                   onClick={copyCode}
-                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[#FF6B4A] transition hover:bg-[#E31E2D]/15 hover:text-[#FF8A70] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D] lg:size-10"
+                  className={cn("inline-flex size-9 shrink-0 items-center justify-center rounded-lg transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D] lg:size-10", ui.soft, ui.softHover)}
                   aria-label={copied ? "Kode disalin" : "Salin kode unit"}
                   title={copied ? "Disalin" : "Salin kode"}
                 >
@@ -307,196 +440,76 @@ export default function InTourSpacePopup({
                 </button>
               </div>
               {breadcrumb ? (
-                <p className="mt-2 text-sm leading-snug text-[#C4A8AD] lg:mt-3 lg:text-base">
+                <p className={cn("mt-2 text-sm leading-snug lg:mt-3 lg:text-base", ui.muted)}>
                   {breadcrumb}
                 </p>
               ) : null}
               {occupiedTenant ? (
-                <p className="mt-3 text-sm font-semibold text-[#FF6B4A] lg:text-base">
+                <p className={cn("mt-3 text-sm font-semibold lg:text-base", ui.occupied)}>
                   Penyewa saat ini: {occupiedTenant}
                 </p>
               ) : null}
             </div>
 
-            <div className="mt-4 border-t border-[rgba(255,214,218,0.14)] px-5 pt-2 sm:px-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:overflow-y-auto lg:border-t-0 lg:border-l lg:border-[rgba(255,214,218,0.14)] lg:px-10 lg:pt-10 lg:pb-8">
-              <ul className="divide-y divide-[rgba(255,214,218,0.10)]">
-                {rows.map((row, index) => (
-                  <li
-                    key={row.id}
-                    className="tour-spec-row flex items-start gap-3.5 py-3.5 lg:gap-4 lg:py-4"
-                    style={{ animationDelay: `${index * 40}ms` }}
-                  >
-                    <span className="mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-[#E31E2D]/28 bg-[#E31E2D]/12 text-[#FF6B4A] lg:size-11">
-                      {row.icon}
-                    </span>
-                    <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)] items-start gap-2 lg:gap-4">
-                      <p className="pt-2 text-sm text-[#C4A8AD] lg:text-base">{row.label}</p>
-                      <div className="min-w-0 text-right lg:text-left">
-                        <p className="text-sm font-semibold text-[#F8ECEE] lg:text-lg">
-                          {row.value}
-                        </p>
-                        {row.hint ? (
-                          <p className="mt-0.5 text-xs leading-snug text-[#C4A8AD]/90 lg:text-sm">
-                            {row.hint}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <button
+              type="button"
+              data-apply-cta
+              onClick={() => switchView("form")}
+              disabled={!canApply}
+              className="hidden h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#E31E2D] px-4 text-base font-bold text-white shadow-[0_10px_28px_rgba(227,30,45,0.28)] transition hover:bg-[#c41926] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF6B4A] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none lg:inline-flex"
+            >
+              <MessageSquare className="size-4" strokeWidth={2.2} />
+              {canApply ? "Ajukan Minat Sewa" : "Ruang belum tersedia"}
+            </button>
+          </div>
 
-            <div className="hidden px-10 pt-2 pb-8 lg:block">
-              <button
-                type="button"
-                onClick={() => setShowInterestModal(true)}
-                disabled={space.status !== "TERSEDIA"}
-                className="inline-flex h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#E31E2D] px-4 text-base font-bold text-white shadow-[0_10px_28px_rgba(227,30,45,0.28)] transition hover:bg-[#c41926] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF6B4A] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
-              >
-                <MessageSquare className="size-4" strokeWidth={2.2} />
-                {space.status === "TERSEDIA" ? "Ajukan Minat Sewa" : "Ruang belum tersedia"}
-              </button>
-            </div>
+          <div className="min-h-0 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6 lg:px-10 lg:pt-10 lg:pb-8">
+            <ul className={cn("divide-y", PANEL_TONE === "light" ? "divide-black/10" : "divide-white/10")}>
+              {rows.map((row, index) => (
+                <li
+                  key={row.id}
+                  className="tour-spec-row flex items-start gap-3.5 py-3.5 lg:gap-4 lg:py-4"
+                  style={{ animationDelay: `${index * 40}ms` }}
+                >
+                  <span className={cn("mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-full border lg:size-11", ui.iconRing)}>
+                    {row.icon}
+                  </span>
+                  <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)] items-start gap-2 lg:gap-4">
+                    <p className={cn("pt-2 text-sm lg:text-base", ui.muted)}>{row.label}</p>
+                    <div className="min-w-0 text-right lg:text-left">
+                      <p className={cn("text-sm font-semibold break-words lg:text-lg", ui.text)}>
+                        {row.value}
+                      </p>
+                      {row.hint ? (
+                        <p className={cn("mt-0.5 text-xs leading-snug break-words lg:text-sm", ui.muted)}>
+                          {row.hint}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
+        )}
 
-        <div className="shrink-0 border-t border-[rgba(255,214,218,0.14)] px-5 pt-4 pb-5 sm:px-6 lg:hidden">
+        {!isForm ? (
+        <div className={cn("shrink-0 border-t px-5 pt-4 pb-5 sm:px-6 lg:hidden", ui.hairline)}>
           <button
             type="button"
-            onClick={() => setShowInterestModal(true)}
-            disabled={space.status !== "TERSEDIA"}
+            data-apply-cta
+            onClick={() => switchView("form")}
+            disabled={!canApply}
             className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-[#E31E2D] px-4 text-sm font-bold text-white shadow-[0_10px_28px_rgba(227,30,45,0.28)] transition hover:bg-[#c41926] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF6B4A] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
           >
             <MessageSquare className="size-4" strokeWidth={2.2} />
-            {space.status === "TERSEDIA" ? "Ajukan Minat Sewa" : "Ruang belum tersedia"}
+            {canApply ? "Ajukan Minat Sewa" : "Ruang belum tersedia"}
           </button>
         </div>
+        ) : null}
       </div>
 
-      {showInterestModal &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-6">
-            <div className="relative grid max-h-[min(920px,calc(100vh-24px))] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl md:grid-cols-[minmax(300px,0.95fr)_minmax(0,1.15fr)]">
-              <div className="relative hidden overflow-y-auto bg-[#111111] text-white md:block">
-                <div className="flex min-h-full flex-col p-5 pb-7 lg:p-6 lg:pb-8">
-                  <div
-                    className={`mb-4 inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}
-                  >
-                    <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
-                    {statusConfig.label}
-                  </div>
-
-                  <div className="relative mb-5 aspect-[16/10] overflow-hidden rounded-xl">
-                    <Image
-                      src={coverSrc}
-                      alt={space.name}
-                      fill
-                      sizes="420px"
-                      className="object-cover"
-                      unoptimized={coverSrc.startsWith("http") || coverSrc.includes("/api/")}
-                    />
-                    {stationSlug ? (
-                      <a
-                        href={`/station/${stationSlug}?unit=${space.id}`}
-                        className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-lg bg-black/65 px-3 py-2 text-[11px] font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src="/brand/landing/icons/tour-360.svg"
-                          alt=""
-                          width={14}
-                          height={14}
-                          className="size-3.5 brightness-0 invert"
-                        />
-                        Lihat Virtual Tour
-                        <ArrowRight className="size-3" />
-                      </a>
-                    ) : null}
-                  </div>
-
-                  <p className="text-[10px] font-semibold tracking-[0.18em] text-white/55 uppercase">
-                    Formulir Tenant
-                  </p>
-                  <h2 className="mt-1.5 text-2xl leading-tight font-bold lg:text-[28px]">
-                    {space.name}
-                  </h2>
-                  <p className="mt-1 text-sm text-white/70">
-                    {space.code} - Stasiun {stationName}
-                  </p>
-
-                  <div className="mt-4 grid grid-cols-2 gap-2.5">
-                    <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
-                      <Users className="mb-2 size-3.5 text-[#E31E2D]" />
-                      <p className="text-[10px] font-medium text-white/60">Eksposur</p>
-                      <p className="mt-1 text-[15px] leading-none font-bold text-white">
-                        {formatNumber(Math.round(space.exposure))}
-                      </p>
-                      <p className="mt-1 text-[10px] text-white/55">orang/hari</p>
-                    </div>
-                    <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
-                      <MapPin className="mb-2 size-3.5 text-[#E31E2D]" />
-                      <p className="text-[10px] font-medium text-white/60">Lokasi</p>
-                      <p className="mt-1 truncate text-[15px] leading-none font-bold text-white">
-                        {space.location || space.floor}
-                      </p>
-                      <p className="mt-1 truncate text-[10px] text-white/55">
-                        Stasiun {stationName}
-                      </p>
-                    </div>
-                    <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
-                      <Maximize2 className="mb-2 size-3.5 text-[#E31E2D]" />
-                      <p className="text-[10px] font-medium text-white/60">Luas</p>
-                      <p className="mt-1 text-[15px] font-bold text-white">{space.area} m²</p>
-                    </div>
-                    <div className="rounded-xl bg-white/5 p-3 ring-1 ring-[#E31E2D]/40">
-                      <Store className="mb-2 size-3.5 text-[#E31E2D]" />
-                      <p className="text-[10px] font-medium text-white/60">Status</p>
-                      <span
-                        className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusConfig.className}`}
-                      >
-                        <span className={`size-1.5 rounded-full ${statusConfig.dot}`} />
-                        {statusConfig.label}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative max-h-[min(920px,calc(100vh-24px))] overflow-y-auto bg-white p-5 sm:p-7 lg:p-8">
-                <button
-                  type="button"
-                  onClick={() => setShowInterestModal(false)}
-                  className="absolute top-4 right-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                  aria-label="Tutup formulir minat"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-
-                <div className="mb-5 pr-8">
-                  <p className="text-[11px] font-bold tracking-[0.16em] text-[#D81435] uppercase">
-                    Ajukan Minat Sewa
-                  </p>
-                  <h3 className="mt-1.5 text-2xl font-bold text-[#101828] sm:text-[28px]">
-                    Data Calon Tenant
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                    Form ini khusus untuk unit {space.code} di Stasiun {stationName}.
-                  </p>
-                </div>
-
-                <TenantInterestForm
-                  spaceId={space.id}
-                  spaceCode={space.code}
-                  stationName={stationName}
-                  variant="modal"
-                />
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
     </div>
   );
 }

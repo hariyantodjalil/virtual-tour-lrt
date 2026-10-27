@@ -223,6 +223,7 @@ export function PannellumPreview({
                 onClick,
                 scale: h.scale,
                 spaceStatus,
+                spaceCode: h.type === "space" ? h.spaceCode : undefined,
                 facilityIcon: h.type === "info" ? h.facilityIcon : undefined,
                 sceneTitle:
                   h.type === "scene"
@@ -276,7 +277,7 @@ export function PannellumPreview({
 
   if (!panoramaUrl) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-500">
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#1C0A0E] text-[#C4A8AD]">
         <div className="text-5xl mb-3">360</div>
         <p className="text-sm">Upload panorama terlebih dahulu untuk melihat preview</p>
       </div>
@@ -285,7 +286,7 @@ export function PannellumPreview({
 
   return (
     <div className="cms-vt-panorama relative h-full min-h-0 w-full overflow-hidden overscroll-none">
-      <div ref={containerRef} className="absolute inset-0" style={{ background: "#0f172a" }} />
+      <div ref={containerRef} className="absolute inset-0" style={{ background: "#1C0A0E" }} />
       <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(to_bottom,rgba(0,0,0,.42)_0%,transparent_30%,transparent_66%,rgba(0,0,0,.52)_100%)]" />
 
       {levels.length > 0 && currentScene && (
@@ -420,11 +421,11 @@ export function PannellumPreview({
         </PreviewPanel>
       )}
 
-      <div className="absolute top-3 left-3 bg-slate-900/90 backdrop-blur text-slate-200 text-xs px-3 py-1.5 rounded-full border border-slate-700 pointer-events-none flex items-center gap-1.5 z-20">
+      <div className="absolute top-3 left-3 bg-[#261015]/90 backdrop-blur text-[#F8ECEE] text-xs px-3 py-1.5 rounded-full border border-[rgba(255,214,218,0.18)] pointer-events-none flex items-center gap-1.5 z-20">
         <span className="w-2 h-2 rounded-full bg-purple-400 inline-block" />
         Preview - {sceneName}
       </div>
-      <div className="absolute top-3 right-3 bg-slate-900/90 backdrop-blur text-slate-400 text-xs px-3 py-1.5 rounded-full border border-slate-700 pointer-events-none z-20">
+      <div className="absolute top-3 right-3 bg-[#261015]/90 backdrop-blur text-[#C4A8AD] text-xs px-3 py-1.5 rounded-full border border-[rgba(255,214,218,0.18)] pointer-events-none z-20">
         {hotspots.length} hotspot
         {privacyBlurs.length > 0 ? ` · ${privacyBlurs.length} blur (bake)` : ""} · klik untuk interaksi
       </div>
@@ -468,7 +469,7 @@ function PreviewPanel({
   children: ReactNode;
 }) {
   return (
-    <div className="pointer-events-auto absolute left-16 top-1/2 z-30 w-72 -translate-y-1/2 rounded-2xl border border-white/15 bg-[#0d1f3c]/90 text-white shadow-2xl backdrop-blur-xl">
+    <div className="pointer-events-auto absolute left-16 top-1/2 z-30 w-72 -translate-y-1/2 rounded-2xl border border-white/15 bg-[#261015]/90 text-white shadow-2xl backdrop-blur-xl">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <h2 className="min-w-0 truncate text-sm font-black">{title}</h2>
         <button type="button" onClick={onClose} className="rounded-full p-1 transition-colors hover:bg-white/10">

@@ -25,7 +25,7 @@ export async function uploadPanoramaTiles(
 ): Promise<PannellumMultiRes> {
   const prefix = `virtual-tour/panorama-tiles/${safeSegment(ownerSlug)}/${safeSegment(sceneId)}`;
   const tiles = await buildPanoramaTiles(panorama);
-  await mapPool(tiles, 8, async (tile) => {
+  await mapPool(tiles, 3, async (tile) => {
     await uploadToS3(tile.buffer, `${prefix}/${tile.name}`, "image/jpeg", {
       "scene-id": sceneId,
       "storage-mode": "pannellum-multires",

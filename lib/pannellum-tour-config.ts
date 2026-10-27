@@ -72,6 +72,7 @@ function buildHotSpots(scene: PanoramaScene, allScenes: PanoramaScene[], handler
           onClick,
           scale: h.scale,
           spaceStatus,
+          spaceCode: h.type === "space" ? h.spaceCode : undefined,
           facilityIcon: h.type === "info" ? h.facilityIcon : undefined,
           sceneTitle:
             h.type === "scene"

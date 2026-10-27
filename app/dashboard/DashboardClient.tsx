@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { LEAD_STATUS_LABELS, type CommercialLeadStatus } from "@/lib/commercial-pipeline";
 import { formatNumber } from "@/lib/utils";
 
 type DashboardData = {
@@ -49,23 +50,32 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   PDF_DOWNLOAD: "Unduh PDF",
 };
 
+const CHIP = "border-[rgba(255,214,218,0.22)] bg-[#261015] text-[#F8ECEE]";
 const LEAD_STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  NEW: { label: "Baru", color: "border-sky-300/20 bg-sky-400/10 text-sky-200", icon: <Clock className="h-3 w-3" /> },
-  CONTACTED: { label: "Dihubungi", color: "border-cyan-300/20 bg-cyan-400/10 text-cyan-200", icon: <MessageCircle className="h-3 w-3" /> },
-  NEGOTIATING: { label: "Negosiasi", color: "border-amber-300/20 bg-amber-400/10 text-amber-200", icon: <TrendingUp className="h-3 w-3" /> },
-  CLOSED_WON: { label: "Berhasil", color: "border-emerald-300/20 bg-emerald-400/10 text-emerald-200", icon: <CheckCircle className="h-3 w-3" /> },
-  CLOSED_LOST: { label: "Gagal", color: "border-red-300/20 bg-red-400/10 text-red-200", icon: <XCircle className="h-3 w-3" /> },
+  NEW: { label: LEAD_STATUS_LABELS.NEW, color: CHIP, icon: <Clock className="h-3 w-3" /> },
+  CONTACTED: { label: LEAD_STATUS_LABELS.CONTACTED, color: CHIP, icon: <MessageCircle className="h-3 w-3" /> },
+  RDS_OFFER: { label: LEAD_STATUS_LABELS.RDS_OFFER, color: CHIP, icon: <MessageCircle className="h-3 w-3" /> },
+  NEGOTIATING: { label: LEAD_STATUS_LABELS.NEGOTIATING, color: CHIP, icon: <TrendingUp className="h-3 w-3" /> },
+  SITE_CHECK: { label: LEAD_STATUS_LABELS.SITE_CHECK, color: CHIP, icon: <Clock className="h-3 w-3" /> },
+  BA_SIGNED: { label: LEAD_STATUS_LABELS.BA_SIGNED, color: CHIP, icon: <CheckCircle className="h-3 w-3" /> },
+  DESIGN_REVIEW: { label: LEAD_STATUS_LABELS.DESIGN_REVIEW, color: CHIP, icon: <Clock className="h-3 w-3" /> },
+  PKS: { label: LEAD_STATUS_LABELS.PKS, color: CHIP, icon: <CheckCircle className="h-3 w-3" /> },
+  BILLING: { label: LEAD_STATUS_LABELS.BILLING, color: CHIP, icon: <Clock className="h-3 w-3" /> },
+  FIT_OUT_HANDOVER: { label: LEAD_STATUS_LABELS.FIT_OUT_HANDOVER, color: CHIP, icon: <Clock className="h-3 w-3" /> },
+  COMMERCIAL_OPERATION: { label: LEAD_STATUS_LABELS.COMMERCIAL_OPERATION, color: "border-emerald-400/30 bg-emerald-500/10 text-emerald-100", icon: <CheckCircle className="h-3 w-3" /> },
+  CLOSED_WON: { label: LEAD_STATUS_LABELS.CLOSED_WON, color: "border-emerald-400/30 bg-emerald-500/10 text-emerald-100", icon: <CheckCircle className="h-3 w-3" /> },
+  CLOSED_LOST: { label: LEAD_STATUS_LABELS.CLOSED_LOST, color: "border-red-400/30 bg-red-500/10 text-red-100", icon: <XCircle className="h-3 w-3" /> },
 };
 
 const CHART_COLORS = ["#fb3444", "#34d399", "#38bdf8", "#f59e0b", "#a78bfa"];
-const PANEL_CLASS = "border-white/10 bg-white/[0.055] text-slate-100 shadow-2xl shadow-black/20 backdrop-blur-xl";
-const GRID_COLOR = "rgba(148,163,184,.13)";
-const AXIS_COLOR = "#94a3b8";
+const PANEL_CLASS = "border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]";
+const GRID_COLOR = "rgba(255,214,218,.12)";
+const AXIS_COLOR = "#C4A8AD";
 const TOOLTIP_STYLE = {
-  backgroundColor: "rgba(8, 20, 38, .96)",
-  border: "1px solid rgba(255,255,255,.12)",
+  backgroundColor: "#261015",
+  border: "1px solid rgba(255,214,218,.18)",
   borderRadius: 12,
-  color: "#e2e8f0",
+  color: "#F8ECEE",
   boxShadow: "0 18px 50px rgba(0,0,0,.35)",
 };
 
@@ -77,9 +87,9 @@ function StatCard({ title, value, subtitle, icon: Icon, color }: {
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-400">{title}</p>
+            <p className="text-sm font-medium text-[#C4A8AD]">{title}</p>
             <p className="mt-1 text-3xl font-black text-white">{value}</p>
-            {subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}
+            {subtitle && <p className="mt-1 text-xs text-[#C4A8AD]">{subtitle}</p>}
           </div>
           <div className={`rounded-xl p-3 shadow-lg ${color}`}>
             <Icon className="h-5 w-5 text-white" />
@@ -137,7 +147,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-52 flex items-center justify-center text-slate-500 text-sm">
+              <div className="h-52 flex items-center justify-center text-[#C4A8AD] text-sm">
                 Data kunjungan belum tersedia
               </div>
             )}
@@ -170,7 +180,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
               </PieChart>
             </ResponsiveContainer>
-            <div className="flex justify-center gap-4 text-xs text-slate-300">
+            <div className="flex justify-center gap-4 text-xs text-[#F8ECEE]">
               <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-[#E31E2D]" /> Terisi ({stats.occupiedSpaces})</div>
               <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Tersedia ({stats.availableSpaces})</div>
             </div>
@@ -196,7 +206,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-52 flex items-center justify-center text-slate-500 text-sm">
+              <div className="h-52 flex items-center justify-center text-[#C4A8AD] text-sm">
                 Belum ada data kunjungan per stasiun
               </div>
             )}
@@ -224,7 +234,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-52 flex items-center justify-center text-slate-500 text-sm">
+              <div className="h-52 flex items-center justify-center text-[#C4A8AD] text-sm">
                 Belum ada data aktivitas
               </div>
             )}
@@ -241,7 +251,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
               variant="outline"
               size="sm"
               onClick={() => exportCSV(recentLeads)}
-              className="flex items-center gap-1.5 border-white/15 bg-white/5 text-slate-200 hover:bg-white/10"
+              className="flex items-center gap-1.5 border-white/15 bg-white/5 text-[#F8ECEE] hover:bg-white/10"
             >
               <Download className="h-4 w-4" />
               Export CSV
@@ -252,9 +262,9 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
             {leadsByStatus.map((l) => {
               const cfg = LEAD_STATUS_CONFIG[l.status];
               return (
-                <span key={l.status} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${cfg?.color ?? "border-white/10 bg-white/5 text-slate-300"}`}>
+                <span key={l.status} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${cfg?.color ?? "border-white/10 bg-white/5 text-[#F8ECEE]"}`}>
                   {cfg?.icon}
-                  {cfg?.label ?? l.status}: {l.count}
+                  {cfg?.label ?? LEAD_STATUS_LABELS[l.status as CommercialLeadStatus] ?? l.status}: {l.count}
                 </span>
               );
             })}
@@ -266,14 +276,14 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
               <thead>
                 <tr className="border-b border-white/10">
                   {["Perusahaan", "Kontak", "Jenis Usaha", "Unit", "Stasiun", "Status", "Tanggal"].map((h) => (
-                    <th key={h} className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left py-2.5 px-3 text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/8">
                 {recentLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-10 text-center text-slate-500 text-sm">
+                    <td colSpan={7} className="py-10 text-center text-[#C4A8AD] text-sm">
                       Belum ada lead masuk
                     </td>
                   </tr>
@@ -283,20 +293,20 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                     return (
                       <tr key={lead.id} className="transition-colors hover:bg-white/[0.04]">
                         <td className="py-3 px-3 font-semibold text-white">{lead.companyName}</td>
-                        <td className="py-3 px-3 text-slate-300">
+                        <td className="py-3 px-3 text-[#F8ECEE]">
                           <div>{lead.contactName}</div>
-                          <div className="text-xs text-slate-500">{lead.phone}</div>
+                          <div className="text-xs text-[#C4A8AD]">{lead.phone}</div>
                         </td>
-                        <td className="py-3 px-3 text-slate-300">{lead.businessType}</td>
-                        <td className="py-3 px-3 text-slate-300 font-mono text-xs">{lead.spaceName}</td>
-                        <td className="py-3 px-3 text-slate-300">{lead.stationName}</td>
+                        <td className="py-3 px-3 text-[#F8ECEE]">{lead.businessType}</td>
+                        <td className="py-3 px-3 text-[#F8ECEE] font-mono text-xs">{lead.spaceName}</td>
+                        <td className="py-3 px-3 text-[#F8ECEE]">{lead.stationName}</td>
                         <td className="py-3 px-3">
-                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${cfg?.color ?? "border-white/10 bg-white/5 text-slate-300"}`}>
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${cfg?.color ?? "border-white/10 bg-white/5 text-[#F8ECEE]"}`}>
                             {cfg?.icon}
-                            {cfg?.label ?? lead.status}
+                            {cfg?.label ?? LEAD_STATUS_LABELS[lead.status as CommercialLeadStatus] ?? lead.status}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-slate-500 text-xs whitespace-nowrap">
+                        <td className="py-3 px-3 text-[#C4A8AD] text-xs whitespace-nowrap">
                           {new Date(lead.createdAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
                         </td>
                       </tr>

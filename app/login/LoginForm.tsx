@@ -44,28 +44,28 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[#07111f] px-4 py-8 text-slate-100">
-      <Link href="/" className="mx-auto mb-8 flex max-w-md items-center gap-2 text-sm text-slate-400 hover:text-white">
+    <div className="min-h-screen bg-[#1C0A0E] px-4 py-8 text-[#F8ECEE]">
+      <Link href="/" className="mx-auto mb-8 flex max-w-md items-center gap-2 text-sm text-[#C4A8AD] hover:text-white">
         <ArrowLeft className="h-4 w-4" />
         Kembali ke virtual tour
       </Link>
-      <Card className="mx-auto w-full max-w-md border-white/10 bg-white/[0.055] text-slate-100 shadow-2xl shadow-black/20">
+      <Card className="mx-auto w-full max-w-md border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
         <CardHeader>
           <CardTitle>Login Akun</CardTitle>
-          <p className="text-sm text-slate-400">Mitra masuk ke panel pengajuan. Admin dan editor diarahkan ke CMS.</p>
+          <p className="text-sm text-[#C4A8AD]">Mitra masuk ke panel pengajuan. Admin dan editor diarahkan ke CMS.</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-slate-900 border-slate-700" required />
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE]" required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-slate-900 border-slate-700" required />
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE]" required />
             </div>
             {error && <p className="text-sm text-red-300">{error}</p>}
-            <Button type="submit" className="w-full bg-[#d32f2f] hover:bg-[#b71c1c]" disabled={loading}>
+            <Button type="submit" className="w-full bg-[#E31E2D] hover:bg-[#c41926]" disabled={loading}>
               <LogIn className="h-4 w-4" />
               {loading ? "Memproses..." : "Login"}
             </Button>
@@ -73,14 +73,14 @@ export default function LoginForm() {
 
           <div className="my-4 flex items-center gap-2">
             <div className="h-px flex-1 bg-white/20" />
-            <span className="text-xs font-medium whitespace-nowrap text-slate-400">
+            <span className="text-xs font-medium whitespace-nowrap text-[#C4A8AD]">
               atau masuk dengan
             </span>
             <div className="h-px flex-1 bg-white/20" />
           </div>
 
           <GoogleSignInButton
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-800/80 text-xs font-medium text-slate-100 transition hover:bg-slate-700"
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[rgba(255,214,218,0.14)] bg-[#261015] text-xs font-medium text-[#F8ECEE] transition hover:bg-[#3A161C]"
             label="Masuk dengan Google"
             onSuccess={(u, redirect) => {
               const target =

@@ -244,6 +244,8 @@ model TenantLead {
   siteVisitStatus  SiteVisitStatus @default(NONE)
   siteVisitScheduledAt DateTime?
   message          String?
+  rdsOfferNo       String?
+  baNegotiationNo  String?
   status           LeadStatus       @default(NEW)
   notes            String?
   followUpAt       DateTime?
@@ -299,8 +301,13 @@ enum SpaceStatus {
 enum LeadStatus {
   NEW
   CONTACTED
+  RDS_OFFER
   NEGOTIATING
+  SITE_CHECK
+  BA_SIGNED
+  DESIGN_REVIEW
   PKS
+  BILLING
   FIT_OUT_HANDOVER
   COMMERCIAL_OPERATION
   CLOSED_WON

@@ -129,7 +129,7 @@ function getPageMeta(pathname: string) {
   if (pathname.startsWith("/cms/leads")) {
     return {
       title: "Pengajuan & Site Visit",
-      subtitle: "Pipeline calon mitra dari inquiry hingga operasional komersial",
+      subtitle: "Alur calon mitra: penawaran, verifikasi lokasi, BA Negosiasi, lalu PKS",
     };
   }
   if (pathname.startsWith("/cms/commercial-profile")) {
@@ -177,14 +177,14 @@ export default function CmsShell({
   );
 
   return (
-    <div className="cms-shell flex h-screen bg-[#07111f] text-slate-100 overflow-hidden">
+    <div className="cms-shell flex h-screen overflow-hidden bg-[#1C0A0E] text-[#F8ECEE]">
       <aside
-        className={`relative z-20 flex h-full min-h-0 flex-none flex-col border-r border-white/10 bg-[#081426]/95 shadow-2xl shadow-black/30 transition-all duration-200 ${
+        className={`relative z-20 flex h-full min-h-0 flex-none flex-col border-r border-[rgba(255,214,218,0.14)] bg-[#261015] transition-all duration-200 ${
           collapsed ? "w-14" : "w-56"
         }`}
       >
         <div
-          className={`border-b border-white/10 flex items-center ${
+          className={`border-b border-[rgba(255,214,218,0.14)] flex items-center ${
             collapsed ? "justify-center p-3" : "gap-2.5 p-4"
           }`}
         >
@@ -194,7 +194,7 @@ export default function CmsShell({
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm font-black text-white leading-tight">Virtual Tour CMS</p>
-              <p className="text-xs text-slate-400">LRT Jabodebek</p>
+              <p className="text-xs text-[#C4A8AD]">LRT Jabodebek</p>
             </div>
           )}
         </div>
@@ -212,8 +212,8 @@ export default function CmsShell({
                   collapsed ? "justify-center w-10 h-10 mx-auto" : "gap-3 px-3 py-2"
                 } ${
                   active
-                    ? "bg-emerald-400/12 text-emerald-200 ring-1 ring-emerald-300/20"
-                    : "text-slate-300 hover:bg-white/8 hover:text-white"
+                    ? "bg-[#E31E2D] text-white"
+                    : "text-[#C4A8AD] hover:bg-white/8 hover:text-[#F8ECEE]"
                 }`}
               >
                 <Icon className="h-4 w-4 flex-none" />
@@ -223,14 +223,14 @@ export default function CmsShell({
           })}
         </nav>
 
-        <div className={`border-t border-white/10 p-2 ${collapsed ? "flex flex-col items-center gap-2" : "space-y-2"}`}>
+        <div className={`border-t border-[rgba(255,214,218,0.14)] p-2 ${collapsed ? "flex flex-col items-center gap-2" : "space-y-2"}`}>
           <div
             title={collapsed ? initialUser?.name ?? initialUser?.email ?? "User" : undefined}
-            className={`flex items-center rounded-xl border border-white/10 bg-white/[0.035] text-slate-300 ${
+            className={`flex items-center rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE] ${
               collapsed ? "h-10 w-10 justify-center" : "gap-3 p-2"
             }`}
           >
-            <UserCircle className="h-5 w-5 flex-none text-emerald-300" />
+            <UserCircle className="h-5 w-5 flex-none text-[#FF6B4A]" />
             {!collapsed && (
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-white">
@@ -254,14 +254,14 @@ export default function CmsShell({
       </aside>
 
       <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="relative z-20 border-b border-white/10 bg-[#081426]/95 shadow-lg shadow-black/10">
+        <header className="relative z-20 border-b border-[rgba(255,214,218,0.14)] bg-[#261015]">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
             <button
               type="button"
               onClick={toggleSidebar}
               title={collapsed ? "Perluas sidebar" : "Sembunyikan sidebar"}
               aria-label={collapsed ? "Perluas sidebar" : "Sembunyikan sidebar"}
-              className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 transition hover:border-emerald-300/30 hover:bg-emerald-400/10 hover:text-emerald-100"
+              className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE] transition hover:bg-[#E31E2D]"
             >
               {collapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
             </button>
@@ -275,7 +275,7 @@ export default function CmsShell({
         </header>
 
         <div className={`relative min-h-0 flex-1 ${fullWidth ? "overflow-hidden" : "overflow-auto"}`}>
-          <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,.13),transparent_32%),radial-gradient(circle_at_85%_8%,rgba(227,30,45,.11),transparent_30%)]" />
+          <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(227,30,45,.16),transparent_32%),radial-gradient(circle_at_85%_8%,rgba(27,58,107,.2),transparent_28%)]" />
 
           {fullWidth ? (
             <div className="relative z-10 flex h-full min-h-0 w-full flex-col overflow-hidden">{children}</div>

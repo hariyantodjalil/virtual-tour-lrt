@@ -61,7 +61,6 @@ async function mapStationToInfo(station: StationRow): Promise<StationInfo> {
       title: scene.title,
       panoramaUrl: scene.panoramaUrl,
       multiRes: extractMultiResFromCanvasData(scene.canvasData),
-      thumbnailUrl: scene.thumbnailUrl ?? undefined,
       levelId: scene.levelId,
       areaId: scene.areaId,
       levelSlug: scene.level,
