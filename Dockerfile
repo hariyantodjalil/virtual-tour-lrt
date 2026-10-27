@@ -43,6 +43,7 @@ COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/prisma ./prisma
 COPY --from=builder --chown=node:node /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder --chown=node:node /app/next.config.ts ./next.config.ts
+COPY --from=builder --chown=node:node /app/scripts/bin.mjs ./scripts/bin.mjs
 COPY --from=builder --chown=node:node /app/scripts/prisma-migrate-deploy.sh ./scripts/prisma-migrate-deploy.sh
 RUN chmod +x ./scripts/prisma-migrate-deploy.sh
 
