@@ -46,9 +46,34 @@ export async function GET(request: NextRequest) {
           area: true,
           floor: true,
           location: true,
-          monthlyRent: true,
+          leasingModel: true,
           panoramaUrl: true,
           station: { select: { name: true, slug: true } },
+        },
+      },
+      workflowVersion: {
+        select: {
+          id: true,
+          version: true,
+          title: true,
+          steps: {
+            orderBy: { stepOrder: "asc" },
+            select: {
+              id: true,
+              stepOrder: true,
+              title: true,
+              description: true,
+              publicMessage: true,
+              requiresMedia: true,
+            },
+          },
+        },
+      },
+      _count: {
+        select: {
+          mediaAttachments: {
+            where: { isVisibleToMitra: true },
+          },
         },
       },
     },
@@ -153,6 +178,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const activeWf = await prisma.pipelineWorkflowVersion.findFirst({
+    where: { status: "ACTIVE" },
+    orderBy: { version: "desc" },
+    include: {
+      steps: {
+        where: { stepOrder: 1 },
+        take: 1,
+        select: { id: true },
+      },
+    },
+  });
+
+  const year = new Date().getFullYear();
+  const countTotal = await prisma.tenantLead.count();
+  let seq = countTotal + 1;
+  let inquiryCode = `INQ-${year}-${String(seq).padStart(4, "0")}`;
+  while (await prisma.tenantLead.findUnique({ where: { inquiryCode }, select: { id: true } })) {
+    seq += 1;
+    inquiryCode = `INQ-${year}-${String(seq).padStart(4, "0")}`;
+  }
+
+  const firstStepId = activeWf?.steps[0]?.id ?? null;
+
   const lead = await prisma.tenantLead.create({
     data: {
       userId: user.id,
@@ -164,8 +212,19 @@ export async function POST(request: NextRequest) {
       businessType: parsed.data.businessType,
       spaceRequirement: trainRequirement ?? null,
       message: parsed.data.message || null,
-      surveyPreference: parsed.data.surveyPreference || null,
-      siteVisitStatus: parsed.data.surveyPreference ? "REQUESTED" : "NONE",
+      inquiryCode,
+      status: "ACTIVE",
+      workflowVersionId: activeWf?.id ?? null,
+      currentStepOrder: 1,
+      stepLogs: {
+        create: {
+          stepOrder: 1,
+          pipelineStepId: firstStepId,
+          action: "SUBMITTED",
+          notes: "Pengajuan minat sewa dikirim oleh mitra.",
+          performedBy: contactName,
+        },
+      },
     },
   });
 

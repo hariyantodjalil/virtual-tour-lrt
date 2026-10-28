@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { requireRole } from "@/lib/auth";
+import { requireRole, signToken } from "@/lib/auth";
+import { cmsTokenCookieOptions } from "@/lib/auth-cookie";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/rate-limit";
 import { ACTIVE_LEAD_STATUSES } from "@/lib/commercial-pipeline";
@@ -146,6 +147,29 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const activeWf = await prisma.pipelineWorkflowVersion.findFirst({
+      where: { status: "ACTIVE" },
+      orderBy: { version: "desc" },
+      include: {
+        steps: {
+          where: { stepOrder: 1 },
+          take: 1,
+          select: { id: true },
+        },
+      },
+    });
+
+    const year = new Date().getFullYear();
+    const countTotal = await prisma.tenantLead.count();
+    let seq = countTotal + 1;
+    let inquiryCode = `INQ-${year}-${String(seq).padStart(4, "0")}`;
+    while (await prisma.tenantLead.findUnique({ where: { inquiryCode }, select: { id: true } })) {
+      seq += 1;
+      inquiryCode = `INQ-${year}-${String(seq).padStart(4, "0")}`;
+    }
+
+    const firstStepId = activeWf?.steps[0]?.id ?? null;
+
     const lead = await prisma.tenantLead.create({
       data: {
         ...(commercialSpaceId ? { spaceId: commercialSpaceId } : {}),
@@ -155,10 +179,21 @@ export async function POST(req: NextRequest) {
         email,
         businessType: data.businessType,
         spaceRequirement: trainRequirement ?? data.spaceRequirement,
-        surveyPreference: data.surveyPreference,
         message: data.message,
         userId: user.id,
-        siteVisitStatus: data.surveyPreference ? "REQUESTED" : "NONE",
+        inquiryCode,
+        status: "ACTIVE",
+        workflowVersionId: activeWf?.id ?? null,
+        currentStepOrder: 1,
+        stepLogs: {
+          create: {
+            stepOrder: 1,
+            pipelineStepId: firstStepId,
+            action: "SUBMITTED",
+            notes: "Pengajuan minat sewa dikirim oleh calon mitra.",
+            performedBy: data.contactName,
+          },
+        },
       },
     });
 
@@ -173,7 +208,21 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json(lead, { status: 201, headers: rateLimitHeaders(rateLimit) });
+    const response = NextResponse.json(lead, {
+      status: 201,
+      headers: rateLimitHeaders(rateLimit),
+    });
+
+    if (user.role === "MITRA") {
+      const token = signToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      });
+      response.cookies.set("cms-token", token, cmsTokenCookieOptions(60 * 60 * 8));
+    }
+
+    return response;
   } catch (error) {
     console.error("[api/leads POST]", error);
     return NextResponse.json({ error: "Gagal menyimpan lead" }, { status: 500 });

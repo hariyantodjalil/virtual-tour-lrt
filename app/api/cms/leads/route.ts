@@ -72,22 +72,7 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  const nextSiteVisitStatus =
-    siteVisitStatus ??
-    (siteVisitScheduledAt ? "SCHEDULED" : undefined);
-  const scheduledAt =
-    siteVisitScheduledAt === undefined
-      ? existing.siteVisitScheduledAt
-      : siteVisitScheduledAt
-        ? new Date(siteVisitScheduledAt)
-        : null;
-
-  if (nextSiteVisitStatus === "SCHEDULED" && !scheduledAt) {
-    return NextResponse.json(
-      { error: "Tanggal dan waktu site visit wajib diisi ketika status dijadwalkan." },
-      { status: 400 }
-    );
-  }
+  // Site visit dihandle melalui pipeline steps di probis 1
 
   try {
     const lead = await prisma.$transaction(async (tx) => {
@@ -237,10 +222,6 @@ export async function PATCH(request: NextRequest) {
           ...(notes !== undefined && { notes }),
           ...(followUpAt !== undefined && {
             followUpAt: followUpAt ? new Date(followUpAt) : null,
-          }),
-          ...(nextSiteVisitStatus && { siteVisitStatus: nextSiteVisitStatus }),
-          ...(siteVisitScheduledAt !== undefined && {
-            siteVisitScheduledAt: scheduledAt,
           }),
         },
         include: { space: { include: { station: true } } },

@@ -6,9 +6,10 @@ import {
   ArrowLeft, Building2, CheckCircle2, ChevronDown, ChevronRight,
   Grid3X3, Info, MapPin, Play, Route, Users, X,
 } from "lucide-react";
-import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
+import SpaceInquiryModal from "@/components/tour/SpaceInquiryModal";
 import VirtualTourViewer from "@/components/tour/VirtualTourViewer";
 import { formatNumber, formatRupiah } from "@/lib/utils";
+import { findSpaceByCode } from "@/lib/space-availability";
 import type { StationInfo } from "@/lib/stations-data";
 
 type Space = {
@@ -25,8 +26,11 @@ type Space = {
   nearestExit: string | null;
   exposure: number;
   powerSupply: string | null;
-  waterAccess: boolean;
-  airConditioning: boolean;
+  waterAccess: string | boolean | null;
+  airConditioning: string | boolean | null;
+  leasableAreaDetail?: string | null;
+  leasingModel?: string | null;
+  fitOutTerms?: string | null;
   description: string | null;
 };
 
@@ -79,7 +83,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
   };
 
   const openSpaceFromHotspot = (spaceCode: string) => {
-    const space = spaces.find((s) => s.code === spaceCode);
+    const space = findSpaceByCode(spaces, spaceCode);
     if (space) {
       setOpenedFromUnitsList(false);
       setSelectedSpace(space);
@@ -358,7 +362,7 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
 
       {/* ΓöÇΓöÇ SPACE DETAIL POPUP ΓöÇΓöÇ */}
       {selectedSpace && (
-        <InTourSpacePopup
+        <SpaceInquiryModal
           key={selectedSpace.id}
           space={selectedSpace}
           stationName={stationInfo.name}

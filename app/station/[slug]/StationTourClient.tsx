@@ -27,7 +27,7 @@ import {
   TrainFront,
   X,
 } from "lucide-react";
-import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
+import SpaceInquiryModal from "@/components/tour/SpaceInquiryModal";
 import InTourAdPopup from "@/components/tour/InTourAdPopup";
 import InTourInfoPopup from "@/components/tour/InTourInfoPopup";
 import StationPickerModal, {
@@ -49,7 +49,7 @@ import {
 import { findSpaceHotspotPlacement } from "@/lib/space-hotspot-locate";
 import { findFacilityHotspotPlacement } from "@/lib/facility-hotspot-locate";
 import type { FacilityIconId } from "@/lib/facility-icons";
-import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
+import { findSpaceByCode, type SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 
 type Space = {
@@ -67,8 +67,11 @@ type Space = {
   nearbyFacilities?: string[];
   exposure: number;
   powerSupply: string | null;
-  waterAccess: boolean;
-  airConditioning: boolean;
+  waterAccess: string | boolean | null;
+  airConditioning: string | boolean | null;
+  leasableAreaDetail?: string | null;
+  leasingModel?: string | null;
+  fitOutTerms?: string | null;
   description: string | null;
   panoramaUrl?: string | null;
   tenantBrand?: string | null;
@@ -934,7 +937,7 @@ export default function StationTourClient({
       )}
 
       {selectedSpace && (
-        <InTourSpacePopup
+        <SpaceInquiryModal
           key={selectedSpace.id}
           space={selectedSpace}
           stationName={stationInfo.name}

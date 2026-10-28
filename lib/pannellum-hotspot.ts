@@ -12,7 +12,7 @@ export const LRT_MAROON = "#E31E2D";
 export function hotspotIconSvg(type: HotspotType): string {
   if (type === "scene") return "";
   if (type === "space") {
-    return '<svg width="22" height="22" viewBox="0 0 24 24" fill="white" aria-hidden="true"><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="8" fill="none" stroke="white" stroke-width="2.8"/></svg>';
+    return '<svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true"><image href="/brand/tour-pins/tenant-i.png" xlink:href="/brand/tour-pins/tenant-i.png" x="1" y="1" width="24" height="24" preserveAspectRatio="xMidYMid meet"/></svg>';
   }
   if (type === "ad") {
     return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15V9l4 3 4-3v6"/></svg>';

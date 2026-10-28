@@ -27,6 +27,16 @@ export function spaceStatusColor(status?: SpaceAvailabilityStatus | null): strin
   return "#94a3b8";
 }
 
+/** Cari objek unit berdasarkan kode (case-insensitive & trim whitespace). */
+export function findSpaceByCode<T extends { code: string }>(
+  spaces: T[],
+  code: string | undefined | null
+): T | undefined {
+  if (!code) return undefined;
+  const cleanCode = code.trim().toLowerCase();
+  return spaces.find((s) => s.code.trim().toLowerCase() === cleanCode);
+}
+
 /** Lookup status unit by kode (case-insensitive). */
 export function findSpaceStatus<T extends { code: string; status: SpaceAvailabilityStatus }>(
   spaces: T[],
@@ -34,5 +44,5 @@ export function findSpaceStatus<T extends { code: string; status: SpaceAvailabil
 ): SpaceAvailabilityStatus | undefined {
   if (!code) return undefined;
   const lower = code.toLowerCase();
-  return spaces.find((s) => s.code.toLowerCase() === lower)?.status;
+  return findSpaceByCode(spaces, code)?.status;
 }

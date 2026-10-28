@@ -29,8 +29,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ authenticated: false });
   }
 
+  let companyName: string | null = null;
+  let phone: string | null = null;
+
+  if (user.role === "MITRA") {
+    const latestLead = await prisma.tenantLead.findFirst({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      select: { companyName: true, phone: true },
+    });
+    companyName = latestLead?.companyName ?? null;
+    phone = latestLead?.phone ?? null;
+  }
+
   return NextResponse.json({
     authenticated: true,
-    user: { ...user, avatarUrl: null as string | null },
+    user: {
+      ...user,
+      avatarUrl: null as string | null,
+      companyName,
+      phone,
+    },
   });
 }

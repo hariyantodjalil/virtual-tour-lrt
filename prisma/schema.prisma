@@ -166,7 +166,9 @@ model CommercialSpace {
   name            String
   type            SpaceType    @default(KIOS)
   status          SpaceStatus  @default(TERSEDIA)
-  area            Float
+  area               Float
+  leasableAreaDetail String?
+  leasingModel       String?         @default("Space-Only Leasing")
   monthlyRent     Float
   deposit         Float        @default(0)
   floor           String       @default("G")
@@ -174,9 +176,10 @@ model CommercialSpace {
   nearestExit     String?
   nearbyFacilities String[]      @default([])
   exposure        Int          @default(0)
-  powerSupply     String?
-  waterAccess     Boolean      @default(false)
-  airConditioning Boolean      @default(false)
+  powerSupply        String?         @default("Tenant-Provided")
+  waterAccess        String?         @default("Subject to Technical Review")
+  airConditioning    String?         @default("Subject to Technical Review")
+  fitOutTerms        String?         @default("By Tenant • Approval Required")
   description     String?
   panoramaUrl     String?
   tenantLeads     TenantLead[]
@@ -229,32 +232,101 @@ model SpaceOccupancy {
 }
 
 model TenantLead {
-  id               String           @id @default(cuid())
-  userId           String?
-  user             User?            @relation(fields: [userId], references: [id])
-  spaceId          String?
-  space            CommercialSpace? @relation(fields: [spaceId], references: [id])
-  companyName      String
-  contactName      String
-  phone            String
-  email            String
-  businessType     String
-  spaceRequirement String?
-  surveyPreference String?
-  siteVisitStatus  SiteVisitStatus @default(NONE)
-  siteVisitScheduledAt DateTime?
-  message          String?
-  status           LeadStatus       @default(NEW)
-  notes            String?
-  followUpAt       DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  id                String                   @id @default(cuid())
+  inquiryCode       String?                  @unique
+  userId            String?
+  user              User?                    @relation(fields: [userId], references: [id])
+  spaceId           String?
+  space             CommercialSpace?         @relation(fields: [spaceId], references: [id])
+  companyName       String
+  contactName       String
+  phone             String
+  email             String
+  businessType      String
+  spaceRequirement  String?
+  message           String?                  @db.Text
+  status            String                   @default("ACTIVE") // "ACTIVE" | "COMPLETED" | "REJECTED"
+  workflowVersionId String?
+  workflowVersion   PipelineWorkflowVersion? @relation(fields: [workflowVersionId], references: [id])
+  currentStepOrder  Int                      @default(1)
+  rejectionReason   String?                  @db.Text
+  notes             String?                  @db.Text
+  followUpAt        DateTime?
+  mediaAttachments  InquiryMedia[]
+  stepLogs          InquiryStepLog[]
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
 
   @@index([userId])
   @@index([userId, createdAt])
   @@index([status])
   @@index([createdAt])
   @@map("tenant_leads")
+}
+
+model PipelineWorkflowVersion {
+  id          String         @id @default(cuid())
+  version     Int            @unique
+  title       String
+  description String?
+  status      String         @default("DRAFT") // "DRAFT" | "ACTIVE" | "ARCHIVED"
+  publishedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  steps       PipelineStep[]
+  leads       TenantLead[]
+
+  @@index([status])
+  @@map("pipeline_workflow_versions")
+}
+
+model PipelineStep {
+  id                String                  @id @default(cuid())
+  workflowVersionId String
+  workflowVersion   PipelineWorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  stepOrder         Int
+  title             String
+  description       String?
+  publicMessage     String                  @db.Text
+  requiresMedia     Boolean                 @default(false)
+
+  stepLogs          InquiryStepLog[]
+
+  @@unique([workflowVersionId, stepOrder])
+  @@map("pipeline_steps")
+}
+
+model InquiryMedia {
+  id               String     @id @default(cuid())
+  tenantLeadId     String
+  tenantLead       TenantLead @relation(fields: [tenantLeadId], references: [id], onDelete: Cascade)
+  stepOrder        Int
+  mediaTitle       String
+  documentNumber   String?
+  mediaLink        String
+  isVisibleToMitra Boolean    @default(true)
+  uploadedByAdmin  String
+  createdAt        DateTime   @default(now())
+
+  @@index([tenantLeadId, stepOrder])
+  @@map("inquiry_media")
+}
+
+model InquiryStepLog {
+  id             String        @id @default(cuid())
+  tenantLeadId   String
+  tenantLead     TenantLead    @relation(fields: [tenantLeadId], references: [id], onDelete: Cascade)
+  pipelineStepId String?
+  pipelineStep   PipelineStep? @relation(fields: [pipelineStepId], references: [id])
+  stepOrder      Int
+  action         String        // "SUBMITTED" | "ADVANCED" | "REJECTED" | "COMPLETED"
+  notes          String?       @db.Text
+  performedBy    String
+  createdAt      DateTime      @default(now())
+
+  @@index([tenantLeadId, createdAt])
+  @@map("inquiry_step_logs")
 }
 
 model VisitEvent {
@@ -296,24 +368,6 @@ enum SpaceStatus {
   FIT_OUT
 }
 
-enum LeadStatus {
-  NEW
-  CONTACTED
-  NEGOTIATING
-  PKS
-  FIT_OUT_HANDOVER
-  COMMERCIAL_OPERATION
-  CLOSED_WON
-  CLOSED_LOST
-}
-
-enum SiteVisitStatus {
-  NONE
-  REQUESTED
-  SCHEDULED
-  COMPLETED
-  CANCELLED
-}
 
 enum EventType {
   STATION_VIEW

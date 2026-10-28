@@ -123,7 +123,8 @@ async function getCommercialListings() {
             : null,
       })),
     };
-  } catch {
+  } catch (error) {
+    console.error("[getCommercialListings] Failed to load commercial spaces:", error);
     return { totalSpaces: 0, totalStations: 18, stations: [], spaces: [] };
   }
 }

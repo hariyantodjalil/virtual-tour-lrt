@@ -14,8 +14,11 @@ export type LandingSpace = {
   nearestExit: string | null;
   exposure: number;
   powerSupply: string | null;
-  waterAccess: boolean;
-  airConditioning: boolean;
+  waterAccess: string | boolean | null;
+  airConditioning: string | boolean | null;
+  leasableAreaDetail?: string | null;
+  leasingModel?: string | null;
+  fitOutTerms?: string | null;
   description: string | null;
 };
 
@@ -91,8 +94,11 @@ function makeSpaces(station: StationSeed): LandingSpace[] {
     nearestExit: `Exit ${String.fromCharCode(65 + (index % 4))}`,
     exposure: Math.round(station.dailyPassengers * (0.34 + index * 0.055)),
     powerSupply: "220V/10A",
-    waterAccess: template.type === "RUKO" || template.type === "KIOS",
-    airConditioning: true,
+    waterAccess: template.type === "RUKO" || template.type === "KIOS" ? "Clean Water Pipe Ready" : "Subject to Technical Review",
+    airConditioning: "Station Central AC",
+    leasableAreaDetail: `${template.area} m²`,
+    leasingModel: "Space-Only Leasing",
+    fitOutTerms: "By Tenant • Approval Required",
     description: `Unit komersial ${template.name.toLowerCase()} di Stasiun ${station.name}.`,
   }));
 }

@@ -9,12 +9,13 @@ import type { PanoramaScene, TourLevelPublic } from "@/lib/tour-types";
 import { setupHotspotElement, resolveSceneHotspotTitle } from "@/lib/pannellum-hotspot";
 import {
   findSpaceStatus,
+  findSpaceByCode,
   type SpaceAvailabilityStatus,
 } from "@/lib/space-availability";
 import { PANNELLUM_HFOV, PANNELLUM_INTERACTION, PANNELLUM_PITCH_LIMITS } from "@/lib/pannellum-viewer-defaults";
 import { formatNumber } from "@/lib/utils";
 import { TourNavigationBar } from "@/components/tour/TourNavigationBar";
-import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
+import SpaceInquiryModal from "@/components/tour/SpaceInquiryModal";
 import InTourInfoPopup from "@/components/tour/InTourInfoPopup";
 
 type CommercialSpace = {
@@ -31,8 +32,11 @@ type CommercialSpace = {
   nearestExit: string | null;
   exposure: number;
   powerSupply: string | null;
-  waterAccess: boolean;
-  airConditioning: boolean;
+  waterAccess: string | boolean | null;
+  airConditioning: string | boolean | null;
+  leasableAreaDetail?: string | null;
+  leasingModel?: string | null;
+  fitOutTerms?: string | null;
   description: string | null;
   panoramaUrl?: string | null;
   tenantBrand?: string | null;
@@ -183,7 +187,7 @@ export function PannellumPreview({
           } else if (h.type === "space" && h.spaceCode) {
             const code = h.spaceCode;
             onClick = () => {
-              const space = spacesRef.current.find((s) => s.code === code);
+              const space = findSpaceByCode(spacesRef.current, code);
               if (space) setSelectedSpace(space);
             };
           } else if (h.type === "ad") {
@@ -430,7 +434,7 @@ export function PannellumPreview({
       </div>
 
       {selectedSpace && (
-        <InTourSpacePopup
+        <SpaceInquiryModal
           space={selectedSpace}
           stationName={stationName}
           onClose={() => setSelectedSpace(null)}

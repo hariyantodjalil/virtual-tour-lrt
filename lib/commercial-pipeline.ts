@@ -1,21 +1,18 @@
-export const LEAD_PIPELINE_STATUSES = [
-  "NEW",
-  "CONTACTED",
-  "NEGOTIATING",
-  "PKS",
-  "FIT_OUT_HANDOVER",
-  "COMMERCIAL_OPERATION",
-  "CLOSED_LOST",
+export const INQUIRY_LIFECYCLE_STATUSES = [
+  "ACTIVE",
+  "COMPLETED",
+  "REJECTED",
 ] as const;
 
-export const LEAD_STATUS_VALUES = [
-  ...LEAD_PIPELINE_STATUSES,
-  "CLOSED_WON",
-] as const;
+export const LEAD_PIPELINE_STATUSES = INQUIRY_LIFECYCLE_STATUSES;
+export const LEAD_STATUS_VALUES = INQUIRY_LIFECYCLE_STATUSES;
 
-export type CommercialLeadStatus = (typeof LEAD_STATUS_VALUES)[number];
+export type CommercialLeadStatus = (typeof INQUIRY_LIFECYCLE_STATUSES)[number];
 
-export const LEAD_STATUS_LABELS: Record<CommercialLeadStatus, string> = {
+export const LEAD_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Sedang Diproses",
+  COMPLETED: "Selesai / Beroperasi",
+  REJECTED: "Ditolak",
   NEW: "Inquiry Baru",
   CONTACTED: "Sudah Dihubungi",
   NEGOTIATING: "Negosiasi",
@@ -26,13 +23,7 @@ export const LEAD_STATUS_LABELS: Record<CommercialLeadStatus, string> = {
   CLOSED_LOST: "Drop-off",
 };
 
-export const ACTIVE_LEAD_STATUSES: CommercialLeadStatus[] = [
-  "NEW",
-  "CONTACTED",
-  "NEGOTIATING",
-  "PKS",
-  "FIT_OUT_HANDOVER",
-];
+export const ACTIVE_LEAD_STATUSES: string[] = ["ACTIVE"];
 
 export const SITE_VISIT_STATUS_VALUES = [
   "NONE",
@@ -71,5 +62,5 @@ export const SPACE_STATUS_LABELS: Record<CommercialSpaceStatus, string> = {
 };
 
 export function isCommercialOperation(status: string) {
-  return status === "COMMERCIAL_OPERATION" || status === "CLOSED_WON";
+  return status === "COMPLETED" || status === "COMMERCIAL_OPERATION" || status === "CLOSED_WON";
 }

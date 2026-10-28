@@ -16,6 +16,13 @@ export const metadata: Metadata = {
   description:
     "Eksplorasi ruang komersial 18 stasiun LRT Jabodebek secara virtual 360°. Lihat ketersediaan real-time, spesifikasi lengkap, dan ajukan minat sewa online.",
   keywords: "LRT Jabodebek, virtual tour, ruang komersial, sewa kios stasiun",
+  icons: {
+    icon: [
+      { url: "/icon.png", type: "image/png" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -24,8 +31,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={`${poppins.variable} h-full scroll-smooth antialiased`}>
-      <body className="flex min-h-full flex-col font-body">
+    <html
+      lang="id"
+      className={`${poppins.variable} h-full scroll-smooth antialiased`}
+      suppressHydrationWarning
+    >
+      <body className="flex min-h-full flex-col font-body" suppressHydrationWarning>
         <CommercialProfileProvider>
           {children}
           <PublicContactFab />

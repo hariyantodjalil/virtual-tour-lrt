@@ -183,8 +183,11 @@ async function main() {
           nearestExit: `Exit ${String.fromCharCode(65 + (i % 4))}`,
           exposure: Math.round(stationData.dailyPassengers * (0.34 + i * 0.055)),
           powerSupply: "220V/10A",
-          waterAccess: tmpl.type === "RUKO" || tmpl.type === "KIOS",
-          airConditioning: true,
+          waterAccess: tmpl.type === "RUKO" || tmpl.type === "KIOS" ? "Clean Water Pipe Ready" : "Subject to Technical Review",
+          airConditioning: "Station Central AC",
+          fitOutTerms: "By Tenant • Approval Required",
+          leasableAreaDetail: `${tmpl.area} m²`,
+          leasingModel: "Space-Only Leasing",
           description: `Unit komersial ${tmpl.name.toLowerCase()} di ${i % 2 === 0 ? "area concourse utama" : "gate area"} Stasiun ${stationData.name}, cocok untuk tenant yang membutuhkan eksposur penumpang tinggi.`,
         },
       });

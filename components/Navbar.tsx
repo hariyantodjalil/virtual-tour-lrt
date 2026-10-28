@@ -19,7 +19,8 @@ const navItems = [
   { href: "#area-komersial", label: "Area Komersial" },
 ] as const;
 
-export default function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
+export default function Navbar({ variant = "light", onToggleTheme }: { variant?: "light" | "dark"; onToggleTheme?: () => void }) {
+  void onToggleTheme;
   const [user, setUser] = useState<AuthUser | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const [authView, setAuthView] = useState<"login" | "register" | null>(null);

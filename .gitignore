@@ -52,3 +52,17 @@ Thumbs.db
 *.pem
 
 .cursor/*
+
+
+# Local development and database containers
+docker-compose*.yml
+docker-compose*.yaml
+
+# Local development scripts
+*.ps1
+
+# Local verification & testing scripts
+prisma/verify-*.ts
+
+# Local test & preview pin assets
+public/brand/tour-pins/preview-*.png

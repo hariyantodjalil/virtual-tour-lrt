@@ -36,8 +36,11 @@ type Space = {
   nearbyFacilities: FacilityIconId[];
   exposure: number;
   powerSupply: string | null;
-  waterAccess: boolean;
-  airConditioning: boolean;
+  waterAccess: string | boolean | null;
+  airConditioning: string | boolean | null;
+  leasableAreaDetail?: string | null;
+  leasingModel?: string | null;
+  fitOutTerms?: string | null;
   description: string | null;
   panoramaUrl: string | null;
   tenantId: string | null;
@@ -476,11 +479,11 @@ export default function CmsSpacesStationPage() {
                 </Field>
                 <div className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 md:col-span-2 md:grid-cols-3">
                   <label className="flex items-center gap-3 text-sm text-slate-200">
-                    <input type="checkbox" checked={editing.waterAccess} onChange={(e) => setEditing({ ...editing, waterAccess: e.target.checked })} />
+                    <input type="checkbox" checked={editing.waterAccess === true || editing.waterAccess === "true" || editing.waterAccess === "Clean Water Pipe Ready"} onChange={(e) => setEditing({ ...editing, waterAccess: e.target.checked ? "Clean Water Pipe Ready" : "Subject to Technical Review" })} />
                     Air bersih tersedia
                   </label>
                   <label className="flex items-center gap-3 text-sm text-slate-200">
-                    <input type="checkbox" checked={editing.airConditioning} onChange={(e) => setEditing({ ...editing, airConditioning: e.target.checked })} />
+                    <input type="checkbox" checked={editing.airConditioning === true || editing.airConditioning === "true" || editing.airConditioning === "Station Central AC"} onChange={(e) => setEditing({ ...editing, airConditioning: e.target.checked ? "Station Central AC" : "Subject to Technical Review" })} />
                     AC tersedia
                   </label>
                   <Label className="flex cursor-pointer items-center gap-3 text-sm text-slate-200">

@@ -214,7 +214,7 @@ export default function VirtualTourViewer({
       divingRef.current = true;
       externalNavRef.current = false;
 
-      const transitionOpts = { ensureReady: () => ensureSceneReady(targetSceneId) };
+      const transitionOpts = { ensureReady: () => ensureSceneReady(targetSceneId).then(() => {}) };
 
       try {
         await diveIntoScene(
@@ -370,7 +370,7 @@ export default function VirtualTourViewer({
         divingRef.current = true;
 
         softCrossfadeScene(viewer, activeSceneId, overlayController, {
-          ensureReady: () => ensureSceneReady(activeSceneId),
+          ensureReady: () => ensureSceneReady(activeSceneId).then(() => {}),
         })
           .catch(() => {
             try { viewer.loadScene(activeSceneId); } catch { /* ignore */ }

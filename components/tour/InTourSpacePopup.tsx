@@ -53,8 +53,11 @@ type CommercialSpace = {
   nearbyFacilities?: string[];
   exposure: number;
   powerSupply: string | null;
-  waterAccess: boolean;
-  airConditioning: boolean;
+  waterAccess: string | boolean | null;
+  airConditioning: string | boolean | null;
+  leasableAreaDetail?: string | null;
+  leasingModel?: string | null;
+  fitOutTerms?: string | null;
   description: string | null;
   panoramaUrl?: string | null;
   tenantBrand?: string | null;

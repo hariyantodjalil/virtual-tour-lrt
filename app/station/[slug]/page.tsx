@@ -40,7 +40,8 @@ async function getStationData(slug: string) {
         },
       },
     });
-  } catch {
+  } catch (error) {
+    console.error(`[getStationData] Failed to load station data for slug '${slug}':`, error);
     return null;
   }
 }
@@ -93,6 +94,9 @@ export default async function StationPage({ params }: Props) {
             exposure: s.exposure,
             powerSupply: s.powerSupply,
             waterAccess: s.waterAccess,
+            leasableAreaDetail: s.leasableAreaDetail,
+            leasingModel: s.leasingModel,
+            fitOutTerms: s.fitOutTerms,
             airConditioning: s.airConditioning,
             description: s.description,
             panoramaUrl: s.panoramaUrl,

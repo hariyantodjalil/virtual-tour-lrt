@@ -71,8 +71,11 @@ export const spaceMutationSchema = z.object({
     .default([]),
   exposure: z.number().int().min(0).max(1_000_000),
   powerSupply: optionalText(160),
-  waterAccess: z.boolean(),
-  airConditioning: z.boolean(),
+  waterAccess: z.union([z.string().trim().max(160), z.boolean()]).nullable().optional().transform((val) => typeof val === "boolean" ? (val ? "Clean Water Pipe Ready" : "Subject to Technical Review") : (val ?? "Subject to Technical Review")),
+  airConditioning: z.union([z.string().trim().max(160), z.boolean()]).nullable().optional().transform((val) => typeof val === "boolean" ? (val ? "Station Central AC" : "Subject to Technical Review") : (val ?? "Subject to Technical Review")),
+  leasableAreaDetail: optionalText(160),
+  leasingModel: optionalText(160),
+  fitOutTerms: optionalText(300),
   description: optionalText(5_000),
   panoramaUrl: nullableUrl,
   tenantId: id.nullable().optional(),
@@ -144,6 +147,9 @@ export const occupancySchema = z.object({
 export const leadUpdateSchema = z.object({
   id,
   status: z.enum([
+    "ACTIVE",
+    "COMPLETED",
+    "REJECTED",
     "NEW",
     "CONTACTED",
     "NEGOTIATING",
@@ -153,6 +159,8 @@ export const leadUpdateSchema = z.object({
     "CLOSED_WON",
     "CLOSED_LOST",
   ]).optional(),
+  currentStepOrder: safeInteger.optional(),
+  rejectionReason: optionalText(2_000),
   siteVisitStatus: z.enum([
     "NONE",
     "REQUESTED",
