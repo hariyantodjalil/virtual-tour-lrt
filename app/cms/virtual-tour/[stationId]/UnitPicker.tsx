@@ -81,11 +81,12 @@ export function UnitPicker({
   const selectedTenant =
     selected?.status === "TERISI" ? selected.tenantBrand?.trim() : "";
 
-  return (
+  const picker = (
     <div className="space-y-2">
       <div className="relative">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#C4A8AD]" />
         <Input
+          aria-label="Cari unit"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
@@ -94,6 +95,7 @@ export function UnitPicker({
       </div>
       <div className="flex gap-1.5">
         <select
+          aria-label="Filter tipe unit"
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
           className="h-7 flex-1 rounded-md border border-[rgba(255,214,218,0.18)] bg-[#3A161C] px-1.5 text-[10px] text-[#F0DDE1]"
@@ -106,6 +108,7 @@ export function UnitPicker({
           ))}
         </select>
         <select
+          aria-label="Filter status unit"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
           className="h-7 flex-1 rounded-md border border-[rgba(255,214,218,0.18)] bg-[#3A161C] px-1.5 text-[10px] text-[#F0DDE1]"
@@ -119,24 +122,6 @@ export function UnitPicker({
         </select>
       </div>
 
-      {selected && (
-        <div className="rounded-lg border border-emerald-700/40 bg-emerald-950/30 px-2.5 py-2 text-xs">
-          {selectedTenant ? (
-            <>
-              <p className="truncate font-semibold text-emerald-300">{selectedTenant}</p>
-              <p className="truncate text-[10px] text-[#C4A8AD]">
-                Tenant aktif · <span className="font-mono">{selected.code}</span> · {selected.name}
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="font-mono font-semibold text-emerald-300">{selected.code}</p>
-              <p className="truncate text-[#F0DDE1]">{selected.name}</p>
-            </>
-          )}
-        </div>
-      )}
-
       <div className="max-h-44 overflow-y-auto rounded-lg border border-[rgba(255,214,218,0.18)] divide-y divide-[rgba(255,214,218,0.12)]">
         {filtered.length === 0 ? (
           <p className="px-2.5 py-3 text-center text-[11px] text-[#C4A8AD]">Tidak ada unit</p>
@@ -149,7 +134,14 @@ export function UnitPicker({
               <button
                 key={s.id}
                 type="button"
-                onClick={() => onChange(s.code, s)}
+                onClick={(event) => {
+                  onChange(s.code, s);
+                  const disclosure = event.currentTarget.closest("details");
+                  if (disclosure) {
+                    disclosure.open = false;
+                    disclosure.querySelector("summary")?.focus();
+                  }
+                }}
                 className={`flex w-full items-start gap-2 px-2.5 py-2 text-left transition-colors ${
                   active ? "bg-emerald-950/50" : "hover:bg-[#3A161C]/80"
                 }`}
@@ -186,5 +178,20 @@ export function UnitPicker({
         )}
       </div>
     </div>
+  );
+
+  if (!selected) return picker;
+  return (
+    <details className="group space-y-2" data-unit-picker>
+      <summary aria-label={`Ganti unit ${selected.code}`} className="flex cursor-pointer list-none items-center gap-2 rounded-md border border-[rgba(255,214,218,0.18)] bg-[#3A161C] px-2.5 py-2 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: spaceStatusColor(selected.status) }} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium text-[#F8ECEE]">{selectedTenant || selected.code}</span>
+          <span className="block truncate text-[#C4A8AD]">{selectedTenant ? `${selected.code} · ` : ""}{selected.name} · {STATUS_LABELS[selected.status]}</span>
+        </span>
+        <span className="shrink-0 text-[#C4A8AD]">Ganti unit</span>
+      </summary>
+      {picker}
+    </details>
   );
 }

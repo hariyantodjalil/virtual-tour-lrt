@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from "react";
 import {
+  AlertTriangle,
   Building2,
   CalendarClock,
   ChevronDown,
   ChevronUp,
   MapPin,
   RotateCcw,
+  RefreshCw,
   Save,
   Search,
   SlidersHorizontal,
@@ -87,8 +89,16 @@ function siteVisitLabel(status: string) {
   );
 }
 
-export default function LeadsClient({ initialLeads }: { initialLeads: LeadItem[] }) {
+export default function LeadsClient({
+  initialLeads,
+  initialLoadError,
+}: {
+  initialLeads: LeadItem[];
+  initialLoadError: string | null;
+}) {
   const [leads, setLeads] = useState(() => asLeadList(initialLeads));
+  const [loadError, setLoadError] = useState(initialLoadError);
+  const [isLoading, setIsLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -133,10 +143,25 @@ export default function LeadsClient({ initialLeads }: { initialLeads: LeadItem[]
     filteredLeads.every((lead) => expandedIds.has(lead.id));
 
   async function load() {
-    const res = await cmsFetch("/api/cms/leads");
-    if (!res.ok) return;
-    const data = await res.json().catch(() => null);
-    setLeads(asLeadList(data));
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const res = await cmsFetch("/api/cms/leads");
+      if (!res.ok) {
+        setLoadError("Data pengajuan gagal dimuat. Data yang tampil mungkin belum terbaru.");
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (!Array.isArray(data)) {
+        setLoadError("Respons data pengajuan tidak valid.");
+        return;
+      }
+      setLeads(asLeadList(data));
+    } catch {
+      setLoadError("Tidak dapat terhubung ke layanan pengajuan.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   function updateLocal(id: string, patch: Partial<LeadItem>) {
@@ -257,6 +282,32 @@ export default function LeadsClient({ initialLeads }: { initialLeads: LeadItem[]
         </p>
       </div>
 
+      {loadError && (
+        <div
+          role="alert"
+          className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-amber-50 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+            <div>
+              <p className="font-semibold">Pengajuan tidak dapat dimuat</p>
+              <p className="mt-0.5 text-sm text-amber-100/80">{loadError}</p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={load}
+            disabled={isLoading}
+            className="shrink-0 border-amber-200/30 bg-transparent text-amber-50 hover:bg-amber-100/10"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            {isLoading ? "Memuat..." : "Coba lagi"}
+          </Button>
+        </div>
+      )}
+
       <div className="mb-5 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#261015] p-3">
         <div className="flex flex-col gap-2 lg:flex-row">
           <label className="relative min-w-0 flex-1">
@@ -359,7 +410,7 @@ export default function LeadsClient({ initialLeads }: { initialLeads: LeadItem[]
           />
         ))}
 
-        {leads.length === 0 && (
+        {!loadError && leads.length === 0 && (
           <div className="rounded-xl border border-dashed border-[rgba(255,214,218,0.14)] py-14 text-center text-[#C4A8AD]">
             Belum ada pengajuan.
           </div>
@@ -431,7 +482,12 @@ function LeadCard({
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
               <span className="font-semibold text-white">{lead.companyName}</span>
-              <Badge variant="outline">{leadStatusLabel(lead.status)}</Badge>
+              <Badge
+                variant="outline"
+                className="border-[rgba(255,214,218,0.18)] bg-transparent text-[#F0DDE1]"
+              >
+                {leadStatusLabel(lead.status)}
+              </Badge>
               {lead.siteVisitStatus !== "NONE" && (
                 <Badge
                   variant="outline"

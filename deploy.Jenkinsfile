@@ -217,9 +217,13 @@ pipeline {
 
                         sudo chmod 777 -R "$WORKSPACE"
 
+                        SPATIAL_BUILD_FLAG="$(sed -n 's/^NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT=//p' "$WORKSPACE/.env" | tail -n 1)"
+                        case "$SPATIAL_BUILD_FLAG" in 1|true|on) ;; *) SPATIAL_BUILD_FLAG=0 ;; esac
+
                         sudo docker build \
                             --no-cache \
                             --pull \
+                            --build-arg "NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT=$SPATIAL_BUILD_FLAG" \
                             -t "$HARBOR_REGISTRY/$APP_NAME:$TAG" \
                             .
                     '''
@@ -330,33 +334,29 @@ echo "Menjalankan Prisma migration"
 sudo docker container prune -f 2>/dev/null || true
 sudo docker network prune -f 2>/dev/null || true
 
-APP_ID=""
-for i in $(seq 1 20); do
-    APP_ID="$(sudo docker ps -q -f name="${STACK_NAME}_virtualtour" -f status=running | head -n 1)"
-    if [ -n "$APP_ID" ]; then
-        break
-    fi
-    echo "Menunggu container aplikasi: percobaan $i/20"
-    sleep 3
-done
-
-if [ -n "$APP_ID" ]; then
-    echo "Migration via container aplikasi yang sudah berjalan, tanpa veth baru"
-    sudo docker exec "$APP_ID" npx prisma migrate deploy
-else
-    echo "Container aplikasi belum jalan, migration lewat network namespace PostgreSQL"
-    POSTGRES_CONT_ID="$(sudo docker ps -q -f name="${STACK_NAME}_postgres" | head -n 1)"
-    if [ -z "$POSTGRES_CONT_ID" ]; then
-        echo "Container PostgreSQL tidak ditemukan" >&2
-        exit 1
-    fi
-    MIGRATE_URL="$(printf '%s' "$DATABASE_URL" | sed -E 's#@[^/?]+#@127.0.0.1:5432#')"
-    sudo docker run --rm \
-        --network "container:${POSTGRES_CONT_ID}" \
-        -e DATABASE_URL="$MIGRATE_URL" \
-        "$IMAGE_REF" \
-        npx prisma migrate deploy
+POSTGRES_CONT_ID="$(sudo docker ps -q -f name="${STACK_NAME}_postgres" -f status=running | head -n 1)"
+if [ -z "$POSTGRES_CONT_ID" ]; then
+    echo "Container PostgreSQL tidak ditemukan" >&2
+    exit 1
 fi
+
+# Selalu jalankan migration dari image yang sedang dirilis. Saat rolling update,
+# container aplikasi lama dan baru dapat hidup bersamaan sehingga memilih
+# container running pertama berisiko menjalankan migration bundle versi lama.
+MIGRATE_URL="$(printf '%s' "$DATABASE_URL" | sed -E 's#@[^/?]+#@127.0.0.1:5432#')"
+sudo docker run --rm \
+    --network "container:${POSTGRES_CONT_ID}" \
+    -e DATABASE_URL="$MIGRATE_URL" \
+    "$IMAGE_REF" \
+    npx prisma migrate deploy
+
+echo "Memverifikasi status Prisma migration"
+
+sudo docker run --rm \
+    --network "container:${POSTGRES_CONT_ID}" \
+    -e DATABASE_URL="$MIGRATE_URL" \
+    "$IMAGE_REF" \
+    npx prisma migrate status
 
 echo "Deploy ulang Docker Stack"
 
@@ -365,6 +365,38 @@ sudo -E docker stack deploy \
     --with-registry-auth \
     -c "$COMPOSE_FILE" \
     "$STACK_NAME"
+
+echo "Menunggu image baru healthy"
+
+APP_READY=0
+for i in $(seq 1 40); do
+    for APP_CONT_ID in $(sudo docker ps -q -f name="${STACK_NAME}_virtualtour" -f status=running); do
+        RUNNING_IMAGE="$(sudo docker inspect -f '{{.Config.Image}}' "$APP_CONT_ID")"
+        HEALTH_STATUS="$(sudo docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$APP_CONT_ID")"
+
+        case "$RUNNING_IMAGE" in
+            "$IMAGE_REF"|"$IMAGE_REF"@*)
+                if [ "$HEALTH_STATUS" = "healthy" ]; then
+                    APP_READY=1
+                    break
+                fi
+                ;;
+        esac
+    done
+
+    if [ "$APP_READY" -eq 1 ]; then
+        break
+    fi
+
+    echo "Menunggu image baru healthy: percobaan $i/40"
+    sleep 5
+done
+
+if [ "$APP_READY" -ne 1 ]; then
+    echo "Image baru tidak healthy sampai batas waktu" >&2
+    sudo docker service ps "${STACK_NAME}_virtualtour" --no-trunc || true
+    exit 1
+fi
 
 echo "Status service"
 

@@ -150,7 +150,10 @@ model VirtualTourScene {
   order               Int               @default(0) // urutan jalur jalan dalam area
   hotspots            Json              @default("[]") // array hotspot — paralel placedAssets di floorplan
   canvasData          Json? // initialView {yaw,pitch,hfov}, editor viewport state
-  isActive            Boolean           @default(true)
+  spatialEntities          Json    @default("[]") // Spatial Area polygons (additive; pin hotspots tetap di hotspots)
+  publishedSpatialEntities Json    @default("[]") // Snapshot area publik; draft tidak dibaca pengunjung
+  spatialRevision          Int     @default(0)
+  isActive                 Boolean @default(true)
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 

@@ -228,7 +228,7 @@ export function PanoramaCanvas({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full overflow-hidden bg-slate-950 select-none"
+      className="relative w-full h-full overflow-hidden bg-[#1C0A0E] select-none"
       style={{ cursor }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -238,7 +238,7 @@ export function PanoramaCanvas({
     >
       {/* No panorama hint */}
       {!panoramaUrl && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 pointer-events-none z-10">
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-[#A88990] pointer-events-none z-10">
           <div className="text-5xl mb-3">🌐</div>
           <p className="text-sm">Upload panorama equirectangular untuk mulai</p>
         </div>
@@ -380,7 +380,7 @@ export function PanoramaCanvas({
 
       {/* Add mode indicator banner */}
       {addMode !== "none" && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur border border-emerald-500/70 text-emerald-300 text-sm px-5 py-2.5 rounded-full pointer-events-none flex items-center gap-2 shadow-lg">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#3A161C]/95 backdrop-blur border border-emerald-500/70 text-emerald-300 text-sm px-5 py-2.5 rounded-full pointer-events-none flex items-center gap-2 shadow-lg">
           <span className="text-base">{addMode === "scene" ? "🔀" : "🏪"}</span>
           Klik pada panorama untuk menempatkan hotspot{" "}
           <strong>{addMode === "scene" ? "scene" : "unit komersial"}</strong>
@@ -388,7 +388,7 @@ export function PanoramaCanvas({
       )}
 
       {/* Zoom Controls */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-slate-900/95 backdrop-blur border border-slate-700 rounded-xl p-1.5 shadow-xl">
+      <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-[#3A161C]/95 backdrop-blur border border-[rgba(255,214,218,0.14)] rounded-xl p-1.5 shadow-xl">
         <button
           onClick={() => {
             setZoom((z) => {
@@ -398,12 +398,12 @@ export function PanoramaCanvas({
               return n;
             });
           }}
-          className="w-8 h-8 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center justify-center font-bold"
+          className="w-8 h-8 rounded-lg text-[#F0DDE1] hover:bg-[#3A161C] hover:text-white transition-colors flex items-center justify-center font-bold"
           title="Zoom out"
         >
           −
         </button>
-        <span className="w-14 text-center text-xs text-slate-400 font-mono">{Math.round(zoom)}%</span>
+        <span className="w-14 text-center text-xs text-[#C4A8AD] font-mono">{Math.round(zoom)}%</span>
         <button
           onClick={() => {
             setZoom((z) => {
@@ -413,22 +413,22 @@ export function PanoramaCanvas({
               return n;
             });
           }}
-          className="w-8 h-8 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center justify-center font-bold"
+          className="w-8 h-8 rounded-lg text-[#F0DDE1] hover:bg-[#3A161C] hover:text-white transition-colors flex items-center justify-center font-bold"
           title="Zoom in"
         >
           +
         </button>
-        <div className="w-px h-5 bg-slate-700 mx-0.5" />
+        <div className="w-px h-5 bg-[#3A161C] mx-0.5" />
         <button
           onClick={resetView}
-          className="px-2.5 h-8 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white transition-colors text-xs"
+          className="px-2.5 h-8 rounded-lg text-[#C4A8AD] hover:bg-[#3A161C] hover:text-white transition-colors text-xs"
         >
           Fit
         </button>
       </div>
 
       {/* Coordinate display overlay (bottom-left) */}
-      <div className="absolute bottom-4 left-4 text-xs text-slate-500 bg-slate-900/80 px-2 py-1 rounded pointer-events-none">
+      <div className="absolute bottom-4 left-4 text-xs text-[#A88990] bg-[#3A161C]/80 px-2 py-1 rounded pointer-events-none">
         {hotspots.length} hotspot{hotspots.length !== 1 ? "s" : ""}
       </div>
 
@@ -440,14 +440,14 @@ export function PanoramaCanvas({
             onClick={() => setContextMenu(null)}
           />
           <div
-            className="fixed z-50 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl py-1.5 min-w-[160px]"
+            className="fixed z-50 bg-[#261015] border border-[rgba(255,214,218,0.18)] rounded-xl shadow-2xl py-1.5 min-w-[160px]"
             style={{ left: contextMenu.screenX, top: contextMenu.screenY }}
           >
-            <div className="px-3 py-1 text-xs text-slate-500 font-medium uppercase tracking-wider border-b border-slate-700 mb-1">
+            <div className="px-3 py-1 text-xs text-[#A88990] font-medium uppercase tracking-wider border-b border-[rgba(255,214,218,0.14)] mb-1">
               Hotspot
             </div>
             <button
-              className="w-full px-3 py-2 text-sm text-left text-slate-200 hover:bg-slate-700 flex items-center gap-2"
+              className="w-full px-3 py-2 text-sm text-left text-[#F8ECEE] hover:bg-[#3A161C] flex items-center gap-2"
               onClick={() => {
                 onHotspotSelect(contextMenu.id);
                 setContextMenu(null);
@@ -456,7 +456,7 @@ export function PanoramaCanvas({
               <span>✎</span> Edit Properties
             </button>
             <button
-              className="w-full px-3 py-2 text-sm text-left text-red-400 hover:bg-slate-700 flex items-center gap-2"
+              className="w-full px-3 py-2 text-sm text-left text-red-400 hover:bg-[#3A161C] flex items-center gap-2"
               onClick={() => {
                 onHotspotDelete(contextMenu.id);
                 setContextMenu(null);

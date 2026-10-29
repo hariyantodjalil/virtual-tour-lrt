@@ -1,4 +1,5 @@
 import type { FacilityIconId } from "./facility-icons";
+import type { SceneInitialView } from "./tour-types";
 
 export type HotspotType = "scene" | "space" | "info" | "ad";
 
@@ -74,6 +75,8 @@ export type HotspotData = {
   /** Arah chevron scene hotspot */
   direction?: HotspotDirection;
   sceneId?: string;
+  /** Arah pandang saat tiba melalui koneksi ini, dalam koordinat panorama tujuan. */
+  targetView?: SceneInitialView;
   spaceCode?: string;
   description?: string;
   /** Ikon fasilitas untuk hotspot info (toilet, mushola, dll.) */
@@ -97,7 +100,15 @@ export type HotspotItem = HotspotData & {
   _id: string;
 };
 
-export type AddMode = "none" | "scene" | "space" | "info" | "ad" | "blur";
+export type AddMode =
+  | "none"
+  | "pan"
+  | "scene"
+  | "space"
+  | "info"
+  | "ad"
+  | "blur"
+  | "spatial";
 
 export function hotspotColor(type: HotspotType): string {
   if (type === "scene") return "#E31E2D";

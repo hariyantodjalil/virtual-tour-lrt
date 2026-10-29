@@ -7,6 +7,8 @@ import { extractInitialViewFromCanvasData } from "@/lib/scene-initial-view";
 import { extractMultiResFromCanvasData } from "@/lib/panorama-multires";
 import { sortScenesByTourOrder } from "@/lib/virtual-tour-structure";
 import { buildPublicTourLevels } from "@/lib/public-tour-structure";
+import { normalizeSpatialEntities } from "@/lib/spatial/normalize";
+import { isSpatialHotspotEnabled } from "@/lib/spatial-feature";
 
 export type { Hotspot, PanoramaScene, StationInfo, TourLevelPublic, TourAreaPublic } from "@/lib/tour-types";
 export type { PrivacyBlur } from "@/lib/privacy-blur-types";
@@ -67,6 +69,9 @@ async function mapStationToInfo(station: StationRow): Promise<StationInfo> {
       hotspots: normalizeHotspots(scene.hotspots),
       privacyBlurs: extractPrivacyBlursFromCanvasData(scene.canvasData),
       initialView: extractInitialViewFromCanvasData(scene.canvasData),
+      spatialEntities: isSpatialHotspotEnabled()
+        ? normalizeSpatialEntities(scene.publishedSpatialEntities, scene.sceneId).filter((e) => e.enabled)
+        : [],
     })),
   };
 }

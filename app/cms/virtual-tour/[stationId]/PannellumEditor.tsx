@@ -23,6 +23,8 @@ import {
 import { PANNELLUM_EDITOR_HFOV, PANNELLUM_INTERACTION, PANNELLUM_PITCH_LIMITS } from "@/lib/pannellum-viewer-defaults";
 import type { SceneInitialView } from "@/lib/tour-types";
 import { PANNELLUM_HFOV } from "@/lib/pannellum-viewer-defaults";
+import { SpatialOverlay } from "@/components/tour/spatial/SpatialOverlay";
+import type { SpatialEntity, SphericalPoint } from "@/lib/spatial/types";
 
 declare global {
   interface Window {
@@ -152,8 +154,17 @@ interface Props {
   spaces?: { code: string; status: SpaceAvailabilityStatus }[];
   scenes?: { sceneId: string; title: string }[];
   initialView?: SceneInitialView | null;
+  minHfov?: number;
   /** Setelah pernah dibake: overlay tanpa backdrop (hindari double blur). */
   privacyBlurGuideOnly?: boolean;
+  spatialEntities?: SpatialEntity[];
+  draftSpatialVertices?: SphericalPoint[];
+  selectedSpatialId?: string | null;
+  onSpatialSelect?: (id: string | null) => void;
+  onSpatialVertexAdd?: (yaw: number, pitch: number) => void;
+  onSpatialGeometryCommit?: (id: string, vertices: SphericalPoint[]) => void;
+  onSpatialEditError?: (message: string) => void;
+  onSpatialCloseDraft?: () => void;
 }
 
 export type PannellumEditorHandle = {
@@ -180,7 +191,16 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
     spaces = [],
     scenes = [],
     initialView = null,
+    minHfov = PANNELLUM_EDITOR_HFOV.minHfov,
     privacyBlurGuideOnly = false,
+    spatialEntities = [],
+    draftSpatialVertices = [],
+    selectedSpatialId = null,
+    onSpatialSelect,
+    onSpatialVertexAdd,
+    onSpatialGeometryCommit,
+    onSpatialEditError,
+    onSpatialCloseDraft,
   },
   ref
 ) {
@@ -188,6 +208,15 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const viewerRef = useRef<any>(null);
   const viewerReadyRef = useRef(false);
+  const [viewerTick, setViewerTick] = useState(0);
+  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [viewerForOverlay, setViewerForOverlay] = useState<any>(null);
+  const [liveView, setLiveView] = useState<{ yaw: number; pitch: number; hfov: number } | null>(
+    null
+  );
+  const onSpatialVertexAddRef = useRef(onSpatialVertexAdd);
+  const onSpatialSelectRef = useRef(onSpatialSelect);
   const mountedHotspotIdsRef = useRef<string[]>([]);
   const mountedBlurIdsRef = useRef<string[]>([]);
   const hotspotDomRef = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -260,6 +289,8 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
     onMoveRef.current = onHotspotMove;
     onBlurMoveRef.current = onBlurMove;
     addModeRef.current = addMode;
+    onSpatialVertexAddRef.current = onSpatialVertexAdd;
+    onSpatialSelectRef.current = onSpatialSelect;
   }, [
     addMode,
     onBlurAdd,
@@ -270,11 +301,19 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
     onHotspotDelete,
     onHotspotMove,
     onHotspotSelect,
+    onSpatialSelect,
+    onSpatialVertexAdd,
   ]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    setContainerEl((prev) => (prev === el ? prev : el));
+  }, [panoramaUrl, viewerTick]);
 
   const [dragging, setDragging] = useState(false);
   const pointerRef = useRef<{
     kind: "add" | "hotspot" | "blur";
+    pointerId: number;
     id?: string;
     x: number;
     y: number;
@@ -291,7 +330,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
 
   const onPointerDownItem = useCallback((kind: "hotspot" | "blur", id: string, e: PointerEvent) => {
     if (addModeRef.current !== "none") return;
-    pointerRef.current = { kind, id, x: e.clientX, y: e.clientY, moved: false };
+    pointerRef.current = { kind, id, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
     dragIdRef.current = null;
     setDragging(false);
   }, []);
@@ -425,6 +464,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
           showFullscreenCtrl: false,
           showZoomCtrl: true,
           ...PANNELLUM_EDITOR_HFOV,
+          minHfov,
           ...(initialView
             ? {
                 yaw: initialView.yaw,
@@ -440,6 +480,8 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         viewerRef.current.on("load", () => {
           viewerReadyRef.current = true;
           syncAllOverlays(viewerRef.current);
+          setViewerForOverlay(viewerRef.current);
+          setViewerTick((n) => n + 1);
         });
       } catch (err) {
         console.error("PannellumEditor init error:", err);
@@ -455,6 +497,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
       mountedBlurIdsRef.current = [];
       hotspotDom.clear();
       blurDom.clear();
+      setViewerForOverlay(null);
       if (viewerRef.current) {
         try { viewerRef.current.destroy(); } catch { /* ignore */ }
         viewerRef.current = null;
@@ -533,15 +576,30 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
   }, [selectedId, selectedBlurId]);
 
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const isPinAuthoring = (mode: AddMode) =>
+      mode === "scene" || mode === "space" || mode === "info" || mode === "ad" || mode === "blur";
+
+    const isPanoramaInput = (e: PointerEvent) => {
+      const target = e.target;
+      if (!(target instanceof Element) || !container.contains(target)) return false;
+      if (target.closest("button, a, input, select, textarea, [role=button], [contenteditable=true], .pnlm-controls, .pnlm-about-msg, .lrt-editor-hs, .lrt-editor-blur, .spatial-hit, .spatial-badge")) return false;
+      const rect = container.getBoundingClientRect();
+      return e.clientX >= rect.left && e.clientX < rect.right && e.clientY >= rect.top && e.clientY < rect.bottom;
+    };
+
     const onPointerDown = (e: PointerEvent) => {
-      if (addModeRef.current === "none") return;
-      if ((e.target as Element).closest(".lrt-editor-hs, .lrt-editor-blur")) return;
-      pointerRef.current = { kind: "add", x: e.clientX, y: e.clientY, moved: false };
+      const mode = addModeRef.current;
+      // pan / select: jangan pasang pin; spatial pakai jalur add terpisah
+      if (!isPinAuthoring(mode) && mode !== "spatial") return;
+      if (e.button !== 0 || !e.isPrimary || !isPanoramaInput(e)) return;
+      pointerRef.current = { kind: "add", pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
     };
 
     const onPointerMove = (e: PointerEvent) => {
       const p = pointerRef.current;
-      if (!p) return;
+      if (!p || p.pointerId !== e.pointerId) return;
       const dist = Math.hypot(e.clientX - p.x, e.clientY - p.y);
       if (dist <= DRAG_THRESHOLD_PX) return;
       p.moved = true;
@@ -554,21 +612,26 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
 
     const onPointerUp = (e: PointerEvent) => {
       const p = pointerRef.current;
+      if (!p || p.pointerId !== e.pointerId) return;
       pointerRef.current = null;
 
-      if (!p || !viewerRef.current || !viewerReadyRef.current) {
+      if (!viewerRef.current || !viewerReadyRef.current) {
         dragIdRef.current = null;
         setDragging(false);
         return;
       }
 
-      if (p.kind === "add" && addModeRef.current !== "none" && !p.moved) {
+      if (p.kind === "add" && !p.moved && isPanoramaInput(e)) {
         try {
           const coords: [number, number] = viewerRef.current.mouseEventToCoords(e);
           const yaw = roundCoord(coords[1]);
           const pitch = roundCoord(coords[0]);
-          if (addModeRef.current === "blur") onBlurAddRef.current(yaw, pitch);
-          else onAddRef.current(yaw, pitch);
+          if (addModeRef.current === "spatial") {
+            onSpatialVertexAddRef.current?.(yaw, pitch);
+          } else if (isPinAuthoring(addModeRef.current)) {
+            if (addModeRef.current === "blur") onBlurAddRef.current(yaw, pitch);
+            else onAddRef.current(yaw, pitch);
+          }
         } catch { /* ignore */ }
       } else if ((p.kind === "hotspot" || p.kind === "blur") && p.id) {
         if (dragIdRef.current?.id === p.id && dragIdRef.current.kind === p.kind) {
@@ -594,13 +657,23 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
       setDragging(false);
     };
 
-    window.addEventListener("pointerdown", onPointerDown);
+    const onPointerCancel = (e: PointerEvent) => {
+      if (pointerRef.current?.pointerId !== e.pointerId) return;
+      pointerRef.current = null;
+      dragIdRef.current = null;
+      setDragging(false);
+    };
+
+    // Authoring begins on the panorama, never on toolbar / inspector controls.
+    container.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerCancel);
     return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
+      container.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerCancel);
     };
   }, []);
 
@@ -615,11 +688,89 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
             ? "info"
             : addMode === "blur"
               ? "blur privasi"
-              : "";
+              : addMode === "spatial"
+                ? "spatial area"
+                : addMode === "pan"
+                  ? "pan"
+                  : "";
+
+  const showAuthoringHint =
+    addMode === "scene" ||
+    addMode === "space" ||
+    addMode === "info" ||
+    addMode === "ad" ||
+    addMode === "blur" ||
+    addMode === "spatial";
+
+  useEffect(() => {
+    let raf = 0;
+    let alive = true;
+    let lastHudUpdate = -Infinity;
+    const tick = (now: number) => {
+      if (!alive) return;
+      // Camera/rendering stays at native refresh rate; numeric HUD needs 10 Hz.
+      if (now - lastHudUpdate < 100) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      lastHudUpdate = now;
+      const v = viewerRef.current;
+      if (v && typeof v.getYaw === "function") {
+        try {
+          const next = {
+            yaw: Number(v.getYaw()),
+            pitch: Number(v.getPitch()),
+            hfov: Number(v.getHfov?.() ?? 100),
+          };
+          setLiveView((prev) => {
+            if (
+              prev &&
+              Math.abs(prev.yaw - next.yaw) < 0.05 &&
+              Math.abs(prev.pitch - next.pitch) < 0.05 &&
+              Math.abs(prev.hfov - next.hfov) < 0.2
+            ) {
+              return prev;
+            }
+            return next;
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      alive = false;
+      cancelAnimationFrame(raf);
+    };
+  }, [viewerTick, panoramaUrl]);
 
   return (
     <div className="cms-vt-panorama relative h-full min-h-0 w-full overflow-hidden overscroll-none select-none">
       <div ref={containerRef} className="absolute inset-0" style={{ background: "#1C0A0E" }} />
+
+      {viewerTick > 0 && viewerForOverlay && (
+        <SpatialOverlay
+          viewer={viewerForOverlay}
+          container={containerEl}
+          entities={spatialEntities}
+          draftVertices={draftSpatialVertices}
+          selectedId={selectedSpatialId}
+          interactive={addMode === "none"}
+          onGeometryCommit={addMode === "none" ? onSpatialGeometryCommit : undefined}
+          onEditError={onSpatialEditError}
+          onCloseDraft={onSpatialCloseDraft}
+          resolveSpaceStatus={(code) => getSpaceStatusRef.current(code)}
+          onSelect={(id) => {
+            onSpatialSelectRef.current?.(id);
+            if (id) {
+              onSelectRef.current(null);
+              onBlurSelectRef.current(null);
+            }
+          }}
+        />
+      )}
 
       {dragging && (
         <div className="absolute inset-0 z-50 pointer-events-none">
@@ -630,38 +781,40 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         </div>
       )}
 
-      {addMode !== "none" && (
+      {showAuthoringHint && (
         <div
-          className={`absolute top-4 left-1/2 -translate-x-1/2 text-sm px-5 py-2.5 rounded-full pointer-events-none flex items-center gap-2 shadow-lg z-20 backdrop-blur border ${
+          className={`absolute left-1/2 top-3 z-20 -translate-x-1/2 pointer-events-none rounded-full border px-3 py-1.5 text-xs shadow-md backdrop-blur ${
             addMode === "blur"
-              ? "bg-[#261015]/95 border-purple-500/70 text-purple-300"
-              : addMode === "ad"
-                ? "bg-[#261015]/95 border-purple-400/70 text-purple-200"
-                : "bg-[#261015]/95 border-emerald-500/70 text-emerald-300"
+              ? "border-[rgba(255,214,218,0.28)] bg-[#261015]/90 text-[#E8C4D0]"
+              : addMode === "spatial"
+                ? "border-emerald-500/50 bg-[#261015]/90 text-emerald-200"
+                : "border-emerald-500/40 bg-[#261015]/90 text-emerald-200"
           }`}
         >
-          <span className="text-base">
-            {addMode === "scene"
-              ? "🔀"
+          {addMode === "spatial"
+              ? `Klik sudut area · ${draftSpatialVertices.length} titik`
               : addMode === "space"
-                ? "🏪"
-                : addMode === "ad"
-                  ? "📢"
-                  : addMode === "info"
-                    ? "ℹ️"
-                    : "🫥"}
-          </span>
-          Klik (tanpa drag) untuk pasang <strong>{addModeLabel}</strong>
+                ? "Klik posisi unit"
+              : (
+                <>
+                  Klik untuk pasang <strong>{addModeLabel}</strong>
+                </>
+              )}
         </div>
       )}
 
-      <div className="absolute bottom-4 left-4 flex items-center gap-3 pointer-events-none z-20">
-        <div className="hidden bg-[#261015]/80 backdrop-blur text-[#C4A8AD] text-xs px-3 py-1.5 rounded-full border border-[rgba(255,214,218,0.18)] items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-          Edit 3D — drag untuk lihat sekeliling
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-2 px-3 pb-3">
+        <div className="rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/85 px-2.5 py-1.5 font-mono text-[10px] tabular-nums text-[#C4A8AD] backdrop-blur">
+          {liveView
+            ? `Yaw ${liveView.yaw.toFixed(1)}° · Pitch ${liveView.pitch.toFixed(1)}° · HFOV ${liveView.hfov.toFixed(0)}°`
+            : "Yaw — · Pitch — · HFOV —"}
         </div>
-        <div className="bg-[#261015]/80 backdrop-blur text-[#C4A8AD] text-xs px-2.5 py-1.5 rounded-full border border-[rgba(255,214,218,0.18)]">
-          {hotspots.length} hotspot · {privacyBlurs.length} blur
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          <span className="rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/85 px-2 py-1 text-[10px] text-[#C4A8AD] backdrop-blur">
+            {hotspots.length} hotspot
+            {spatialEntities.length > 0 ? ` · ${spatialEntities.length} spatial` : ""}
+            {privacyBlurs.length > 0 ? ` · ${privacyBlurs.length} blur` : ""}
+          </span>
         </div>
       </div>
 

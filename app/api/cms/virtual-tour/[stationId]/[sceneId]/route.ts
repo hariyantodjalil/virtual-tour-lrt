@@ -9,6 +9,9 @@ import { Prisma } from "@prisma/client";
 import { MAX_PANORAMA_UPLOAD_BYTES, readValidatedImageUpload } from "@/lib/upload-validation";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { sceneUpdateSchema } from "@/lib/api-schemas";
+import { spatialEntitiesSchema } from "@/lib/spatial/spatial-entity-schema";
+import { isSpatialHotspotEnabled } from "@/lib/spatial-feature";
+import { validateSpatialLinks } from "@/lib/spatial/links";
 
 type Params = { params: Promise<{ stationId: string; sceneId: string }> };
 
@@ -26,6 +29,8 @@ const sceneSelect = {
   order: true,
   hotspots: true,
   canvasData: true,
+  spatialEntities: true,
+  spatialRevision: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
@@ -53,6 +58,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
   const parsed = await parseJsonRequest(request, sceneUpdateSchema);
   if (!parsed.success) return parsed.response;
   const body = parsed.data;
+  if (body.spatialEntities === undefined && (body.spatialRevision !== undefined || body.spatialOperation !== undefined)) {
+    return NextResponse.json({ error: "Data Spatial Area diperlukan untuk operasi ini." }, { status: 400 });
+  }
 
   // Hanya update panoramaUrl jika eksplisit dikirim (hindari overwrite saat save hotspot)
   const updateData: Prisma.VirtualTourSceneUncheckedUpdateInput = {};
@@ -60,6 +68,41 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (body.level !== undefined) updateData.level = body.level;
   if (body.order !== undefined) updateData.order = body.order;
   if (body.hotspots !== undefined) updateData.hotspots = body.hotspots as Prisma.InputJsonValue;
+  if (body.spatialEntities !== undefined) {
+    if (!isSpatialHotspotEnabled()) {
+      return NextResponse.json(
+        { error: "Fitur Spatial Hotspot belum diaktifkan (CMS_SPATIAL_HOTSPOT)" },
+        { status: 403 }
+      );
+    }
+    const parsedSpatial = spatialEntitiesSchema.safeParse(body.spatialEntities);
+    if (!parsedSpatial.success) {
+      return NextResponse.json(
+        {
+          error: "spatialEntities tidak valid",
+          details: parsedSpatial.error.issues.slice(0, 8).map((i) => i.message),
+        },
+        { status: 400 }
+      );
+    }
+    if (body.spatialRevision === undefined) {
+      return NextResponse.json({ error: "Revisi area diperlukan. Muat ulang editor sebelum menyimpan." }, { status: 409 });
+    }
+    const [units, targetScenes] = await Promise.all([
+      prisma.commercialSpace.findMany({ where: { stationId }, select: { id: true, code: true } }),
+      prisma.virtualTourScene.findMany({
+        where: { stationId, ...(body.spatialOperation === "publish" ? { isActive: true } : {}) },
+        select: { sceneId: true },
+      }),
+    ]);
+    const linked = validateSpatialLinks(parsedSpatial.data, sceneId, units, targetScenes.map((s) => s.sceneId));
+    if (!linked.ok) return NextResponse.json({ error: linked.error }, { status: 400 });
+    updateData.spatialEntities = linked.entities as Prisma.InputJsonValue;
+    updateData.spatialRevision = { increment: 1 };
+    if (body.spatialOperation === "publish") {
+      updateData.publishedSpatialEntities = linked.entities as Prisma.InputJsonValue;
+    }
+  }
   if (body.isActive !== undefined) updateData.isActive = body.isActive;
   if (body.areaId !== undefined) {
     if (body.areaId === null) {
@@ -102,13 +145,24 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (body.originalPanoramaUrl !== undefined) updateData.originalPanoramaUrl = body.originalPanoramaUrl;
   if (body.thumbnailUrl !== undefined) updateData.thumbnailUrl = body.thumbnailUrl;
   if (body.canvasData !== undefined) updateData.canvasData = body.canvasData as Prisma.InputJsonValue;
+  // spatialEntities handled above with strict Zod
 
-  const scene = await prisma.virtualTourScene.update({
-    where: { stationId_sceneId: { stationId, sceneId } },
-    data: updateData,
-    select: sceneSelect,
+  const scene = await prisma.$transaction(async (tx) => {
+    const updated = await tx.virtualTourScene.updateMany({
+      where: {
+        stationId, sceneId,
+        ...(body.spatialEntities !== undefined ? { spatialRevision: body.spatialRevision } : {}),
+      },
+      data: updateData,
+    });
+    if (updated.count === 0) return null;
+    return tx.virtualTourScene.findUnique({
+      where: { stationId_sceneId: { stationId, sceneId } }, select: sceneSelect,
+    });
   });
-
+  if (!scene) {
+    return NextResponse.json({ error: "Scene sudah berubah atau dihapus oleh editor lain. Perubahan lokal tetap ada; muat ulang dan bandingkan sebelum mencoba lagi." }, { status: 409 });
+  }
   return NextResponse.json(scene);
 }
 

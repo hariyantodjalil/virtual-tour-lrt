@@ -11,6 +11,8 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    // Local browser diagnostics and generated performance artifacts.
+    "output/playwright/**",
     "next-env.d.ts",
   ]),
 ]);

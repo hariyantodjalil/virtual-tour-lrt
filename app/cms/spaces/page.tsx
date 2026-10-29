@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { cmsUi } from "@/lib/cms-ui";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Store } from "lucide-react";
@@ -26,25 +27,24 @@ export default async function CmsSpacesIndexPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Ruang Komersial</h1>
       <div className="grid gap-3 md:grid-cols-2">
         {stations.map((s) => (
-          <Card key={s.id} className="bg-slate-900 border-slate-800">
+          <Card key={s.id} className={cmsUi.card}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">{s.name}</CardTitle>
+              <CardTitle className="text-base text-[#F8ECEE]">{s.name}</CardTitle>
             </CardHeader>
             <CardContent className="flex items-center justify-between">
-              <span className="text-sm text-slate-400">{s._count.commercialSpaces} unit</span>
-              <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-500">
+              <span className={`text-sm ${cmsUi.muted}`}>{s._count.commercialSpaces} unit</span>
+              <Button asChild size="sm" className={cmsUi.primaryBtn}>
                 <Link href={`/cms/spaces/${s.id}`}>
-                  <Store className="h-3 w-3 mr-1" /> Kelola
+                  <Store className="mr-1 h-3 w-3" /> Kelola
                 </Link>
               </Button>
             </CardContent>
           </Card>
         ))}
       </div>
-      {stations.length === 0 && <p className="text-slate-400">Belum ada stasiun.</p>}
+      {stations.length === 0 && <p className={cmsUi.muted}>Belum ada stasiun.</p>}
     </div>
   );
 }

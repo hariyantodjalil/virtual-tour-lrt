@@ -35,6 +35,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/virtual_tour_lrt?schema=public}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-dev}
       NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED:-1}
+      CMS_SPATIAL_HOTSPOT: ${CMS_SPATIAL_HOTSPOT:-0}
+      NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT: ${NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT:-0}
       TZ: ${TZ:-Asia/Jakarta}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}

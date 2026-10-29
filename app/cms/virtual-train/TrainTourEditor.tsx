@@ -1192,20 +1192,20 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
 
   return (
     <div className="cms-vt-editor flex h-full min-h-0 w-full flex-col overflow-hidden">
-      <div className="relative z-30 flex shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-900 px-4 py-3">
-        <Button asChild variant="ghost" size="sm" className="shrink-0 text-slate-400 hover:text-slate-200">
+      <div className="relative z-30 flex shrink-0 items-center gap-3 border-b border-[rgba(255,214,218,0.14)] bg-[#261015] px-4 py-3 text-[#F8ECEE]">
+        <Button asChild variant="ghost" size="sm" className="shrink-0 text-[#C4A8AD] hover:text-[#F8ECEE]">
           <Link href="/cms/dashboard">
             <ArrowLeft className="mr-1 h-4 w-4" /> Dashboard
           </Link>
         </Button>
-        <div className="h-5 w-px bg-slate-700" />
+        <div className="h-5 w-px bg-[#4A1F28]" />
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className="shrink-0 text-sm text-slate-400">Train Virtual Tour</span>
-          <span className="text-slate-600">›</span>
-          <span className="truncate text-sm font-semibold text-slate-100">{trainName}</span>
+          <span className="shrink-0 text-sm text-[#C4A8AD]">Train Virtual Tour</span>
+          <span className="text-[#A88990]">›</span>
+          <span className="truncate text-sm font-semibold text-[#F8ECEE]">{trainName}</span>
           {currentScene && (
             <>
-              <span className="text-slate-600">›</span>
+              <span className="text-[#A88990]">›</span>
               <span
                 className="truncate text-sm font-medium"
                 style={{ color: getLevelConfig(currentScene.level, levels).color }}
@@ -1216,11 +1216,11 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           )}
         </div>
         <div className="flex-1" />
-        <div className="flex items-center gap-1 rounded-lg bg-slate-800 p-1">
+        <div className="flex items-center gap-1 rounded-lg bg-[#3A161C] p-1">
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              addMode === "none" ? "bg-slate-600 text-white" : "text-slate-400 hover:text-slate-200"
+              addMode === "none" ? "bg-[#E31E2D] text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
             }`}
             onClick={() => setAddMode("none")}
             title="Mode Seleksi"
@@ -1230,7 +1230,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              addMode === "scene" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-200"
+              addMode === "scene" ? "bg-emerald-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
             }`}
             onClick={() => setAddMode((m) => (m === "scene" ? "none" : "scene"))}
             title="Tambah hotspot scene"
@@ -1240,7 +1240,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              addMode === "space" ? "bg-amber-600 text-white" : "text-slate-400 hover:text-slate-200"
+              addMode === "space" ? "bg-amber-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
             }`}
             onClick={() => setAddMode((m) => (m === "space" ? "none" : "space"))}
             title="Tambah hotspot unit"
@@ -1250,7 +1250,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              addMode === "info" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"
+              addMode === "info" ? "bg-blue-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
             }`}
             onClick={() => setAddMode((m) => (m === "info" ? "none" : "info"))}
             title="Tambah hotspot info"
@@ -1260,7 +1260,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              addMode === "ad" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-slate-200"
+              addMode === "ad" ? "bg-purple-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
             }`}
             onClick={() => setAddMode((m) => (m === "ad" ? "none" : "ad"))}
             title="Tambah hotspot iklan"
@@ -1270,7 +1270,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              addMode === "blur" ? "bg-slate-600 text-white ring-1 ring-purple-500/50" : "text-slate-400 hover:text-slate-200"
+              addMode === "blur" ? "bg-[#E31E2D] text-white ring-1 ring-purple-500/50" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
             }`}
             onClick={() => setAddMode((m) => (m === "blur" ? "none" : "blur"))}
             title="Tambah blur privasi"
@@ -1278,11 +1278,11 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
             <EyeOff className="h-3.5 w-3.5" /> + Blur
           </button>
         </div>
-        <div className="h-5 w-px bg-slate-700" />
-        <div className="flex items-center gap-1 rounded-lg bg-slate-800 p-1">
+        <div className="h-5 w-px bg-[#4A1F28]" />
+        <div className="flex items-center gap-1 rounded-lg bg-[#3A161C] p-1">
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 disabled:pointer-events-none disabled:opacity-30"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:pointer-events-none disabled:opacity-30"
             onClick={undo}
             disabled={!canUndo}
             title="Undo (Ctrl+Z)"
@@ -1291,7 +1291,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           </button>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 disabled:pointer-events-none disabled:opacity-30"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:pointer-events-none disabled:opacity-30"
             onClick={redo}
             disabled={!canRedo}
             title="Redo (Ctrl+Y)"
@@ -1300,7 +1300,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           </button>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 disabled:pointer-events-none disabled:opacity-30"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:pointer-events-none disabled:opacity-30"
             onClick={duplicateSelected}
             disabled={!selectedHotspot && !selectedBlur}
             title="Duplikat hotspot/blur terpilih"
@@ -1309,7 +1309,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           </button>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 disabled:pointer-events-none disabled:opacity-30"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:pointer-events-none disabled:opacity-30"
             onClick={handleSetInitialView}
             disabled={!currentScene || isPreview}
             title="Set view awal dari posisi kamera"
@@ -1318,15 +1318,15 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           </button>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE]"
             onClick={() => setShowConnectionMap(true)}
             title="Peta koneksi antar scene"
           >
             <Network className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="h-5 w-px bg-slate-700" />
-        <Button asChild variant="outline" size="sm" className="shrink-0 border-slate-700">
+        <div className="h-5 w-px bg-[#4A1F28]" />
+        <Button asChild variant="outline" size="sm" className="shrink-0 border-[rgba(255,214,218,0.14)]">
           <Link href={`/train/${trainSlug}`} target="_blank">
             Preview Publik
           </Link>
@@ -1336,7 +1336,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
             isPreview
               ? "border-purple-500 bg-purple-600 text-white"
-              : "border-slate-700 bg-slate-800 text-slate-300 hover:border-purple-500 hover:text-purple-300"
+              : "border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F0DDE1] hover:border-purple-500 hover:text-purple-300"
           }`}
           onClick={() => {
             setIsPreview((p) => !p);
@@ -1356,7 +1356,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           variant="outline"
           onClick={resetChanges}
           disabled={!hasUnsaved || saving || !currentScene}
-          className="shrink-0 border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white disabled:opacity-40"
+          className="shrink-0 border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE] hover:bg-[#3A161C] hover:text-white disabled:opacity-40"
         >
           <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reset
         </Button>
@@ -1364,7 +1364,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           size="sm"
           onClick={() => void saveScene()}
           disabled={!currentScene || saving}
-          className="shrink-0 bg-emerald-600 hover:bg-emerald-500"
+          className="shrink-0 bg-[#E31E2D] hover:bg-[#c41926]"
         >
           {saving ? (
             <>
@@ -1451,7 +1451,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
               />
             )
           ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400">
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-[#C4A8AD]">
               <p>Pilih atau tambah scene dari panel kiri</p>
               <Button size="sm" variant="outline" onClick={() => setShowBulkImport(true)}>
                 <Package className="mr-1 h-4 w-4" /> Bulk Import Panorama
@@ -1525,9 +1525,9 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <form
             onSubmit={addScene}
-            className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"
+            className="w-full max-w-md rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] p-5 shadow-2xl"
           >
-            <h2 className="mb-4 font-bold text-slate-100">Tambah Scene</h2>
+            <h2 className="mb-4 font-bold text-[#F8ECEE]">Tambah Scene</h2>
             <div className="space-y-3">
               <div>
                 <Label>Judul</Label>
@@ -1541,7 +1541,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                       );
                     }
                   }}
-                  className="mt-1 border-slate-700 bg-slate-950"
+                  className="mt-1 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                   required
                 />
               </div>
@@ -1550,7 +1550,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                 <Input
                   value={newSceneId}
                   onChange={(e) => setNewSceneId(e.target.value)}
-                  className="mt-1 border-slate-700 bg-slate-950 font-mono text-sm"
+                  className="mt-1 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-sm"
                   required
                 />
               </div>
@@ -1567,7 +1567,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                       setNewSceneId(suggestSceneId(areaId, found.level.slug, levels, scenes));
                     }
                   }}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-700 bg-slate-950 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-2 text-sm"
                   required
                 >
                   {levels.map((level) => (
@@ -1583,7 +1583,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
               </div>
             </div>
             <div className="mt-5 flex gap-2">
-              <Button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500">
+              <Button type="submit" className="flex-1 bg-[#E31E2D] hover:bg-[#c41926]">
                 Tambah
               </Button>
               <Button type="button" variant="ghost" className="flex-1" onClick={() => setShowAddScene(false)}>
@@ -1596,21 +1596,21 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
 
       {showBulkImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="mx-4 flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 p-5">
-              <h2 className="flex items-center gap-2 font-bold text-slate-100">
+          <div className="mx-4 flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[rgba(255,214,218,0.14)] p-5">
+              <h2 className="flex items-center gap-2 font-bold text-[#F8ECEE]">
                 <Package className="h-5 w-5 text-sky-400" /> Bulk Import Panorama
               </h2>
-              <button type="button" onClick={() => setShowBulkImport(false)} className="text-slate-500 hover:text-slate-300">
+              <button type="button" onClick={() => setShowBulkImport(false)} className="text-[#A88990] hover:text-[#F0DDE1]">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto p-5">
-              <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-slate-700 p-5 text-slate-400 transition-colors hover:border-sky-600 hover:text-sky-400">
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-[rgba(255,214,218,0.14)] p-5 text-[#C4A8AD] transition-colors hover:border-sky-600 hover:text-sky-400">
                 <Upload className="h-6 w-6 shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Pilih beberapa file panorama sekaligus</p>
-                  <p className="mt-0.5 text-xs text-slate-500">JPEG/PNG equirectangular (rasio 2:1)</p>
+                  <p className="mt-0.5 text-xs text-[#A88990]">JPEG/PNG equirectangular (rasio 2:1)</p>
                 </div>
                 <input
                   ref={bulkFileInputRef}
@@ -1631,14 +1631,14 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                           ? "border-emerald-800/50 bg-emerald-900/10"
                           : row.status === "error"
                             ? "border-red-800/50 bg-red-900/10"
-                            : "border-slate-800 bg-slate-800/50"
+                            : "border-[rgba(255,214,218,0.14)] bg-[#261015]/50"
                       }`}
                     >
                       <Input
                         value={row.title}
                         onChange={(e) => updateBulkRow(row.key, "title", e.target.value)}
                         disabled={row.status !== "pending"}
-                        className="h-7 border-slate-700 bg-slate-900 text-xs"
+                        className="h-7 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-xs"
                       />
                       <Input
                         value={row.sceneId}
@@ -1646,13 +1646,13 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                           updateBulkRow(row.key, "sceneId", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
                         }
                         disabled={row.status !== "pending"}
-                        className="h-7 border-slate-700 bg-slate-900 font-mono text-xs"
+                        className="h-7 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-xs"
                       />
                       <select
                         value={row.areaId}
                         onChange={(e) => updateBulkRow(row.key, "areaId", e.target.value)}
                         disabled={row.status !== "pending"}
-                        className="h-7 min-w-[110px] rounded border border-slate-700 bg-slate-900 px-1.5 text-xs"
+                        className="h-7 min-w-[110px] rounded border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-1.5 text-xs"
                       >
                         {levels.map((level) => (
                           <optgroup key={level.id} label={level.label}>
@@ -1672,7 +1672,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                         ) : row.status === "creating" || row.status === "uploading" ? (
                           <Loader2 className="h-4 w-4 animate-spin text-sky-400" />
                         ) : (
-                          <span className="h-2 w-2 rounded-full bg-slate-600" />
+                          <span className="h-2 w-2 rounded-full bg-[#4A1F28]" />
                         )}
                       </span>
                     </div>
@@ -1680,8 +1680,8 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-between gap-3 border-t border-slate-800 p-5">
-              <p className="text-xs text-slate-500">
+            <div className="flex items-center justify-between gap-3 border-t border-[rgba(255,214,218,0.14)] p-5">
+              <p className="text-xs text-[#A88990]">
                 {bulkRows.filter((r) => r.status === "done").length}/{bulkRows.length} selesai
               </p>
               <div className="flex gap-2">

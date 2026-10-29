@@ -274,16 +274,16 @@ export default function CmsSpacesStationPage() {
 
   return (
     <div>
-      <Button asChild variant="ghost" className="mb-4 text-slate-300">
+      <Button asChild variant="ghost" className="mb-4 text-[#F0DDE1]">
         <Link href="/cms/spaces"><ArrowLeft className="h-4 w-4 mr-1" /> Kembali</Link>
       </Button>
 
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Ruang Komersial</h1>
-          <p className="mt-1 text-sm text-slate-400">Kelola semua field yang muncul di virtual tour publik.</p>
+          <p className="mt-1 text-sm text-[#C4A8AD]">Kelola semua field yang muncul di virtual tour publik.</p>
         </div>
-        <Button onClick={() => { setMessage(""); setEditing(createDraft()); }} className="bg-emerald-600 hover:bg-emerald-500">
+        <Button onClick={() => { setMessage(""); setEditing(createDraft()); }} className="bg-[#E31E2D] hover:bg-[#c41926]">
           <Plus className="h-4 w-4" />
           Tambah Unit
         </Button>
@@ -291,13 +291,13 @@ export default function CmsSpacesStationPage() {
 
       <div className="grid gap-3">
         {spaces.map((space) => (
-          <Card key={space.id} className="bg-slate-900 border-slate-800">
+          <Card key={space.id} className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
             <CardContent className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
               <div className="min-w-0">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <p className="font-semibold text-white">{space.code} - {space.name}</p>
-                  <Badge variant="outline" className="border-slate-700 text-slate-300">{space.status}</Badge>
-                  <Badge variant="outline" className="border-slate-700 text-slate-300">{SPACE_TYPES.find((t) => t.value === space.type)?.label ?? space.type}</Badge>
+                  <Badge variant="outline" className="border-[rgba(255,214,218,0.14)] text-[#F0DDE1]">{space.status}</Badge>
+                  <Badge variant="outline" className="border-[rgba(255,214,218,0.14)] text-[#F0DDE1]">{SPACE_TYPES.find((t) => t.value === space.type)?.label ?? space.type}</Badge>
                   {space.status === "TERISI" && space.tenantBrand && (
                     <Badge
                       variant="outline"
@@ -307,17 +307,17 @@ export default function CmsSpacesStationPage() {
                     </Badge>
                   )}
                 </div>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-[#C4A8AD]">
                   {space.floor} · {space.location} · {space.area} m²
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-[#A88990]">
                   Exposure {Number(space.exposure).toLocaleString("id-ID")} orang/hari
                   {space.nearestExit ? ` · ${space.nearestExit}` : ""}
                   {space.powerSupply ? ` · ${space.powerSupply}` : ""}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" className="border-slate-700" onClick={() => { setMessage(""); setEditing({ ...space, nearbyFacilities: normalizeFacilities(space.nearbyFacilities) }); }}>
+                <Button size="sm" variant="outline" className="border-[rgba(255,214,218,0.14)]" onClick={() => { setMessage(""); setEditing({ ...space, nearbyFacilities: normalizeFacilities(space.nearbyFacilities) }); }}>
                   <Pencil className="h-3.5 w-3.5" />
                   Edit
                 </Button>
@@ -333,8 +333,8 @@ export default function CmsSpacesStationPage() {
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[calc(100vh-32px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-800 px-6 py-4">
+          <div className="flex max-h-[calc(100vh-32px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] shadow-2xl">
+            <div className="flex items-start justify-between border-b border-[rgba(255,214,218,0.14)] px-6 py-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-300">
                   {editing.id ? "Edit Unit" : "Tambah Unit"}
@@ -344,7 +344,7 @@ export default function CmsSpacesStationPage() {
               <button
                 type="button"
                 onClick={() => setEditing(null)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white"
+                className="rounded-lg p-2 text-[#C4A8AD] hover:bg-white/10 hover:text-white"
                 aria-label="Tutup form"
               >
                 <X className="h-5 w-5" />
@@ -354,13 +354,13 @@ export default function CmsSpacesStationPage() {
             <div className="min-h-0 flex-1 overflow-y-auto p-6">
               <div className="grid gap-5 md:grid-cols-2">
                 <Field label="Kode Unit" required>
-                  <Input value={editing.code} onChange={(e) => setEditing({ ...editing, code: e.target.value })} className="bg-slate-900 border-slate-700" />
+                  <Input value={editing.code} onChange={(e) => setEditing({ ...editing, code: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </Field>
                 <Field label="Nama Unit" required>
-                  <Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="bg-slate-900 border-slate-700" />
+                  <Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </Field>
                 <Field label="Tipe">
-                  <select value={editing.type} onChange={(e) => setEditing({ ...editing, type: e.target.value })} className="h-10 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white">
+                  <select value={editing.type} onChange={(e) => setEditing({ ...editing, type: e.target.value })} className="h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm text-white">
                     {SPACE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
                   </select>
                 </Field>
@@ -375,7 +375,7 @@ export default function CmsSpacesStationPage() {
                         tenantId: status === "TERISI" ? editing.tenantId : null,
                       });
                     }}
-                    className="h-10 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white"
+                    className="h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm text-white"
                   >
                     {STATUSES.map((status) => (
                       <option key={status} value={status}>
@@ -397,7 +397,7 @@ export default function CmsSpacesStationPage() {
                           tenantBrand: tenant?.brandName ?? null,
                         });
                       }}
-                      className="h-10 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white"
+                      className="h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm text-white"
                     >
                       <option value="">Pilih penyewa</option>
                       {tenants.map((tenant) => (
@@ -407,7 +407,7 @@ export default function CmsSpacesStationPage() {
                       ))}
                     </select>
                     <div className="mt-2 flex items-center justify-between gap-3">
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-[#A88990]">
                         Memilih penyewa akan membuat status occupancy unit menjadi terisi.
                       </p>
                       <Link
@@ -420,38 +420,38 @@ export default function CmsSpacesStationPage() {
                   </Field>
                 )}
                 <Field label="Luas (m2)">
-                  <Input type="number" value={editing.area} onChange={(e) => setEditing({ ...editing, area: Number(e.target.value) })} className="bg-slate-900 border-slate-700" />
+                  <Input type="number" value={editing.area} onChange={(e) => setEditing({ ...editing, area: Number(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </Field>
                 <Field label="Sewa Bulanan (Rp)">
-                  <Input type="number" value={editing.monthlyRent} onChange={(e) => setEditing({ ...editing, monthlyRent: Number(e.target.value) })} className="bg-slate-900 border-slate-700" />
+                  <Input type="number" value={editing.monthlyRent} onChange={(e) => setEditing({ ...editing, monthlyRent: Number(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </Field>
                 <Field label="Deposit">
-                  <Input type="number" value={editing.deposit} onChange={(e) => setEditing({ ...editing, deposit: Number(e.target.value) })} className="bg-slate-900 border-slate-700" />
+                  <Input type="number" value={editing.deposit} onChange={(e) => setEditing({ ...editing, deposit: Number(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </Field>
                 <Field label="Eksposur Penumpang / Hari">
-                  <Input type="number" value={editing.exposure} onChange={(e) => setEditing({ ...editing, exposure: Number(e.target.value) })} className="bg-slate-900 border-slate-700" />
+                  <Input type="number" value={editing.exposure} onChange={(e) => setEditing({ ...editing, exposure: Number(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </Field>
                 <Field label="Lantai" required>
-                  <Input value={editing.floor} onChange={(e) => setEditing({ ...editing, floor: e.target.value })} className="bg-slate-900 border-slate-700" />
+                  <Input value={editing.floor} onChange={(e) => setEditing({ ...editing, floor: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </Field>
                 <Field label="Lokasi" required>
-                  <Input value={editing.location} onChange={(e) => setEditing({ ...editing, location: e.target.value })} className="bg-slate-900 border-slate-700" />
+                  <Input value={editing.location} onChange={(e) => setEditing({ ...editing, location: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </Field>
                 <Field label="Exit Terdekat">
-                  <Input value={editing.nearestExit ?? ""} onChange={(e) => setEditing({ ...editing, nearestExit: e.target.value })} className="bg-slate-900 border-slate-700" />
+                  <Input value={editing.nearestExit ?? ""} onChange={(e) => setEditing({ ...editing, nearestExit: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </Field>
                 <Field label="Daya Listrik">
-                  <Input value={editing.powerSupply ?? ""} onChange={(e) => setEditing({ ...editing, powerSupply: e.target.value })} placeholder="contoh: 2200 VA" className="bg-slate-900 border-slate-700" />
+                  <Input value={editing.powerSupply ?? ""} onChange={(e) => setEditing({ ...editing, powerSupply: e.target.value })} placeholder="contoh: 2200 VA" className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </Field>
                 <div className="md:col-span-2">
                   <Label>Daftar Fasilitas Terdekat</Label>
-                  <div className="mt-2 grid gap-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="mt-2 grid gap-2 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]/60 p-4 sm:grid-cols-2 lg:grid-cols-3">
                     {FACILITY_ICONS.map((facility) => {
                       const checked = editing.nearbyFacilities.includes(facility.id);
                       return (
                         <label
                           key={facility.id}
-                          className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-700/80 bg-slate-950/50 px-3 py-2.5 text-sm text-slate-200 transition hover:border-slate-500"
+                          className="flex cursor-pointer items-center gap-3 rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/50 px-3 py-2.5 text-sm text-[#F8ECEE] transition hover:border-[rgba(255,214,218,0.28)]"
                         >
                           <input
                             type="checkbox"
@@ -472,18 +472,18 @@ export default function CmsSpacesStationPage() {
                   </div>
                 </div>
                 <Field label="URL Foto/Panorama Unit">
-                  <Input value={editing.panoramaUrl ?? ""} onChange={(e) => setEditing({ ...editing, panoramaUrl: e.target.value })} className="bg-slate-900 border-slate-700" />
+                  <Input value={editing.panoramaUrl ?? ""} onChange={(e) => setEditing({ ...editing, panoramaUrl: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </Field>
-                <div className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 md:col-span-2 md:grid-cols-3">
-                  <label className="flex items-center gap-3 text-sm text-slate-200">
+                <div className="grid gap-3 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]/60 p-4 md:col-span-2 md:grid-cols-3">
+                  <label className="flex items-center gap-3 text-sm text-[#F8ECEE]">
                     <input type="checkbox" checked={editing.waterAccess} onChange={(e) => setEditing({ ...editing, waterAccess: e.target.checked })} />
                     Air bersih tersedia
                   </label>
-                  <label className="flex items-center gap-3 text-sm text-slate-200">
+                  <label className="flex items-center gap-3 text-sm text-[#F8ECEE]">
                     <input type="checkbox" checked={editing.airConditioning} onChange={(e) => setEditing({ ...editing, airConditioning: e.target.checked })} />
                     AC tersedia
                   </label>
-                  <Label className="flex cursor-pointer items-center gap-3 text-sm text-slate-200">
+                  <Label className="flex cursor-pointer items-center gap-3 text-sm text-[#F8ECEE]">
                     <Upload className="h-4 w-4" />
                     Upload foto unit
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadSpacePhoto(e.target.files[0])} />
@@ -491,15 +491,15 @@ export default function CmsSpacesStationPage() {
                 </div>
                 <div className="md:col-span-2">
                   <Label>Deskripsi</Label>
-                  <Textarea value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} className="mt-2 min-h-28 bg-slate-900 border-slate-700" />
+                  <Textarea value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} className="mt-2 min-h-28 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </div>
               </div>
               {message && <p className="mt-4 text-sm text-amber-300">{message}</p>}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-slate-800 px-6 py-4">
+            <div className="flex items-center justify-end gap-2 border-t border-[rgba(255,214,218,0.14)] px-6 py-4">
               <Button variant="ghost" onClick={() => setEditing(null)}>Batal</Button>
-              <Button onClick={saveSpace} disabled={saving} className="bg-emerald-600 hover:bg-emerald-500">
+              <Button onClick={saveSpace} disabled={saving} className="bg-[#E31E2D] hover:bg-[#c41926]">
                 {saving ? "Menyimpan..." : "Simpan Unit"}
               </Button>
             </div>

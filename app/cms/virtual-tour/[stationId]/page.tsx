@@ -1,23 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useSyncExternalStore } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import { cmsFetch } from "@/lib/cms-fetch";
 import {
-  ArrowLeft,
-  Eye,
-  EyeOff,
-  Save,
   Plus,
   Trash2,
   Upload,
-  MousePointer,
   ArrowRightLeft,
   Store,
   AlertCircle,
@@ -29,14 +24,6 @@ import {
   Loader2,
   X,
   Check,
-  Info,
-  RotateCcw,
-  Crosshair,
-  Copy,
-  Undo2,
-  Redo2,
-  Network,
-  Megaphone,
 } from "lucide-react";
 import { hotspotColor, hotspotLabel, HOTSPOT_SCALE_MIN, HOTSPOT_SCALE_MAX, HOTSPOT_SCALE_DEFAULT, DIRECTION_COMPASS, DIRECTION_LABELS, DIRECTION_ROTATE_DEG, type HotspotDirection } from "@/lib/hotspot-types";
 import {
@@ -74,7 +61,8 @@ import {
 } from "@/lib/scene-initial-view";
 import { buildWalkPathHotspots } from "@/lib/walk-path";
 import type { TourLevel, TourArea } from "@/lib/virtual-tour-structure";
-import type { TourLevelPublic } from "@/lib/tour-types";
+import type { SceneInitialView, TourLevelPublic } from "@/lib/tour-types";
+import { resolveSceneEntryView } from "@/lib/scene-entry-view";
 
 import type { AddMode, HotspotItem } from "@/lib/hotspot-types";
 import {
@@ -90,6 +78,14 @@ import { TourStructureSidebar } from "./TourStructureSidebar";
 import { ManageLevelsDialog } from "./ManageLevelsDialog";
 import { ManageAreaDialog, type AreaDialogState } from "./ManageAreaDialog";
 import { SceneTargetPicker } from "./SceneTargetPicker";
+import { SceneEntryViewDialog, type SceneEntryViewSelection } from "./SceneEntryViewDialog";
+import { EditorToolbar } from "./EditorToolbar";
+import { SpatialAreaInspector } from "./SpatialAreaInspector";
+import { isSpatialHotspotEnabled } from "@/lib/spatial-feature";
+import { normalizeSpatialEntities, spatialEntitiesToSave } from "@/lib/spatial/normalize";
+import { validateSphericalPolygonAuthoring } from "@/lib/spatial/geometry/polygon-validation";
+import type { SpatialEntity, SphericalPoint } from "@/lib/spatial/types";
+import { DEFAULT_SPATIAL_STYLE } from "@/lib/spatial/types";
 import {
   compressPanoramaClient,
   compressImageClient,
@@ -110,6 +106,8 @@ type Scene = {
   order: number;
   hotspots: Omit<HotspotItem, "_id">[];
   canvasData?: unknown;
+  spatialEntities?: unknown;
+  spatialRevision?: number;
   isActive: boolean;
 };
 
@@ -213,7 +211,12 @@ type EditorSnapshot = {
   hotspots: HotspotItem[];
   privacyBlurs: PrivacyBlurItem[];
   canvasData: unknown;
+  spatialEntities: SpatialEntity[];
 };
+
+function tempSpatialId() {
+  return `sp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 /** Saran sceneId otomatis berdasarkan area */
 function suggestSceneId(areaId: string, levelSlug: string, levels: TourLevel[], existingScenes: Scene[]): string {
@@ -245,6 +248,12 @@ type BulkRow = {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
+function subscribeCompactViewport(listener: () => void) {
+  const query = window.matchMedia("(max-width: 1023px)");
+  query.addEventListener("change", listener);
+  return () => query.removeEventListener("change", listener);
+}
+
 export default function VirtualTourEditorPage() {
   const { stationId } = useParams<{ stationId: string }>();
 
@@ -259,8 +268,30 @@ export default function VirtualTourEditorPage() {
   const [selectedBlurId, setSelectedBlurId] = useState<string | null>(null);
   const [addMode, setAddMode] = useState<AddMode>("none");
   const [isPreview, setIsPreview] = useState(false);
+  const [entryViewSelection, setEntryViewSelection] = useState<SceneEntryViewSelection | null>(null);
+  const [previewEntryView, setPreviewEntryView] = useState<{ sceneId: string; view: SceneInitialView } | null>(null);
   const [hasUnsaved, setHasUnsaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const compactViewport = useSyncExternalStore(subscribeCompactViewport,
+    () => window.matchMedia("(max-width: 1023px)").matches, () => false);
+  const [explorerPreference, setExplorerCollapsed] = useState<boolean | null>(null);
+  const [inspectorPreference, setInspectorCollapsed] = useState<boolean | null>(null);
+  const explorerCollapsed = explorerPreference ?? compactViewport;
+  const inspectorCollapsed = inspectorPreference ?? compactViewport;
+  const [pendingSceneIndex, setPendingSceneIndex] = useState<number | null>(null);
+  /** Scene | Point | Spatial | Media | Coverage — konteks mengikuti selection. */
+  type InspectorTab = "scene" | "point" | "spatial" | "media" | "coverage";
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("scene");
+  const spatialEnabled = isSpatialHotspotEnabled();
+  const [spatialEntities, setSpatialEntities] = useState<SpatialEntity[]>([]);
+  /** Saat “Tambah sisi lain”: draft berikutnya auto-taut ke unit yang sama. */
+  const [pendingSpatialUnitLink, setPendingSpatialUnitLink] = useState<{
+    unitId: string | null;
+    spaceCode: string;
+    faceIndex: number;
+  } | null>(null);
+  const [draftSpatialVertices, setDraftSpatialVertices] = useState<SphericalPoint[]>([]);
+  const [selectedSpatialId, setSelectedSpatialId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [bakingPrivacyBlur, setBakingPrivacyBlur] = useState(false);
@@ -302,8 +333,47 @@ export default function VirtualTourEditorPage() {
 
   // ─── Derived ─────────────────────────────────────────────────────────────
   const currentScene = scenes[selectedSceneIndex] ?? null;
+  const currentAreaPlacement = currentScene?.areaId ? findArea(levels, currentScene.areaId) : null;
+  const currentLevel = currentScene
+    ? levels.find((level) => level.id === currentScene.levelId)
+      ?? currentAreaPlacement?.level
+      ?? levels.find((level) => level.slug === currentScene.level)
+    : undefined;
   const selectedHotspot = hotspots.find((h) => h._id === selectedHotspotId) ?? null;
   const selectedBlur = privacyBlurs.find((b) => b._id === selectedBlurId) ?? null;
+
+  // Auto-switch inspector konteks saat selection / mode authoring berubah
+  useEffect(() => {
+    if (
+      spatialEnabled &&
+      (selectedSpatialId || addMode === "spatial" || draftSpatialVertices.length > 0)
+    ) {
+      setInspectorTab("spatial");
+      return;
+    }
+    if (selectedHotspot?.type === "ad" || addMode === "ad") {
+      setInspectorTab("media");
+      return;
+    }
+    if (
+      selectedHotspotId ||
+      selectedBlurId ||
+      addMode === "scene" ||
+      addMode === "space" ||
+      addMode === "info" ||
+      addMode === "blur"
+    ) {
+      setInspectorTab("point");
+    }
+  }, [
+    spatialEnabled,
+    selectedSpatialId,
+    draftSpatialVertices.length,
+    addMode,
+    selectedHotspot?.type,
+    selectedHotspotId,
+    selectedBlurId,
+  ]);
   const previewLevels: TourLevelPublic[] = levels
     .filter((level) => level.isActive)
     .map((level) => ({
@@ -336,6 +406,7 @@ export default function VirtualTourEditorPage() {
       : null;
   }
 
+  const spatialEntitiesRef = useRef(spatialEntities);
   useEffect(() => {
     hotspotsRef.current = hotspots;
   }, [hotspots]);
@@ -343,6 +414,10 @@ export default function VirtualTourEditorPage() {
   useEffect(() => {
     privacyBlursRef.current = privacyBlurs;
   }, [privacyBlurs]);
+
+  useEffect(() => {
+    spatialEntitiesRef.current = spatialEntities;
+  }, [spatialEntities]);
 
   useEffect(() => {
     currentSceneRef.current = currentScene;
@@ -366,12 +441,17 @@ export default function VirtualTourEditorPage() {
       canvasData: currentSceneRef.current?.canvasData
         ? JSON.parse(JSON.stringify(currentSceneRef.current.canvasData))
         : undefined,
+      spatialEntities: JSON.parse(
+        JSON.stringify(spatialEntitiesRef.current)
+      ) as SpatialEntity[],
     };
   }
 
   function applySnapshot(snap: EditorSnapshot) {
     setHotspots(snap.hotspots);
     setPrivacyBlurs(snap.privacyBlurs);
+    setSpatialEntities(snap.spatialEntities ?? []);
+    setDraftSpatialVertices([]);
     setScenes((prev) =>
       prev.map((s, i) =>
         i === selectedSceneIndex ? { ...s, canvasData: snap.canvasData } : s
@@ -409,8 +489,11 @@ export default function VirtualTourEditorPage() {
   function restoreSceneState(scene: Scene) {
     setHotspots(sceneToHotspots(scene));
     setPrivacyBlurs(sceneToPrivacyBlurs(scene));
+    setSpatialEntities(normalizeSpatialEntities(scene.spatialEntities, scene.sceneId));
+    setDraftSpatialVertices([]);
     setSelectedHotspotId(null);
     setSelectedBlurId(null);
+    setSelectedSpatialId(null);
     setAddMode("none");
     setHasUnsaved(false);
     clearHistory();
@@ -481,12 +564,15 @@ export default function VirtualTourEditorPage() {
       const idx = keepIndex !== undefined && keepIndex < scData.length ? keepIndex : 0;
       setSelectedSceneIndex(idx);
       rememberSavedScene(scData[idx]);
-      setHotspots(sceneToHotspots(scData[idx]));
-      setPrivacyBlurs(sceneToPrivacyBlurs(scData[idx]));
+      restoreSceneState(scData[idx]);
     } else {
       rememberSavedScene(null);
       setHotspots([]);
       setPrivacyBlurs([]);
+      setSpatialEntities([]);
+      setDraftSpatialVertices([]);
+      setSelectedSpatialId(null);
+      clearHistory();
     }
     setHasUnsaved(false);
   }
@@ -497,35 +583,17 @@ export default function VirtualTourEditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stationId]);
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (e.ctrlKey && e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      } else if (e.ctrlKey && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
-        e.preventDefault();
-        redo();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSceneIndex]);
-
   // ─── Scene selection ─────────────────────────────────────────────────────
   function selectScene(index: number) {
+    if (index === selectedSceneIndex) return;
     if (hasUnsaved) {
-      if (!confirm("Ada perubahan yang belum disimpan. Pindah scene?")) return;
-      // Kembalikan scene lama ke snapshot tersimpan sebelum pindah
-      const saved = savedSceneRef.current;
-      if (saved) {
-        setScenes((prev) =>
-          prev.map((s) => (s.sceneId === saved.sceneId ? { ...saved } : s))
-        );
-      }
+      setPendingSceneIndex(index);
+      return;
     }
+    switchScene(index);
+  }
+
+  function switchScene(index: number) {
     const next = scenes[index];
     if (!next) return;
     setSelectedSceneIndex(index);
@@ -599,8 +667,7 @@ export default function VirtualTourEditorPage() {
       setSelectedSceneIndex(finalIdx);
       if (scData[finalIdx]) {
         rememberSavedScene(scData[finalIdx]);
-        setHotspots(sceneToHotspots(scData[finalIdx]));
-        setPrivacyBlurs(sceneToPrivacyBlurs(scData[finalIdx]));
+        restoreSceneState(scData[finalIdx]);
       }
     } catch {
       showToast("err", "Gagal mengubah urutan");
@@ -610,7 +677,7 @@ export default function VirtualTourEditorPage() {
   // ─── Canvas handlers ─────────────────────────────────────────────────────
   const handleHotspotAdd = useCallback(
     (yaw: number, pitch: number) => {
-      if (addMode === "blur") return;
+      if (addMode === "blur" || addMode === "pan" || addMode === "spatial" || addMode === "none") return;
       pushHistory();
       const type =
         addMode === "scene"
@@ -666,7 +733,8 @@ export default function VirtualTourEditorPage() {
     setHasUnsaved(true);
   }, [pushHistory]);
 
-  function previewNavigateScene(sceneId: string) {
+  function previewNavigateScene(sceneId: string, entryView?: SceneInitialView) {
+    setPreviewEntryView(entryView ? { sceneId, view: entryView } : null);
     const updatedScenes = scenes.map((s, i) =>
       i === selectedSceneIndex
         ? {
@@ -699,7 +767,7 @@ export default function VirtualTourEditorPage() {
 
   const handleHotspotSelect = useCallback((id: string | null) => {
     setSelectedHotspotId(id);
-    if (id) setSelectedBlurId(null);
+    if (id) { setSelectedBlurId(null); setSelectedSpatialId(null); }
   }, []);
 
   const handleHotspotDelete = useCallback((id: string) => {
@@ -722,7 +790,7 @@ export default function VirtualTourEditorPage() {
 
   const handleBlurSelect = useCallback((id: string | null) => {
     setSelectedBlurId(id);
-    if (id) setSelectedHotspotId(null);
+    if (id) { setSelectedHotspotId(null); setSelectedSpatialId(null); }
   }, []);
 
   const handleBlurDelete = useCallback((id: string) => {
@@ -732,9 +800,208 @@ export default function VirtualTourEditorPage() {
     setHasUnsaved(true);
   }, [pushHistory]);
 
-  // ─── Save scene ──────────────────────────────────────────────────────────
-  async function saveScene() {
+  const handleSpatialSelect = useCallback((id: string | null) => {
+    setSelectedSpatialId(id);
+    if (id) {
+      setSelectedHotspotId(null);
+      setSelectedBlurId(null);
+      setAddMode("none");
+    }
+  }, []);
+
+  const handleSpatialVertexAdd = useCallback(
+    (yaw: number, pitch: number) => {
+      if (!spatialEnabled) return;
+      setDraftSpatialVertices((prev) => {
+        if (prev.length >= 64) return prev;
+        return [...prev, { yaw, pitch }];
+      });
+      setSelectedSpatialId(null);
+      setHasUnsaved(true);
+    },
+    [spatialEnabled]
+  );
+
+  const commitSpatialDraft = useCallback(() => {
     if (!currentScene) return;
+    const validated = validateSphericalPolygonAuthoring(draftSpatialVertices);
+    if (!validated.ok) {
+      showToast("err", validated.reason);
+      return;
+    }
+    pushHistory();
+    const link = pendingSpatialUnitLink;
+    const faceLabel = link
+      ? `Sisi ${link.faceIndex} · ${link.spaceCode}`
+      : "Spatial Area";
+    const linkedSpace = link
+      ? stationSpaces.find((s) => s.code === link.spaceCode)
+      : undefined;
+    const statusColor = linkedSpace ? spaceStatusColor(linkedSpace.status) : null;
+    const entity: SpatialEntity = {
+      id: tempSpatialId(),
+      kind: "SPATIAL_AREA",
+      sceneId: currentScene.sceneId,
+      label: faceLabel,
+      unitId: link?.unitId ?? null,
+      spaceCode: link?.spaceCode ?? null,
+      geometry: { type: "spherical_polygon", vertices: validated.vertices },
+      style: {
+        ...DEFAULT_SPATIAL_STYLE,
+        ...(statusColor
+          ? { fillColor: statusColor, strokeColor: statusColor }
+          : {}),
+      },
+      action: link
+        ? { type: "unit_detail", targetId: link.unitId }
+        : { type: "none" },
+      enabled: true,
+      schemaVersion: 1,
+      revision: 1,
+    };
+    setSpatialEntities((prev) => [...prev, entity]);
+    setDraftSpatialVertices([]);
+    setPendingSpatialUnitLink(null);
+    setSelectedSpatialId(entity.id);
+    setAddMode("none");
+    setHasUnsaved(true);
+  }, [
+    currentScene,
+    draftSpatialVertices,
+    pendingSpatialUnitLink,
+    pushHistory,
+    stationSpaces,
+  ]);
+
+  const cancelSpatialDraft = useCallback(() => {
+    setDraftSpatialVertices([]);
+    setPendingSpatialUnitLink(null);
+    setAddMode("none");
+  }, []);
+
+  const startSiblingSpatialFace = useCallback(
+    (from: SpatialEntity) => {
+      const code = from.spaceCode?.trim();
+      if (!code) {
+        showToast("err", "Tautkan unit dulu sebelum menambah sisi lain.");
+        return;
+      }
+      const siblings = spatialEntities.filter((e) => e.spaceCode === code);
+      setPendingSpatialUnitLink({
+        unitId: from.unitId ?? null,
+        spaceCode: code,
+        faceIndex: siblings.length + 1,
+      });
+      setDraftSpatialVertices([]);
+      setSelectedSpatialId(null);
+      setSelectedHotspotId(null);
+      setSelectedBlurId(null);
+      setAddMode("spatial");
+      setHasUnsaved(true);
+      showToast(
+        "ok",
+        `Gambar sisi ${siblings.length + 1} untuk ${code} — klik sudut, lalu Selesaikan area`
+      );
+    },
+    [spatialEntities]
+  );
+
+  const updateSelectedSpatial = useCallback(
+    (patch: Partial<SpatialEntity>) => {
+      if (!selectedSpatialId) return;
+      pushHistory();
+      setSpatialEntities((prev) =>
+        prev.map((e) =>
+          e.id === selectedSpatialId
+            ? {
+                ...e,
+                ...patch,
+                style: patch.style ? { ...e.style, ...patch.style } : e.style,
+                action: patch.action ?? e.action,
+                revision: e.revision + 1,
+              }
+            : e
+        )
+      );
+      setHasUnsaved(true);
+    },
+    [pushHistory, selectedSpatialId]
+  );
+
+  const deleteSelectedSpatial = useCallback(() => {
+    if (!selectedSpatialId) return;
+    pushHistory();
+    setSpatialEntities((prev) => prev.filter((e) => e.id !== selectedSpatialId));
+    setSelectedSpatialId(null);
+    setHasUnsaved(true);
+  }, [pushHistory, selectedSpatialId]);
+
+  const selectedSpatial =
+    spatialEntities.find((e) => e.id === selectedSpatialId) ?? null;
+
+  const draftSpatialCheck =
+    draftSpatialVertices.length >= 3
+      ? validateSphericalPolygonAuthoring(draftSpatialVertices)
+      : null;
+  const draftSpatialWarning =
+    draftSpatialCheck && !draftSpatialCheck.ok ? draftSpatialCheck.reason : null;
+
+  function commitSpatialGeometry(id: string, vertices: SphericalPoint[]) {
+    const result = validateSphericalPolygonAuthoring(vertices);
+    if (!result.ok) { showToast("err", result.reason); return; }
+    pushHistory();
+    setSpatialEntities((current) => current.map((entity) => entity.id === id ? {
+      ...entity,
+      geometry: { type: "spherical_polygon", vertices: result.vertices },
+      revision: entity.revision + 1,
+    } : entity));
+    setHasUnsaved(true);
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target;
+      if (target instanceof Element && target.closest("input, textarea, select, [contenteditable=true], [role=dialog]")) return;
+      if (isPreview) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo(); else undo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault(); redo();
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (addMode === "spatial" && e.key === "Enter") {
+          // Let focused buttons / SVG vertex controls handle their own Enter.
+          if (target instanceof Element && target.closest("button, [role=button]")) return;
+          e.preventDefault(); commitSpatialDraft();
+        } else if (e.key === "Escape") {
+          e.preventDefault(); cancelSpatialDraft(); setSelectedSpatialId(null);
+        } else if (addMode === "spatial" && e.key === "Backspace") {
+          e.preventDefault(); setDraftSpatialVertices((current) => current.slice(0, -1));
+        } else if (e.key.toLowerCase() === "g" && spatialEnabled) setAddMode("spatial");
+        else if (e.key.toLowerCase() === "h") setAddMode("pan");
+        else if (e.key.toLowerCase() === "v") setAddMode("none");
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // History reads the current scene through refs; rebuild shortcuts for draw state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addMode, isPreview, selectedSceneIndex, spatialEnabled, commitSpatialDraft, cancelSpatialDraft]);
+
+  useEffect(() => {
+    if (!hasUnsaved) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasUnsaved]);
+
+  // ─── Save scene ──────────────────────────────────────────────────────────
+  async function saveScene(spatialOperation: "draft" | "publish" = "draft") {
+    if (!currentScene || saving) return false;
+    if (draftSpatialVertices.length > 0) {
+      showToast("err", "Selesaikan atau batalkan gambar area sebelum menyimpan.");
+      return false;
+    }
     setSaving(true);
     try {
       const res = await cmsFetch(
@@ -751,26 +1018,36 @@ export default function VirtualTourEditorPage() {
             isActive: currentScene.isActive,
             hotspots: hotspotsToSave(hotspots),
             canvasData: sceneCanvasWithBlurs(currentScene, privacyBlurs),
+            ...(spatialEnabled
+              ? {
+                  spatialEntities: spatialEntitiesToSave(spatialEntities),
+                  spatialRevision: currentScene.spatialRevision ?? 0,
+                  spatialOperation,
+                }
+              : {}),
           }),
         }
       );
       if (res.ok) {
-        showToast("ok", "Scene disimpan");
+        const saved: Scene = await res.json();
+        showToast("ok", spatialEnabled
+          ? spatialOperation === "publish" ? "Area dipublikasikan. Perubahan scene disimpan." : "Draft area disimpan. Perubahan pin/scene tetap mengikuti Simpan."
+          : "Scene disimpan");
         setHasUnsaved(false);
-        rememberSavedScene({
-          ...currentScene,
-          hotspots: hotspotsToSave(hotspots),
-          canvasData: sceneCanvasWithBlurs(currentScene, privacyBlurs),
-        });
-        load(selectedSceneIndex);
+        rememberSavedScene(saved);
+        setScenes((current) => current.map((scene) => scene.sceneId === saved.sceneId ? saved : scene));
+        setSpatialEntities(normalizeSpatialEntities(saved.spatialEntities, saved.sceneId));
+        return true;
       } else {
-        showToast("err", "Gagal menyimpan scene");
+        const error = await res.json().catch(() => null);
+        showToast("err", error?.error ?? "Gagal menyimpan scene. Perubahan lokal tetap ada.");
       }
     } catch {
       showToast("err", "Error jaringan");
     } finally {
       setSaving(false);
     }
+    return false;
   }
 
   // ─── Bake blur ke piksel panorama lalu upload ─────────────────────────────
@@ -1139,6 +1416,7 @@ export default function VirtualTourEditorPage() {
         prev.map((h) => {
           if (h._id !== selectedHotspotId) return h;
           const next: HotspotItem = { ...h, type: newType };
+          if (newType !== "scene") delete next.targetView;
           if (newType === "scene") {
             delete next.spaceCode;
             delete next.description;
@@ -1180,9 +1458,10 @@ export default function VirtualTourEditorPage() {
         })
       );
     } else {
+      if (field === "sceneId") pushHistory();
       setHotspots((prev) =>
         prev.map((h) =>
-          h._id === selectedHotspotId ? { ...h, [field]: value } : h
+          h._id === selectedHotspotId ? { ...h, [field]: value, ...(field === "sceneId" ? { targetView: undefined } : {}) } : h
         )
       );
     }
@@ -1218,6 +1497,13 @@ export default function VirtualTourEditorPage() {
     showToast("ok", "View awal diset dari posisi kamera saat ini");
   }
 
+  function setHotspotEntryView(hotspotId: string, sceneId: string, view?: SceneInitialView) {
+    if (!hotspots.some((h) => h._id === hotspotId && h.type === "scene" && h.sceneId === sceneId)) return;
+    pushHistory();
+    setHotspots((previous) => previous.map((h) => h._id === hotspotId ? { ...h, targetView: view } : h));
+    setHasUnsaved(true);
+  }
+
   function duplicateSelected() {
     if (selectedHotspot) {
       pushHistory();
@@ -1246,13 +1532,13 @@ export default function VirtualTourEditorPage() {
     }
   }
 
-  function jumpToHotspot(sceneId: string, hotspotIndex: number) {
+  function jumpToHotspot(sceneId: string, hotspotIndex: number, spatialId?: string) {
     const idx = scenes.findIndex((s) => s.sceneId === sceneId);
     if (idx < 0) return;
     const scene = scenes[idx];
     const hs = sceneToHotspots(scene);
     const target = hs[hotspotIndex];
-    if (!target) return;
+    if (!target && !spatialId) return;
 
     if (idx !== selectedSceneIndex) {
       if (hasUnsaved) {
@@ -1266,12 +1552,10 @@ export default function VirtualTourEditorPage() {
       }
       setSelectedSceneIndex(idx);
       rememberSavedScene(scene);
-      setHotspots(hs);
-      setPrivacyBlurs(sceneToPrivacyBlurs(scene));
-      setHasUnsaved(false);
-      clearHistory();
+      restoreSceneState(scene);
     }
-    setSelectedHotspotId(target._id);
+    setSelectedHotspotId(spatialId ? null : target?._id ?? null);
+    setSelectedSpatialId(spatialId ?? null);
     setSelectedBlurId(null);
     setAddMode("none");
   }
@@ -1495,196 +1779,74 @@ export default function VirtualTourEditorPage() {
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="cms-vt-editor flex h-full min-h-0 w-full flex-col overflow-hidden">
-      {/* ── Top Toolbar ─────────────────────────────────────────────────── */}
-      <div className="relative z-30 flex shrink-0 items-center gap-3 px-4 py-3 bg-[#261015] border-b border-[rgba(255,214,218,0.14)]">
-        <Button asChild variant="ghost" size="sm" className="text-[#C4A8AD] hover:text-[#F8ECEE] shrink-0">
-          <Link href="/cms/virtual-tour">
-            <ArrowLeft className="h-4 w-4 mr-1" /> Kembali
-          </Link>
-        </Button>
-
-        <div className="h-5 w-px bg-[#4A1F28]" />
-
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[#C4A8AD] text-sm shrink-0">Station Virtual Tour</span>
-          <span className="text-[#A88990]">›</span>
-          <span className="text-[#F8ECEE] text-sm font-semibold truncate">
-            {station?.name ?? "…"}
-          </span>
-          {currentScene && (
-            <>
-              <span className="text-[#A88990]">›</span>
-              <span
-                className="text-sm font-medium truncate"
-                style={{ color: getLevelConfig(currentScene.level, levels).color }}
-              >
-                {currentScene.title}
-              </span>
-            </>
-          )}
-        </div>
-
-        <div className="flex-1" />
-
-        {/* Mode toolbar */}
-        <div className="flex items-center gap-1 bg-[#3A161C] rounded-lg p-1">
-          <button
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "none" ? "bg-[#E31E2D] text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
-            }`}
-            onClick={() => setAddMode("none")}
-            title="Mode Seleksi"
-          >
-            <MousePointer className="h-3.5 w-3.5" /> Pilih
-          </button>
-          <button
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "scene" ? "bg-emerald-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
-            }`}
-            onClick={() => setAddMode((m) => (m === "scene" ? "none" : "scene"))}
-            title="Tambah hotspot scene"
-          >
-            <ArrowRightLeft className="h-3.5 w-3.5" /> + Scene
-          </button>
-          <button
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "space" ? "bg-amber-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
-            }`}
-            onClick={() => setAddMode((m) => (m === "space" ? "none" : "space"))}
-            title="Tambah hotspot unit"
-          >
-            <Store className="h-3.5 w-3.5" /> + Unit
-          </button>
-          <button
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "info" ? "bg-blue-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
-            }`}
-            onClick={() => setAddMode((m) => (m === "info" ? "none" : "info"))}
-            title="Tambah hotspot info"
-          >
-            <Info className="h-3.5 w-3.5" /> + Info
-          </button>
-          <button
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "ad" ? "bg-purple-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
-            }`}
-            onClick={() => setAddMode((m) => (m === "ad" ? "none" : "ad"))}
-            title="Tambah hotspot iklan"
-          >
-            <Megaphone className="h-3.5 w-3.5" /> + Iklan
-          </button>
-          <button
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              addMode === "blur" ? "bg-[#E31E2D] text-white ring-1 ring-purple-500/50" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
-            }`}
-            onClick={() => setAddMode((m) => (m === "blur" ? "none" : "blur"))}
-            title="Tambah blur privasi (wajah, dll.)"
-          >
-            <EyeOff className="h-3.5 w-3.5" /> + Blur
-          </button>
-        </div>
-
-        <div className="h-5 w-px bg-[#4A1F28]" />
-
-        <div className="flex items-center gap-1 bg-[#3A161C] rounded-lg p-1">
-          <button
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:opacity-30 disabled:pointer-events-none"
-            onClick={undo}
-            disabled={!canUndo}
-            title="Undo (Ctrl+Z)"
-          >
-            <Undo2 className="h-3.5 w-3.5" />
-          </button>
-          <button
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:opacity-30 disabled:pointer-events-none"
-            onClick={redo}
-            disabled={!canRedo}
-            title="Redo (Ctrl+Y)"
-          >
-            <Redo2 className="h-3.5 w-3.5" />
-          </button>
-          <button
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:opacity-30 disabled:pointer-events-none"
-            onClick={duplicateSelected}
-            disabled={!selectedHotspot && !selectedBlur}
-            title="Duplikat hotspot/blur terpilih"
-          >
-            <Copy className="h-3.5 w-3.5" />
-          </button>
-          <button
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:opacity-30 disabled:pointer-events-none"
-            onClick={handleSetInitialView}
-            disabled={!currentScene || isPreview}
-            title="Set view awal dari posisi kamera"
-          >
-            <Crosshair className="h-3.5 w-3.5" />
-          </button>
-          <button
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE]"
-            onClick={() => setShowConnectionMap(true)}
-            title="Peta koneksi antar scene"
-          >
-            <Network className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <div className="h-5 w-px bg-[#4A1F28]" />
-
-        {/* Preview toggle — Edit = Pannellum 3D editor, Preview = Pannellum full preview */}
-        <button
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-            isPreview
-              ? "bg-purple-600 border-purple-500 text-white"
-              : "bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F0DDE1] hover:border-purple-500 hover:text-purple-300"
-          }`}
-          onClick={() => {
-            setIsPreview((p) => !p);
-            setAddMode("none");
-          }}
-        >
-          {isPreview ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-          {isPreview ? "Kembali Edit" : "Full Preview"}
-        </button>
-
-        {hasUnsaved && (
-          <span className="text-xs text-amber-400 flex items-center gap-1">
-            <AlertCircle className="h-3.5 w-3.5" /> Belum disimpan
-          </span>
-        )}
-
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={resetChanges}
-          disabled={!hasUnsaved || saving || !currentScene}
-          className="border-[rgba(255,214,218,0.22)] bg-[#3A161C] text-[#F8ECEE] hover:bg-[#4A1F28] hover:text-white shrink-0 disabled:opacity-40"
-          title="Buang perubahan yang belum disimpan"
-        >
-          <span className="flex items-center gap-1.5">
-            <RotateCcw className="h-3.5 w-3.5" /> Reset
-          </span>
-        </Button>
-
-        <Button
-          size="sm"
-          onClick={saveScene}
-          disabled={saving || !currentScene}
-          className="bg-emerald-600 hover:bg-emerald-500 shrink-0"
-        >
-          {saving ? (
-            <span className="flex items-center gap-1.5">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Menyimpan…
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5">
-              <Save className="h-3.5 w-3.5" /> Simpan
-            </span>
-          )}
-        </Button>
-      </div>
+      <EditorToolbar
+        stationName={station?.name}
+        sceneTitle={currentScene?.title}
+        sceneLevelLabel={currentLevel?.label ?? (currentScene ? getLevelConfig(currentScene.level, levels).label : undefined)}
+        sceneAreaLabel={currentAreaPlacement?.area.label}
+        sceneLevelColor={
+          currentLevel?.color ?? (currentScene ? getLevelConfig(currentScene.level, levels).color : undefined)
+        }
+        addMode={addMode}
+        setAddMode={(next) => {
+          if (saving) return;
+          const mode = typeof next === "function" ? next(addMode) : next;
+          if (mode !== "spatial") setDraftSpatialVertices([]);
+          if (mode !== "none" && mode !== "pan") setSelectedSpatialId(null);
+          setAddMode(mode);
+        }}
+        spatialEnabled={spatialEnabled}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        canDuplicate={Boolean(selectedHotspot || selectedBlur)}
+        hasUnsaved={hasUnsaved}
+        saving={saving}
+        isPreview={isPreview}
+        hasScene={Boolean(currentScene)}
+        onUndo={undo}
+        onRedo={redo}
+        onDuplicate={duplicateSelected}
+        onSetInitialView={handleSetInitialView}
+        onOpenConnectionMap={() => setShowConnectionMap(true)}
+        onTogglePreview={() => {
+          setPreviewEntryView(null);
+          setIsPreview((p) => !p);
+          setAddMode("none");
+        }}
+        onReset={resetChanges}
+        onSave={() => { void saveScene(); }}
+        onPublishSpatial={() => {
+          if (confirm("Publikasikan area pada scene ini? Pengunjung akan melihat versi area ini setelah publikasi.")) void saveScene("publish");
+        }}
+      />
 
       {/* ── Main Editor Area ─────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <Dialog open={pendingSceneIndex !== null} onOpenChange={(open) => { if (!open) setPendingSceneIndex(null); }}>
+        <DialogContent className="border-white/15 bg-[#261015] text-[#F8ECEE]">
+          <DialogTitle>Perubahan belum disimpan</DialogTitle>
+          <DialogDescription className="text-[#C4A8AD]">
+            Simpan perubahan sebelum pindah scene, buang perubahan, atau lanjutkan mengedit scene ini.
+          </DialogDescription>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" onClick={() => setPendingSceneIndex(null)} disabled={saving}>Batal</Button>
+            <Button variant="outline" disabled={saving} onClick={() => {
+              const index = pendingSceneIndex;
+              const saved = savedSceneRef.current;
+              if (saved) setScenes((current) => current.map((scene) => scene.sceneId === saved.sceneId ? saved : scene));
+              setPendingSceneIndex(null);
+              if (index !== null) switchScene(index);
+            }}>Buang dan pindah</Button>
+            <Button disabled={saving} onClick={async () => {
+              const index = pendingSceneIndex;
+              if (await saveScene()) {
+                setPendingSceneIndex(null);
+                if (index !== null) switchScene(index);
+              }
+            }}>{saving ? "Menyimpan…" : "Simpan dan pindah"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <div className="relative flex flex-1 min-h-0 overflow-hidden" inert={saving}>
 
         <TourStructureSidebar
           levels={levels}
@@ -1705,6 +1867,8 @@ export default function VirtualTourEditorPage() {
           onEditArea={openEditArea}
           onDeleteArea={openDeleteArea}
           onAutoWalkPath={autoWalkPath}
+          collapsed={explorerCollapsed}
+          onToggleCollapse={() => setExplorerCollapsed(!explorerCollapsed)}
         />
 
         {/* ── Center: Canvas / Preview ─────────────────────────────── */}
@@ -1712,18 +1876,19 @@ export default function VirtualTourEditorPage() {
           {currentScene ? (
             isPreview ? (
               <PannellumPreview
-                key={`preview-${currentScene.sceneId}-${hotspots.length}-${privacyBlurs.length}`}
+                key={`preview-${currentScene.sceneId}-${hotspots.length}-${privacyBlurs.length}-${spatialEntities.length}`}
                 panoramaUrl={currentScene.panoramaUrl}
                 hotspots={hotspots}
                 privacyBlurs={privacyBlurs}
                 sceneId={currentScene.sceneId}
                 sceneName={currentScene.title}
-                scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
+                scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title, initialView: extractInitialViewFromCanvasData(s.canvasData) }))}
                 levels={previewLevels}
                 spaces={stationSpaces}
+                spatialEntities={spatialEnabled ? spatialEntities : []}
                 stationName={station?.name ?? ""}
                 onSceneNavigate={previewNavigateScene}
-                initialView={extractInitialViewFromCanvasData(currentScene.canvasData)}
+                initialView={previewEntryView?.sceneId === currentScene.sceneId ? previewEntryView.view : extractInitialViewFromCanvasData(currentScene.canvasData)}
               />
             ) : (
               /* Edit — Pannellum 3D statis (no auto-rotate), klik untuk pasang hotspot */
@@ -1748,6 +1913,14 @@ export default function VirtualTourEditorPage() {
                 scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
                 initialView={extractInitialViewFromCanvasData(currentScene.canvasData) ?? null}
                 privacyBlurGuideOnly={privacyBlurGuideOnly}
+                spatialEntities={spatialEnabled ? spatialEntities : []}
+                draftSpatialVertices={spatialEnabled ? draftSpatialVertices : []}
+                selectedSpatialId={selectedSpatialId}
+                onSpatialSelect={handleSpatialSelect}
+                onSpatialVertexAdd={handleSpatialVertexAdd}
+                onSpatialGeometryCommit={commitSpatialGeometry}
+                onSpatialEditError={(message) => showToast("err", message)}
+                onSpatialCloseDraft={commitSpatialDraft}
               />
             )
           ) : (
@@ -1758,15 +1931,156 @@ export default function VirtualTourEditorPage() {
           )}
         </div>
 
-        {/* ── Right: Properties Panel ──────────────────────────────── */}
-        <aside className="w-72 bg-[#261015] border-l border-[rgba(255,214,218,0.14)] flex flex-col flex-none overflow-hidden">
-          <div className="overflow-y-auto flex-1 px-3 py-3 space-y-5">
+        {/* ── Right: Properties / Coverage ──────────────────────────────── */}
+        {inspectorCollapsed ? (
+          <aside className="flex w-10 flex-none flex-col items-center border-l border-[rgba(255,214,218,0.14)] bg-[#261015] py-2">
+            <button
+              type="button"
+              onClick={() => setInspectorCollapsed(false)}
+              className="rounded-md p-1.5 text-[#C4A8AD] hover:bg-[#3A161C] hover:text-[#F8ECEE]"
+              title="Tampilkan Inspector"
+              aria-label="Tampilkan Inspector"
+            >
+              <Store className="h-4 w-4" />
+            </button>
+          </aside>
+        ) : (
+        <aside className="flex w-[300px] flex-none flex-col overflow-hidden border-l border-[rgba(255,214,218,0.14)] bg-[#261015] max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-30 lg:w-80">
+          <div className="flex shrink-0 flex-col gap-1 border-b border-[rgba(255,214,218,0.14)] p-1.5">
+            <div className="flex items-center gap-0.5">
+              {(
+                [
+                  { id: "scene" as const, label: "Scene" },
+                  { id: "point" as const, label: "Point" },
+                  ...(spatialEnabled ? [{ id: "spatial" as const, label: "Spatial" }] : []),
+                  { id: "media" as const, label: "Media" },
+                  { id: "coverage" as const, label: "Coverage" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`min-w-0 flex-1 truncate rounded-full px-1.5 py-1.5 text-[10px] font-semibold transition-colors ${
+                    inspectorTab === tab.id
+                      ? "bg-[#E31E2D] text-white"
+                      : "text-[#C4A8AD] hover:bg-[#3A161C] hover:text-[#F8ECEE]"
+                  }`}
+                  onClick={() => setInspectorTab(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setInspectorCollapsed(true)}
+                className="shrink-0 rounded p-1.5 text-[#C4A8AD] hover:text-[#F8ECEE]"
+                title="Sembunyikan Inspector"
+                aria-label="Sembunyikan Inspector"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-3">
 
+            {inspectorTab === "coverage" ? (
+              currentScene ? (
+              <CoveragePanel
+                spaces={stationSpaces}
+                scenes={scenes.map((s) => ({
+                  sceneId: s.sceneId,
+                  title: s.title,
+                  hotspots: s.sceneId === currentScene.sceneId ? hotspotsToSave(hotspots) : s.hotspots,
+                  spatialEntities:
+                    s.sceneId === currentScene.sceneId
+                      ? spatialEntities
+                      : normalizeSpatialEntities(s.spatialEntities, s.sceneId),
+                }))}
+                currentHotspots={hotspots}
+                currentSceneId={currentScene.sceneId}
+                onJumpTo={jumpToHotspot}
+              />
+              ) : (
+                <p className="text-xs text-[#C4A8AD]">Pilih scene untuk melihat coverage.</p>
+              )
+            ) : inspectorTab === "spatial" ? (
+              spatialEnabled ? (
+                <>
+                <div className="mb-3 space-y-1" role="group" aria-label="Daftar Spatial Area">
+                  {spatialEntities.map((entity) => {
+                    const code = entity.spaceCode?.trim();
+                    const siblings = code
+                      ? spatialEntities.filter((e) => e.spaceCode === code)
+                      : [entity];
+                    const faceNo =
+                      code && siblings.length > 1
+                        ? siblings.findIndex((e) => e.id === entity.id) + 1
+                        : 0;
+                    return (
+                      <button
+                        type="button"
+                        key={entity.id}
+                        className={`block w-full rounded border px-2 py-1.5 text-left text-xs hover:bg-white/10 ${
+                          selectedSpatialId === entity.id
+                            ? "border-emerald-500/50 bg-emerald-950/40 text-[#F8ECEE]"
+                            : "border-white/15 text-[#F8ECEE]"
+                        }`}
+                        aria-pressed={selectedSpatialId === entity.id}
+                        onClick={() => handleSpatialSelect(entity.id)}
+                      >
+                        {faceNo > 0 ? (
+                          <span className="font-mono text-emerald-300">
+                            {code} · sisi {faceNo}/{siblings.length}
+                          </span>
+                        ) : (
+                          entity.label || entity.spaceCode || "Area"
+                        )}
+                        <span className="text-[#A88990]">
+                          {" "}
+                          · {entity.enabled ? "aktif" : "nonaktif"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <SpatialAreaInspector
+                  entity={selectedSpatial}
+                  draftVertexCount={draftSpatialVertices.length}
+                  draftWarning={draftSpatialWarning}
+                  pendingSiblingUnitCode={pendingSpatialUnitLink?.spaceCode ?? null}
+                  siblingFaceCount={
+                    selectedSpatial?.spaceCode
+                      ? spatialEntities.filter(
+                          (e) => e.spaceCode === selectedSpatial.spaceCode
+                        ).length
+                      : 0
+                  }
+                  spaces={stationSpaces}
+                  onUpdate={updateSelectedSpatial}
+                  onDelete={deleteSelectedSpatial}
+                  onCommitDraft={commitSpatialDraft}
+                  onCancelDraft={cancelSpatialDraft}
+                  onAddSiblingFace={
+                    selectedSpatial?.spaceCode
+                      ? () => startSiblingSpatialFace(selectedSpatial)
+                      : undefined
+                  }
+                  scenes={scenes}
+                  onPopLastDraftVertex={() =>
+                    setDraftSpatialVertices((current) => current.slice(0, -1))
+                  }
+                />
+                </>
+              ) : (
+                <p className="text-xs text-[#C4A8AD]">Spatial Area belum diaktifkan.</p>
+              )
+            ) : (
+            <>
             {/* Scene Properties */}
-            {currentScene && (
+            {inspectorTab === "scene" && currentScene && (
               <section>
                 <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider mb-3 pb-2 border-b border-[rgba(255,214,218,0.14)]">
-                  Scene
+                  Scene Properties
                 </h3>
                 <div className="space-y-3">
                   <div>
@@ -1838,6 +2152,13 @@ export default function VirtualTourEditorPage() {
                     </button>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label className="text-xs text-[#F8ECEE]">Arah kamera awal scene</Label>
+                    <Button type="button" variant="outline" size="sm" disabled={isPreview} onClick={handleSetInitialView} className="w-full text-xs">
+                      Gunakan arah kamera saat ini
+                    </Button>
+                  </div>
+
                   {/* Connection info */}
                   <div className="bg-[#3A161C]/60 rounded-lg px-3 py-2 text-xs text-[#C4A8AD] space-y-1">
                     {(() => {
@@ -1883,7 +2204,8 @@ export default function VirtualTourEditorPage() {
                       </div>
                     )}
                     {currentScene.panoramaUrl && (
-                      <div className="mb-2 space-y-0.5">
+                      <details className="mb-2 text-xs text-[#C4A8AD]">
+                        <summary className="cursor-pointer py-1 focus-visible:outline-2 focus-visible:outline-white">Detail aset</summary>
                         <p className="text-[10px] text-[#A88990] font-mono break-all leading-relaxed">
                           {currentScene.panoramaUrl}
                         </p>
@@ -1892,7 +2214,7 @@ export default function VirtualTourEditorPage() {
                             ✓ thumbnail tersedia
                           </p>
                         )}
-                      </div>
+                      </details>
                     )}
                     <label
                       className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg p-2.5 text-xs transition-colors ${
@@ -1921,8 +2243,52 @@ export default function VirtualTourEditorPage() {
               </section>
             )}
 
+            {inspectorTab === "scene" && currentScene && (
+              <section className="rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/40 px-3 py-2.5">
+                <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[#A88990]">
+                  Elemen di scene
+                </h3>
+                <ul className="space-y-1 text-xs text-[#C4A8AD]">
+                  <li className="flex justify-between gap-2">
+                    <span>Point (scene/unit/info)</span>
+                    <span className="font-mono text-[#F8ECEE]">
+                      {hotspots.filter((h) => h.type !== "ad").length}
+                    </span>
+                  </li>
+                  <li className="flex justify-between gap-2">
+                    <span>Media / iklan</span>
+                    <span className="font-mono text-[#F8ECEE]">
+                      {hotspots.filter((h) => h.type === "ad").length}
+                    </span>
+                  </li>
+                  {spatialEnabled && (
+                    <li className="flex justify-between gap-2">
+                      <span>Spatial Area</span>
+                      <span className="font-mono text-[#F8ECEE]">{spatialEntities.length}</span>
+                    </li>
+                  )}
+                  <li className="flex justify-between gap-2">
+                    <span>Blur privasi</span>
+                    <span className="font-mono text-[#F8ECEE]">{privacyBlurs.length}</span>
+                  </li>
+                </ul>
+              </section>
+            )}
+
+            {inspectorTab === "point" && !selectedHotspot && !selectedBlur && (
+              <p className="rounded-lg border border-dashed border-[rgba(255,214,218,0.2)] px-3 py-4 text-center text-xs text-[#C4A8AD]">
+                Pilih pin di kanvas untuk mengedit.
+              </p>
+            )}
+
+            {inspectorTab === "media" && !(selectedHotspot && selectedHotspot.type === "ad") && (
+              <p className="rounded-lg border border-dashed border-[rgba(255,214,218,0.2)] px-3 py-4 text-center text-xs text-[#C4A8AD]">
+                Pilih hotspot iklan untuk mengedit.
+              </p>
+            )}
+
             {/* Blur privasi */}
-            {selectedBlur && (
+            {inspectorTab === "point" && selectedBlur && (
               <section>
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-[rgba(255,214,218,0.14)]">
                   <h3 className="text-xs font-semibold text-purple-400 uppercase tracking-wider">
@@ -1939,8 +2305,8 @@ export default function VirtualTourEditorPage() {
                 <div className="space-y-3">
                   <p className="text-xs text-[#C4A8AD] leading-relaxed">
                     {privacyBlurGuideOnly
-                      ? "Panorama sudah pernah dibake. Kotak ungu = area edit; blur asli ada di gambar. Setelah ubah posisi/ukuran/skala, simpan scene lalu klik «Bake ke panorama» lagi."
-                      : "Preview overlay CSS di editor. Klik «Bake ke panorama» agar blur permanen di gambar (tetap bisa diedit & re-bake)."}
+                      ? "Posisi blur berubah? Simpan, lalu Bake ke panorama lagi."
+                      : "Klik Bake ke panorama untuk menerapkan blur pada foto."}
                   </p>
 
                   <div>
@@ -2048,10 +2414,6 @@ export default function VirtualTourEditorPage() {
                       onChange={(e) => updateBlur("radius", Number(e.target.value))}
                       className="w-full accent-purple-500"
                     />
-                    <p className="text-[10px] text-[#A88990] mt-1 leading-snug">
-                      Membulatkan sudut area blur. Naikkan hingga maks (½ sisi terpendek) untuk bentuk
-                      lingkaran atau kapsul.
-                    </p>
                   </div>
 
                   <div>
@@ -2113,12 +2475,14 @@ export default function VirtualTourEditorPage() {
               </section>
             )}
 
-            {/* Hotspot Properties */}
-            {selectedHotspot && (
+            {/* Hotspot Properties — Point (non-ad) atau Media (ad) */}
+            {selectedHotspot &&
+              ((inspectorTab === "point" && selectedHotspot.type !== "ad") ||
+                (inspectorTab === "media" && selectedHotspot.type === "ad")) && (
               <section>
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-[rgba(255,214,218,0.14)]">
                   <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider">
-                    Hotspot
+                    {selectedHotspot.type === "ad" ? "Media / Iklan" : "Point Hotspot"}
                   </h3>
                   <button
                     onClick={() => handleHotspotDelete(selectedHotspot._id)}
@@ -2183,8 +2547,28 @@ export default function VirtualTourEditorPage() {
                             defaultLevelId={currentScene.levelId}
                             defaultAreaId={currentScene.areaId}
                             syncKey={selectedHotspot._id}
-                            onChange={(sceneId) => updateHotspot("sceneId", sceneId)}
+                            onChange={(sceneId) => { if (sceneId !== selectedHotspot.sceneId) updateHotspot("sceneId", sceneId); }}
                           />
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-[#F8ECEE]">Arah kamera saat tiba</Label>
+                        <p className="text-xs text-[#C4A8AD]" data-scene-entry-status>
+                          {selectedHotspot.targetView
+                            ? `Yaw ${selectedHotspot.targetView.yaw.toFixed(1)}° · Pitch ${selectedHotspot.targetView.pitch.toFixed(1)}° · Zoom ${(selectedHotspot.targetView.hfov ?? 120).toFixed(0)}°`
+                            : "Bawaan scene tujuan"}
+                        </p>
+                        <Button type="button" variant="outline" size="sm" className="w-full text-xs" disabled={!scenes.some((s) => s.sceneId === selectedHotspot.sceneId && s.panoramaUrl)} onClick={() => {
+                          const destination = scenes.find((s) => s.sceneId === selectedHotspot.sceneId);
+                          if (!destination || !currentScene) return;
+                          setEntryViewSelection({
+                            hotspotId: selectedHotspot._id, sourceTitle: currentScene.title,
+                            sceneId: destination.sceneId, title: destination.title, panoramaUrl: destination.panoramaUrl,
+                            initialView: resolveSceneEntryView(selectedHotspot, extractInitialViewFromCanvasData(destination.canvasData)),
+                          });
+                        }}>Atur arah di scene tujuan</Button>
+                        {selectedHotspot.targetView && selectedHotspot.sceneId && (
+                          <button type="button" className="text-xs text-[#C4A8AD] underline hover:text-white" onClick={() => { if (selectedHotspot.sceneId) setHotspotEntryView(selectedHotspot._id, selectedHotspot.sceneId); }}>Ikuti arah bawaan scene</button>
                         )}
                       </div>
                       <div>
@@ -2405,7 +2789,7 @@ export default function VirtualTourEditorPage() {
                           onChange={(e) => updateHotspot("description", e.target.value)}
                           rows={4}
                           className="w-full resize-none rounded-md border border-[rgba(255,214,218,0.18)] bg-[#3A161C] px-3 py-2 text-sm text-[#F8ECEE]"
-                          placeholder="Teks yang muncul di modal info saat diklik pengunjung"
+                          placeholder="Isi informasi"
                         />
                       </div>
                     </>
@@ -2515,14 +2899,11 @@ export default function VirtualTourEditorPage() {
                       </div>
                     </div>
                   </div>
-                  <p className="text-[10px] leading-relaxed text-[#C4A8AD]">
-                    Drag pin di kanvas, atau pakai yaw/pitch di sini. Ukuran mengatur footprint unit.
-                  </p>
                 </div>
               </section>
             )}
 
-            {currentScene && privacyBlurs.length > 0 && (
+            {inspectorTab === "point" && currentScene && privacyBlurs.length > 0 && (
               <section>
                 <div className="flex items-center justify-between mb-2 pb-2 border-b border-[rgba(255,214,218,0.14)] gap-2">
                   <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider">
@@ -2582,25 +2963,13 @@ export default function VirtualTourEditorPage() {
               </section>
             )}
 
-            {currentScene && (
-              <CoveragePanel
-                spaces={stationSpaces}
-                scenes={scenes.map((s) => ({
-                  sceneId: s.sceneId,
-                  title: s.title,
-                  hotspots: s.sceneId === currentScene.sceneId ? hotspotsToSave(hotspots) : s.hotspots,
-                }))}
-                currentHotspots={hotspots}
-                currentSceneId={currentScene.sceneId}
-                onJumpTo={jumpToHotspot}
-              />
-            )}
-
-            {/* Hotspot list — dikategorikan per tipe */}
-            {currentScene && hotspots.length > 0 && (
+            {/* Hotspot list — Point: scene/space/info · Media: ad */}
+            {currentScene &&
+              hotspots.length > 0 &&
+              (inspectorTab === "point" || inspectorTab === "media") && (
               <section className="space-y-4">
                 <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider pb-2 border-b border-[rgba(255,214,218,0.14)]">
-                  Hotspot ({hotspots.length})
+                  {inspectorTab === "media" ? "Daftar Media" : "Daftar Point"}
                 </h3>
 
                 {(
@@ -2610,7 +2979,11 @@ export default function VirtualTourEditorPage() {
                     { type: "ad" as const, color: "#a855f7", accent: "text-purple-400", badge: "bg-purple-950 text-purple-300" },
                     { type: "info" as const, color: "#3b82f6", accent: "text-blue-400", badge: "bg-blue-950 text-blue-300" },
                   ] as const
-                ).map((group) => {
+                )
+                  .filter((group) =>
+                    inspectorTab === "media" ? group.type === "ad" : group.type !== "ad"
+                  )
+                  .map((group) => {
                   const items = hotspots.filter((h) => h.type === group.type);
                   if (items.length === 0) return null;
 
@@ -2716,7 +3089,8 @@ export default function VirtualTourEditorPage() {
               </section>
             )}
 
-            {/* Legend */}
+            {/* Legend (tersembunyi; cadangan panduan) */}
+            {inspectorTab === "scene" && (
             <section className="hidden border-t border-[rgba(255,214,218,0.14)] pt-4">
               <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider mb-2">
                 Panduan
@@ -2755,8 +3129,12 @@ export default function VirtualTourEditorPage() {
                 <li className="flex items-center gap-2"><span>📦</span> Icon kotak = bulk import</li>
               </ul>
             </section>
+            )}
+            </>
+            )}
           </div>
         </aside>
+        )}
       </div>
 
       {/* ── Add Scene Dialog ─────────────────────────────────────────────── */}
@@ -2806,7 +3184,6 @@ export default function VirtualTourEditorPage() {
                   className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] font-mono"
                   required
                 />
-                <p className="text-xs text-[#A88990] mt-1">Huruf kecil, tanpa spasi — auto-generated, bisa diubah</p>
                 {scenes.some((s) => s.sceneId === newSceneId) && (
                   <p className="text-xs text-red-400 mt-1">Scene ID ini sudah digunakan</p>
                 )}
@@ -3000,6 +3377,11 @@ export default function VirtualTourEditorPage() {
         onDelete={deleteLevel}
       />
 
+      {entryViewSelection && <SceneEntryViewDialog selection={entryViewSelection} onClose={() => setEntryViewSelection(null)} onApply={(view) => {
+        setHotspotEntryView(entryViewSelection.hotspotId, entryViewSelection.sceneId, view);
+        setEntryViewSelection(null);
+        showToast("ok", "Arah tiba diterapkan. Klik Simpan untuk menyimpan koneksi.");
+      }} />}
       <ConnectionMapDialog
         open={showConnectionMap}
         onClose={() => setShowConnectionMap(false)}

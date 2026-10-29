@@ -7,10 +7,18 @@ import type { HotspotItem } from "@/lib/hotspot-types";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { spaceStatusColor } from "@/lib/space-availability";
 
+type SpatialCoverageRef = {
+  id?: string;
+  spaceCode?: string | null;
+  unitId?: string | null;
+  enabled?: boolean;
+};
+
 type SceneRef = {
   sceneId: string;
   title: string;
   hotspots: Omit<HotspotItem, "_id">[];
+  spatialEntities?: SpatialCoverageRef[];
 };
 
 type SpaceRef = {
@@ -27,6 +35,7 @@ type Placement = {
   sceneTitle: string;
   hotspotIndex: number;
   hotspotType: "space" | "ad";
+  spatialId?: string;
 };
 
 type Props = {
@@ -34,7 +43,7 @@ type Props = {
   scenes: SceneRef[];
   currentHotspots: HotspotItem[];
   currentSceneId: string | null;
-  onJumpTo: (sceneId: string, hotspotIndex: number) => void;
+  onJumpTo: (sceneId: string, hotspotIndex: number, spatialId?: string) => void;
   hideKindFilters?: boolean;
 };
 
@@ -76,6 +85,21 @@ export function CoveragePanel({
             hotspotType: h.type,
           });
         }
+      });
+
+      // Spatial Area linked units (dedupe by spaceCode)
+      const spatialList = scene.spatialEntities ?? [];
+      spatialList.forEach((ent, index) => {
+        if (ent.enabled === false) return;
+        const code = ent.spaceCode?.trim();
+        if (!code) return;
+        push(code, {
+          sceneId: scene.sceneId,
+          sceneTitle: scene.title,
+          hotspotIndex: index,
+          hotspotType: "space",
+          spatialId: ent.id,
+        });
       });
     }
     return map;
@@ -149,7 +173,7 @@ export function CoveragePanel({
                 {covered ? (
                   <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
                 ) : (
-                  <CircleDashed className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-600" />
+                  <CircleDashed className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#A88990]" />
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
@@ -164,7 +188,7 @@ export function CoveragePanel({
                       <p className="truncate text-[10px] font-semibold text-emerald-400">
                         {space.tenantBrand}
                       </p>
-                      <p className="truncate text-[9px] text-slate-600">{space.name}</p>
+                      <p className="truncate text-[9px] text-[#A88990]">{space.name}</p>
                     </>
                   ) : (
                     <p className="truncate text-[10px] text-[#C4A8AD]">{space.name}</p>
@@ -173,15 +197,15 @@ export function CoveragePanel({
                     <div className="mt-1 flex flex-wrap gap-1">
                       {placements.map((p) => (
                         <button
-                          key={`${p.sceneId}-${p.hotspotIndex}`}
+                          key={`${p.sceneId}-${p.spatialId ?? p.hotspotIndex}`}
                           type="button"
-                          onClick={() => onJumpTo(p.sceneId, p.hotspotIndex)}
+                          onClick={() => onJumpTo(p.sceneId, p.hotspotIndex, p.spatialId)}
                           className="inline-flex items-center gap-0.5 rounded bg-[#3A161C] px-1.5 py-0.5 text-[9px] text-[#F0DDE1] hover:bg-[#4A1F28]"
                           title={`Buka di ${p.sceneTitle}`}
                         >
                           <MapPin className="h-2.5 w-2.5" />
                           {p.sceneTitle}
-                          <span className="text-[#C4A8AD]">({p.hotspotType})</span>
+                          <span className="text-[#C4A8AD]">({p.spatialId ? "spatial" : p.hotspotType})</span>
                         </button>
                       ))}
                     </div>

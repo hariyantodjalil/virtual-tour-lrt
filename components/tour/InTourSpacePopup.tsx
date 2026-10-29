@@ -333,7 +333,7 @@ export default function InTourSpacePopup({
     >
       <div
         ref={panelRef}
-        className={cn(ui.panel, "tour-panel-in flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[440px] flex-col overflow-hidden rounded-2xl sm:max-h-[calc(100dvh-2.5rem)] lg:max-w-[min(100%,1200px)]")}
+        className={cn(ui.panel, "tour-panel-in flex max-h-full w-full max-w-[440px] flex-col overflow-hidden rounded-2xl lg:max-w-[min(100%,1200px)]")}
         style={isForm && lockedHeight ? { height: lockedHeight } : undefined}
       >
         <div className={cn("flex shrink-0 items-center justify-end gap-1 border-b px-4 py-3 sm:px-5 lg:px-8 lg:py-4", ui.hairline)}>

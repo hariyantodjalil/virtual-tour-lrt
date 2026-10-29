@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sceneEntryViewSchema } from "./scene-entry-view";
 
 const id = z.string().trim().min(1).max(128);
 const shortText = z.string().trim().min(1).max(160);
@@ -178,6 +179,17 @@ export const levelOrderSchema = z.object({
   orders: z.array(z.object({ levelId: id, order: safeInteger }).strict()).min(1).max(100),
 }).strict();
 
+// Preserve legacy hotspot fields while validating the new destination camera contract.
+const sceneHotspotsSchema = z.array(z.unknown()).max(200).superRefine((hotspots, ctx) => {
+  hotspots.forEach((hotspot, index) => {
+    if (!hotspot || typeof hotspot !== "object" || !("targetView" in hotspot) || hotspot.targetView === undefined) return;
+    const result = sceneEntryViewSchema.safeParse(hotspot.targetView);
+    if (!result.success) {
+      ctx.addIssue({ code: "custom", path: [index, "targetView"], message: "Arah kamera tujuan tidak valid." });
+    }
+  });
+});
+
 export const sceneCreateSchema = z.object({
   sceneId: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),
   title: shortText,
@@ -186,7 +198,7 @@ export const sceneCreateSchema = z.object({
   areaId: id.optional().nullable(),
   panoramaUrl: z.string().trim().max(2_048).optional(),
   order: safeInteger.optional(),
-  hotspots: z.array(z.unknown()).max(200).optional(),
+  hotspots: sceneHotspotsSchema.optional(),
   isActive: z.boolean().optional(),
 }).strict();
 
@@ -199,7 +211,11 @@ export const sceneUpdateSchema = z.object({
   originalPanoramaUrl: nullableUrl,
   thumbnailUrl: nullableUrl,
   order: safeInteger.optional(),
-  hotspots: z.array(z.unknown()).max(200).optional(),
+  hotspots: sceneHotspotsSchema.optional(),
+  /** Spatial Area entities — validated ketat di route via spatialEntitiesSchema */
+  spatialEntities: z.array(z.unknown()).max(100).optional(),
+    spatialRevision: z.number().int().min(0).max(2_000_000_000).optional(),
+    spatialOperation: z.enum(["draft", "publish"]).optional(),
   canvasData: z.unknown().optional(),
   isActive: z.boolean().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "Minimal satu field harus diisi");

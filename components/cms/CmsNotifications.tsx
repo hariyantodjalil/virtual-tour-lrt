@@ -105,13 +105,13 @@ export default function CmsNotifications() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+        className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE] transition hover:border-[#E31E2D]/40 hover:bg-[#E31E2D] hover:text-white"
         aria-label="Notifikasi"
         aria-expanded={open}
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#D81435] px-1 text-[10px] font-bold text-white">
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#E31E2D] px-1 text-[10px] font-bold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -125,11 +125,11 @@ export default function CmsNotifications() {
             aria-label="Tutup notifikasi"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute top-full right-0 z-50 mt-2 w-[min(100vw-2rem,22rem)] overflow-hidden rounded-2xl border border-white/10 bg-[#0b1628] shadow-2xl shadow-black/50">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <div className="absolute top-full right-0 z-50 mt-2 w-[min(100vw-2rem,22rem)] overflow-hidden rounded-2xl border border-[rgba(255,214,218,0.14)] bg-[#261015] shadow-2xl shadow-black/50">
+            <div className="flex items-center justify-between border-b border-[rgba(255,214,218,0.14)] px-4 py-3">
               <div>
                 <p className="text-sm font-bold text-white">Notifikasi</p>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-[#C4A8AD]">
                   {loaded
                     ? unreadCount > 0
                       ? `${unreadCount} lead baru belum dibaca`
@@ -142,7 +142,7 @@ export default function CmsNotifications() {
                   <button
                     type="button"
                     onClick={markAllRead}
-                    className="rounded-lg px-2 py-1 text-[11px] font-semibold text-emerald-300 transition hover:bg-white/5"
+                    className="rounded-lg px-2 py-1 text-[11px] font-semibold text-[#FF6B4A] transition hover:bg-white/5"
                   >
                     Tandai dibaca
                   </button>
@@ -150,7 +150,7 @@ export default function CmsNotifications() {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/5 hover:text-white"
+                  className="rounded-lg p-1.5 text-[#C4A8AD] transition hover:bg-white/5 hover:text-white"
                   aria-label="Tutup"
                 >
                   <X className="h-4 w-4" />
@@ -160,7 +160,7 @@ export default function CmsNotifications() {
 
             <ul className="max-h-[min(60vh,22rem)] overflow-y-auto">
               {leads.length === 0 && loaded && (
-                <li className="px-4 py-10 text-center text-sm text-slate-500">
+                <li className="px-4 py-10 text-center text-sm text-[#A88990]">
                   Belum ada notifikasi lead baru.
                 </li>
               )}
@@ -169,7 +169,7 @@ export default function CmsNotifications() {
                 const station = lead.space?.station?.name;
                 const unit = lead.space ? `${lead.space.code} · ${lead.space.name}` : null;
                 return (
-                  <li key={lead.id} className="border-b border-white/5 last:border-0">
+                  <li key={lead.id} className="border-b border-[rgba(255,214,218,0.08)] last:border-0">
                     <Link
                       href="/cms/leads"
                       onClick={() => {
@@ -177,14 +177,14 @@ export default function CmsNotifications() {
                         setOpen(false);
                       }}
                       className={`flex gap-3 px-4 py-3 transition hover:bg-white/[0.04] ${
-                        isUnread ? "bg-[#D81435]/[0.06]" : ""
+                        isUnread ? "bg-[#E31E2D]/[0.08]" : ""
                       }`}
                     >
                       <span
                         className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full ${
                           isUnread
-                            ? "bg-[#D81435]/20 text-[#ff6b7a]"
-                            : "bg-white/5 text-slate-400"
+                            ? "bg-[#E31E2D]/20 text-[#FF6B4A]"
+                            : "bg-[#3A161C] text-[#C4A8AD]"
                         }`}
                       >
                         <UserCircle className="size-4" />
@@ -195,19 +195,19 @@ export default function CmsNotifications() {
                             {lead.companyName || lead.contactName}
                           </span>
                           {isUnread && (
-                            <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[#D81435]" />
+                            <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[#E31E2D]" />
                           )}
                         </span>
-                        <span className="mt-0.5 block truncate text-xs text-slate-400">
+                        <span className="mt-0.5 block truncate text-xs text-[#C4A8AD]">
                           {lead.contactName}
                           {lead.businessType ? ` · ${lead.businessType}` : ""}
                         </span>
                         {(unit || station) && (
-                          <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                          <span className="mt-0.5 block truncate text-[11px] text-[#A88990]">
                             {[unit, station].filter(Boolean).join(" · ")}
                           </span>
                         )}
-                        <span className="mt-1 block text-[10px] text-slate-500">
+                        <span className="mt-1 block text-[10px] text-[#A88990]">
                           {timeAgo(lead.createdAt)}
                         </span>
                       </span>
@@ -217,11 +217,11 @@ export default function CmsNotifications() {
               })}
             </ul>
 
-            <div className="border-t border-white/10 p-2">
+            <div className="border-t border-[rgba(255,214,218,0.14)] p-2">
               <Link
                 href="/cms/leads"
                 onClick={() => setOpen(false)}
-                className="flex h-9 w-full items-center justify-center rounded-xl text-xs font-semibold text-emerald-300 transition hover:bg-white/[0.04]"
+                className="flex h-9 w-full items-center justify-center rounded-xl text-xs font-semibold text-[#FF6B4A] transition hover:bg-white/[0.04]"
               >
                 Buka semua leads
               </Link>

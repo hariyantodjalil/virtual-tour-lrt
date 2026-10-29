@@ -5,7 +5,8 @@ import { Grid3X3, Info, Route, X } from "lucide-react";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { HotspotItem } from "@/lib/hotspot-types";
 import type { PrivacyBlurItem } from "@/lib/privacy-blur-types";
-import type { PanoramaScene, TourLevelPublic } from "@/lib/tour-types";
+import type { PanoramaScene, SceneInitialView, TourLevelPublic } from "@/lib/tour-types";
+import { resolveSceneEntryView } from "@/lib/scene-entry-view";
 import { setupHotspotElement, resolveSceneHotspotTitle } from "@/lib/pannellum-hotspot";
 import {
   findSpaceStatus,
@@ -16,6 +17,9 @@ import { formatNumber } from "@/lib/utils";
 import { TourNavigationBar } from "@/components/tour/TourNavigationBar";
 import InTourSpacePopup from "@/components/tour/InTourSpacePopup";
 import InTourInfoPopup from "@/components/tour/InTourInfoPopup";
+import { SpatialOverlay } from "@/components/tour/spatial/SpatialOverlay";
+import type { SpatialEntity } from "@/lib/spatial/types";
+import { runSpatialAction } from "@/lib/spatial/actions";
 
 type CommercialSpace = {
   id: string;
@@ -41,6 +45,7 @@ type CommercialSpace = {
 type PreviewScene = {
   sceneId: string;
   title: string;
+  initialView?: SceneInitialView;
 };
 
 interface Props {
@@ -52,8 +57,9 @@ interface Props {
   scenes?: PreviewScene[];
   levels?: TourLevelPublic[];
   spaces?: CommercialSpace[];
+  spatialEntities?: SpatialEntity[];
   stationName?: string;
-  onSceneNavigate?: (sceneId: string) => void;
+  onSceneNavigate?: (sceneId: string, entryView?: SceneInitialView) => void;
   initialView?: { yaw: number; pitch: number; hfov?: number } | null;
 }
 
@@ -108,6 +114,7 @@ export function PannellumPreview({
   scenes = [],
   levels = [],
   spaces = [],
+  spatialEntities = [],
   stationName = "",
   onSceneNavigate,
   initialView = null,
@@ -120,6 +127,10 @@ export function PannellumPreview({
   const scenesRef = useRef(scenes);
 
   const [selectedSpace, setSelectedSpace] = useState<CommercialSpace | null>(null);
+  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [viewerForOverlay, setViewerForOverlay] = useState<any>(null);
+  const [viewerReady, setViewerReady] = useState(false);
   const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
@@ -157,6 +168,17 @@ export function PannellumPreview({
   }, [scenes]);
 
   useEffect(() => {
+    setContainerEl(containerRef.current);
+  }, []);
+
+  const openSpaceByCode = (code: string) => {
+    const space = spacesRef.current.find((s) => s.code === code);
+    if (space) setSelectedSpace(space);
+  };
+
+  const enabledSpatial = spatialEntities.filter((e) => e.enabled);
+
+  useEffect(() => {
     if (!containerRef.current || !panoramaUrl) return;
     const isMounted = { current: true };
 
@@ -173,19 +195,18 @@ export function PannellumPreview({
           }
           viewerRef.current = null;
         }
+        setViewerReady(false);
+        setViewerForOverlay(null);
 
         const hotSpots = hotspots.map((h) => {
           let onClick: (() => void) | undefined;
 
           if (h.type === "scene" && h.sceneId) {
             const sceneId = h.sceneId;
-            onClick = () => onSceneNavigateRef.current?.(sceneId);
+            onClick = () => onSceneNavigateRef.current?.(sceneId, resolveSceneEntryView(h, scenesRef.current.find((s) => s.sceneId === sceneId)?.initialView));
           } else if (h.type === "space" && h.spaceCode) {
             const code = h.spaceCode;
-            onClick = () => {
-              const space = spacesRef.current.find((s) => s.code === code);
-              if (space) setSelectedSpace(space);
-            };
+            onClick = () => openSpaceByCode(code);
           } else if (h.type === "ad") {
             const code = h.spaceCode;
             const title = h.creativeTitle || h.text;
@@ -255,6 +276,12 @@ export function PannellumPreview({
           ...PANNELLUM_INTERACTION,
           hotSpots: hotSpots,
         });
+        viewerRef.current.on("load", () => {
+          if (!isMounted.current) return;
+          setViewerForOverlay(viewerRef.current);
+          setViewerReady(true);
+          setContainerEl(containerRef.current);
+        });
       } catch (e) {
         console.error("Pannellum preview error:", e);
       }
@@ -287,7 +314,24 @@ export function PannellumPreview({
   return (
     <div className="cms-vt-panorama relative h-full min-h-0 w-full overflow-hidden overscroll-none">
       <div ref={containerRef} className="absolute inset-0" style={{ background: "#1C0A0E" }} />
-      <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(to_bottom,rgba(0,0,0,.42)_0%,transparent_30%,transparent_66%,rgba(0,0,0,.52)_100%)]" />
+      {viewerReady && viewerForOverlay && enabledSpatial.length > 0 && (
+        <SpatialOverlay
+          viewer={viewerForOverlay}
+          container={containerEl}
+          entities={enabledSpatial}
+          interactive
+          resolveSpaceStatus={(code) => findSpaceStatus(spacesRef.current, code)}
+          onEntityClick={(entity) => {
+            runSpatialAction(entity, {
+              openUnit: openSpaceByCode,
+              openScene: (id) => onSceneNavigateRef.current?.(id),
+              openInfo: (title, description) => setInfoPopup({ title, description }),
+            });
+          }}
+        />
+      )}
+      {/* z-[12] di bawah SpatialOverlay (z-15) supaya klik area unit tetap jalan */}
+      <div className="pointer-events-none absolute inset-0 z-[12] bg-[linear-gradient(to_bottom,rgba(0,0,0,.42)_0%,transparent_30%,transparent_66%,rgba(0,0,0,.52)_100%)]" />
 
       {levels.length > 0 && currentScene && (
         <TourNavigationBar

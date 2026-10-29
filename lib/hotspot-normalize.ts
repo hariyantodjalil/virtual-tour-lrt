@@ -6,6 +6,7 @@ import {
   type HotspotType,
 } from "./hotspot-types";
 import { isFacilityIconId } from "./facility-icons";
+import { sceneEntryViewSchema } from "./scene-entry-view";
 
 function normalizeDirection(raw: unknown): HotspotDirection | undefined {
   if (typeof raw !== "string") return undefined;
@@ -44,6 +45,8 @@ export function normalizeHotspots(raw: unknown): Hotspot[] {
       else type = "scene";
     }
 
+    const targetView = type === "scene" ? sceneEntryViewSchema.safeParse(h.targetView) : null;
+
     return {
       pitch,
       yaw,
@@ -51,6 +54,7 @@ export function normalizeHotspots(raw: unknown): Hotspot[] {
       text,
       scale: clampHotspotScale(h.scale),
       ...(type === "scene" && direction ? { direction } : {}),
+      ...(targetView?.success ? { targetView: targetView.data } : {}),
       sceneId,
       spaceCode,
       description,

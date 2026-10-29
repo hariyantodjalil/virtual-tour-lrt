@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import {
   LayoutDashboard,
   LogOut,
@@ -176,6 +176,16 @@ export default function CmsShell({
     (item) => !item.adminOnly || initialUser?.role === "ADMIN"
   );
 
+  // Editor panoramik: auto-collapse app rail agar canvas lebih lebar (toggle tetap tersedia).
+  const prevFullWidth = useRef(false);
+  useEffect(() => {
+    if (fullWidth && !prevFullWidth.current) {
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, "true");
+      window.dispatchEvent(new Event(SIDEBAR_EVENT));
+    }
+    prevFullWidth.current = fullWidth;
+  }, [fullWidth]);
+
   return (
     <div className="cms-shell flex h-screen overflow-hidden bg-[#1C0A0E] text-[#F8ECEE]">
       <aside
@@ -243,7 +253,7 @@ export default function CmsShell({
           <button
             onClick={handleLogout}
             title={collapsed ? "Logout" : undefined}
-            className={`flex items-center justify-center rounded-lg text-slate-400 hover:bg-red-900/30 hover:text-red-300 transition-colors ${
+            className={`flex items-center justify-center rounded-lg text-[#C4A8AD] hover:bg-red-900/30 hover:text-red-300 transition-colors ${
               collapsed ? "w-10 h-10" : "w-full h-9 gap-2 px-3"
             }`}
           >

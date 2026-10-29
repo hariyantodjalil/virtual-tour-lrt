@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
 import {
@@ -30,6 +30,7 @@ import { DEFAULT_TRAIN_CARS } from "@/lib/train-tour-defaults";
 import type { TrainRentalSpacePublic } from "@/lib/train-rental-spaces-shared";
 
 const ACCENT = "#E31E2D";
+const subscribeToHydration = () => () => {};
 
 const STATUS_CLASS: Record<TrainRentalStatus, string> = {
   TERSEDIA: "border-[#E31E2D]/40 bg-[#E31E2D]/12 text-[#FF4D57]",
@@ -122,7 +123,11 @@ export default function TrainRentalSpaceDetail({
   initialCarSlug,
 }: Props) {
   const profile = useCommercialProfile();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false
+  );
   const [carIndex, setCarIndex] = useState(() => resolveCarIndex(initialCarSlug));
   const [showInterestModal, setShowInterestModal] = useState(false);
   const [rentMode, setRentMode] = useState<"gerbong" | "trainset">("gerbong");
@@ -190,14 +195,6 @@ export default function TrainRentalSpaceDetail({
       return [...current, slug];
     });
   }
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    setCarIndex(resolveCarIndex(initialCarSlug));
-  }, [space.id, initialCarSlug]);
 
   useEffect(() => {
     if (!mounted) return;

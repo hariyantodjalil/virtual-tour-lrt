@@ -5,7 +5,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell,
 } from "recharts";
 import {
-  Users, Building2, TrendingUp, Eye, MessageCircle,
+  AlertTriangle, Users, Building2, TrendingUp, Eye, MessageCircle,
   Download, CheckCircle, Clock, XCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,12 +15,12 @@ import { formatNumber } from "@/lib/utils";
 
 type DashboardData = {
   stats: {
-    totalVisits: number;
-    totalLeads: number;
-    totalSpaces: number;
-    availableSpaces: number;
-    occupiedSpaces: number;
-    occupancyRate: number;
+    totalVisits: number | null;
+    totalLeads: number | null;
+    totalSpaces: number | null;
+    availableSpaces: number | null;
+    occupiedSpaces: number | null;
+    occupancyRate: number | null;
   };
   eventsByType: { type: string; count: number }[];
   recentLeads: {
@@ -39,6 +39,7 @@ type DashboardData = {
   topStations: { stationId: string; stationName: string; visits: number }[];
   leadsByStatus: { status: string; count: number }[];
   dailyVisits: { date: string; count: number }[];
+  errors: string[];
 };
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
@@ -117,16 +118,32 @@ function exportCSV(leads: DashboardData["recentLeads"]) {
 }
 
 export default function DashboardClient({ data }: { data: DashboardData }) {
-  const { stats, eventsByType, recentLeads, topStations, leadsByStatus, dailyVisits } = data;
+  const { stats, eventsByType, recentLeads, topStations, leadsByStatus, dailyVisits, errors } = data;
+  const hasError = (key: string) => errors.includes(key);
+  const unavailable = "—";
 
   return (
     <div className="space-y-6">
+      {errors.length > 0 && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-amber-50"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+          <div>
+            <p className="font-semibold">Sebagian data dashboard gagal dimuat</p>
+            <p className="mt-0.5 text-sm text-amber-100/80">
+              Nilai yang tidak tersedia ditandai dengan garis. Muat ulang halaman untuk mencoba lagi.
+            </p>
+          </div>
+        </div>
+      )}
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Kunjungan" value={formatNumber(stats.totalVisits)} icon={Eye} color="bg-sky-500/80" subtitle="Semua sesi virtual tour" />
-        <StatCard title="Total Lead" value={formatNumber(stats.totalLeads)} icon={Users} color="bg-[#E31E2D]" subtitle="Calon tenant terdaftar" />
-        <StatCard title="Unit Tersedia" value={stats.availableSpaces} icon={Building2} color="bg-emerald-500/85" subtitle={`dari ${stats.totalSpaces} total unit`} />
-        <StatCard title="Tingkat Hunian" value={`${stats.occupancyRate}%`} icon={TrendingUp} color="bg-amber-500/85" subtitle={`${stats.occupiedSpaces} unit terisi`} />
+        <StatCard title="Total Kunjungan" value={stats.totalVisits === null ? unavailable : formatNumber(stats.totalVisits)} icon={Eye} color="bg-sky-500/80" subtitle="Semua sesi virtual tour" />
+        <StatCard title="Total Lead" value={stats.totalLeads === null ? unavailable : formatNumber(stats.totalLeads)} icon={Users} color="bg-[#E31E2D]" subtitle="Calon tenant terdaftar" />
+        <StatCard title="Unit Tersedia" value={stats.availableSpaces ?? unavailable} icon={Building2} color="bg-emerald-500/85" subtitle={`dari ${stats.totalSpaces ?? unavailable} total unit`} />
+        <StatCard title="Tingkat Hunian" value={stats.occupancyRate === null ? unavailable : `${stats.occupancyRate}%`} icon={TrendingUp} color="bg-amber-500/85" subtitle={stats.occupiedSpaces === null ? "Data unit tidak tersedia" : `${stats.occupiedSpaces} unit terisi`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -136,7 +153,11 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
             <CardTitle className="text-base text-white">Kunjungan 7 Hari Terakhir</CardTitle>
           </CardHeader>
           <CardContent>
-            {dailyVisits.length > 0 ? (
+            {hasError("dailyVisits") ? (
+              <div className="h-52 flex items-center justify-center text-amber-200 text-sm">
+                Data kunjungan gagal dimuat
+              </div>
+            ) : dailyVisits.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={dailyVisits}>
                   <CartesianGrid stroke={GRID_COLOR} vertical={false} />
@@ -160,30 +181,38 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
             <CardTitle className="text-base text-white">Status Hunian</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: "Terisi", value: stats.occupiedSpaces },
-                    { name: "Tersedia", value: stats.availableSpaces },
-                  ]}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  dataKey="value"
-                >
-                  {[0, 1].map((_, i) => (
-                    <Cell key={i} fill={i === 0 ? "#E31E2D" : "#10B981"} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex justify-center gap-4 text-xs text-[#F8ECEE]">
-              <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-[#E31E2D]" /> Terisi ({stats.occupiedSpaces})</div>
-              <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Tersedia ({stats.availableSpaces})</div>
-            </div>
+            {stats.occupiedSpaces === null || stats.availableSpaces === null ? (
+              <div className="h-52 flex items-center justify-center text-amber-200 text-sm">
+                Data hunian gagal dimuat
+              </div>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: "Terisi", value: stats.occupiedSpaces },
+                        { name: "Tersedia", value: stats.availableSpaces },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      dataKey="value"
+                    >
+                      {[0, 1].map((_, i) => (
+                        <Cell key={i} fill={i === 0 ? "#E31E2D" : "#10B981"} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex justify-center gap-4 text-xs text-[#F8ECEE]">
+                  <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-[#E31E2D]" /> Terisi ({stats.occupiedSpaces})</div>
+                  <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Tersedia ({stats.availableSpaces})</div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -195,7 +224,11 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
             <CardTitle className="text-base text-white">Stasiun Paling Banyak Dikunjungi</CardTitle>
           </CardHeader>
           <CardContent>
-            {topStations.length > 0 ? (
+            {hasError("topStations") ? (
+              <div className="h-52 flex items-center justify-center text-amber-200 text-sm">
+                Data stasiun gagal dimuat
+              </div>
+            ) : topStations.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={topStations} layout="vertical">
                   <CartesianGrid stroke={GRID_COLOR} horizontal={false} />
@@ -219,7 +252,11 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
             <CardTitle className="text-base text-white">Aktivitas Pengguna</CardTitle>
           </CardHeader>
           <CardContent>
-            {eventsByType.length > 0 ? (
+            {hasError("eventsByType") ? (
+              <div className="h-52 flex items-center justify-center text-amber-200 text-sm">
+                Data aktivitas gagal dimuat
+              </div>
+            ) : eventsByType.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={eventsByType.map((e) => ({ ...e, label: EVENT_TYPE_LABELS[e.type] ?? e.type }))}>
                   <CartesianGrid stroke={GRID_COLOR} vertical={false} />
@@ -259,7 +296,9 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
           </div>
           {/* Status summary */}
           <div className="flex flex-wrap gap-2 mt-3">
-            {leadsByStatus.map((l) => {
+            {hasError("leadsByStatus") ? (
+              <span className="text-sm text-amber-200">Ringkasan status gagal dimuat</span>
+            ) : leadsByStatus.map((l) => {
               const cfg = LEAD_STATUS_CONFIG[l.status];
               return (
                 <span key={l.status} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${cfg?.color ?? "border-white/10 bg-white/5 text-[#F8ECEE]"}`}>
@@ -281,7 +320,13 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/8">
-                {recentLeads.length === 0 ? (
+                {hasError("recentLeads") ? (
+                  <tr>
+                    <td colSpan={7} className="py-10 text-center text-amber-200 text-sm">
+                      Data lead terbaru gagal dimuat
+                    </td>
+                  </tr>
+                ) : recentLeads.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-10 text-center text-[#C4A8AD] text-sm">
                       Belum ada lead masuk

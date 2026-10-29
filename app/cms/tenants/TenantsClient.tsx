@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Building2, Plus, Trash2, Link2, Unlink, Pencil, Save, X } from "lucide-react";
 import { cmsFetch } from "@/lib/cms-fetch";
+import { cmsUi } from "@/lib/cms-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -188,28 +189,24 @@ export default function TenantsClient({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Penyewa Aktif</h1>
-          <p className="text-sm text-slate-400">Brand atau mitra yang mengisi unit di stasiun</p>
-        </div>
-        <Button onClick={() => setShowForm((v) => !v)} className="bg-emerald-600 hover:bg-emerald-500">
+      <div className="mb-6 flex items-center justify-end gap-3">
+        <Button onClick={() => setShowForm((v) => !v)} className="bg-[#E31E2D] hover:bg-[#c41926]">
           <Plus className="mr-1.5 h-4 w-4" />
           Tambah Penyewa
         </Button>
       </div>
 
       {showForm && (
-        <Card className="mb-6 border-slate-800 bg-slate-900">
+        <Card className="mb-6 border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
           <CardContent className="space-y-3 p-4">
             <form onSubmit={createTenant} className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <Label className="mb-1.5 block text-xs text-slate-400">Stasiun</Label>
+                <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Stasiun</Label>
                 <select
                   required
                   value={form.stationId}
                   onChange={(e) => setForm((f) => ({ ...f, stationId: e.target.value, spaceId: "" }))}
-                  className="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm"
+                  className="h-10 w-full rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm"
                 >
                   <option value="">Pilih stasiun</option>
                   {stations.map((s) => (
@@ -220,45 +217,45 @@ export default function TenantsClient({
                 </select>
               </div>
               <div>
-                <Label className="mb-1.5 block text-xs text-slate-400">Brand / Nama Tenant</Label>
+                <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Brand / Nama Tenant</Label>
                 <Input
                   required
                   value={form.brandName}
                   onChange={(e) => setForm((f) => ({ ...f, brandName: e.target.value }))}
-                  className="border-slate-700 bg-slate-800"
+                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                 />
               </div>
               <div>
-                <Label className="mb-1.5 block text-xs text-slate-400">Kontak</Label>
+                <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Kontak</Label>
                 <Input
                   value={form.contactName}
                   onChange={(e) => setForm((f) => ({ ...f, contactName: e.target.value }))}
-                  className="border-slate-700 bg-slate-800"
+                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                 />
               </div>
               <div>
-                <Label className="mb-1.5 block text-xs text-slate-400">Telepon</Label>
+                <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Telepon</Label>
                 <Input
                   value={form.phone}
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  className="border-slate-700 bg-slate-800"
+                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                 />
               </div>
               <div>
-                <Label className="mb-1.5 block text-xs text-slate-400">Email</Label>
+                <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Email</Label>
                 <Input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  className="border-slate-700 bg-slate-800"
+                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                 />
               </div>
               <div className="sm:col-span-2">
-                <Label className="mb-1.5 block text-xs text-slate-400">Unit (opsional)</Label>
+                <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Unit (opsional)</Label>
                 <select
                   value={form.spaceId}
                   onChange={(e) => setForm((f) => ({ ...f, spaceId: e.target.value }))}
-                  className="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm"
+                  className="h-10 w-full rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm"
                   disabled={!form.stationId}
                 >
                   <option value="">Belum assign unit</option>
@@ -270,7 +267,7 @@ export default function TenantsClient({
                 </select>
               </div>
               <div className="sm:col-span-2 flex gap-2">
-                <Button type="submit" disabled={busy} className="bg-emerald-600 hover:bg-emerald-500">
+                <Button type="submit" disabled={busy} className="bg-[#E31E2D] hover:bg-[#c41926]">
                   Simpan
                 </Button>
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
@@ -284,7 +281,7 @@ export default function TenantsClient({
 
       <div className="space-y-3">
         {tenants.length === 0 ? (
-          <p className="text-sm text-slate-500">Belum ada tenant aktif.</p>
+          <p className="text-sm text-[#A88990]">Belum ada tenant aktif.</p>
         ) : (
           tenants.map((tenant) => {
             const stationSpaces = spaces.filter((s) => s.stationId === tenant.station.id);
@@ -292,7 +289,7 @@ export default function TenantsClient({
             const availableToLink = stationSpaces.filter((s) => !occupiedIds.has(s.id));
 
             return (
-              <Card key={tenant.id} className="border-slate-800 bg-slate-900">
+              <Card key={tenant.id} className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
                 <CardContent className="p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -305,15 +302,20 @@ export default function TenantsClient({
                             onChange={(event) =>
                               setEditingName({ id: tenant.id, value: event.target.value })
                             }
-                            className="h-8 w-56 border-slate-700 bg-slate-800"
+                            className="h-8 w-56 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                           />
                         ) : (
                           <p className="font-semibold text-white">{tenant.brandName}</p>
                         )}
-                        <Badge variant="outline">{tenant.isActive ? "Aktif" : "Nonaktif"}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={tenant.isActive ? cmsUi.successBadge : cmsUi.inactiveBadge}
+                        >
+                          {tenant.isActive ? "Aktif" : "Nonaktif"}
+                        </Badge>
                       </div>
-                      <p className="mt-1 text-sm text-slate-400">{tenant.station.name}</p>
-                      <p className="text-xs text-slate-500">
+                      <p className="mt-1 text-sm text-[#C4A8AD]">{tenant.station.name}</p>
+                      <p className="text-xs text-[#A88990]">
                         {[tenant.contactName, tenant.phone, tenant.email].filter(Boolean).join(" · ") ||
                           "Tanpa kontak"}
                       </p>
@@ -364,25 +366,25 @@ export default function TenantsClient({
                   </div>
 
                   <div className="mt-3 space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#A88990]">
                       Unit ditempati
                     </p>
                     {tenant.occupancies.length === 0 ? (
-                      <p className="text-xs text-slate-600">Belum ada unit</p>
+                      <p className="text-xs text-[#A88990]">Belum ada unit</p>
                     ) : (
                       tenant.occupancies.map((o) => (
                         <div
                           key={o.id}
-                          className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2"
+                          className="flex items-center justify-between rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/50 px-3 py-2"
                         >
                           <div>
-                            <p className="font-mono text-xs text-slate-200">{o.space.code}</p>
-                            <p className="text-[11px] text-slate-500">{o.space.name}</p>
+                            <p className="font-mono text-xs text-[#F8ECEE]">{o.space.code}</p>
+                            <p className="text-[11px] text-[#A88990]">{o.space.name}</p>
                           </div>
                           <button
                             type="button"
                             onClick={() => unlinkSpace(tenant.id, o.spaceId)}
-                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-white"
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-[#C4A8AD] hover:bg-[#261015] hover:text-white"
                           >
                             <Unlink className="h-3 w-3" /> Lepas
                           </button>
@@ -397,7 +399,7 @@ export default function TenantsClient({
                           onChange={(e) =>
                             setLinkSpaceId((prev) => ({ ...prev, [tenant.id]: e.target.value }))
                           }
-                          className="h-8 flex-1 rounded-md border border-slate-700 bg-slate-800 px-2 text-xs"
+                          className="h-8 flex-1 rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-2 text-xs"
                         >
                           <option value="">Tambah unit…</option>
                           {availableToLink.map((s) => (
@@ -409,7 +411,7 @@ export default function TenantsClient({
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 border-slate-600"
+                          className="h-8 border-[rgba(255,214,218,0.18)]"
                           onClick={() => linkSpace(tenant.id)}
                           disabled={!linkSpaceId[tenant.id]}
                         >

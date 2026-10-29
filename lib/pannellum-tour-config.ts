@@ -1,4 +1,5 @@
-import type { Hotspot, PanoramaScene } from "@/lib/tour-types";
+import type { Hotspot, PanoramaScene, SceneInitialView } from "@/lib/tour-types";
+import { resolveSceneEntryView } from "./scene-entry-view";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import { setupHotspotElement, resolveSceneHotspotTitle } from "@/lib/pannellum-hotspot";
 import { findSpaceStatus, type SpaceAvailabilityStatus } from "@/lib/space-availability";
@@ -15,7 +16,7 @@ export type AdHotspotPayload = {
 };
 
 type SceneHandlers = {
-  onSceneHotspot: (targetSceneId: string, pitch: number, yaw: number) => void;
+  onSceneHotspot: (targetSceneId: string, pitch: number, yaw: number, entryView: SceneInitialView) => void;
   onScenePreload?: (targetSceneId: string) => void;
   onSpaceClick: (spaceCode: string) => void;
   onAdClick?: (payload: AdHotspotPayload) => void;
@@ -36,7 +37,8 @@ function buildHotSpots(scene: PanoramaScene, allScenes: PanoramaScene[], handler
       const sceneId = h.sceneId;
       const pitch = h.pitch;
       const yaw = h.yaw;
-      onClick = () => handlers.onSceneHotspot(sceneId, pitch, yaw);
+      const entryView = resolveSceneEntryView(h, allScenes.find((s) => s.id === sceneId)?.initialView);
+      onClick = () => handlers.onSceneHotspot(sceneId, pitch, yaw, entryView);
     } else if (h.type === "space" && h.spaceCode) {
       const code = h.spaceCode;
       onClick = () => handlers.onSpaceClick(code);

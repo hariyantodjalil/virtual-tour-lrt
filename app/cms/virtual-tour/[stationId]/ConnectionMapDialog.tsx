@@ -70,11 +70,11 @@ export function ConnectionMapDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[rgba(255,214,218,0.14)] px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold text-white">Peta Koneksi Scene</h2>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-[#A88990]">
               {graph.edges.length} tautan · {graph.orphans.length} tanpa incoming
               {graph.brokenCount > 0 ? ` · ${graph.brokenCount} rusak` : ""}
             </p>
@@ -82,7 +82,7 @@ export function ConnectionMapDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
+            className="rounded-lg p-1.5 text-[#C4A8AD] hover:bg-[#261015] hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
@@ -110,19 +110,19 @@ export function ConnectionMapDialog({
                   className={`rounded-xl border p-3 text-left transition-colors ${
                     isActive
                       ? "border-emerald-500 bg-emerald-950/40"
-                      : "border-slate-700 bg-slate-850 hover:border-slate-500 hover:bg-slate-800"
+                      : "border-[rgba(255,214,218,0.14)] bg-[#261015] hover:border-[rgba(255,214,218,0.28)] hover:bg-[#261015]"
                   }`}
                 >
                   <div className="mb-1 flex items-start justify-between gap-2">
-                    <p className="text-xs font-semibold text-slate-100">{scene.title}</p>
+                    <p className="text-xs font-semibold text-[#F8ECEE]">{scene.title}</p>
                     {isOrphan && (
                       <span className="shrink-0 rounded bg-amber-950 px-1.5 py-0.5 text-[9px] text-amber-300">
                         orphan
                       </span>
                     )}
                   </div>
-                  <p className="mb-2 font-mono text-[10px] text-slate-500">{scene.sceneId}</p>
-                  <p className="text-[10px] text-slate-400">
+                  <p className="mb-2 font-mono text-[10px] text-[#A88990]">{scene.sceneId}</p>
+                  <p className="text-[10px] text-[#C4A8AD]">
                     in {graph.incoming.get(scene.sceneId) ?? 0} · out {out.length}
                   </p>
                   {out.length > 0 && (
@@ -133,7 +133,7 @@ export function ConnectionMapDialog({
                           <li
                             key={`${e.from}-${e.to}-${i}`}
                             className={`truncate text-[10px] ${
-                              e.broken ? "text-red-400" : "text-slate-500"
+                              e.broken ? "text-red-400" : "text-[#A88990]"
                             }`}
                           >
                             → {target?.title ?? e.to}
@@ -154,8 +154,8 @@ export function ConnectionMapDialog({
           </div>
         </div>
 
-        <div className="flex justify-end border-t border-slate-800 px-4 py-3">
-          <Button variant="outline" size="sm" onClick={onClose} className="border-slate-600">
+        <div className="flex justify-end border-t border-[rgba(255,214,218,0.14)] px-4 py-3">
+          <Button variant="outline" size="sm" onClick={onClose} className="border-[rgba(255,214,218,0.18)]">
             Tutup
           </Button>
         </div>

@@ -38,6 +38,8 @@ const sceneSelect = {
   order: true,
   hotspots: true,
   canvasData: true,
+  spatialEntities: true,
+  spatialRevision: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,

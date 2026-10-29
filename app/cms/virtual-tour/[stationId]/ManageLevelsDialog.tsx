@@ -122,20 +122,20 @@ export function ManageLevelsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-        <DialogContent className="flex max-h-[85vh] max-w-lg flex-col border-slate-700 bg-slate-900 text-slate-100 [&>button]:text-slate-400 [&>button]:hover:text-white">
+        <DialogContent className="flex max-h-[85vh] max-w-lg flex-col border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] [&>button]:text-[#C4A8AD] [&>button]:hover:text-white">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-slate-100">
+            <DialogTitle className="flex items-center gap-2 text-[#F8ECEE]">
               <Layers className="h-5 w-5 text-emerald-400" />
               Kelola Level
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-[#C4A8AD]">
               Drag level untuk mengubah urutan tab di virtual tour publik. Level paling atas = tab pertama.
             </DialogDescription>
           </DialogHeader>
 
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-2">
             {levels.length === 0 && (
-              <p className="rounded-lg border border-dashed border-slate-700 px-3 py-4 text-center text-sm text-slate-500">
+              <p className="rounded-lg border border-dashed border-[rgba(255,214,218,0.14)] px-3 py-4 text-center text-sm text-[#A88990]">
                 Belum ada level. Tambahkan level pertama di bawah.
               </p>
             )}
@@ -145,8 +145,8 @@ export function ManageLevelsDialog({
                 key={level.id}
                 onDragOver={(e) => handleDragOver(e, level.id)}
                 onDrop={() => handleDrop(level.id)}
-                className={`flex items-start gap-2 rounded-lg border bg-slate-800/40 p-3 transition-colors ${
-                  dragLevelId === level.id ? "opacity-40 border-slate-700" : "border-slate-800"
+                className={`flex items-start gap-2 rounded-lg border bg-[#261015]/40 p-3 transition-colors ${
+                  dragLevelId === level.id ? "opacity-40 border-[rgba(255,214,218,0.14)]" : "border-[rgba(255,214,218,0.14)]"
                 } ${
                   dropLevelId === level.id
                     ? "border-emerald-500/70 bg-emerald-950/30 ring-1 ring-emerald-500/50"
@@ -165,7 +165,7 @@ export function ManageLevelsDialog({
                     setDragLevelId(null);
                     setDropLevelId(null);
                   }}
-                  className="mt-1 shrink-0 cursor-grab rounded p-1 text-slate-500 active:cursor-grabbing hover:bg-slate-700 hover:text-slate-200"
+                  className="mt-1 shrink-0 cursor-grab rounded p-1 text-[#A88990] active:cursor-grabbing hover:bg-[#3A161C] hover:text-[#F8ECEE]"
                   title="Drag untuk ubah urutan"
                   aria-label={`Geser urutan level ${level.label}`}
                 >
@@ -182,15 +182,15 @@ export function ManageLevelsDialog({
                   <Input
                     value={level.label}
                     onChange={(e) => onUpdate(level.id, { label: e.target.value })}
-                    className="h-8 border-slate-700 bg-slate-900 text-sm text-slate-100"
+                    className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-sm text-[#F8ECEE]"
                   />
                   <Input
                     value={level.hint ?? ""}
                     onChange={(e) => onUpdate(level.id, { hint: e.target.value })}
                     placeholder="Deskripsi singkat level"
-                    className="h-7 border-slate-700 bg-slate-900 text-xs text-slate-400"
+                    className="h-7 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-xs text-[#C4A8AD]"
                   />
-                  <p className="font-mono text-[10px] text-slate-600">
+                  <p className="font-mono text-[10px] text-[#A88990]">
                     #{idx + 1} · {level.slug} · {level.areas.length} area
                   </p>
                 </div>
@@ -199,7 +199,7 @@ export function ManageLevelsDialog({
                     type="button"
                     onClick={() => moveLevel(level, "up")}
                     disabled={idx === 0 || busy}
-                    className="rounded p-0.5 text-slate-500 hover:text-white disabled:opacity-20"
+                    className="rounded p-0.5 text-[#A88990] hover:text-white disabled:opacity-20"
                     title="Naikkan urutan"
                   >
                     <ChevronUp className="h-3.5 w-3.5" />
@@ -208,7 +208,7 @@ export function ManageLevelsDialog({
                     type="button"
                     onClick={() => moveLevel(level, "down")}
                     disabled={idx === levels.length - 1 || busy}
-                    className="rounded p-0.5 text-slate-500 hover:text-white disabled:opacity-20"
+                    className="rounded p-0.5 text-[#A88990] hover:text-white disabled:opacity-20"
                     title="Turunkan urutan"
                   >
                     <ChevronDown className="h-3.5 w-3.5" />
@@ -236,17 +236,17 @@ export function ManageLevelsDialog({
                 + Tambah Level Baru
               </p>
               <div>
-                <Label className="mb-1 block text-xs text-slate-400">Nama Level</Label>
+                <Label className="mb-1 block text-xs text-[#C4A8AD]">Nama Level</Label>
                 <Input
                   value={newLabel}
                   onChange={(e) => setNewLabel(e.target.value)}
                   placeholder="contoh: Mezanin, Parkir, Rooftop"
-                  className="border-slate-700 bg-slate-800 text-slate-100"
+                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE]"
                   required
                 />
               </div>
               <div>
-                <Label className="mb-1 block text-xs text-slate-400">Warna label</Label>
+                <Label className="mb-1 block text-xs text-[#C4A8AD]">Warna label</Label>
                 <div className="flex flex-wrap gap-2">
                   {PRESET_COLORS.map((c) => (
                     <button
@@ -265,12 +265,12 @@ export function ManageLevelsDialog({
                 value={newHint}
                 onChange={(e) => setNewHint(e.target.value)}
                 placeholder="Deskripsi singkat (opsional)"
-                className="border-slate-700 bg-slate-800 text-sm text-slate-100"
+                className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-sm text-[#F8ECEE]"
               />
               <Button
                 type="submit"
                 disabled={busy || !newLabel.trim()}
-                className="w-full bg-emerald-600 hover:bg-emerald-500"
+                className="w-full bg-[#E31E2D] hover:bg-[#c41926]"
               >
                 <Plus className="mr-1 h-4 w-4" />
                 Tambah Level
@@ -287,14 +287,14 @@ export function ManageLevelsDialog({
       </Dialog>
 
       <Dialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
-        <DialogContent className="max-w-sm border-slate-700 bg-slate-900 text-slate-100 [&>button]:text-slate-400">
+        <DialogContent className="max-w-sm border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] [&>button]:text-[#C4A8AD]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-slate-100">
+            <DialogTitle className="flex items-center gap-2 text-[#F8ECEE]">
               <Trash2 className="h-5 w-5 text-red-400" />
               Hapus Level
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
-              Hapus level <strong className="text-slate-200">{deleteTarget?.label}</strong>? Semua scene di
+            <DialogDescription className="text-[#C4A8AD]">
+              Hapus level <strong className="text-[#F8ECEE]">{deleteTarget?.label}</strong>? Semua scene di
               level ini harus sudah dipindah atau dihapus terlebih dahulu.
             </DialogDescription>
           </DialogHeader>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Navigation, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { PanoramaScene } from "@/lib/tour-types";
+import type { PanoramaScene, SceneInitialView } from "@/lib/tour-types";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { findSpaceStatus } from "@/lib/space-availability";
 import {
@@ -19,6 +19,11 @@ import {
   type DiveOverlayState,
 } from "@/lib/pannellum-tour-dive";
 import { bindPrivacyBlursInContainer } from "@/lib/pannellum-privacy-blur";
+import { SpatialOverlay } from "@/components/tour/spatial/SpatialOverlay";
+import { isSpatialHotspotEnabled } from "@/lib/spatial-feature";
+import type { SpatialEntity } from "@/lib/spatial/types";
+import { runSpatialAction } from "@/lib/spatial/actions";
+import { resolveSceneEntryView } from "@/lib/scene-entry-view";
 
 declare global {
   interface Window {
@@ -137,7 +142,11 @@ export default function VirtualTourViewer({
   const [viewerReady, setViewerReady] = useState(false);
   const [internalSceneId, setInternalSceneId] = useState(initialScene ?? scenes[0]?.id);
   const [autoRotate, setAutoRotate] = useState(false);
+  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [viewerForOverlay, setViewerForOverlay] = useState<any>(null);
   const isMounted = useRef(true);
+  const spatialEnabled = isSpatialHotspotEnabled();
 
   const focusCameraRef = useRef(focusCamera);
   const focusTokenRef = useRef(focusToken);
@@ -146,6 +155,11 @@ export default function VirtualTourViewer({
   const activeSceneIdRef = useRef(activeSceneId);
   const currentSceneIdx = Math.max(0, scenes.findIndex((scene) => scene.id === activeSceneId));
   const scenesSig = useMemo(() => scenes.map((s) => s.id).join("|"), [scenes]);
+  const activeSpatialEntities: SpatialEntity[] = useMemo(() => {
+    if (!spatialEnabled) return [];
+    const scene = scenes.find((s) => s.id === activeSceneId);
+    return (scene?.spatialEntities ?? []).filter((e) => e.enabled);
+  }, [scenes, activeSceneId, spatialEnabled]);
 
   useEffect(() => {
     onSpaceClickRef.current = onSpaceClick;
@@ -207,7 +221,7 @@ export default function VirtualTourViewer({
   }, [ensureSceneReady]);
 
   const handleSceneHotspotClick = useCallback(
-    async (targetSceneId: string, pitch: number, yaw: number) => {
+    async (targetSceneId: string, pitch: number, yaw: number, entryView: SceneInitialView) => {
       const viewer = viewerRef.current;
       if (!viewer || divingRef.current) return;
 
@@ -215,6 +229,7 @@ export default function VirtualTourViewer({
       externalNavRef.current = false;
 
       const transitionOpts = {
+        entryView,
         ensureReady: async () => {
           await ensureSceneReady(targetSceneId);
         },
@@ -239,7 +254,7 @@ export default function VirtualTourViewer({
         overlayController.reset();
         try {
           await ensureSceneReady(targetSceneId);
-          viewer.loadScene(targetSceneId);
+          viewer.loadScene(targetSceneId, entryView.pitch, entryView.yaw, entryView.hfov);
           setInternalSceneId(targetSceneId);
           onSceneChangeRef.current?.(targetSceneId);
         } catch {
@@ -295,7 +310,7 @@ export default function VirtualTourViewer({
 
       const firstId = activeSceneIdRef.current ?? currentScenes[0]?.id;
       const config = buildPannellumTourConfig(currentScenes, firstId, {
-        onSceneHotspot: (id, pitch, yaw) => handleSceneHotspotRef.current(id, pitch, yaw),
+        onSceneHotspot: (id, pitch, yaw, entryView) => handleSceneHotspotRef.current(id, pitch, yaw, entryView),
         onScenePreload: (id) => preloadSceneById(id),
         onSpaceClick: (code) => onSpaceClickRef.current?.(code),
         onAdClick: (payload) => onAdClickRef.current?.(payload),
@@ -319,6 +334,8 @@ export default function VirtualTourViewer({
         if (!isMounted.current || epoch !== initEpochRef.current || viewerRef.current !== viewer) return;
         setViewerReady(true);
         setPanoramaVisible(true);
+        setContainerEl(containerRef.current);
+        setViewerForOverlay(viewer);
         requestAnimationFrame(() => {
           if (epoch === initEpochRef.current) {
             bindPrivacyBlursInContainer(viewer, containerRef.current);
@@ -326,7 +343,10 @@ export default function VirtualTourViewer({
         });
         try {
           const sceneId = viewer.getScene?.();
-          if (sceneId) preloadLinkedScenes(scenesRef.current, sceneId);
+          if (sceneId) {
+            preloadLinkedScenes(scenesRef.current, sceneId);
+            setInternalSceneId((prev) => (prev === sceneId ? prev : sceneId));
+          }
         } catch {
           /* ignore */
         }
@@ -336,6 +356,13 @@ export default function VirtualTourViewer({
       };
 
       viewer.on("load", revealLoadedScene);
+      viewer.on("scenechange", (sceneId: string) => {
+        if (!isMounted.current || epoch !== initEpochRef.current) return;
+        if (typeof sceneId === "string" && sceneId) {
+          // Hindari setState no-op → re-render → crossfade effect → load ulang
+          setInternalSceneId((prev) => (prev === sceneId ? prev : sceneId));
+        }
+      });
       if (typeof viewer.isLoaded === "function" && viewer.isLoaded()) {
         revealLoadedScene();
       }
@@ -361,6 +388,7 @@ export default function VirtualTourViewer({
       isMounted.current = false;
       initEpochRef.current += 1;
       destroyViewer();
+      // Jangan setState di cleanup Strict Mode — biarkan init berikutnya yang set ulang
     };
   }, [initTourViewer, scenesSig, destroyViewer]);
 
@@ -438,6 +466,29 @@ export default function VirtualTourViewer({
         }}
       >
         <div ref={containerRef} className="absolute inset-0" />
+        {viewerReady && spatialEnabled && activeSpatialEntities.length > 0 && (
+          <SpatialOverlay
+            viewer={viewerForOverlay}
+            container={containerEl}
+            entities={activeSpatialEntities}
+            interactive
+            resolveSpaceStatus={(code) => findSpaceStatus(spacesRef.current, code)}
+            onEntityClick={(entity) => {
+              runSpatialAction(entity, {
+                openUnit: (code) => onSpaceClickRef.current?.(code),
+                openScene: (id) => {
+                  if (scenesRef.current.some((scene) => scene.id === id)) {
+                    const pitch = viewerRef.current?.getPitch() ?? 0;
+                    const yaw = viewerRef.current?.getYaw() ?? 0;
+                    const entryView = resolveSceneEntryView({ pitch, yaw }, scenesRef.current.find((scene) => scene.id === id)?.initialView);
+                    void handleSceneHotspotRef.current(id, pitch, yaw, entryView);
+                  }
+                },
+                openInfo: (title, description) => onInfoClickRef.current?.(title, description),
+              });
+            }}
+          />
+        )}
       </div>
 
       {/* Fade putih + vignette — sinkron dengan crossfade Pannellum */}

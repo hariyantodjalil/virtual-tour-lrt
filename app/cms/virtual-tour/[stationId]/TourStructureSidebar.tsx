@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useState, type DragEvent } from "react";
 import Image from "next/image";
 import {
   Plus,
@@ -18,6 +18,8 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   GripVertical,
+  PanelLeftClose,
+  Search,
 } from "lucide-react";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { TourArea, TourLevel } from "@/lib/virtual-tour-structure";
@@ -53,6 +55,8 @@ type Props = {
   onEditArea: (area: TourArea, levelLabel: string) => void;
   onDeleteArea: (area: TourArea, levelLabel: string) => void;
   onAutoWalkPath: (areaId: string) => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 };
 
 const STORAGE_KEY = "vt-editor-tree-expanded";
@@ -90,28 +94,33 @@ export function TourStructureSidebar({
   onEditArea,
   onDeleteArea,
   onAutoWalkPath,
+  collapsed = false,
+  onToggleCollapse,
 }: Props) {
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
   const [hydrated, setHydrated] = useState(false);
   const [dragLevelId, setDragLevelId] = useState<string | null>(null);
   const [dropLevelId, setDropLevelId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const searchNorm = search.trim().toLowerCase();
 
-  const scenesByArea = (areaId: string) =>
+  const sceneMatchesSearch = (scene: SidebarScene) => {
+    if (!searchNorm) return true;
+    return (
+      scene.title.toLowerCase().includes(searchNorm) ||
+      scene.sceneId.toLowerCase().includes(searchNorm)
+    );
+  };
+
+  const scenesByArea = (areaId: string, applySearch = false) =>
     scenes
       .map((scene, index) => ({ scene, index }))
       .filter(({ scene }) => scene.areaId === areaId)
+      .filter(({ scene }) => !applySearch || sceneMatchesSearch(scene))
       .sort((a, b) => a.scene.order - b.scene.order);
 
   const selectedScene = scenes[selectedSceneIndex] ?? null;
-
-  const selectionPath = useMemo(() => {
-    if (!selectedScene) return null;
-    const level = levels.find((l) => l.id === selectedScene.levelId || l.slug === selectedScene.level);
-    const area = level?.areas.find((a) => a.id === selectedScene.areaId);
-    if (!level) return null;
-    return { level, area };
-  }, [selectedScene, levels]);
 
   // Hydrate expanded tree dari sessionStorage + buka path scene aktif (async agar tidak cascade render)
   useEffect(() => {
@@ -225,8 +234,25 @@ export function TourStructureSidebar({
     setDropLevelId(null);
   }
 
+  if (collapsed) {
+    return (
+      <aside className="flex w-10 flex-none flex-col items-center border-r border-[rgba(255,214,218,0.14)] bg-[#261015] py-2">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="rounded-md p-1.5 text-[#C4A8AD] hover:bg-[#3A161C] hover:text-[#F8ECEE]"
+          title="Tampilkan Struktur Tur"
+          aria-label="Tampilkan Struktur Tur"
+        >
+          <Layers className="h-4 w-4" />
+        </button>
+        <span className="mt-2 text-[10px] text-[#A88990]">{scenes.length}</span>
+      </aside>
+    );
+  }
+
   return (
-    <aside className="flex w-72 flex-none flex-col overflow-hidden border-r border-[rgba(255,214,218,0.14)] bg-[#261015]">
+    <aside className="flex w-[260px] flex-none flex-col overflow-hidden border-r border-[rgba(255,214,218,0.14)] bg-[#261015] max-lg:absolute max-lg:inset-y-0 max-lg:left-0 max-lg:z-30 lg:w-72">
       {/* Header */}
       <div className="border-b border-[rgba(255,214,218,0.14)] px-3 py-2.5">
         <div className="flex items-center justify-between gap-2">
@@ -236,6 +262,17 @@ export function TourStructureSidebar({
             <span className="text-xs text-[#A88990]">({scenes.length})</span>
           </div>
           <div className="flex items-center gap-1">
+            {onToggleCollapse && (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="rounded p-0.5 text-[#C4A8AD] hover:text-[#F8ECEE]"
+                title="Sembunyikan panel"
+                aria-label="Sembunyikan Struktur Tur"
+              >
+                <PanelLeftClose className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
               onClick={allExpanded ? collapseAll : expandAll}
               className="p-0.5 text-[#C4A8AD] transition-colors hover:text-[#F8ECEE]"
@@ -265,26 +302,17 @@ export function TourStructureSidebar({
           </div>
         </div>
 
-        {selectionPath && (
-          <div className="mt-2 rounded-md border border-[rgba(255,214,218,0.14)] bg-[#3A161C]/50 px-2 py-1.5">
-            <p className="text-[9px] uppercase tracking-wider text-[#C4A8AD]">Sedang diedit</p>
-            <p className="mt-0.5 truncate text-[11px] font-medium text-[#F8ECEE]">
-              <span style={{ color: selectionPath.level.color }}>{selectionPath.level.label}</span>
-              {selectionPath.area && (
-                <>
-                  <span className="text-[#A88990]"> › </span>
-                  <span>{selectionPath.area.label}</span>
-                </>
-              )}
-              {selectedScene && (
-                <>
-                  <span className="text-[#A88990]"> › </span>
-                  <span className="text-emerald-400">{selectedScene.title}</span>
-                </>
-              )}
-            </p>
-          </div>
-        )}
+        <div className="relative mt-2">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-[#A88990]" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari scene…"
+            className="h-7 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] pl-7 pr-2 text-[11px] text-[#F8ECEE] outline-none placeholder:text-[#A88990] focus:border-[#E31E2D]/50"
+            aria-label="Cari scene"
+          />
+        </div>
+
       </div>
 
       {/* Tree */}
@@ -364,7 +392,7 @@ export function TourStructureSidebar({
                 <div className="ml-3 border-l border-[rgba(255,214,218,0.14)] pl-1">
                   {level.areas.map((area) => {
                     const areaOpen = expandedAreas.has(area.id);
-                    const areaScenes = scenesByArea(area.id);
+                    const areaScenes = scenesByArea(area.id, true);
 
                     return (
                       <div key={area.id} className="mb-0.5">

@@ -18,6 +18,8 @@ export type Hotspot = {
     | "down-right"
     | "down-left";
   sceneId?: string;
+  /** Overrides the destination scene's initial view for this connection. */
+  targetView?: SceneInitialView;
   spaceCode?: string;
   description?: string;
   /** Ikon fasilitas (toilet, mushola, dll.) — hanya untuk type info */
@@ -39,6 +41,8 @@ export type PanoramaScene = {
   multiRes?: PannellumMultiRes;
   hotspots: Hotspot[];
   privacyBlurs?: PrivacyBlur[];
+  /** Spatial Area polygons (read-only publik) */
+  spatialEntities?: import("@/lib/spatial/types").SpatialEntity[];
   initialView?: SceneInitialView;
   thumbnailUrl?: string;
   levelId?: string | null;

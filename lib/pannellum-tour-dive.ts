@@ -1,4 +1,6 @@
 /** Transisi scene — preload dulu, lalu crossfade ringan (tanpa loading UI). */
+import type { SceneInitialView } from "./tour-types";
+import { resolveSceneEntryView } from "./scene-entry-view";
 
 export const SCENE_FADE_MS = 600;
 export const SCENE_SWAP_MS = 140;
@@ -19,6 +21,7 @@ export type DiveOverlayController = {
 export type SceneTransitionOptions = {
   /** Pastikan texture panorama sudah di-cache/decode sebelum animasi */
   ensureReady: () => Promise<void>;
+  entryView?: SceneInitialView;
 };
 
 export function sleep(ms: number) {
@@ -99,7 +102,7 @@ export async function diveIntoScene(
 
   viewer.stopAutoRotate?.();
 
-  const entryPitch = Math.max(-8, Math.min(8, hotspotPitch * 0.12));
+  const entry = options.entryView ?? resolveSceneEntryView({ pitch: hotspotPitch, yaw: hotspotYaw });
   const totalOverlayMs = SCENE_FADE_MS * 0.55;
   let swapped = false;
 
@@ -109,7 +112,7 @@ export async function diveIntoScene(
     const elapsedMs = t * totalOverlayMs;
     if (!swapped && elapsedMs >= SCENE_SWAP_MS) {
       swapped = true;
-      viewer.loadScene(targetSceneId, entryPitch, hotspotYaw, SCENE_ENTRY_HFOV);
+      viewer.loadScene(targetSceneId, entry.pitch, entry.yaw, entry.hfov ?? SCENE_ENTRY_HFOV);
       onSceneChange?.(targetSceneId);
     }
   });

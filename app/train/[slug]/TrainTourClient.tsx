@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import VirtualTourViewer from "@/components/tour/VirtualTourViewer";
@@ -33,26 +33,19 @@ export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
     trainInfo.scenes[0]?.id;
 
   const [activeLevelId, setActiveLevelId] = useState(trainInfo.levels[0]?.id ?? "");
-  const [activeAreaId, setActiveAreaId] = useState<string | null>(
+  const [, setActiveAreaId] = useState<string | null>(
     trainInfo.levels[0]?.areas[0]?.id ?? null
   );
   const [activeSceneId, setActiveSceneId] = useState(firstScene ?? "");
   const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
-  const [selectedSpace, setSelectedSpace] = useState<TrainRentalSpacePublic | null>(null);
-  const [uiCleared, setUiCleared] = useState(false);
-  const [spaceDeepLinkHandled, setSpaceDeepLinkHandled] = useState(false);
-
-  useEffect(() => {
-    if (spaceDeepLinkHandled) return;
+  const [selectedSpace, setSelectedSpace] = useState<TrainRentalSpacePublic | null>(() => {
     const code = searchParams.get("space");
-    if (!code) return;
-    const space = rentalSpaces.find(
-      (item) => item.displayNumber === code || item.id === code
+    if (!code) return null;
+    return (
+      rentalSpaces.find((item) => item.displayNumber === code || item.id === code) ?? null
     );
-    if (!space) return;
-    setSelectedSpace(space);
-    setSpaceDeepLinkHandled(true);
-  }, [searchParams, rentalSpaces, spaceDeepLinkHandled]);
+  });
+  const [uiCleared, setUiCleared] = useState(false);
 
   const currentCar =
     trainInfo.levels.find((l) => l.id === activeLevelId) ?? trainInfo.levels[0];

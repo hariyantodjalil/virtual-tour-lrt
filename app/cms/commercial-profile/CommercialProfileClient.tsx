@@ -83,16 +83,8 @@ export default function CommercialProfileClient({
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Profil Tim Komersial</h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-400">
-          Data ini menjadi sumber utama tombol Reno, WhatsApp, detail unit,
-          ringkasan PDF, dan bantuan pada portal Mitra.
-        </p>
-      </div>
-
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card className="border-slate-800 bg-slate-900">
+        <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
           <CardContent className="p-5">
             <form onSubmit={save} className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -104,7 +96,7 @@ export default function CommercialProfileClient({
                     required
                     value={profile.teamName}
                     onChange={(event) => update("teamName", event.target.value)}
-                    className="border-slate-700 bg-slate-800"
+                    className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                     placeholder="Tim Komersial LRT Jabodebek"
                   />
                 </Field>
@@ -118,7 +110,7 @@ export default function CommercialProfileClient({
                     onChange={(event) =>
                       update("contactPersonName", event.target.value || null)
                     }
-                    className="border-slate-700 bg-slate-800"
+                    className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                     placeholder="Opsional"
                   />
                 </Field>
@@ -135,7 +127,7 @@ export default function CommercialProfileClient({
                     onChange={(event) =>
                       update("whatsappNumber", event.target.value)
                     }
-                    className="border-slate-700 bg-slate-800"
+                    className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                     placeholder="628118012012"
                   />
                 </Field>
@@ -151,7 +143,7 @@ export default function CommercialProfileClient({
                     onChange={(event) =>
                       update("phoneNumber", event.target.value || null)
                     }
-                    className="border-slate-700 bg-slate-800"
+                    className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                     placeholder="021..."
                   />
                 </Field>
@@ -163,7 +155,7 @@ export default function CommercialProfileClient({
                     onChange={(event) =>
                       update("email", event.target.value || null)
                     }
-                    className="border-slate-700 bg-slate-800"
+                    className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                     placeholder="komersial@lrtjabodebek.co.id"
                   />
                 </Field>
@@ -177,7 +169,7 @@ export default function CommercialProfileClient({
                     onChange={(event) =>
                       update("officeAddress", event.target.value || null)
                     }
-                    className="border-slate-700 bg-slate-800"
+                    className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                     placeholder="Opsional"
                   />
                 </Field>
@@ -195,7 +187,7 @@ export default function CommercialProfileClient({
                   onChange={(event) =>
                     update("defaultWhatsappMessage", event.target.value)
                   }
-                  className="border-slate-700 bg-slate-800"
+                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                 />
               </Field>
 
@@ -223,12 +215,12 @@ export default function CommercialProfileClient({
         </Card>
 
         <aside className="space-y-4">
-          <Card className="border-slate-800 bg-slate-900">
+          <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
             <CardContent className="p-5">
-              <p className="text-xs font-semibold text-slate-500">Preview kontak</p>
+              <p className="text-xs font-semibold text-[#A88990]">Preview kontak</p>
               <h2 className="mt-2 font-semibold text-white">{profile.teamName}</h2>
               {profile.contactPersonName && (
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-[#C4A8AD]">
                   {profile.contactPersonName}
                 </p>
               )}
@@ -268,7 +260,7 @@ export default function CommercialProfileClient({
             </CardContent>
           </Card>
 
-          <p className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-xs leading-relaxed text-slate-400">
+          <p className="rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C]/70 p-4 text-xs leading-relaxed text-[#C4A8AD]">
             Nomor WhatsApp pada profil stasiun hanya digunakan sebagai override.
             Kosongkan nomor stasiun agar otomatis mengikuti profil global ini.
           </p>
@@ -291,12 +283,12 @@ function Field({
 }) {
   return (
     <div>
-      <Label className="mb-1.5 flex items-center gap-2 text-xs text-slate-300">
+      <Label className="mb-1.5 flex items-center gap-2 text-xs text-[#F0DDE1]">
         <span className="text-emerald-300">{icon}</span>
         {label}
       </Label>
       {children}
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-[#A88990]">{hint}</p>}
     </div>
   );
 }
@@ -309,7 +301,7 @@ function ContactRow({
   value: string;
 }) {
   return (
-    <div className="flex items-start gap-2.5 text-slate-300">
+    <div className="flex items-start gap-2.5 text-[#F0DDE1]">
       <span className="mt-0.5 text-emerald-300">{icon}</span>
       <span className="break-words">{value}</span>
     </div>

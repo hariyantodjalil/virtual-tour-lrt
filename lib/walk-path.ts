@@ -43,6 +43,7 @@ export function buildWalkPathHotspots(
           type: "scene",
           text: `→ ${next.title}`,
           sceneId: next.sceneId,
+          targetView: existing.find((h) => h.type === "scene" && h.sceneId === next.sceneId)?.targetView,
         });
       }
     }
@@ -59,6 +60,7 @@ export function buildWalkPathHotspots(
           type: "scene",
           text: `← ${prev.title}`,
           sceneId: prev.sceneId,
+          targetView: existing.find((h) => h.type === "scene" && h.sceneId === prev.sceneId)?.targetView,
         });
       }
     }

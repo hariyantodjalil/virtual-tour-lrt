@@ -55,7 +55,7 @@ function resolvePickerSelection(
 }
 
 const selectClass =
-  "w-full bg-slate-800 border border-slate-700 rounded-md h-8 px-2 text-sm text-slate-100";
+  "w-full bg-[#261015] border border-[rgba(255,214,218,0.14)] rounded-md h-8 px-2 text-sm text-[#F8ECEE]";
 
 export function SceneTargetPicker({
   levels,
@@ -126,7 +126,7 @@ export function SceneTargetPicker({
   return (
     <div className="space-y-2">
       <div>
-        <Label className="text-xs text-slate-500 mb-1.5 block">Level</Label>
+        <Label className="text-xs text-[#A88990] mb-1.5 block">Level</Label>
         <select
           value={levelId}
           onChange={(e) => handleLevelChange(e.target.value)}
@@ -141,7 +141,7 @@ export function SceneTargetPicker({
       </div>
 
       <div>
-        <Label className="text-xs text-slate-500 mb-1.5 block">Area</Label>
+        <Label className="text-xs text-[#A88990] mb-1.5 block">Area</Label>
         <select
           value={areaId}
           onChange={(e) => handleAreaChange(e.target.value)}
@@ -161,7 +161,7 @@ export function SceneTargetPicker({
       </div>
 
       <div>
-        <Label className="text-xs text-slate-500 mb-1.5 block">Scene</Label>
+        <Label className="text-xs text-[#A88990] mb-1.5 block">Scene</Label>
         <select
           value={value ?? ""}
           onChange={(e) => onChange(e.target.value)}
@@ -176,24 +176,13 @@ export function SceneTargetPicker({
           ))}
         </select>
         {availableScenes.length === 0 && (
-          <p className="text-[10px] text-slate-500 mt-1">
+          <p className="text-[10px] text-[#A88990] mt-1">
             Tidak ada scene lain di {targetLevel?.label}
             {targetArea ? ` › ${targetArea.label}` : ""}. Pilih level/area lain atau tambah scene.
           </p>
         )}
       </div>
 
-      {value && (
-        <p className="text-[10px] text-slate-600 font-mono">
-          → {value}
-          {targetLevel && targetArea && (
-            <span className="text-slate-500">
-              {" "}
-              · {targetLevel.label} › {targetArea.label}
-            </span>
-          )}
-        </p>
-      )}
     </div>
   );
 }

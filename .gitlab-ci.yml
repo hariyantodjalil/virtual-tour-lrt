@@ -23,6 +23,7 @@ variables:
   REGISTRY_USERNAME: $CI_REGISTRY_USER
   REGISTRY_PASSWORD: $CI_REGISTRY_PASSWORD
   REGISTRY_IMAGE_ROOT: $CI_REGISTRY_IMAGE
+  NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT: "0"
 
 include:
   - project: "divisi-lrt/lrt-cicd"
@@ -197,6 +198,7 @@ publish:dev:web:
     IMAGE_JOB_NAME: lrt-virtualtour
     DOCKERFILE_PATH: Dockerfile
     DOCKER_CONTEXT: .
+    BUILD_ARGS: "NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT=$NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT"
 
 publish:prod:web:
   extends: .publish-image-template
@@ -212,6 +214,7 @@ publish:prod:web:
     IMAGE_JOB_NAME: lrt-virtualtour
     DOCKERFILE_PATH: Dockerfile
     DOCKER_CONTEXT: .
+    BUILD_ARGS: "NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT=$NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT"
 
 deploy:dev:
   extends: .deploy-template

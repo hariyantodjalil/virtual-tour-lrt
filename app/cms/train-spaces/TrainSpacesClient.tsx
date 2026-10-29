@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { cmsFetch } from "@/lib/cms-fetch";
+import { cmsUi } from "@/lib/cms-ui";
 import { resolvePublicAssetUrl, shouldUnoptimizeImage } from "@/lib/s3-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -217,15 +218,8 @@ export default function TrainSpacesClient() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Train Rental Space</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-400">
-            Kelola kartu carousel &quot;Apa yang Ingin Anda Sewa?&quot; di landing train virtual tour.
-            Isi ketersediaan trainset, cara pemesanan, dan info penjualan seperti unit ruang komersial.
-          </p>
-        </div>
-        <Button onClick={openCreate} className="bg-[#d32f2f] hover:bg-[#b71c1c]">
+      <div className="mb-6 flex flex-wrap items-start justify-end gap-4">
+        <Button onClick={openCreate} className={cmsUi.primaryBtn}>
           <Plus className="mr-2 size-4" />
           Tambah Ruang
         </Button>
@@ -244,9 +238,9 @@ export default function TrainSpacesClient() {
 
       <div className="grid gap-3">
         {spaces.map((space) => (
-          <Card key={space.id} className="border-slate-800 bg-slate-900">
+          <Card key={space.id} className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
             <CardContent className="grid gap-4 p-4 sm:grid-cols-[88px_minmax(0,1fr)_auto] sm:items-center">
-              <div className="relative h-24 w-full overflow-hidden rounded-lg bg-slate-800 sm:h-[88px] sm:w-[88px]">
+              <div className="relative h-24 w-full overflow-hidden rounded-lg bg-[#261015] sm:h-[88px] sm:w-[88px]">
                 {space.imageUrl ? (
                   <Image
                     src={resolvePublicAssetUrl(space.imageUrl)}
@@ -258,7 +252,7 @@ export default function TrainSpacesClient() {
                     unoptimized={shouldUnoptimizeImage(resolvePublicAssetUrl(space.imageUrl))}
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-slate-500">
+                  <div className="flex h-full items-center justify-center text-[#A88990]">
                     <LayoutGrid className="size-6" />
                   </div>
                 )}
@@ -269,23 +263,28 @@ export default function TrainSpacesClient() {
                   <p className="font-semibold text-white">
                     {space.displayNumber} · {space.title}
                   </p>
-                  <Badge variant={space.isActive ? "default" : "secondary"}>
+                  <Badge
+                    variant="outline"
+                    className={space.isActive ? cmsUi.successBadge : cmsUi.inactiveBadge}
+                  >
                     {space.isActive ? "Aktif" : "Nonaktif"}
                   </Badge>
-                  <Badge variant="outline">{TRAIN_RENTAL_STATUS_LABELS[space.status]}</Badge>
-                  <span className="text-xs text-slate-500">Urutan {space.order + 1}</span>
+                  <Badge variant="outline" className={cmsUi.outlineBadge}>
+                    {TRAIN_RENTAL_STATUS_LABELS[space.status]}
+                  </Badge>
+                  <span className="text-xs text-[#A88990]">Urutan {space.order + 1}</span>
                 </div>
                 {unionCarTrainsets(parseCarTrainsetMap(space.availableByCar, space.availableTrainsets)).length === 0 ? (
-                  <p className="mb-1 text-xs italic text-slate-500">Belum diatur trainset (TS) mana yang tersedia.</p>
+                  <p className="mb-1 text-xs italic text-[#A88990]">Belum diatur trainset (TS) mana yang tersedia.</p>
                 ) : (
-                  <p className="mb-1 text-xs text-slate-400">
+                  <p className="mb-1 text-xs text-[#C4A8AD]">
                     {formatCarTrainsetSummary(parseCarTrainsetMap(space.availableByCar, space.availableTrainsets))}
                   </p>
                 )}
                 {space.description ? (
-                  <p className="line-clamp-2 text-sm text-slate-400">{space.description}</p>
+                  <p className="line-clamp-2 text-sm text-[#C4A8AD]">{space.description}</p>
                 ) : (
-                  <p className="text-sm italic text-slate-500">Belum ada deskripsi detail.</p>
+                  <p className="text-sm italic text-[#A88990]">Belum ada deskripsi detail.</p>
                 )}
               </div>
 
@@ -294,7 +293,7 @@ export default function TrainSpacesClient() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="border-slate-700"
+                  className="border-[rgba(255,214,218,0.14)]"
                   onClick={() => openEdit(space)}
                 >
                   <Pencil className="mr-1.5 size-3.5" />
@@ -304,7 +303,7 @@ export default function TrainSpacesClient() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="border-slate-700 text-red-400 hover:text-red-300"
+                  className="border-[rgba(255,214,218,0.14)] text-red-400 hover:text-red-300"
                   onClick={() => void deleteSpace(space.id)}
                 >
                   <Trash2 className="size-3.5" />
@@ -317,7 +316,7 @@ export default function TrainSpacesClient() {
 
       {editing ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white">
                 {editing.id ? "Edit Ruang Sewa" : "Tambah Ruang Sewa"}
@@ -325,7 +324,7 @@ export default function TrainSpacesClient() {
               <button
                 type="button"
                 onClick={() => setEditing(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+                className="rounded-lg p-1 text-[#C4A8AD] hover:bg-[#261015] hover:text-white"
               >
                 <X className="size-5" />
               </button>
@@ -334,7 +333,7 @@ export default function TrainSpacesClient() {
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label className="text-slate-300">Nomor Tampilan</Label>
+                  <Label className="text-[#F0DDE1]">Nomor Tampilan</Label>
                   <Input
                     value={editing.displayNumber}
                     onChange={(event) =>
@@ -343,11 +342,11 @@ export default function TrainSpacesClient() {
                       )
                     }
                     placeholder="01"
-                    className="mt-1.5 border-slate-700 bg-slate-800"
+                    className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                   />
                 </div>
                 <div>
-                  <Label className="text-slate-300">Urutan</Label>
+                  <Label className="text-[#F0DDE1]">Urutan</Label>
                   <Input
                     type="number"
                     min={0}
@@ -357,13 +356,13 @@ export default function TrainSpacesClient() {
                         current ? { ...current, order: Number(event.target.value) || 0 } : current
                       )
                     }
-                    className="mt-1.5 border-slate-700 bg-slate-800"
+                    className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                   />
                 </div>
               </div>
 
               <div>
-                <Label className="text-slate-300">Judul</Label>
+                <Label className="text-[#F0DDE1]">Judul</Label>
                 <Input
                   value={editing.title}
                   onChange={(event) =>
@@ -372,12 +371,12 @@ export default function TrainSpacesClient() {
                     )
                   }
                   placeholder="Handgrip"
-                  className="mt-1.5 border-slate-700 bg-slate-800"
+                  className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                 />
               </div>
 
               <div>
-                <Label className="text-slate-300">Deskripsi Detail</Label>
+                <Label className="text-[#F0DDE1]">Deskripsi Detail</Label>
                 <Textarea
                   value={editing.description ?? ""}
                   onChange={(event) =>
@@ -387,13 +386,13 @@ export default function TrainSpacesClient() {
                   }
                   rows={4}
                   placeholder="Jelaskan ruang sewa ini untuk calon mitra iklan..."
-                  className="mt-1.5 border-slate-700 bg-slate-800"
+                  className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                 />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label className="text-slate-300">Status Penjualan</Label>
+                  <Label className="text-[#F0DDE1]">Status Penjualan</Label>
                   <select
                     value={editing.status}
                     onChange={(event) =>
@@ -403,7 +402,7 @@ export default function TrainSpacesClient() {
                           : current
                       )
                     }
-                    className="mt-1.5 h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 text-sm text-white"
+                    className="mt-1.5 h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm text-white"
                   >
                     {TRAIN_RENTAL_STATUS_VALUES.map((value) => (
                       <option key={value} value={value}>
@@ -413,7 +412,7 @@ export default function TrainSpacesClient() {
                   </select>
                 </div>
                 <div>
-                  <Label className="text-slate-300">Harga sewa / bulan (opsional)</Label>
+                  <Label className="text-[#F0DDE1]">Harga sewa / bulan (opsional)</Label>
                   <Input
                     type="number"
                     min={0}
@@ -429,13 +428,13 @@ export default function TrainSpacesClient() {
                       )
                     }
                     placeholder="Kosongkan jika nego"
-                    className="mt-1.5 border-slate-700 bg-slate-800"
+                    className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                   />
                 </div>
               </div>
 
               <div>
-                <Label className="text-slate-300">Tersedia di gerbong & train set</Label>
+                <Label className="text-[#F0DDE1]">Tersedia di gerbong & train set</Label>
                 <div className="mt-1.5">
                   <TrainCarTrainsetPicker
                     value={parseCarTrainsetMap(editing.availableByCar, editing.availableTrainsets)}
@@ -455,7 +454,7 @@ export default function TrainSpacesClient() {
               </div>
 
               <div>
-                <Label className="text-slate-300">Cara Pemesanan</Label>
+                <Label className="text-[#F0DDE1]">Cara Pemesanan</Label>
                 <Textarea
                   value={editing.howToOrder ?? ""}
                   onChange={(event) =>
@@ -465,12 +464,12 @@ export default function TrainSpacesClient() {
                   }
                   rows={3}
                   placeholder="Contoh: Hubungi tim komersial via WhatsApp, sebutkan jenis media dan nomor TS yang diinginkan."
-                  className="mt-1.5 border-slate-700 bg-slate-800"
+                  className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                 />
               </div>
 
               <div>
-                <Label className="text-slate-300">Posisi Crop Gambar (object-position)</Label>
+                <Label className="text-[#F0DDE1]">Posisi Crop Gambar (object-position)</Label>
                 <Input
                   value={editing.objectPosition}
                   onChange={(event) =>
@@ -479,9 +478,9 @@ export default function TrainSpacesClient() {
                     )
                   }
                   placeholder="50% 50%"
-                  className="mt-1.5 border-slate-700 bg-slate-800"
+                  className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                 />
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-[#A88990]">
                   Contoh: 50% 12% (horizontal vertical). Atur fokus crop gambar di kartu carousel.
                 </p>
               </div>
@@ -496,18 +495,18 @@ export default function TrainSpacesClient() {
                       current ? { ...current, isActive: event.target.checked } : current
                     )
                   }
-                  className="size-4 rounded border-slate-600"
+                  className="size-4 rounded border-[rgba(255,214,218,0.18)]"
                 />
-                <Label htmlFor="space-active" className="text-slate-300">
+                <Label htmlFor="space-active" className="text-[#F0DDE1]">
                   Tampilkan di carousel publik
                 </Label>
               </div>
 
               {editing.id ? (
                 <div>
-                  <Label className="text-slate-300">Gambar Kartu</Label>
+                  <Label className="text-[#F0DDE1]">Gambar Kartu</Label>
                   <div className="mt-1.5 flex items-center gap-3">
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(255,214,218,0.14)] px-3 py-2 text-sm text-[#F8ECEE] hover:bg-[#261015]">
                       <Upload className="size-4" />
                       Upload Gambar
                       <input
@@ -522,12 +521,12 @@ export default function TrainSpacesClient() {
                       />
                     </label>
                     {editing.imageUrl ? (
-                      <span className="truncate text-xs text-slate-400">{editing.imageUrl}</span>
+                      <span className="truncate text-xs text-[#C4A8AD]">{editing.imageUrl}</span>
                     ) : null}
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-[#A88990]">
                   Simpan dulu untuk mengupload gambar. Sebelum upload, kartu memakai gambar default.
                 </p>
               )}
@@ -536,7 +535,7 @@ export default function TrainSpacesClient() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="border-slate-700"
+                  className="border-[rgba(255,214,218,0.14)]"
                   onClick={() => setEditing(null)}
                 >
                   Batal
@@ -544,7 +543,7 @@ export default function TrainSpacesClient() {
                 <Button
                   type="button"
                   disabled={saving}
-                  className="bg-[#d32f2f] hover:bg-[#b71c1c]"
+                  className={cmsUi.primaryBtn}
                   onClick={() => void saveSpace()}
                 >
                   {saving ? "Menyimpan..." : "Simpan"}
