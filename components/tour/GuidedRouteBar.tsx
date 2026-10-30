@@ -57,9 +57,9 @@ export function GuidedRouteBar({
           <button
             type="button"
             onClick={onToggleAutoplay}
-            disabled={finished && !autoplay}
             aria-pressed={autoplay}
-            title={autoplay ? "Jeda putar otomatis" : "Putar rute otomatis"}
+            title={autoplay ? "Jeda putar otomatis" : finished ? "Ulangi rute" : "Putar rute otomatis"}
+            aria-label={autoplay ? "Jeda putar otomatis" : finished ? "Ulangi rute" : "Putar rute otomatis"}
             className={`flex h-11 shrink-0 items-center justify-center gap-2 rounded-full px-3.5 font-display text-xs font-bold transition duration-300 sm:px-4 ${
               autoplay
                 ? "bg-white text-[#1C0A0E] shadow-[0_10px_24px_rgba(255,255,255,0.18)]"
@@ -108,7 +108,8 @@ export function GuidedRouteBar({
               onClick={onPrev}
               disabled={!canPrev}
               title="Scene sebelumnya"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/55 text-[#F8ECEE] transition hover:bg-[#3A161C] disabled:opacity-30"
+              aria-label="Scene sebelumnya"
+              className="flex size-11 items-center justify-center rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/55 text-[#F8ECEE] transition hover:bg-[#3A161C] disabled:opacity-30 sm:size-9"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -117,7 +118,8 @@ export function GuidedRouteBar({
               onClick={onNext}
               disabled={!canNext}
               title="Scene berikutnya"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/55 text-[#F8ECEE] transition hover:bg-[#3A161C] disabled:opacity-30"
+              aria-label="Scene berikutnya"
+              className="flex size-11 items-center justify-center rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/55 text-[#F8ECEE] transition hover:bg-[#3A161C] disabled:opacity-30 sm:size-9"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -125,7 +127,8 @@ export function GuidedRouteBar({
               type="button"
               onClick={onExit}
               title="Keluar dari rute"
-              className="ml-0.5 flex h-9 items-center gap-1.5 rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/55 px-2.5 font-display text-[10px] font-bold uppercase tracking-[0.12em] text-[#F8ECEE]/80 transition hover:border-[#E31E2D]/40 hover:text-white sm:px-3"
+              aria-label="Keluar dari rute"
+              className="ml-0.5 flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/55 px-2.5 font-display text-[10px] font-bold uppercase tracking-[0.12em] text-[#F8ECEE]/80 transition hover:border-[#E31E2D]/40 hover:text-white sm:min-h-9 sm:min-w-9 sm:px-3"
             >
               <X className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Keluar</span>

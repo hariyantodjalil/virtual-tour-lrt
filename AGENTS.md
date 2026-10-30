@@ -25,6 +25,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Validation
 
+- Use MCP Responsively for visual and responsive UI checks, as requested by the user. Do not substitute another browser tool for these checks without a user request.
 - For documentation-only changes, validate with `git status` before committing.
 - For code changes, prefer `npm run lint` and `npm run build` when dependencies and environment are available.
 - Use Prisma commands from `package.json` for schema generation, migrations, seed data, and database inspection.

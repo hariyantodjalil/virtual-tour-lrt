@@ -39,6 +39,8 @@ import FacilityLegend from "@/components/tour/FacilityLegend";
 import TourLeftPanel from "@/components/tour/TourLeftPanel";
 import TourUnitsPanel from "@/components/tour/TourUnitsPanel";
 import { GuidedRouteBar } from "@/components/tour/GuidedRouteBar";
+import MobileTourPanels, { type MobileTourPanel, type TourUnitListView } from "@/components/tour/MobileTourPanels";
+import { useMobileTour } from "@/lib/use-mobile-tour";
 import { getWhatsAppUrl } from "@/lib/utils";
 import type { StationInfo } from "@/lib/stations-data";
 import type { AdHotspotPayload } from "@/lib/pannellum-tour-config";
@@ -48,9 +50,10 @@ import {
 } from "@/lib/public-tour-structure";
 import { findSpaceHotspotPlacement } from "@/lib/space-hotspot-locate";
 import { findFacilityHotspotPlacement } from "@/lib/facility-hotspot-locate";
-import type { FacilityIconId } from "@/lib/facility-icons";
+import { FACILITY_ICONS, type FacilityIconId } from "@/lib/facility-icons";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
+import { getTourLocationBreadcrumb } from "@/lib/tour-location-breadcrumb";
 
 type Space = {
   id: string;
@@ -177,6 +180,7 @@ function ToolButton({
         type="button"
         onClick={onClick}
         title={title}
+        aria-label={title}
         aria-pressed={active}
         className={`tour-tool-btn pointer-events-auto relative ${active ? "tour-tool-btn--active" : ""}`}
       >
@@ -199,6 +203,8 @@ export default function StationTourClient({
   spaces,
   pickerStations,
 }: Props) {
+  const isMobile = useMobileTour();
+  const [unitListView, setUnitListView] = useState<TourUnitListView>({ scrollTop: 0, expanded: false });
   const commercialProfile = useCommercialProfile();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -221,7 +227,7 @@ export default function StationTourClient({
   const [selectedAd, setSelectedAd] = useState<AdHotspotPayload | null>(null);
   const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
   const [activeSceneId, setActiveSceneId] = useState(firstScene);
-  const [activeLevelId, setActiveLevelId] = useState(
+  const [, setActiveLevelId] = useState(
     initialPlacement?.level.id ?? firstLevel?.id ?? ""
   );
   const [activeAreaId, setActiveAreaId] = useState<string | null>(
@@ -246,12 +252,10 @@ export default function StationTourClient({
   } | null>(null);
   const [focusToken, setFocusToken] = useState(0);
   const [activeFacilityId, setActiveFacilityId] = useState<FacilityIconId | null>(null);
+  const mobilePanel: MobileTourPanel | null = unitsOpen ? "units" : infoOpen ? "info" : routeOpen ? "route" : null;
 
   const availableCount = spaces.filter((s) => s.status === "TERSEDIA").length;
   const occupiedCount = spaces.filter((s) => s.status === "TERISI").length;
-  const currentLevel =
-    stationInfo.levels.find((l) => l.id === activeLevelId) ?? stationInfo.levels[0];
-  const currentPlaceLabel = currentLevel?.label?.trim() || "Lokasi";
   const commercialContactPhone =
     stationInfo.commercialContactPhone || commercialProfile.whatsappNumber;
   const stationWaUrl = getWhatsAppUrl(
@@ -286,7 +290,7 @@ export default function StationTourClient({
   const routeFromTitle =
     stationInfo.scenes.find((s) => s.id === routeFrom)?.title ?? "Awal";
   const routeToTitle = stationInfo.scenes.find((s) => s.id === routeTo)?.title ?? "Tujuan";
-  const popupBlocksAutoplay = Boolean(selectedSpace || selectedAd || infoPopup);
+  const popupBlocksAutoplay = Boolean(selectedSpace || selectedAd || infoPopup || (isMobile && (mobilePanel || facilityOpen)));
 
   function handleSceneChange(sceneId: string) {
     clearCameraFocus();
@@ -430,12 +434,12 @@ export default function StationTourClient({
     }
   };
 
-  const closeSidePanels = () => {
+  const closeSidePanels = useCallback(() => {
     setInfoOpen(false);
     setRouteOpen(false);
     setUnitsOpen(false);
     setFacilityOpen(false);
-  };
+  }, []);
 
   function closeStationPicker() {
     setPickerOpen(false);
@@ -501,7 +505,7 @@ export default function StationTourClient({
         <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(to_bottom,rgba(28,10,14,.55)_0%,transparent_28%,transparent_62%,rgba(28,10,14,.62)_100%)]" />
       )}
 
-      {/* TOP CHIP — kanan saja; aksi kiri ada di TourLeftPanel (atau compact Home+Pilih saat panel tertutup) */}
+      {/* Compact station navigation when the side panel is closed. */}
       {!uiCleared && (
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[60] px-3 pt-4 sm:px-5 sm:pt-5">
         <div className="flex items-center justify-end gap-3">
@@ -527,29 +531,14 @@ export default function StationTourClient({
             </div>
           )}
 
-          <div className="pointer-events-none flex items-center gap-2">
-            <div className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2">
-              <span className="h-2 w-2 rounded-full bg-[#34d399]" />
-              <span className="font-display text-xs font-semibold text-white">
-                {currentPlaceLabel}
-              </span>
-            </div>
-            {availableCount > 0 && (
-              <div className="tour-glass inline-flex items-center gap-2 rounded-full px-3 py-2">
-                <span className="h-2 w-2 rounded-full bg-[#34d399]" />
-                <span className="font-display text-xs font-semibold text-white">
-                  {availableCount} unit tersedia
-                </span>
-              </div>
-            )}
-          </div>
         </div>
       </div>
       )}
 
-      {!uiCleared && !selectedSpace && !selectedAd && !unitsOpen && (
+      {!uiCleared && !selectedSpace && !selectedAd && (!unitsOpen || isMobile) && (
         <TourLeftPanel
           stationName={stationInfo.name}
+          locationBreadcrumb={getTourLocationBreadcrumb(stationInfo, activeSceneId)}
           onPickStation={() => setPickerOpen(true)}
           clearUiControl={
             leftPanelOpen ? (
@@ -653,26 +642,29 @@ export default function StationTourClient({
 
       {/* Panel fasilitas — muncul di samping rail saat tombol diklik */}
       {!uiCleared && facilityOpen && !selectedSpace && !selectedAd && !unitsOpen && (
-        <div className="pointer-events-auto absolute top-1/2 left-14 z-[65] -translate-y-1/2 sm:left-16">
+        <div className={`pointer-events-auto absolute left-14 z-[65] ${isMobile ? "bottom-[max(1rem,calc(50%-126px))]" : "top-1/2 -translate-y-1/2 sm:left-16"}`}>
           <FacilityLegend
             activeFacilityId={activeFacilityId}
             onSelectFacility={focusOnFacility}
+            mobile={isMobile}
+            onClose={isMobile ? closeSidePanels : undefined}
+            availableIds={isMobile ? FACILITY_ICONS.filter(item => findFacilityHotspotPlacement(stationInfo.scenes, item.id)).map(item => item.id) : undefined}
           />
         </div>
       )}
 
       {/* Backdrop soft close for side panels */}
-      {!uiCleared && (infoOpen || routeOpen || facilityOpen) && !selectedSpace && (
+      {(!isMobile || facilityOpen) && !uiCleared && (infoOpen || routeOpen || facilityOpen) && !selectedSpace && (
         <button
           type="button"
           aria-label="Tutup panel"
-          className="pointer-events-auto absolute inset-0 z-[55] bg-[#1C0A0E]/25 backdrop-blur-[1px]"
+          className="pointer-events-auto absolute inset-0 z-[55] bg-[#1C0A0E]/10 md:bg-[#1C0A0E]/25 md:backdrop-blur-[1px]"
           onClick={closeSidePanels}
         />
       )}
 
       {/* INFO PANEL — kiri, di samping rail */}
-      {!uiCleared && infoOpen && !selectedSpace && (
+      {!isMobile && !uiCleared && infoOpen && !selectedSpace && (
         <aside
           className={`tour-glass-panel tour-panel-in pointer-events-auto absolute top-1/2 z-[65] w-[min(18.5rem,calc(100vw-5.5rem))] -translate-y-1/2 overflow-hidden rounded-2xl text-[#F8ECEE] ${
             leftPanelOpen
@@ -685,6 +677,7 @@ export default function StationTourClient({
             <button
               type="button"
               onClick={() => setInfoOpen(false)}
+              aria-label="Tutup informasi stasiun"
               className="rounded-full p-1.5 transition-colors hover:bg-white/10"
             >
               <X className="h-4 w-4 text-[#F8ECEE]/60" />
@@ -731,7 +724,7 @@ export default function StationTourClient({
               href={stationWaUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] py-2.5 font-display text-xs font-bold text-white transition hover:bg-[#1DA851]"
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-[#E31E2D] py-2.5 font-display text-xs font-bold text-white transition hover:bg-[#c41926]"
             >
               Hubungi Tim Komersial
             </a>
@@ -740,7 +733,7 @@ export default function StationTourClient({
       )}
 
       {/* ROUTE PANEL */}
-      {!uiCleared && routeOpen && !selectedSpace && stationInfo.scenes.length > 1 && (
+      {!isMobile && !uiCleared && routeOpen && !selectedSpace && stationInfo.scenes.length > 1 && (
         <aside
           className={`tour-glass-panel tour-panel-in pointer-events-auto absolute top-1/2 z-[65] w-[min(18.5rem,calc(100vw-5.5rem))] -translate-y-1/2 overflow-hidden rounded-2xl text-[#F8ECEE] ${
             leftPanelOpen
@@ -756,6 +749,7 @@ export default function StationTourClient({
             <button
               type="button"
               onClick={() => setRouteOpen(false)}
+              aria-label="Tutup rute"
               className="rounded-full p-1.5 transition-colors hover:bg-white/10"
             >
               <X className="h-4 w-4 text-[#F8ECEE]/60" />
@@ -764,10 +758,11 @@ export default function StationTourClient({
           <div className="max-h-[min(70vh,28rem)] space-y-3 overflow-y-auto p-4">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="mb-1 block font-display text-[10px] uppercase tracking-[0.12em] text-[#C4A8AD]">
+                <label htmlFor="desktop-route-from" className="mb-1 block font-display text-[10px] uppercase tracking-[0.12em] text-[#C4A8AD]">
                   Dari
                 </label>
                 <select
+                  id="desktop-route-from"
                   value={routeFrom}
                   onChange={(e) => setRouteFrom(e.target.value)}
                   className="h-9 w-full rounded-xl border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/65 px-3 text-xs font-semibold text-white outline-none focus:border-[#E31E2D]/50"
@@ -795,10 +790,11 @@ export default function StationTourClient({
                 </select>
               </div>
               <div>
-                <label className="mb-1 block font-display text-[10px] uppercase tracking-[0.12em] text-[#C4A8AD]">
+                <label htmlFor="desktop-route-to" className="mb-1 block font-display text-[10px] uppercase tracking-[0.12em] text-[#C4A8AD]">
                   Ke
                 </label>
                 <select
+                  id="desktop-route-to"
                   value={routeTo}
                   onChange={(e) => setRouteTo(e.target.value)}
                   className="h-9 w-full rounded-xl border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/65 px-3 text-xs font-semibold text-white outline-none focus:border-[#E31E2D]/50"
@@ -917,7 +913,17 @@ export default function StationTourClient({
       )}
 
       {/* UNITS LEFT DRAWER — muncul dari "Lihat semua Tenant" */}
-      {!uiCleared && unitsOpen && !selectedSpace && (
+      {isMobile && mobilePanel && !uiCleared && !selectedSpace && !selectedAd && (
+        <MobileTourPanels key={mobilePanel} panel={mobilePanel} station={stationInfo} spaces={spaces}
+          typeLabels={TYPE_LABELS} contactUrl={stationWaUrl} activeSceneId={activeSceneId}
+          unitListView={unitListView} onUnitListViewChange={setUnitListView} onClose={closeSidePanels}
+          onSelectUnit={unit => { const full = spaces.find(space => space.id === unit.id); if (full) openSpaceFromList(full); }}
+          onViewMap={() => { setUnitsOpen(false); setLeftPanelOpen(true); }}
+          route={{ from: routeFrom, to: routeTo, onFromChange: setRouteFrom, onToChange: setRouteTo, groups: groupedRoute, onSelectScene: handleSceneChange, onStart: autoplay => startGuidedRoute({ autoplay }) }}
+        />
+      )}
+
+      {!isMobile && !uiCleared && unitsOpen && !selectedSpace && (
         <TourUnitsPanel
           spaces={spaces}
           typeLabels={TYPE_LABELS}
@@ -942,6 +948,12 @@ export default function StationTourClient({
           contactPhone={commercialContactPhone}
           returnToList={openedFromUnitsList}
           onClose={closeSpaceDetail}
+          onExplore={() => {
+            setSelectedSpace(null);
+            setUnitsOpen(false);
+            setOpenedFromUnitsList(false);
+            clearCameraFocus();
+          }}
         />
       )}
 
@@ -967,7 +979,7 @@ export default function StationTourClient({
         />
       )}
 
-      {!uiCleared && (
+      {!uiCleared && !(isMobile && (mobilePanel || facilityOpen || guidedActive || selectedSpace || selectedAd || pickerOpen)) && (
         <ContactPersonFab
           phone={commercialContactPhone}
           stationName={stationInfo.name}
@@ -975,7 +987,7 @@ export default function StationTourClient({
       )}
 
       {/* Clear / restore UI — di bawah mini map saat panel terbuka; floating saat UI disembunyikan / panel tertutup */}
-      {(uiCleared || !leftPanelOpen || selectedAd || unitsOpen) && !selectedSpace && (
+      {(uiCleared || !leftPanelOpen || selectedAd || unitsOpen) && !selectedSpace && !(isMobile && mobilePanel) && (
         <button
           type="button"
           onClick={() => {

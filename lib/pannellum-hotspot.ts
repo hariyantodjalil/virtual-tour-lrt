@@ -8,7 +8,7 @@ import { facilityIconSrc } from "./facility-icons";
 /** Warna brand LRT Jabodebek */
 export const LRT_MAROON = "#E31E2D";
 
-/** Ikon SVG per tipe (space & ad) — info memakai aset PNG; scene memakai navigasi pin + label. */
+/** Ikon SVG per tipe (space & ad) — info memakai aset PNG; scene memakai panah navigasi. */
 export function hotspotIconSvg(type: HotspotType): string {
   if (type === "scene") return "";
   if (type === "space") {
@@ -29,15 +29,12 @@ export const INFO_PIN_H = 56;
 const SCENE_CHEVRON_SVG =
   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
-const SCENE_PIN_SVG =
-  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 22s7-7.2 7-12.2A7 7 0 1 0 5 9.8C5 14.8 12 22 12 22z" fill="#c41230"/><circle cx="12" cy="9.5" r="2.6" fill="#fff"/></svg>';
-
 export type HotspotVisualOptions = {
   type: HotspotType;
   selected?: boolean;
   scale?: number;
   onClick?: () => void;
-  /** Label pin scene — biasanya title scene tujuan */
+  /** Nama tujuan untuk pembaca layar — biasanya title scene tujuan. */
   sceneTitle?: string;
   /** Arah chevron scene: right (default), left, up, down */
   direction?: HotspotDirection;
@@ -119,7 +116,7 @@ function applyPinHotspotOuterShell(div: HTMLDivElement, opts: HotspotVisualOptio
   applyHotspotScale(div, scale);
 }
 
-/** Shell scene nav — lebar mengikuti label. */
+/** Shell scene nav — hanya panah, tanpa label visual. */
 function applySceneNavOuterShell(div: HTMLDivElement, opts: HotspotVisualOptions) {
   Object.assign(div.style, {
     width: "auto",
@@ -151,7 +148,7 @@ function buildSceneNavHtml(selected: boolean, title: string, direction?: Hotspot
   const rotate = directionRotateCss(direction);
   const safeTitle = escapeHtml(title);
   const chevronStyle = rotate ? ` style="transform:${rotate}"` : "";
-  return `<div class="lrt-scene-nav"><div class="lrt-scene-nav__pulse" aria-hidden="true"></div><div class="${SCENE_NAV_DISC_CLASS}${sel}"><span class="lrt-scene-nav__core"><span class="lrt-scene-nav__chevron"${chevronStyle}>${SCENE_CHEVRON_SVG}</span></span></div><div class="lrt-scene-nav__label" title="${safeTitle}"><span class="lrt-scene-nav__pin" aria-hidden="true">${SCENE_PIN_SVG}</span><span class="lrt-scene-nav__divider" aria-hidden="true"></span><span class="lrt-scene-nav__label-text">${safeTitle}</span></div></div>`;
+  return `<div class="lrt-scene-nav" role="img" aria-label="${safeTitle}"><div class="lrt-scene-nav__pulse" aria-hidden="true"></div><div class="${SCENE_NAV_DISC_CLASS}${sel}"><span class="lrt-scene-nav__core"><span class="lrt-scene-nav__chevron"${chevronStyle}>${SCENE_CHEVRON_SVG}</span></span></div></div>`;
 }
 
 function buildFacilityPinHtml(icon: FacilityIconId, selected: boolean): string {
@@ -274,13 +271,9 @@ export function setHotspotSelected(div: HTMLDivElement, type: HotspotType, selec
   disc?.classList.toggle("is-selected", selected);
 }
 
-/** Update label scene tanpa re-mount (editor). */
+/** Update nama tujuan untuk pembaca layar tanpa re-mount (editor). */
 export function setSceneNavTitle(div: HTMLDivElement, title: string) {
-  const safeTitle = escapeHtml(title.trim() || "Scene");
-  const label = div.querySelector(".lrt-scene-nav__label");
-  const text = div.querySelector(".lrt-scene-nav__label-text");
-  if (label instanceof HTMLElement) label.title = safeTitle;
-  if (text) text.textContent = title.trim() || "Scene";
+  div.querySelector(".lrt-scene-nav")?.setAttribute("aria-label", title.trim() || "Scene");
 }
 
 /** Update arah chevron tanpa re-mount (editor). */

@@ -32,6 +32,6 @@ export function splitStationLocation(station: StationPickerItem): { area: string
 }
 
 export function stationLineLabel(line: string): string {
-  const trimmed = line.trim() || "Jabodebek";
-  return /line/i.test(trimmed) ? trimmed : `${trimmed} Line`;
+  const trimmed = line.trim();
+  return !trimmed || /\bline\b/i.test(trimmed) ? trimmed : `Line ${trimmed}`;
 }

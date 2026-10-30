@@ -320,7 +320,6 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
                 <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white/60">{spaces.length}</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-[11px] text-emerald-400 font-semibold">{availableCount} tersedia</span>
                 <button onClick={() => setUnitsOpen(false)} className="rounded-full p-1 hover:bg-white/10 transition-colors">
                   <ChevronDown className="h-4 w-4 text-white/60" />
                 </button>
@@ -362,8 +361,14 @@ export default function StationTourClient({ stationInfo, spaces }: Props) {
           key={selectedSpace.id}
           space={selectedSpace}
           stationName={stationInfo.name}
+          stationSlug={stationInfo.slug}
           returnToList={openedFromUnitsList}
           onClose={closeSpaceDetail}
+          onExplore={() => {
+            setSelectedSpace(null);
+            setUnitsOpen(false);
+            setOpenedFromUnitsList(false);
+          }}
         />
       )}
     </div>

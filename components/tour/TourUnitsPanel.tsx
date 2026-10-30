@@ -87,10 +87,6 @@ export default function TourUnitsPanel({
             </span>
           </div>
         </div>
-        <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-300">
-          <span className="size-1.5 rounded-full bg-emerald-400" />
-          {available} tersedia
-        </span>
         <button
           type="button"
           onClick={onClose}

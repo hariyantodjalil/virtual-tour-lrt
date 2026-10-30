@@ -65,6 +65,25 @@ export const PUBLIC_LEASING_STEPS = [
   { n: "05", title: "Perjanjian", detail: "BA Negosiasi, review desain, lalu PKS dan serah terima." },
 ] as const;
 
+const PUBLIC_LEAD_STAGE_DETAILS = {
+  NEW: "Data minat sewa masuk untuk ditinjau tim komersial.",
+  CONTACTED: "Tim komersial menghubungi Anda untuk melengkapi informasi.",
+  RDS_OFFER: "Tim komersial menyampaikan penawaran resmi.",
+  NEGOTIATING: "Pembahasan kebutuhan usaha dan ketentuan sewa.",
+  SITE_CHECK: "Pemeriksaan lokasi dan batas area unit.",
+  BA_SIGNED: "Penandatanganan berita acara negosiasi.",
+  DESIGN_REVIEW: "Peninjauan rancangan penataan ruang dan kebutuhan teknis.",
+  PKS: "Penyusunan dan penandatanganan perjanjian kerja sama.",
+  BILLING: "Proses tagihan sesuai kesepakatan.",
+  FIT_OUT_HANDOVER: "Persiapan ruang, fit-out, dan serah terima.",
+  COMMERCIAL_OPERATION: "Unit memasuki tahap operasional komersial.",
+} satisfies Record<Exclude<(typeof LEAD_PIPELINE_STATUSES)[number], "CLOSED_LOST">, string>;
+
+/** Mengikuti urutan status yang juga digunakan CMS dan Portal Mitra GitDev. */
+export const PUBLIC_LEAD_PROCESS_STEPS = LEAD_PIPELINE_STATUSES
+  .filter(status => status !== "CLOSED_LOST")
+  .map(status => ({ status, title: LEAD_STATUS_LABELS[status], detail: PUBLIC_LEAD_STAGE_DETAILS[status] }));
+
 export function leadStageIndex(status: string) {
   if (status === "CLOSED_WON") {
     return LEAD_PIPELINE_STATUSES.indexOf("COMMERCIAL_OPERATION");
