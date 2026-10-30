@@ -233,6 +233,12 @@ model SpaceOccupancy {
 
 model TenantLead {
   id               String           @id @default(cuid())
+  inquiryCode      String           @unique @default(dbgenerated("'LRT-'::text || nextval('inquiry_code_seq'::regclass)::text"))
+  workflowVersionId String?
+  workflowVersion PipelineWorkflowVersion? @relation(fields: [workflowVersionId], references: [id])
+  rejectionReason String?           @db.Text
+  mediaAttachments InquiryMedia[]
+  stepLogs         InquiryStepLog[]
   userId           String?
   user             User?            @relation(fields: [userId], references: [id])
   spaceId          String?
@@ -260,6 +266,73 @@ model TenantLead {
   @@index([status])
   @@index([createdAt])
   @@map("tenant_leads")
+}
+
+model PipelineWorkflowVersion {
+  id          String       @id @default(cuid())
+  version     Int          @unique
+  title       String
+  description String?
+  status      String       @default("DRAFT")
+  publishedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  steps       PipelineStep[]
+  leads       TenantLead[]
+
+  @@index([status])
+  @@map("pipeline_workflow_versions")
+}
+
+model PipelineStep {
+  id                String                  @id @default(cuid())
+  workflowVersionId String
+  workflowVersion   PipelineWorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  stepOrder         Int
+  leadStatus        LeadStatus
+  title             String
+  description       String?
+  publicMessage     String                  @db.Text
+  requiresMedia     Boolean                 @default(false)
+  stepLogs          InquiryStepLog[]
+
+  @@unique([workflowVersionId, stepOrder])
+  @@unique([workflowVersionId, leadStatus])
+  @@map("pipeline_steps")
+}
+
+model InquiryMedia {
+  id               String     @id @default(cuid())
+  tenantLeadId     String
+  tenantLead       TenantLead @relation(fields: [tenantLeadId], references: [id], onDelete: Cascade)
+  stepOrder        Int
+  mediaTitle       String
+  documentNumber   String?
+  mediaLink        String
+  isVisibleToMitra Boolean    @default(false)
+  uploadedByAdmin  String
+  createdAt        DateTime   @default(now())
+
+  @@index([tenantLeadId, stepOrder])
+  @@map("inquiry_media")
+}
+
+model InquiryStepLog {
+  id             String        @id @default(cuid())
+  tenantLeadId   String
+  tenantLead     TenantLead    @relation(fields: [tenantLeadId], references: [id], onDelete: Cascade)
+  pipelineStepId String?
+  pipelineStep   PipelineStep? @relation(fields: [pipelineStepId], references: [id], onDelete: SetNull)
+  stepOrder      Int
+  status         LeadStatus
+  fromStatus     LeadStatus?
+  action         String
+  notes          String?       @db.Text
+  performedBy    String
+  createdAt      DateTime      @default(now())
+
+  @@index([tenantLeadId, createdAt])
+  @@map("inquiry_step_logs")
 }
 
 model VisitEvent {

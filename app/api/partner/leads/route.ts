@@ -6,6 +6,7 @@ import { z } from "zod";
 import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/rate-limit";
 import { ACTIVE_LEAD_STATUSES } from "@/lib/commercial-pipeline";
 import { findTrainRentalSpaceForLead, trainLeadRequirement } from "@/lib/train-rental-spaces";
+import { inquiryCreationData, partnerInquiryInclude, publicWorkflowSelect, toPartnerInquiry } from "@/lib/partner-inquiries";
 
 const partnerLeadSchema = z
   .object({
@@ -36,25 +37,10 @@ export async function GET(request: NextRequest) {
   const leads = await prisma.tenantLead.findMany({
     where: { userId: auth.user.userId },
     orderBy: { createdAt: "desc" },
-    include: {
-      space: {
-        select: {
-          id: true,
-          code: true,
-          name: true,
-          type: true,
-          area: true,
-          floor: true,
-          location: true,
-          monthlyRent: true,
-          panoramaUrl: true,
-          station: { select: { name: true, slug: true } },
-        },
-      },
-    },
+    include: partnerInquiryInclude,
   });
 
-  return NextResponse.json(leads);
+  return NextResponse.json(leads.map(toPartnerInquiry), { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(request: NextRequest) {
@@ -155,6 +141,7 @@ export async function POST(request: NextRequest) {
 
   const lead = await prisma.tenantLead.create({
     data: {
+      ...await inquiryCreationData(user.id),
       userId: user.id,
       spaceId: commercialSpaceId,
       companyName,
@@ -167,6 +154,7 @@ export async function POST(request: NextRequest) {
       surveyPreference: parsed.data.surveyPreference || null,
       siteVisitStatus: parsed.data.surveyPreference ? "REQUESTED" : "NONE",
     },
+    include: { workflowVersion: { select: publicWorkflowSelect } },
   });
 
   if (commercialSpaceId) {

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { leadUpdateSchema } from "@/lib/api-schemas";
+import { recordInquiryStatus } from "@/lib/partner-inquiries";
 import {
   ACTIVE_LEAD_STATUSES,
   isAtOrAfterLeadStage,
@@ -11,7 +12,7 @@ import {
 } from "@/lib/commercial-pipeline";
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
+  const auth = await requireRole(request, ["ADMIN", "EDITOR"]);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const leads = await prisma.tenantLead.findMany({
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const auth = await requireAuth(request);
+  const auth = await requireRole(request, ["ADMIN", "EDITOR"]);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const parsed = await parseJsonRequest(request, leadUpdateSchema);
@@ -36,6 +37,7 @@ export async function PATCH(request: NextRequest) {
     followUpAt,
     rdsOfferNo,
     baNegotiationNo,
+    rejectionReason,
   } = parsed.data;
   const targetStatus = status === "CLOSED_WON" ? "COMMERCIAL_OPERATION" : status;
 
@@ -154,14 +156,16 @@ export async function PATCH(request: NextRequest) {
         });
 
         if (holdsSpace || targetStatus === "FIT_OUT_HANDOVER") {
+          const affected = await tx.tenantLead.findMany({ where: { spaceId, id: { not: id }, status: { in: ACTIVE_LEAD_STATUSES } }, select: { id: true, status: true, workflowVersionId: true } });
           await tx.tenantLead.updateMany({
             where: {
               spaceId,
               id: { not: id },
               status: { in: ACTIVE_LEAD_STATUSES },
             },
-            data: { status: "CLOSED_LOST" },
+            data: { status: "CLOSED_LOST", rejectionReason: "Unit sudah dialokasikan untuk pengajuan lain." },
           });
+          for (const other of affected) await recordInquiryStatus(tx, { id: other.id, workflowVersionId: other.workflowVersionId, fromStatus: other.status, status: "CLOSED_LOST", rejectionReason: "Unit sudah dialokasikan untuk pengajuan lain.", actor: auth.user.userId });
         }
       }
 
@@ -236,14 +240,16 @@ export async function PATCH(request: NextRequest) {
           data: { status: "TERISI" },
         });
 
+        const affected = await tx.tenantLead.findMany({ where: { spaceId, id: { not: id }, status: { in: ACTIVE_LEAD_STATUSES } }, select: { id: true, status: true, workflowVersionId: true } });
         await tx.tenantLead.updateMany({
           where: {
             spaceId,
             id: { not: id },
             status: { in: ACTIVE_LEAD_STATUSES },
           },
-          data: { status: "CLOSED_LOST" },
+          data: { status: "CLOSED_LOST", rejectionReason: "Unit sudah dialokasikan untuk pengajuan lain." },
         });
+        for (const other of affected) await recordInquiryStatus(tx, { id: other.id, workflowVersionId: other.workflowVersionId, fromStatus: other.status, status: "CLOSED_LOST", rejectionReason: "Unit sudah dialokasikan untuk pengajuan lain.", actor: auth.user.userId });
       }
 
       if (
@@ -270,7 +276,7 @@ export async function PATCH(request: NextRequest) {
         }
       }
 
-      return tx.tenantLead.update({
+      const updated = await tx.tenantLead.update({
         where: { id },
         data: {
           ...(targetStatus && { status: targetStatus }),
@@ -284,9 +290,13 @@ export async function PATCH(request: NextRequest) {
           }),
           ...(rdsOfferNo !== undefined && { rdsOfferNo: nextRdsOfferNo || null }),
           ...(baNegotiationNo !== undefined && { baNegotiationNo: nextBaNumber || null }),
+          ...(rejectionReason !== undefined && { rejectionReason: rejectionReason || null }),
+          ...(targetStatus && targetStatus !== "CLOSED_LOST" && { rejectionReason: null }),
         },
         include: { space: { include: { station: true } } },
       });
+      if (targetStatus && targetStatus !== existing.status) await recordInquiryStatus(tx, { id, workflowVersionId: existing.workflowVersionId, fromStatus: existing.status, status: targetStatus, rejectionReason: rejectionReason ?? existing.rejectionReason, actor: auth.user.userId });
+      return updated;
     });
 
     return NextResponse.json(lead);

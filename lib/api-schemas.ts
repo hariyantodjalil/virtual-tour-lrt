@@ -171,6 +171,7 @@ export const leadUpdateSchema = z.object({
   followUpAt: optionalDate,
   rdsOfferNo: optionalText(80),
   baNegotiationNo: optionalText(80),
+  rejectionReason: optionalText(2_000),
 }).strict().refine((value) => Object.keys(value).length > 1, "Minimal satu perubahan harus diisi");
 
 const orderItem = z.object({ sceneId: id, order: safeInteger }).strict();

@@ -5,11 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowUpRight,
   Bell,
   Building2,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   CircleHelp,
   ClipboardList,
   Clock3,
@@ -42,10 +42,7 @@ import {
 import {
   ACTIVE_LEAD_STATUSES,
   isCommercialOperation,
-  LEAD_STATUS_LABELS,
-  type CommercialLeadStatus,
 } from "@/lib/commercial-pipeline";
-import { formatRupiah } from "@/lib/utils";
 
 type User = {
   id: string;
@@ -85,7 +82,11 @@ export default function PartnerPage() {
 
     refreshFavorites();
     window.addEventListener(FAVORITES_UPDATED_EVENT, refreshFavorites);
-    return () => window.removeEventListener(FAVORITES_UPDATED_EVENT, refreshFavorites);
+    window.addEventListener("storage", refreshFavorites);
+    return () => {
+      window.removeEventListener(FAVORITES_UPDATED_EVENT, refreshFavorites);
+      window.removeEventListener("storage", refreshFavorites);
+    };
   }, []);
 
   useEffect(() => {
@@ -143,7 +144,7 @@ export default function PartnerPage() {
         )
       ).length,
       won: leads.filter((lead) => isCommercialOperation(lead.status)).length,
-      lost: leads.filter((lead) => lead.status === "CLOSED_LOST").length,
+      lost: leads.filter((lead) => lead.status === "REJECTED" || lead.status === "CLOSED_LOST").length,
     }),
     [leads]
   );
@@ -433,7 +434,7 @@ function DashboardOverview({
   onOpenFavorit: () => void;
   pickerReady: boolean;
 }) {
-  const recentLeads = leads.slice(0, 5);
+  const recentLeads = leads.slice(0, 3);
   const recentFavorites = favorites.slice(0, 3);
 
   return (
@@ -587,127 +588,97 @@ function DashboardOverview({
   );
 }
 
-const PROGRESS_CARD_TONES = [
-  { card: "bg-[#e8f1ff]", btn: "bg-[#c4b5fd] hover:bg-[#a78bfa]" },
-  { card: "bg-[#f3e8ff]", btn: "bg-[#f9a8d4] hover:bg-[#f472b6]" },
-  { card: "bg-[#ffe8e4]", btn: "bg-[#fda4af] hover:bg-[#fb7185]" },
-] as const;
-
-function applicationBadge(status: string, createdAt: string) {
-  const dateLabel = new Date(createdAt).toLocaleDateString("id-ID", {
+function applicationBadge(lead: Lead) {
+  const dateLabel = new Date(lead.createdAt).toLocaleDateString("id-ID", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 
-  switch (status) {
-    case "COMMERCIAL_OPERATION":
-    case "CLOSED_WON":
-      return { label: "Operasional", className: "bg-emerald-500 text-white" };
-    case "CLOSED_LOST":
-      return { label: "Ditolak", className: "bg-red-500 text-white" };
-    case "NEGOTIATING":
-      return { label: `Negosiasi · ${dateLabel}`, className: "bg-[#1e293b] text-white" };
-    case "PKS":
-      return { label: `PKS · ${dateLabel}`, className: "bg-indigo-600 text-white" };
-    case "FIT_OUT_HANDOVER":
-      return { label: `Fit-Out · ${dateLabel}`, className: "bg-violet-600 text-white" };
-    case "CONTACTED":
-      return { label: `Direview · ${dateLabel}`, className: "bg-[#1e293b] text-white" };
-    default:
-      return {
-        label: `${LEAD_STATUS_LABELS[status as CommercialLeadStatus] ?? "Diajukan"} · ${dateLabel}`,
-        className: "bg-[#1C0A0E] text-white",
-      };
+  if (
+    lead.status === "COMPLETED" ||
+    lead.status === "COMMERCIAL_OPERATION" ||
+    lead.status === "CLOSED_WON"
+  ) {
+    return { label: "Selesai", className: "bg-emerald-600 text-white" };
   }
-}
-
-function isApplicationDone(status: string) {
-  return isCommercialOperation(status) || status === "CLOSED_LOST";
+  if (lead.status === "REJECTED" || lead.status === "CLOSED_LOST") {
+    return { label: "Ditolak", className: "bg-rose-600 text-white" };
+  }
+  const currentStep = lead.workflowVersion?.steps?.find(
+    (s) => s.stepOrder === lead.currentStepOrder
+  );
+  if (currentStep) {
+    return {
+      label: `Tahap ${lead.currentStepOrder}: ${currentStep.title}`,
+      className: "bg-[#c41230] text-white",
+    };
+  }
+  return { label: `Diajukan · ${dateLabel}`, className: "bg-[#1e293b] text-white" };
 }
 
 function ApplicationProgressList({ leads }: { leads: Lead[] }) {
   return (
-    <div className="relative">
-      {/* vertical timeline line */}
-      {leads.length > 1 && (
-        <div
-          className="absolute top-6 bottom-6 left-[11px] w-0.5 bg-[#1e293b]/25 md:left-[13px]"
-          aria-hidden
-        />
-      )}
+    <div className="space-y-3">
+      {leads.map((lead) => {
+        const badge = applicationBadge(lead);
 
-      <ul className="space-y-3">
-        {leads.map((lead, index) => {
-          const tone = PROGRESS_CARD_TONES[index % PROGRESS_CARD_TONES.length];
-          const badge = applicationBadge(lead.status, lead.createdAt);
-          const done = isApplicationDone(lead.status);
-          const href = lead.space?.station?.slug
-            ? `/station/${lead.space.station.slug}?unit=${lead.space.id}`
-            : undefined;
-
-          return (
-            <li key={lead.id} className="relative flex gap-3 md:gap-4">
-              <div className="relative z-[1] mt-5 flex w-6 shrink-0 justify-center md:w-7">
-                <span
-                  className={`size-3.5 rounded-full border-2 border-[#1e293b] md:size-4 ${
-                    done ? "bg-[#1e293b]" : "bg-white"
-                  }`}
-                />
-              </div>
-
-              <div
-                className={`min-w-0 flex-1 rounded-2xl ${tone.card} px-4 py-3.5 sm:px-5 sm:py-4`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="truncate text-sm font-bold text-[#101828] sm:text-base">
-                      {lead.space?.code ?? "-"} — {lead.space?.name ?? "Unit Komersial"}
-                    </h3>
-                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-600 sm:text-[13px]">
-                      {lead.space?.station?.name ?? "Stasiun"}
-                      {lead.space?.floor ? ` · ${lead.space.floor}` : ""}
-                      {lead.businessType ? ` · ${lead.businessType}` : ""}
-                      {lead.space ? ` · ${lead.space.area} m²` : ""}
-                    </p>
-                    {lead.message && (
-                      <p className="mt-1.5 line-clamp-1 text-xs text-slate-500">{lead.message}</p>
-                    )}
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold tracking-wide uppercase ${badge.className}`}
-                  >
-                    {badge.label}
-                  </span>
-                </div>
-
-                <div className="mt-3 flex items-end justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">
-                    {lead.space?.monthlyRent && lead.space.monthlyRent > 0
-                      ? formatRupiah(lead.space.monthlyRent) + " / bulan"
-                      : "Harga: hubungi tim"}
-                  </p>
-                  {href ? (
-                    <Link
-                      href={href}
-                      className={`inline-flex size-9 items-center justify-center rounded-full text-white shadow-sm transition ${tone.btn}`}
-                      aria-label="Lihat unit"
-                    >
-                      <ArrowUpRight className="size-4" strokeWidth={2.5} />
-                    </Link>
-                  ) : (
-                    <span
-                      className={`inline-flex size-9 items-center justify-center rounded-full text-white/70 ${tone.btn}`}
-                    >
-                      <ArrowUpRight className="size-4" strokeWidth={2.5} />
-                    </span>
+        return (
+          <div
+            key={lead.id}
+            className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs transition hover:border-[#c41230]/30 hover:shadow-xs"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                  {lead.inquiryCode || "Pengajuan Minat"}
+                </span>
+                <h3 className="mt-0.5 truncate text-sm font-bold text-[#101828] sm:text-base">
+                  {lead.space?.code ?? "-"} — {lead.space?.name ?? "Unit Komersial"}
+                </h3>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
+                  <span>{lead.space?.station?.name ?? "Stasiun"}</span>
+                  <span>·</span>
+                  <span>{lead.space ? `${lead.space.area} m²` : "-"}</span>
+                  {lead.businessType && (
+                    <>
+                      <span>·</span>
+                      <span className="font-medium text-slate-700">{lead.businessType}</span>
+                    </>
                   )}
                 </div>
               </div>
-            </li>
-          );
-        })}
-      </ul>
+
+              <div>
+                <span
+                  className={`inline-block rounded-md px-2.5 py-1 text-[10px] font-bold tracking-wide uppercase ${badge.className}`}
+                >
+                  {badge.label}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-3.5 flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
+              <span className="text-[11px] text-slate-400">
+                Diajukan:{" "}
+                {new Date(lead.createdAt).toLocaleDateString("id-ID", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+
+              <Link
+                href={`/partner/inquiries/${lead.id}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:border-slate-300"
+              >
+                <span>Lihat Detail</span>
+                <ChevronRight className="size-3.5" />
+              </Link>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -805,10 +776,7 @@ function FavoritesSection({
         ) : (
           <div className="divide-y divide-slate-100">
             {favorites.map((item) => {
-              const priceLabel =
-                item.monthlyRent && item.monthlyRent > 0
-                  ? `${formatRupiah(item.monthlyRent)} / bulan`
-                  : "Hubungi tim";
+
               return (
                 <div
                   key={item.spaceId}
@@ -833,7 +801,6 @@ function FavoritesSection({
                         {item.stationName}
                       </span>
                       <span>{item.area} m²</span>
-                      <span>{priceLabel}</span>
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
@@ -845,7 +812,7 @@ function FavoritesSection({
                       Hapus
                     </button>
                     <Link
-                      href={`/station/${item.stationSlug}`}
+                      href={`/station/${encodeURIComponent(item.stationSlug)}?unit=${encodeURIComponent(item.spaceId)}`}
                       className="inline-flex items-center justify-center rounded-lg bg-[#c41230] px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
                     >
                       Lihat Unit
