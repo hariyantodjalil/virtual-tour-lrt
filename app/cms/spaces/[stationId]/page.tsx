@@ -18,6 +18,18 @@ import {
   SPACE_STATUS_VALUES,
   type CommercialSpaceStatus,
 } from "@/lib/commercial-pipeline";
+import {
+  AREA_EPSILON,
+  SPACE_AREA_KIND_LABELS,
+  SPACE_AREA_KIND_VALUES,
+  STATION_DIMENSION_LIMITS,
+  areaFromDimensions,
+  formatArea,
+  formatDimensions,
+  validateDimensions,
+  type SpaceAreaKind,
+} from "@/lib/unit-dimensions";
+import ScaledUnitPlan from "@/components/commercial/ScaledUnitPlan";
 
 type SpaceStatus = CommercialSpaceStatus;
 
@@ -42,7 +54,17 @@ type Space = {
   panoramaUrl: string | null;
   tenantId: string | null;
   tenantBrand: string | null;
+  lengthM: number | null;
+  widthM: number | null;
+  heightM: number | null;
+  areaKind: SpaceAreaKind;
+  parentZoneId: string | null;
+  parentZoneLabel?: string | null;
+  allocatedArea?: number | null;
+  remainingArea?: number | null;
 };
+
+type HotspotLinkInfo = { sceneId: string; title: string; hotspots: number; spatialAreas: number };
 
 type TenantOption = {
   id: string;
@@ -88,7 +110,23 @@ function createDraft(): Space {
     panoramaUrl: "",
     tenantId: null,
     tenantBrand: null,
+    lengthM: null,
+    widthM: null,
+    heightM: null,
+    areaKind: "FIXED",
+    parentZoneId: null,
   };
+}
+
+/** Input angka kosong disimpan sebagai null, bukan 0, agar validasi "wajib > 0" tetap jalan. */
+function numberOrNull(value: string): number | null {
+  if (value.trim() === "") return null;
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function effectiveArea(space: Space) {
+  return areaFromDimensions(space.lengthM, space.widthM) ?? (Number(space.area) || 0);
 }
 
 function toPayload(space: Space) {
@@ -97,7 +135,12 @@ function toPayload(space: Space) {
     name: space.name.trim(),
     type: space.type,
     status: space.status,
-    area: Number(space.area) || 0,
+    area: effectiveArea(space),
+    lengthM: space.lengthM,
+    widthM: space.widthM,
+    heightM: space.heightM,
+    areaKind: space.areaKind,
+    parentZoneId: space.areaKind === "ZONE_ALLOCATION" ? space.parentZoneId : null,
     monthlyRent: Number(space.monthlyRent) || 0,
     deposit: Number(space.deposit) || 0,
     floor: space.floor.trim() || "G",
@@ -122,9 +165,11 @@ const FIELD_LABELS: Record<string, string> = {
   exposure: "Eksposur penumpang",
   area: "Luas",
   monthlyRent: "Sewa bulanan",
+  lengthM: "Ukuran",
+  parentZoneId: "Zona induk",
 };
 
-function validateSpace(space: Space): string | null {
+function validateSpace(space: Space, allSpaces: Space[]): string | null {
   if (!space.code.trim()) return "Kode unit wajib diisi.";
   if (!space.name.trim()) return "Nama unit wajib diisi.";
   if (!space.floor.trim()) return "Lantai wajib diisi.";
@@ -133,7 +178,34 @@ function validateSpace(space: Space): string | null {
   if (space.status === "TERISI" && !space.tenantId) {
     return "Penyewa wajib dipilih untuk unit berstatus TERISI.";
   }
+  const dimensionError = validateDimensions(space, STATION_DIMENSION_LIMITS);
+  if (dimensionError) return dimensionError;
+  const area = effectiveArea(space);
+  if (area <= 0) return "Luas unit harus lebih dari 0 m². Isi panjang × lebar atau luas.";
+  if (space.areaKind === "ZONE_ALLOCATION") {
+    const zone = allSpaces.find((item) => item.id === space.parentZoneId && item.areaKind === "ZONE");
+    if (!zone) return "Pilih zona induk untuk unit bagian zona.";
+    // Luas tersimpan unit ini sudah terhitung di sisa zona; kembalikan dulu sebelum membandingkan.
+    const stored = allSpaces.find((item) => item.id === space.id);
+    const original = stored && stored.parentZoneId === zone.id ? stored.area : 0;
+    const remaining = (zone.remainingArea ?? zone.area) + original;
+    if (area > remaining + AREA_EPSILON) {
+      return `Luas ${formatArea(area)} melebihi sisa zona ${zone.code} (${formatArea(Math.max(remaining, 0))}).`;
+    }
+  }
   return null;
+}
+
+function hotspotLinkSummary(links: HotspotLinkInfo[]) {
+  return links
+    .map((link) => {
+      const parts = [
+        link.hotspots ? `${link.hotspots} hotspot` : "",
+        link.spatialAreas ? `${link.spatialAreas} area` : "",
+      ].filter(Boolean);
+      return `• ${link.title || link.sceneId} (${parts.join(", ")})`;
+    })
+    .join("\n");
 }
 
 async function readSaveError(res: Response): Promise<string> {
@@ -165,6 +237,8 @@ export default function CmsSpacesStationPage() {
   const [editing, setEditing] = useState<Space | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [notice, setNotice] = useState("");
+  const zones = spaces.filter((space) => space.areaKind === "ZONE" && space.id !== editing?.id);
 
   async function load() {
     const [spacesRes, tenantsRes] = await Promise.all([
@@ -196,7 +270,7 @@ export default function CmsSpacesStationPage() {
   async function saveSpace() {
     if (!editing) return;
 
-    const validationError = validateSpace(editing);
+    const validationError = validateSpace(editing, spaces);
     if (validationError) {
       setMessage(validationError);
       return;
@@ -232,6 +306,12 @@ export default function CmsSpacesStationPage() {
       return;
     }
 
+    const saved = (await res.json().catch(() => null)) as { hotspotsAffected?: number } | null;
+    setNotice(
+      saved?.hotspotsAffected
+        ? `Unit disimpan. Kode baru ikut diperbarui di ${saved.hotspotsAffected} penanda lokasi panorama.`
+        : "Unit disimpan."
+    );
     setEditing(null);
     await load();
   }
@@ -266,9 +346,34 @@ export default function CmsSpacesStationPage() {
     }
   }
 
-  async function deleteSpace(id: string) {
-    if (!confirm("Hapus unit ini?")) return;
-    await cmsFetch(`/api/cms/spaces/${id}`, { method: "DELETE" });
+  async function deleteSpace(space: Space) {
+    if (!confirm(`Hapus unit ${space.code} - ${space.name}?`)) return;
+    setNotice("");
+
+    let res = await cmsFetch(`/api/cms/spaces/${space.id}`, { method: "DELETE" });
+    let data = (await res.json().catch(() => null)) as
+      | { error?: string; code?: string; links?: HotspotLinkInfo[]; hotspotsAffected?: number }
+      | null;
+
+    if (res.status === 409 && data?.code === "HOTSPOT_LINKED") {
+      const proceed = confirm(
+        `Unit ${space.code} masih ditandai di panorama:\n${hotspotLinkSummary(data.links ?? [])}\n\n` +
+          "Hapus unit beserta penanda lokasinya? Hotspot iklan tetap ada, hanya tautan unitnya yang dilepas."
+      );
+      if (!proceed) return;
+      res = await cmsFetch(`/api/cms/spaces/${space.id}?cascadeHotspots=1`, { method: "DELETE" });
+      data = await res.json().catch(() => null);
+    }
+
+    if (!res.ok) {
+      setNotice(data?.error ?? "Gagal menghapus unit.");
+      return;
+    }
+    setNotice(
+      data?.hotspotsAffected
+        ? `Unit ${space.code} dihapus beserta ${data.hotspotsAffected} penanda lokasi.`
+        : `Unit ${space.code} dihapus.`
+    );
     await load();
   }
 
@@ -289,6 +394,12 @@ export default function CmsSpacesStationPage() {
         </Button>
       </div>
 
+      {notice ? (
+        <p className="mb-4 whitespace-pre-line rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#3A161C] px-4 py-3 text-sm text-[#F8ECEE]">
+          {notice}
+        </p>
+      ) : null}
+
       <div className="grid gap-3">
         {spaces.map((space) => (
           <Card key={space.id} className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
@@ -306,9 +417,20 @@ export default function CmsSpacesStationPage() {
                       Penyewa: {space.tenantBrand}
                     </Badge>
                   )}
+                  {space.areaKind === "ZONE" && (
+                    <Badge variant="outline" className="border-sky-700 bg-sky-950/40 text-sky-300">
+                      Zona · sisa {formatArea(space.remainingArea ?? space.area)} dari {formatArea(space.area)}
+                    </Badge>
+                  )}
+                  {space.areaKind === "ZONE_ALLOCATION" && (
+                    <Badge variant="outline" className="border-sky-700 bg-sky-950/40 text-sky-300">
+                      Bagian zona {space.parentZoneLabel ?? ""}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-sm text-[#C4A8AD]">
-                  {space.floor} · {space.location} · {space.area} m²
+                  {space.floor} · {space.location} · {formatArea(space.area)}
+                  {formatDimensions(space) ? ` · ${formatDimensions(space)}` : " · ukuran belum diisi"}
                 </p>
                 <p className="mt-1 text-xs text-[#A88990]">
                   Exposure {Number(space.exposure).toLocaleString("id-ID")} orang/hari
@@ -321,7 +443,7 @@ export default function CmsSpacesStationPage() {
                   <Pencil className="h-3.5 w-3.5" />
                   Edit
                 </Button>
-                <Button size="sm" variant="ghost" className="text-red-400 hover:bg-red-950/40" onClick={() => deleteSpace(space.id)}>
+                <Button size="sm" variant="ghost" className="text-red-400 hover:bg-red-950/40" onClick={() => void deleteSpace(space)}>
                   <Trash2 className="h-3.5 w-3.5" />
                   Hapus
                 </Button>
@@ -419,9 +541,80 @@ export default function CmsSpacesStationPage() {
                     </div>
                   </Field>
                 )}
-                <Field label="Luas (m2)">
-                  <Input type="number" value={editing.area} onChange={(e) => setEditing({ ...editing, area: Number(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
-                </Field>
+                <div className="grid gap-4 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C]/60 p-4 md:col-span-2 md:grid-cols-2">
+                  <div className="grid content-start gap-4">
+                    <p className="text-sm font-semibold text-white">Ukuran &amp; Jenis Area</p>
+                    <Field label="Jenis Area">
+                      <select
+                        value={editing.areaKind}
+                        onChange={(e) => {
+                          const areaKind = e.target.value as SpaceAreaKind;
+                          setEditing({
+                            ...editing,
+                            areaKind,
+                            parentZoneId: areaKind === "ZONE_ALLOCATION" ? editing.parentZoneId : null,
+                          });
+                        }}
+                        className="h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm text-white"
+                      >
+                        {SPACE_AREA_KIND_VALUES.map((kind) => (
+                          <option key={kind} value={kind}>{SPACE_AREA_KIND_LABELS[kind]}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    {editing.areaKind === "ZONE_ALLOCATION" && (
+                      <Field label="Zona Induk" required>
+                        <select
+                          value={editing.parentZoneId ?? ""}
+                          onChange={(e) => setEditing({ ...editing, parentZoneId: e.target.value || null })}
+                          className="h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm text-white"
+                        >
+                          <option value="">Pilih zona</option>
+                          {zones.map((zone) => (
+                            <option key={zone.id} value={zone.id}>
+                              {zone.code} - {zone.name} (sisa {formatArea(zone.remainingArea ?? zone.area)})
+                            </option>
+                          ))}
+                        </select>
+                        {zones.length === 0 && (
+                          <p className="mt-2 text-xs text-amber-300">Belum ada zona induk di stasiun ini. Buat unit berjenis zona induk terlebih dahulu.</p>
+                        )}
+                      </Field>
+                    )}
+                    <div className="grid grid-cols-3 gap-3">
+                      <Field label="Panjang (m)">
+                        <Input type="number" step="0.01" min={0} value={editing.lengthM ?? ""} onChange={(e) => setEditing({ ...editing, lengthM: numberOrNull(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                      </Field>
+                      <Field label="Lebar (m)">
+                        <Input type="number" step="0.01" min={0} value={editing.widthM ?? ""} onChange={(e) => setEditing({ ...editing, widthM: numberOrNull(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                      </Field>
+                      <Field label="Tinggi (m)">
+                        <Input type="number" step="0.01" min={0} value={editing.heightM ?? ""} onChange={(e) => setEditing({ ...editing, heightM: numberOrNull(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                      </Field>
+                    </div>
+                    <Field label="Luas (m²)">
+                      {areaFromDimensions(editing.lengthM, editing.widthM) !== null ? (
+                        <p className="flex h-10 items-center rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/60 px-3 text-sm text-[#F8ECEE]">
+                          {formatArea(effectiveArea(editing))} <span className="ml-2 text-xs text-[#A88990]">dihitung dari panjang × lebar</span>
+                        </p>
+                      ) : (
+                        <Input type="number" step="0.01" min={0} value={editing.area} onChange={(e) => setEditing({ ...editing, area: numberOrNull(e.target.value) ?? 0 })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                      )}
+                    </Field>
+                    <p className="text-xs text-[#A88990]">
+                      Batas: panjang/lebar {STATION_DIMENSION_LIMITS.maxLength} m, tinggi {STATION_DIMENSION_LIMITS.maxHeight} m.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="mb-2 text-sm font-semibold text-white">Pratinjau Denah Berskala</p>
+                    <ScaledUnitPlan
+                      lengthM={editing.lengthM}
+                      widthM={editing.widthM}
+                      heightM={editing.heightM}
+                      allocatedArea={editing.areaKind === "ZONE" ? editing.allocatedArea : null}
+                    />
+                  </div>
+                </div>
                 <Field label="Sewa Bulanan (Rp)">
                   <Input type="number" value={editing.monthlyRent} onChange={(e) => setEditing({ ...editing, monthlyRent: Number(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
                 </Field>

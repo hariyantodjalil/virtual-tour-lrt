@@ -24,6 +24,16 @@ import {
   type TrainRentalStatus,
 } from "@/lib/train-rental-sales";
 import TrainCarTrainsetPicker from "@/components/train/TrainCarTrainsetPicker";
+import ScaledUnitPlan from "@/components/commercial/ScaledUnitPlan";
+import { TRAIN_DIMENSION_LIMITS, formatDimensions, validateDimensions } from "@/lib/unit-dimensions";
+
+type HotspotLinkInfo = { sceneId: string; title: string; hotspots: number };
+
+function numberOrNull(value: string): number | null {
+  if (value.trim() === "") return null;
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
 type TrainSpace = {
   id: string;
@@ -39,6 +49,9 @@ type TrainSpace = {
   monthlyRent: number | null;
   order: number;
   isActive: boolean;
+  lengthM: number | null;
+  widthM: number | null;
+  heightM: number | null;
 };
 
 function createDraft(order: number): TrainSpace {
@@ -57,6 +70,9 @@ function createDraft(order: number): TrainSpace {
     monthlyRent: null,
     order,
     isActive: true,
+    lengthM: null,
+    widthM: null,
+    heightM: null,
   };
 }
 
@@ -77,6 +93,9 @@ function toPayload(space: TrainSpace) {
       : Number(space.monthlyRent),
     order: Number(space.order) || 0,
     isActive: Boolean(space.isActive),
+    lengthM: space.lengthM,
+    widthM: space.widthM,
+    heightM: space.heightM,
   };
 }
 
@@ -103,6 +122,9 @@ export default function TrainSpacesClient() {
             howToOrder: item.howToOrder ?? "",
             status: isTrainRentalStatus(item.status) ? item.status : "TERSEDIA",
             monthlyRent: item.monthlyRent ?? null,
+            lengthM: item.lengthM ?? null,
+            widthM: item.widthM ?? null,
+            heightM: item.heightM ?? null,
           }))
         : []
     );
@@ -144,6 +166,11 @@ export default function TrainSpacesClient() {
       setError("Judul wajib diisi.");
       return;
     }
+    const dimensionError = validateDimensions(editing, TRAIN_DIMENSION_LIMITS);
+    if (dimensionError) {
+      setError(dimensionError);
+      return;
+    }
 
     setSaving(true);
     setMessage("");
@@ -161,30 +188,58 @@ export default function TrainSpacesClient() {
 
     if (!response?.ok) {
       const data = await response?.json().catch(() => null);
-      setError(data?.error ?? "Gagal menyimpan ruang sewa.");
+      setError(data?.details?.[0]?.message ?? data?.error ?? "Gagal menyimpan ruang sewa.");
       setSaving(false);
       return;
     }
 
+    const saved = (await response.json().catch(() => null)) as { hotspotsAffected?: number } | null;
     setEditing(null);
-    setMessage(isNew ? "Ruang sewa baru ditambahkan." : "Perubahan disimpan.");
+    setMessage(
+      isNew
+        ? "Ruang sewa baru ditambahkan."
+        : saved?.hotspotsAffected
+          ? `Perubahan disimpan. Nomor baru ikut diperbarui di ${saved.hotspotsAffected} hotspot.`
+          : "Perubahan disimpan."
+    );
     setSaving(false);
     await load();
   }
 
-  async function deleteSpace(id: string) {
-    if (!window.confirm("Hapus ruang sewa ini?")) return;
+  async function deleteSpace(space: TrainSpace) {
+    if (!window.confirm(`Hapus ruang sewa ${space.displayNumber} - ${space.title}?`)) return;
+    setMessage("");
+    setError("");
 
-    const response = await cmsFetch(`/api/cms/train-rental-spaces/${id}`, {
+    let response = await cmsFetch(`/api/cms/train-rental-spaces/${space.id}`, {
       method: "DELETE",
     }).catch(() => null);
+    let data = await response?.json().catch(() => null);
+
+    if (response?.status === 409 && data?.code === "HOTSPOT_LINKED") {
+      const links: HotspotLinkInfo[] = data.links ?? [];
+      const proceed = window.confirm(
+        `Ruang sewa ${space.displayNumber} masih ditandai di panorama kereta:\n` +
+          links.map((link) => `• ${link.title || link.sceneId} (${link.hotspots} hotspot)`).join("\n") +
+          "\n\nHapus ruang sewa beserta hotspot-nya?"
+      );
+      if (!proceed) return;
+      response = await cmsFetch(`/api/cms/train-rental-spaces/${space.id}?cascadeHotspots=1`, {
+        method: "DELETE",
+      }).catch(() => null);
+      data = await response?.json().catch(() => null);
+    }
 
     if (!response?.ok) {
-      setError("Gagal menghapus ruang sewa.");
+      setError(data?.error ?? "Gagal menghapus ruang sewa.");
       return;
     }
 
-    setMessage("Ruang sewa dihapus.");
+    setMessage(
+      data?.hotspotsAffected
+        ? `Ruang sewa dihapus beserta ${data.hotspotsAffected} hotspot.`
+        : "Ruang sewa dihapus."
+    );
     await load();
   }
 
@@ -274,6 +329,9 @@ export default function TrainSpacesClient() {
                   </Badge>
                   <span className="text-xs text-[#A88990]">Urutan {space.order + 1}</span>
                 </div>
+                <p className="mb-1 text-xs text-[#C4A8AD]">
+                  {formatDimensions(space) || <span className="italic text-[#A88990]">Ukuran belum diisi.</span>}
+                </p>
                 {unionCarTrainsets(parseCarTrainsetMap(space.availableByCar, space.availableTrainsets)).length === 0 ? (
                   <p className="mb-1 text-xs italic text-[#A88990]">Belum diatur trainset (TS) mana yang tersedia.</p>
                 ) : (
@@ -304,7 +362,7 @@ export default function TrainSpacesClient() {
                   variant="outline"
                   size="sm"
                   className="border-[rgba(255,214,218,0.14)] text-red-400 hover:text-red-300"
-                  onClick={() => void deleteSpace(space.id)}
+                  onClick={() => void deleteSpace(space)}
                 >
                   <Trash2 className="size-3.5" />
                 </Button>
@@ -430,6 +488,41 @@ export default function TrainSpacesClient() {
                     placeholder="Kosongkan jika nego"
                     className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
                   />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C]/60 p-4">
+                <p className="mb-3 text-sm font-semibold text-white">Ukuran Media</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {(
+                    [
+                      ["lengthM", "Panjang (m)"],
+                      ["widthM", "Lebar (m)"],
+                      ["heightM", "Tinggi (m)"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <div key={key}>
+                      <Label className="text-[#F0DDE1]">{label}</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={editing[key] ?? ""}
+                        onChange={(event) =>
+                          setEditing((current) =>
+                            current ? { ...current, [key]: numberOrNull(event.target.value) } : current
+                          )
+                        }
+                        className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-[#A88990]">
+                  Batas: panjang/lebar {TRAIN_DIMENSION_LIMITS.maxLength} m, tinggi {TRAIN_DIMENSION_LIMITS.maxHeight} m.
+                </p>
+                <div className="mt-3">
+                  <ScaledUnitPlan lengthM={editing.lengthM} widthM={editing.widthM} heightM={editing.heightM} />
                 </div>
               </div>
 

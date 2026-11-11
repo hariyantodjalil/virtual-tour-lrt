@@ -51,6 +51,9 @@ import {
 import { SceneTargetPicker } from "../virtual-tour/[stationId]/SceneTargetPicker";
 import { TrainRentalPicker, type TrainRentalPickerItem } from "./TrainRentalPicker";
 import { CoveragePanel } from "../virtual-tour/[stationId]/CoveragePanel";
+import VolumeAdjustControls from "@/components/cms/VolumeAdjustControls";
+import { hasCompleteDimensions } from "@/lib/unit-dimensions";
+import { TRAIN_MEDIA_DISTANCE_M } from "@/lib/spatial/unit-volume";
 
 type Scene = {
   sceneId: string;
@@ -65,6 +68,9 @@ type Scene = {
 
 type TrainEditorSpace = TrainRentalPickerItem & {
   type: "TRAIN_RENTAL";
+  lengthM?: number | null;
+  widthM?: number | null;
+  heightM?: number | null;
 };
 
 type Props = {
@@ -542,6 +548,16 @@ export function TrainTourEditorSidebar({
                   </div>
                 </>
               )}
+              {selectedHotspot.type === "space" &&
+                hasCompleteDimensions(rentalSpaces.find((s) => s.code === selectedHotspot.spaceCode)) && (
+                  <VolumeAdjustControls
+                    rotation={selectedHotspot.volumeRotation}
+                    distance={selectedHotspot.volumeDistance}
+                    defaultDistance={TRAIN_MEDIA_DISTANCE_M}
+                    autoHint="Otomatis: media diletakkan 1,8 m dari kamera (kira-kira jarak di dalam kabin), searah titik ⓘ."
+                    onChange={(field, value) => updateHotspot(field, value)}
+                  />
+                )}
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <Label className="text-xs text-[#A88990]">Ukuran Hotspot</Label>

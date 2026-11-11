@@ -96,6 +96,9 @@ export default async function StationPage({ params }: Props) {
             airConditioning: s.airConditioning,
             description: s.description,
             panoramaUrl: s.panoramaUrl,
+            lengthM: s.lengthM,
+            widthM: s.widthM,
+            heightM: s.heightM,
             tenantBrand:
               s.occupancy?.tenant?.isActive !== false
                 ? s.occupancy?.tenant?.brandName ?? null

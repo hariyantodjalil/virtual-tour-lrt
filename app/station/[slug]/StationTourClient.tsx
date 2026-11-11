@@ -75,6 +75,9 @@ type Space = {
   description: string | null;
   panoramaUrl?: string | null;
   tenantBrand?: string | null;
+  lengthM?: number | null;
+  widthM?: number | null;
+  heightM?: number | null;
 };
 
 type Props = {
@@ -470,7 +473,7 @@ export default function StationTourClient({
 
       <VirtualTourViewer
         scenes={stationInfo.scenes}
-        spaces={spaces.map((s) => ({ code: s.code, status: s.status }))}
+        spaces={spaces.map((s) => ({ code: s.code, status: s.status, lengthM: s.lengthM, widthM: s.widthM, heightM: s.heightM }))}
         onSpaceClick={openSpaceFromHotspot}
         onAdClick={openAdFromHotspot}
         onInfoClick={handleInfoClick}

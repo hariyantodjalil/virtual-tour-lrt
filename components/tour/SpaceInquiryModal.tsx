@@ -11,6 +11,8 @@ import { printSpaceSummary } from "@/lib/space-summary";
 import { cn, getWhatsAppUrl } from "@/lib/utils";
 import { resolveSheetSwipe } from "@/lib/sheet-gesture";
 import { FAVORITES_UPDATED_EVENT, isFavoriteSpace, toggleFavoriteSpace } from "@/lib/favorite-spaces";
+import { formatDimensions } from "@/lib/unit-dimensions";
+import ScaledUnitPlan from "@/components/commercial/ScaledUnitPlan";
 
 export type SpaceInquiryModalProps = ComponentProps<typeof InTourSpacePopupLegacy> & { onExplore?: () => void };
 const TYPE_LABELS: Record<string, string> = {
@@ -43,8 +45,14 @@ export default function SpaceInquiryModal({ space, stationName, stationSlug, con
     ? space.floor.trim() : space.nearestExit?.trim() ? `Exit terdekat: ${space.nearestExit.trim()}` : null;
   const tenant = space.status === "TERISI" ? space.tenantBrand?.trim() : null;
   const breadcrumb = [stationName, space.floor, space.location].map(part => part?.trim()).filter(Boolean).join(" | ");
+  const dimensions = formatDimensions(space);
+  const sizeVisual = dimensions ? <div>
+    <h3 className="text-sm font-semibold text-slate-900">Visual Ukuran</h3>
+    <p className="mt-1 text-xs leading-relaxed text-slate-600">Gambaran ukuran unit dari data dimensi, dengan orang sebagai pembanding.</p>
+    <div className="mt-3"><ScaledUnitPlan tone="light" lengthM={space.lengthM} widthM={space.widthM} heightM={space.heightM} /></div>
+  </div> : null;
   const rows: SpecRow[] = [
-    { label: "Luas Lantai", value: `${space.area} m²`, icon: <Maximize2 className="size-4" /> },
+    { label: "Luas Lantai", value: `${space.area} m²`, hint: dimensions || null, icon: <Maximize2 className="size-4" /> },
     { label: "Lokasi Toko", value: location, hint: locationHint, icon: <MapPin className="size-4" /> },
     { label: "Jenis Ruang", value: TYPE_LABELS[space.type] ?? space.type, hint: space.description?.trim() || null, icon: <Store className="size-4" /> },
     { label: "Pasokan Listrik", value: space.powerSupply?.trim() || "-", icon: <Zap className="size-4" /> },
@@ -251,6 +259,7 @@ export default function SpaceInquiryModal({ space, stationName, stationSlug, con
               </div>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">{breadcrumb}</p>
               {tenant && <p className="mt-3 text-sm font-semibold text-[#C41926]">Penyewa saat ini: {tenant}</p>}
+              {sizeVisual && <div className="mt-6">{sizeVisual}</div>}
               <div className="mt-8 hidden border-t border-slate-200 pt-6 lg:block">
                 <h2 className="text-sm font-semibold text-slate-900">Setelah pengajuan</h2>
                 {afterSteps}
@@ -275,6 +284,7 @@ export default function SpaceInquiryModal({ space, stationName, stationSlug, con
                     {[["Stasiun", stationName], ["Area", location], ["Luas", `${space.area} m²`], ["Status", SPACE_STATUS_LABELS[space.status]]].map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-slate-100 bg-slate-50 p-3"><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-sm font-semibold">{value}</dd></div>)}
                   </dl>
                   {tenant && <p className="mt-3 text-sm text-slate-600">Penyewa: {tenant}</p>}
+                  {sizeVisual && <div className="mt-4">{sizeVisual}</div>}
                   <details className="mt-3 border-b border-slate-200 pb-3"><summary className="cursor-pointer py-2 text-sm font-medium text-slate-700">Spesifikasi dan utilitas</summary><dl className="divide-y divide-slate-200">{specRows}</dl></details>
                   <details className="border-b border-slate-200 py-3"><summary className="cursor-pointer py-2 text-sm font-medium text-slate-700">Setelah pengajuan</summary>{afterSteps}</details>
                   <div className="mt-4 grid grid-cols-2 gap-2">

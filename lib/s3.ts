@@ -4,6 +4,12 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
+import {
+  deleteLocalObject,
+  isLocalStorageEnabled,
+  readLocalObject,
+  writeLocalObject,
+} from "@/lib/local-storage";
 
 export type S3AssetType =
   | "panoramas"       // virtual-tour/panoramas/{station-slug}/
@@ -106,6 +112,10 @@ export async function uploadToS3(
   contentType: string,
   metadata?: Record<string, string>
 ): Promise<UploadResult> {
+  if (isLocalStorageEnabled()) {
+    await writeLocalObject(key, file);
+    return { url: `/api/s3-proxy/${key}`, key, bucket: "local" };
+  }
   const s3Client = getS3Client();
   const bucket = getBucketName();
 
@@ -127,6 +137,11 @@ export async function uploadToS3(
 }
 
 export async function downloadFromS3(key: string): Promise<Buffer> {
+  if (isLocalStorageEnabled()) {
+    const local = await readLocalObject(key);
+    if (!local) throw new Error("File lokal tidak ditemukan");
+    return local;
+  }
   const s3Client = getS3Client();
   const bucket = getBucketName();
   const res = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
@@ -141,6 +156,10 @@ export async function downloadFromS3(key: string): Promise<Buffer> {
 }
 
 export async function deleteFromS3(key: string): Promise<void> {
+  if (isLocalStorageEnabled()) {
+    await deleteLocalObject(key);
+    return;
+  }
   const s3Client = getS3Client();
   const bucket = getBucketName();
   await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));

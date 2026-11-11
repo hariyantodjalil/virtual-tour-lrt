@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
 import type { ViewerBakeContext } from "@/lib/panorama-privacy-blur-geometry";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { AddMode, HotspotItem } from "@/lib/hotspot-types";
@@ -24,6 +24,7 @@ import { PANNELLUM_EDITOR_HFOV, PANNELLUM_INTERACTION, PANNELLUM_PITCH_LIMITS } 
 import type { SceneInitialView } from "@/lib/tour-types";
 import { PANNELLUM_HFOV } from "@/lib/pannellum-viewer-defaults";
 import { SpatialOverlay } from "@/components/tour/spatial/SpatialOverlay";
+import { canBuildPinVolume, pinVolumeEntity, pinVolumeOptions, type PinPlacement } from "@/lib/spatial/unit-volume";
 import type { SpatialEntity, SphericalPoint } from "@/lib/spatial/types";
 
 declare global {
@@ -72,6 +73,7 @@ function buildEditorHotspotEl(
   isSelected: boolean,
   getSpaceStatus: (code: string) => SpaceAvailabilityStatus | undefined,
   getSceneTitle: (sceneId: string | undefined, fallback: string) => string,
+  hasVolume: (h: HotspotItem) => boolean,
   onPointerDownRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string, e: PointerEvent) => void>,
   onDeleteRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string) => void>
 ) {
@@ -83,6 +85,8 @@ function buildEditorHotspotEl(
     scale: h.scale,
     spaceStatus,
     spaceCode: h.type === "space" ? h.spaceCode : undefined,
+    // Pin unit berdimensi digambar sebagai volume 3D oleh overlay; pin menjadi titik pegangan kecil.
+    volumeOverlay: hasVolume(h) ? "handle" : undefined,
     facilityIcon: h.type === "info" ? h.facilityIcon : undefined,
     sceneTitle:
       h.type === "scene" ? getSceneTitle(h.sceneId, h.text) : undefined,
@@ -151,8 +155,16 @@ interface Props {
   onBlurSelect: (id: string | null) => void;
   onHotspotDelete: (id: string) => void;
   onBlurDelete: (id: string) => void;
-  spaces?: { code: string; status: SpaceAvailabilityStatus }[];
+  spaces?: {
+    code: string;
+    status: SpaceAvailabilityStatus;
+    lengthM?: number | null;
+    widthM?: number | null;
+    heightM?: number | null;
+  }[];
   scenes?: { sceneId: string; title: string }[];
+  /** Jarak tetap volume pin (meter) — diisi editor kereta; kosong = unit berdiri di lantai (stasiun). */
+  pinVolumeDistanceM?: number;
   initialView?: SceneInitialView | null;
   minHfov?: number;
   /** Setelah pernah dibake: overlay tanpa backdrop (hindari double blur). */
@@ -189,6 +201,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
     onHotspotDelete,
     onBlurDelete,
     spaces = [],
+    pinVolumeDistanceM,
     scenes = [],
     initialView = null,
     minHfov = PANNELLUM_EDITOR_HFOV.minHfov,
@@ -225,6 +238,11 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
   const hotspotsRef = useRef(hotspots);
   const privacyBlursRef = useRef(privacyBlurs);
   const spacesRef = useRef(spaces);
+  const pinPlacement: PinPlacement = pinVolumeDistanceM
+    ? { mode: "distance", distanceM: pinVolumeDistanceM }
+    : { mode: "floor" };
+  const pinPlacementRef = useRef(pinPlacement);
+  pinPlacementRef.current = pinPlacement;
   const scenesRef = useRef(scenes);
   const getSpaceStatusRef = useRef((code: string) => findSpaceStatus(spacesRef.current, code));
 
@@ -415,6 +433,14 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
                 (code) => getSpaceStatusRef.current(code),
                 (sceneId, fallback) =>
                   resolveSceneHotspotTitle(sceneId, scenesRef.current, fallback),
+                (item) =>
+                  item.type === "space" &&
+                  !!item.spaceCode &&
+                  canBuildPinVolume(
+                    item,
+                    spacesRef.current.find((s) => s.code === item.spaceCode),
+                    pinVolumeOptions(item, pinPlacementRef.current)
+                  ),
                 onPointerDownItemRef,
                 onDeleteItemRef
               );
@@ -520,7 +546,38 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
       h.facilityIcon ?? "",
     ])
   );
-  const spacesSig = spaces.map((s) => `${s.code}:${s.status}`).join("|");
+  const spacesSig = spaces
+    .map((s) => `${s.code}:${s.status}:${s.lengthM ?? ""}x${s.widthM ?? ""}x${s.heightM ?? ""}`)
+    .join("|");
+  // Pin unit berdimensi → entitas volume 3D di overlay (sama seperti tour publik).
+  const pinVolumeEntities = useMemo(() => {
+    const dims = new Map(
+      spacesSig.split("|").filter(Boolean).map((row) => {
+        const [code, , size] = row.split(":");
+        const [lengthM, widthM, heightM] = (size ?? "").split("x").map((v) => (v ? Number(v) : null));
+        return [code, { lengthM, widthM, heightM }] as const;
+      })
+    );
+    const placement: PinPlacement = pinVolumeDistanceM
+      ? { mode: "distance", distanceM: pinVolumeDistanceM }
+      : { mode: "floor" };
+    return hotspots.flatMap((h, index) =>
+      h.type === "space" && h.spaceCode && canBuildPinVolume(h, dims.get(h.spaceCode), pinVolumeOptions(h, placement))
+        ? [
+            pinVolumeEntity(
+              "editor",
+              index,
+              { pitch: h.pitch, yaw: h.yaw, spaceCode: h.spaceCode, label: h.text },
+              pinVolumeOptions(h, placement)
+            ),
+          ]
+        : []
+    );
+  }, [hotspots, spacesSig, pinVolumeDistanceM]);
+  const overlayEntities = useMemo(
+    () => [...spatialEntities, ...pinVolumeEntities],
+    [spatialEntities, pinVolumeEntities]
+  );
   const blursSig = JSON.stringify(
     privacyBlurs.map((b) => [b._id, b.pitch, b.yaw, b.width, b.height, b.intensity, b.radius, b.scale ?? 1])
   );
@@ -754,7 +811,9 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         <SpatialOverlay
           viewer={viewerForOverlay}
           container={containerEl}
-          entities={spatialEntities}
+          entities={overlayEntities}
+          pinVolumesInteractive={false}
+          resolveUnitDimensions={(code) => spaces.find((space) => space.code === code)}
           draftVertices={draftSpatialVertices}
           selectedId={selectedSpatialId}
           interactive={addMode === "none"}

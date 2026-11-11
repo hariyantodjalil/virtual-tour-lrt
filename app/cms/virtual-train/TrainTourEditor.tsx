@@ -63,6 +63,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { PannellumEditor, type PannellumEditorHandle } from "../virtual-tour/[stationId]/PannellumEditor";
+import { TRAIN_MEDIA_DISTANCE_M } from "@/lib/spatial/unit-volume";
 import { PannellumPreview } from "../virtual-tour/[stationId]/PannellumPreview";
 import { TourStructureSidebar } from "../virtual-tour/[stationId]/TourStructureSidebar";
 import { ConnectionMapDialog } from "../virtual-tour/[stationId]/ConnectionMapDialog";
@@ -167,6 +168,9 @@ type TrainEditorSpace = {
   status: SpaceAvailabilityStatus;
   rentalStatus: TrainRentalStatus;
   tenantBrand?: string | null;
+  lengthM?: number | null;
+  widthM?: number | null;
+  heightM?: number | null;
 };
 
 async function loadTrainRentalSpaces(): Promise<TrainEditorSpace[]> {
@@ -177,6 +181,9 @@ async function loadTrainRentalSpaces(): Promise<TrainEditorSpace[]> {
     displayNumber: string;
     title: string;
     status?: string;
+    lengthM?: number | null;
+    widthM?: number | null;
+    heightM?: number | null;
   }> = await response.json();
   if (!Array.isArray(rows)) return [];
 
@@ -189,6 +196,9 @@ async function loadTrainRentalSpaces(): Promise<TrainEditorSpace[]> {
       type: "TRAIN_RENTAL",
       status: trainRentalStatusToSpaceStatus(rentalStatus),
       rentalStatus,
+      lengthM: row.lengthM ?? null,
+      widthM: row.widthM ?? null,
+      heightM: row.heightM ?? null,
     };
   });
 }
@@ -1444,7 +1454,8 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                 onBlurSelect={handleBlurSelect}
                 onHotspotDelete={handleHotspotDelete}
                 onBlurDelete={handleBlurDelete}
-                spaces={rentalSpaces.map((s) => ({ code: s.code, status: s.status }))}
+                spaces={rentalSpaces.map((s) => ({ code: s.code, status: s.status, lengthM: s.lengthM, widthM: s.widthM, heightM: s.heightM }))}
+                pinVolumeDistanceM={TRAIN_MEDIA_DISTANCE_M}
                 scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
                 initialView={extractInitialViewFromCanvasData(currentScene.canvasData) ?? null}
                 privacyBlurGuideOnly={privacyBlurGuideOnly}

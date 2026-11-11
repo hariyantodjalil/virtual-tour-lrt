@@ -85,6 +85,8 @@ import { isSpatialHotspotEnabled } from "@/lib/spatial-feature";
 import { normalizeSpatialEntities, spatialEntitiesToSave } from "@/lib/spatial/normalize";
 import { validateSphericalPolygonAuthoring } from "@/lib/spatial/geometry/polygon-validation";
 import type { SpatialEntity, SphericalPoint } from "@/lib/spatial/types";
+import VolumeAdjustControls from "@/components/cms/VolumeAdjustControls";
+import { hasCompleteDimensions } from "@/lib/unit-dimensions";
 import { DEFAULT_SPATIAL_STYLE } from "@/lib/spatial/types";
 import {
   compressPanoramaClient,
@@ -124,6 +126,10 @@ type CommercialSpace = {
   type: string;
   status: SpaceAvailabilityStatus;
   area: number;
+  /** Dimensi unit (meter) — pin unit berdimensi tampil sebagai volume 3D di editor & preview. */
+  lengthM?: number | null;
+  widthM?: number | null;
+  heightM?: number | null;
   monthlyRent: number;
   deposit: number;
   floor: string;
@@ -1909,7 +1915,7 @@ export default function VirtualTourEditorPage() {
                 onBlurSelect={handleBlurSelect}
                 onHotspotDelete={handleHotspotDelete}
                 onBlurDelete={handleBlurDelete}
-                spaces={stationSpaces.map((s) => ({ code: s.code, status: s.status }))}
+                spaces={stationSpaces.map((s) => ({ code: s.code, status: s.status, lengthM: s.lengthM, widthM: s.widthM, heightM: s.heightM }))}
                 scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
                 initialView={extractInitialViewFromCanvasData(currentScene.canvasData) ?? null}
                 privacyBlurGuideOnly={privacyBlurGuideOnly}
@@ -2794,6 +2800,17 @@ export default function VirtualTourEditorPage() {
                       </div>
                     </>
                   )}
+
+                  {selectedHotspot.type === "space" &&
+                    hasCompleteDimensions(stationSpaces.find((s) => s.code === selectedHotspot.spaceCode)) && (
+                      <VolumeAdjustControls
+                        rotation={selectedHotspot.volumeRotation}
+                        distance={selectedHotspot.volumeDistance}
+                        defaultDistance={4}
+                        autoHint="Otomatis: unit dianggap berdiri di lantai, jaraknya dihitung dari posisi titik ⓘ dan tinggi kamera 1,6 m."
+                        onChange={(field, value) => updateHotspot(field, value)}
+                      />
+                    )}
 
                   <div>
                     <div className="mb-1.5 flex items-center justify-between">

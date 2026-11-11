@@ -22,6 +22,8 @@ type SceneHandlers = {
   onAdClick?: (payload: AdHotspotPayload) => void;
   onInfoClick: (title: string, description: string) => void;
   getSpaceStatus?: (spaceCode: string) => SpaceAvailabilityStatus | undefined;
+  /** true bila pin unit ini digambar sebagai volume 3D oleh overlay (elemen pin disembunyikan). */
+  hasSpaceVolume?: (spaceCode: string, pitch: number, yaw: number) => boolean;
 };
 
 export { findSpaceStatus };
@@ -75,6 +77,10 @@ function buildHotSpots(scene: PanoramaScene, allScenes: PanoramaScene[], handler
           scale: h.scale,
           spaceStatus,
           spaceCode: h.type === "space" ? h.spaceCode : undefined,
+          volumeOverlay:
+            h.type === "space" && h.spaceCode && handlers.hasSpaceVolume?.(h.spaceCode, h.pitch, h.yaw)
+              ? "hidden"
+              : undefined,
           facilityIcon: h.type === "info" ? h.facilityIcon : undefined,
           sceneTitle:
             h.type === "scene"

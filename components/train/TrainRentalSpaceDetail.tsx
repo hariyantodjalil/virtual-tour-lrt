@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import {
   ChevronLeft,
   ChevronRight,
+  ImagePlus,
   Info,
   Layers,
   Minus,
@@ -28,6 +29,8 @@ import {
 } from "@/lib/train-rental-sales";
 import { DEFAULT_TRAIN_CARS } from "@/lib/train-tour-defaults";
 import type { TrainRentalSpacePublic } from "@/lib/train-rental-spaces-shared";
+import { formatDimensions } from "@/lib/unit-dimensions";
+import ScaledUnitPlan from "@/components/commercial/ScaledUnitPlan";
 
 const ACCENT = "#E31E2D";
 const subscribeToHydration = () => () => {};
@@ -129,6 +132,12 @@ export default function TrainRentalSpaceDetail({
     () => false
   );
   const [carIndex, setCarIndex] = useState(() => resolveCarIndex(initialCarSlug));
+  /** Pratinjau gambar produk calon mitra di volume media (object URL lokal, tidak diunggah). */
+  const [productPreviewUrl, setProductPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!productPreviewUrl) return;
+    return () => URL.revokeObjectURL(productPreviewUrl);
+  }, [productPreviewUrl]);
   const [showInterestModal, setShowInterestModal] = useState(false);
   const [rentMode, setRentMode] = useState<"gerbong" | "trainset">("gerbong");
   const [trainsetQty, setTrainsetQty] = useState(1);
@@ -362,6 +371,49 @@ export default function TrainRentalSpaceDetail({
             </div>
           </div>
         </div>
+
+        {formatDimensions(space) ? (
+          <div className="mt-3">
+            <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-white/60 uppercase">
+              Visual ukuran · {formatDimensions(space)}
+            </p>
+            <ScaledUnitPlan
+              lengthM={space.lengthM}
+              widthM={space.widthM}
+              heightM={space.heightM}
+              frontImageUrl={productPreviewUrl}
+              context={/handgrip/i.test(space.title) ? "handgrip" : undefined}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#E31E2D]/45 bg-[#161616] px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#1d1d1d]">
+                <ImagePlus className="size-3.5 text-[#E31E2D]" />
+                {productPreviewUrl ? "Ganti gambar produk" : "Coba gambar produkmu"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) setProductPreviewUrl(URL.createObjectURL(file));
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+              {productPreviewUrl ? (
+                <button
+                  type="button"
+                  onClick={() => setProductPreviewUrl(null)}
+                  className="text-[11px] text-white/60 underline-offset-2 hover:text-white hover:underline"
+                >
+                  Hapus gambar
+                </button>
+              ) : null}
+            </div>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-white/45">
+              Gambar produk ditempel di muka depan volume untuk pratinjau, hanya di browser ini dan tidak diunggah.
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-white/10 bg-[#0F0F0F] p-3">

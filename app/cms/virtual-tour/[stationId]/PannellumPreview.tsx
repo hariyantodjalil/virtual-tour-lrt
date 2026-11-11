@@ -40,6 +40,9 @@ type CommercialSpace = {
   description: string | null;
   panoramaUrl?: string | null;
   tenantBrand?: string | null;
+  lengthM?: number | null;
+  widthM?: number | null;
+  heightM?: number | null;
 };
 
 type PreviewScene = {
@@ -321,6 +324,7 @@ export function PannellumPreview({
           entities={enabledSpatial}
           interactive
           resolveSpaceStatus={(code) => findSpaceStatus(spacesRef.current, code)}
+          resolveUnitDimensions={(code) => spaces.find((space) => space.code === code)}
           onEntityClick={(entity) => {
             runSpatialAction(entity, {
               openUnit: openSpaceByCode,

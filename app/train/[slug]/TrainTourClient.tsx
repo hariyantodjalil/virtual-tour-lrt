@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import VirtualTourViewer from "@/components/tour/VirtualTourViewer";
+import { TRAIN_MEDIA_DISTANCE_M } from "@/lib/spatial/unit-volume";
 import TourLeftPanel from "@/components/tour/TourLeftPanel";
 import TrainFormationMap from "@/components/tour/TrainFormationMap";
 import ContactPersonFab from "@/components/tour/ContactPersonFab";
@@ -102,7 +103,11 @@ export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
         spaces={rentalSpaces.map((space) => ({
           code: space.displayNumber,
           status: trainRentalStatusToSpaceStatus(space.status),
+          lengthM: space.lengthM,
+          widthM: space.widthM,
+          heightM: space.heightM,
         }))}
+        pinVolumeDistanceM={TRAIN_MEDIA_DISTANCE_M}
         hideSceneBar
         chromeTone="maroon"
       />

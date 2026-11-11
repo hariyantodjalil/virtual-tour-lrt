@@ -1,5 +1,12 @@
 import { z } from "zod";
 import { sceneEntryViewSchema } from "./scene-entry-view";
+import {
+  SPACE_AREA_KIND_VALUES,
+  STATION_DIMENSION_LIMITS,
+  TRAIN_DIMENSION_LIMITS,
+  validateDimensions,
+  type DimensionLimits,
+} from "./unit-dimensions";
 
 const id = z.string().trim().min(1).max(128);
 const shortText = z.string().trim().min(1).max(160);
@@ -17,6 +24,16 @@ const optionalDate = z.string().trim().max(64).refine(
   (value) => !Number.isNaN(Date.parse(value)),
   "Tanggal tidak valid"
 ).nullable().optional();
+// Batas atas per konteks (stasiun/kereta) dicek di dimensionRefinement agar pesannya sama dengan form CMS.
+const dimension = z.number().finite().nullable().optional();
+const dimensionFields = { lengthM: dimension, widthM: dimension, heightM: dimension };
+
+function dimensionRefinement(limits: DimensionLimits) {
+  return (value: { lengthM?: number | null; widthM?: number | null; heightM?: number | null }, ctx: z.RefinementCtx) => {
+    const message = validateDimensions(value, limits);
+    if (message) ctx.addIssue({ code: "custom", path: ["lengthM"], message });
+  };
+}
 
 const stationFields = {
   code: z.string().trim().max(32).nullable().optional(),
@@ -77,7 +94,10 @@ export const spaceMutationSchema = z.object({
   description: optionalText(5_000),
   panoramaUrl: nullableUrl,
   tenantId: id.nullable().optional(),
-}).strict();
+  ...dimensionFields,
+  areaKind: z.enum(SPACE_AREA_KIND_VALUES).default("FIXED"),
+  parentZoneId: id.nullable().optional(),
+}).strict().superRefine(dimensionRefinement(STATION_DIMENSION_LIMITS));
 
 export const trainRentalSpaceMutationSchema = z.object({
   displayNumber: z.string().trim().min(1).max(8).regex(/^\d{2}$/, "Nomor tampilan harus 2 digit, mis. 01"),
@@ -92,7 +112,8 @@ export const trainRentalSpaceMutationSchema = z.object({
   monthlyRent: nonNegativeNumber.nullable().optional(),
   order: safeInteger.optional(),
   isActive: z.boolean().optional(),
-}).strict();
+  ...dimensionFields,
+}).strict().superRefine(dimensionRefinement(TRAIN_DIMENSION_LIMITS));
 
 export const userCreateSchema = z.object({
   email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),

@@ -84,6 +84,10 @@ export type HotspotData = {
   /** URL aset kreatif untuk hotspot iklan */
   creativeUrl?: string;
   creativeTitle?: string;
+  /** Unit berdimensi: arah hadap volume 3D (derajat, 0 = menghadap kamera). */
+  volumeRotation?: number;
+  /** Unit berdimensi: jarak volume dari kamera (meter); kosong = otomatis. */
+  volumeDistance?: number;
 };
 
 export const HOTSPOT_SCALE_MIN = 0.5;

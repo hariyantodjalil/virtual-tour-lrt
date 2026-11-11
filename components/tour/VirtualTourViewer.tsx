@@ -20,6 +20,7 @@ import {
 } from "@/lib/pannellum-tour-dive";
 import { bindPrivacyBlursInContainer } from "@/lib/pannellum-privacy-blur";
 import { SpatialOverlay } from "@/components/tour/spatial/SpatialOverlay";
+import { canBuildPinVolume, pinVolumeEntity, pinVolumeOptions, type PinPlacement } from "@/lib/spatial/unit-volume";
 import { isSpatialHotspotEnabled } from "@/lib/spatial-feature";
 import type { SpatialEntity } from "@/lib/spatial/types";
 import { runSpatialAction } from "@/lib/spatial/actions";
@@ -37,6 +38,10 @@ const ZERO_OVERLAY: DiveOverlayState = { blur: 0, fade: 0, vignette: 0 };
 type SpaceStatusRef = {
   code: string;
   status: SpaceAvailabilityStatus;
+  /** Dimensi unit (meter) — area spasial unit berdimensi lengkap digambar sebagai volume 3D. */
+  lengthM?: number | null;
+  widthM?: number | null;
+  heightM?: number | null;
 };
 
 type Props = {
@@ -54,6 +59,11 @@ type Props = {
   hideSceneBar?: boolean;
   /** Tone chrome overlay (auto-rotate / scene bar) — maroon mengikuti Void Portal */
   chromeTone?: "default" | "maroon";
+  /**
+   * Jarak tetap (meter) untuk volume pin unit. Diisi untuk tour kereta: media menempel/tergantung di kabin,
+   * bukan berdiri di lantai seperti ruang komersial stasiun.
+   */
+  pinVolumeDistanceM?: number;
 };
 
 function loadPannellum(): Promise<void> {
@@ -121,6 +131,7 @@ export default function VirtualTourViewer({
   focusToken = 0,
   hideSceneBar = false,
   chromeTone = "default",
+  pinVolumeDistanceM,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -130,6 +141,7 @@ export default function VirtualTourViewer({
   const onSceneChangeRef = useRef(onSceneChange);
   const scenesRef = useRef(scenes);
   const spacesRef = useRef(spaces);
+  const pinVolumeDistanceRef = useRef(pinVolumeDistanceM);
   const divingRef = useRef(false);
   const externalNavRef = useRef(false);
   const overlayRef = useRef<DiveOverlayState>(ZERO_OVERLAY);
@@ -161,6 +173,39 @@ export default function VirtualTourViewer({
     return (scene?.spatialEntities ?? []).filter((e) => e.enabled);
   }, [scenes, activeSceneId, spatialEnabled]);
 
+  // Pin unit berdimensi lengkap digambar sebagai volume 3D lewat overlay (tidak bergantung flag Spatial Area).
+  const spaceDimensionsKey = JSON.stringify(
+    spaces.map((s) => [s.code, s.lengthM ?? null, s.widthM ?? null, s.heightM ?? null])
+  );
+  const pinVolumeEntities: SpatialEntity[] = useMemo(() => {
+    const dims = new Map(
+      (JSON.parse(spaceDimensionsKey) as [string, number | null, number | null, number | null][]).map(
+        ([code, lengthM, widthM, heightM]) => [code, { lengthM, widthM, heightM }]
+      )
+    );
+    const scene = scenes.find((s) => s.id === activeSceneId);
+    if (!scene) return [];
+    const placement: PinPlacement = pinVolumeDistanceM
+      ? { mode: "distance", distanceM: pinVolumeDistanceM }
+      : { mode: "floor" };
+    return scene.hotspots.flatMap((h, index) =>
+      h.type === "space" && h.spaceCode && canBuildPinVolume(h, dims.get(h.spaceCode), pinVolumeOptions(h, placement))
+        ? [
+            pinVolumeEntity(
+              scene.id,
+              index,
+              { pitch: h.pitch, yaw: h.yaw, spaceCode: h.spaceCode, label: h.text },
+              pinVolumeOptions(h, placement)
+            ),
+          ]
+        : []
+    );
+  }, [scenes, activeSceneId, spaceDimensionsKey, pinVolumeDistanceM]);
+  const overlayEntities = useMemo(
+    () => [...activeSpatialEntities, ...pinVolumeEntities],
+    [activeSpatialEntities, pinVolumeEntities]
+  );
+
   useEffect(() => {
     onSpaceClickRef.current = onSpaceClick;
     onAdClickRef.current = onAdClick;
@@ -168,6 +213,7 @@ export default function VirtualTourViewer({
     onSceneChangeRef.current = onSceneChange;
     scenesRef.current = scenes;
     spacesRef.current = spaces;
+    pinVolumeDistanceRef.current = pinVolumeDistanceM;
     focusCameraRef.current = focusCamera;
     focusTokenRef.current = focusToken;
     activeSceneIdRef.current = activeSceneId;
@@ -316,6 +362,16 @@ export default function VirtualTourViewer({
         onAdClick: (payload) => onAdClickRef.current?.(payload),
         onInfoClick: (title, desc) => onInfoClickRef.current?.(title, desc),
         getSpaceStatus: (code) => findSpaceStatus(spacesRef.current, code),
+        hasSpaceVolume: (code, pitch, yaw) =>
+          canBuildPinVolume(
+            { pitch, yaw },
+            spacesRef.current.find((space) => space.code === code),
+            {
+              placement: pinVolumeDistanceRef.current
+                ? { mode: "distance", distanceM: pinVolumeDistanceRef.current }
+                : { mode: "floor" },
+            }
+          ),
       });
 
       const viewer = window.pannellum.viewer(containerRef.current, config);
@@ -466,13 +522,14 @@ export default function VirtualTourViewer({
         }}
       >
         <div ref={containerRef} className="absolute inset-0" />
-        {viewerReady && spatialEnabled && activeSpatialEntities.length > 0 && (
+        {viewerReady && overlayEntities.length > 0 && (
           <SpatialOverlay
             viewer={viewerForOverlay}
             container={containerEl}
-            entities={activeSpatialEntities}
+            entities={overlayEntities}
             interactive
             resolveSpaceStatus={(code) => findSpaceStatus(spacesRef.current, code)}
+            resolveUnitDimensions={(code) => spaces.find((space) => space.code === code)}
             onEntityClick={(entity) => {
               runSpatialAction(entity, {
                 openUnit: (code) => onSpaceClickRef.current?.(code),

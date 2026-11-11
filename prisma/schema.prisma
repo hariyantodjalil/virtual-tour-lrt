@@ -182,6 +182,15 @@ model CommercialSpace {
   airConditioning Boolean      @default(false)
   description     String?
   panoramaUrl     String?
+  // Dimensi unit (meter) — sumber visualisasi ukuran; area dihitung dari panjang × lebar bila keduanya diisi
+  lengthM         Float?
+  widthM          Float?
+  heightM         Float?
+  areaKind        SpaceAreaKind @default(FIXED)
+  /** Hanya untuk ZONE_ALLOCATION: zona induk yang luasnya dibagi */
+  parentZoneId    String?
+  parentZone      CommercialSpace?  @relation("ZoneAllocations", fields: [parentZoneId], references: [id], onDelete: Restrict)
+  allocations     CommercialSpace[] @relation("ZoneAllocations")
   tenantLeads     TenantLead[]
   visitEvents     VisitEvent[]
   occupancy       SpaceOccupancy?
@@ -189,7 +198,26 @@ model CommercialSpace {
   updatedAt       DateTime     @updatedAt
 
   @@unique([stationId, code])
+  @@index([parentZoneId])
   @@map("commercial_spaces")
+}
+
+/** Jejak perubahan data tenant (unit stasiun & train space) — dasar cycle time analysis. */
+model TenantChangeLog {
+  id               String             @id @default(cuid())
+  entityType       TenantChangeEntity
+  entityId         String
+  entityLabel      String
+  stationId        String?
+  action           TenantChangeAction
+  changedFields    String[]           @default([])
+  hotspotsAffected Int                @default(0)
+  performedBy      String
+  createdAt        DateTime           @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([createdAt])
+  @@map("tenant_change_logs")
 }
 
 /** Tenant aktif (brand yang mengisi unit TERISI) — beda dari TenantLead (pipeline calon). */
@@ -366,6 +394,23 @@ enum SpaceType {
   AREA_PROMOSI
 }
 
+enum SpaceAreaKind {
+  FIXED
+  ZONE
+  ZONE_ALLOCATION
+}
+
+enum TenantChangeEntity {
+  COMMERCIAL_SPACE
+  TRAIN_RENTAL_SPACE
+}
+
+enum TenantChangeAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
 enum SpaceStatus {
   TERSEDIA
   TERISI
@@ -528,6 +573,10 @@ model TrainRentalSpace {
   howToOrder          String?
   status              TrainRentalStatus @default(TERSEDIA)
   monthlyRent         Float?
+  // Dimensi media (meter) — sumber visualisasi ukuran train space
+  lengthM             Float?
+  widthM              Float?
+  heightM             Float?
   order               Int               @default(0)
   isActive            Boolean           @default(true)
   createdAt           DateTime          @default(now())

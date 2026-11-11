@@ -80,6 +80,10 @@ type CommercialSpace = {
   description: string | null;
   panoramaUrl?: string | null;
   tenantBrand?: string | null;
+  /** Dimensi unit (meter) — sumber pratinjau volume 3D / denah 2D di popup baru. */
+  lengthM?: number | null;
+  widthM?: number | null;
+  heightM?: number | null;
 };
 
 const TYPE_LABELS: Record<string, string> = {

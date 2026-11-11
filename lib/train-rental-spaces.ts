@@ -142,6 +142,9 @@ function toPublicSpace(space: {
   howToOrder?: string | null;
   status?: TrainRentalStatus | string;
   monthlyRent?: number | null;
+  lengthM?: number | null;
+  widthM?: number | null;
+  heightM?: number | null;
 }): TrainRentalSpacePublic {
   const fallback =
     DEFAULT_TRAIN_RENTAL_SPACES.find((item) => item.displayNumber === space.displayNumber) ??
@@ -160,6 +163,9 @@ function toPublicSpace(space: {
     howToOrder: space.howToOrder ?? null,
     status: isTrainRentalStatus(space.status) ? space.status : "TERSEDIA",
     monthlyRent: space.monthlyRent ?? null,
+    lengthM: space.lengthM ?? null,
+    widthM: space.widthM ?? null,
+    heightM: space.heightM ?? null,
   };
 }
 
@@ -244,6 +250,9 @@ export async function getTrainRentalSpacesForCms(): Promise<TrainRentalSpaceCms[
       order: space.order,
       isActive: space.isActive,
       imageUrl: space.imageUrl,
+      lengthM: space.lengthM,
+      widthM: space.widthM,
+      heightM: space.heightM,
     };
   });
 }

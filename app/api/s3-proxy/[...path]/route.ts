@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { requireAuth } from "@/lib/auth";
+import { isLocalStorageEnabled, readLocalObject } from "@/lib/local-storage";
 
 const s3Client = new S3Client({
   endpoint: process.env.S3_ENDPOINT,
@@ -99,6 +100,21 @@ export async function GET(
     }
 
     const contentType = getContentType(s3Key);
+
+    // Development tanpa S3: layani file dari penyimpanan lokal (lihat lib/local-storage.ts).
+    if (isLocalStorageEnabled()) {
+      const local = await readLocalObject(s3Key);
+      if (!local) return new NextResponse("Resource not found", { status: 404 });
+      return new NextResponse(new Uint8Array(local), {
+        headers: {
+          "Content-Type": contentType,
+          "Content-Length": String(local.length),
+          "Cache-Control": isPublic ? "public, max-age=31536000, immutable" : "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+          "Cross-Origin-Resource-Policy": "same-origin",
+        },
+      });
+    }
 
     if (shouldServeDirectly(s3Key) || s3Key.endsWith(".json")) {
       const getObjectCommand = new GetObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key });
