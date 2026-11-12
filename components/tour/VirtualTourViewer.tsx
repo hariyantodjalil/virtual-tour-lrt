@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Navigation, RefreshCw } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Navigation, RefreshCw, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PanoramaScene, SceneInitialView } from "@/lib/tour-types";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
@@ -24,6 +25,7 @@ import { isSpatialHotspotEnabled } from "@/lib/spatial-feature";
 import type { SpatialEntity } from "@/lib/spatial/types";
 import { runSpatialAction } from "@/lib/spatial/actions";
 import { resolveSceneEntryView } from "@/lib/scene-entry-view";
+import type { SpaceHotspotMarker } from "@/lib/pannellum-hotspot";
 
 declare global {
   interface Window {
@@ -52,6 +54,9 @@ type Props = {
   focusToken?: number;
   stationName: string;
   hideSceneBar?: boolean;
+  spaceMarker?: SpaceHotspotMarker;
+  /** Undefined keeps the standard control; null hides it until a custom slot mounts. */
+  autoRotateControlContainer?: HTMLElement | null;
   /** Tone chrome overlay (auto-rotate / scene bar) — maroon mengikuti Void Portal */
   chromeTone?: "default" | "maroon";
 };
@@ -120,6 +125,8 @@ export default function VirtualTourViewer({
   focusCamera,
   focusToken = 0,
   hideSceneBar = false,
+  spaceMarker = "footprint",
+  autoRotateControlContainer,
   chromeTone = "default",
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -310,6 +317,7 @@ export default function VirtualTourViewer({
 
       const firstId = activeSceneIdRef.current ?? currentScenes[0]?.id;
       const config = buildPannellumTourConfig(currentScenes, firstId, {
+        spaceMarker,
         onSceneHotspot: (id, pitch, yaw, entryView) => handleSceneHotspotRef.current(id, pitch, yaw, entryView),
         onScenePreload: (id) => preloadSceneById(id),
         onSpaceClick: (code) => onSpaceClickRef.current?.(code),
@@ -379,7 +387,7 @@ export default function VirtualTourViewer({
         setError(e instanceof Error ? e.message : "Gagal menginisialisasi viewer 360°");
       }
     }
-  }, [applyCameraFocus, destroyViewer, overlayController, preloadSceneById]);
+  }, [applyCameraFocus, destroyViewer, overlayController, preloadSceneById, spaceMarker]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -454,6 +462,12 @@ export default function VirtualTourViewer({
       setAutoRotate(false);
     }
   };
+
+  const autoRotateControl = panoramaVisible && !error ? (
+    <button type="button" onClick={toggleAutoRotate} aria-label="Auto Putar" aria-pressed={autoRotate}
+      className={`flex shrink-0 items-center justify-center rounded-full backdrop-blur-md transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${autoRotateControlContainer === undefined ? "size-10" : "size-11"} ${autoRotate ? `bg-[#E31E2D] text-white ${autoRotateControlContainer === undefined ? "shadow-[0_10px_24px_rgba(227,30,45,0.35)]" : ""}` : "border border-white/12 bg-[#1c1c1e]/78 text-white hover:bg-white/10"}`}
+      title="Auto Putar">{autoRotateControlContainer === undefined ? <Navigation className="size-4" /> : <RotateCw className="size-5" />}</button>
+  ) : null;
 
   return (
     <div className="lrt-vt-viewer relative h-full w-full overflow-hidden bg-[#0a0f18]">
@@ -545,21 +559,9 @@ export default function VirtualTourViewer({
         </div>
       )}
 
-      {panoramaVisible && !error && (
-        <div className="absolute bottom-24 right-4 z-[45] sm:bottom-28">
-          <button
-            onClick={toggleAutoRotate}
-            className={`flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition-all duration-300 ${
-              autoRotate
-                ? "bg-[#E31E2D] text-white shadow-[0_10px_24px_rgba(227,30,45,0.35)]"
-                : "border border-white/12 bg-[#1c1c1e]/78 text-white hover:bg-white/10"
-            }`}
-            title="Auto Putar"
-          >
-            <Navigation className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      {autoRotateControlContainer === undefined
+        ? <div className="absolute bottom-24 right-4 z-[45] sm:bottom-28">{autoRotateControl}</div>
+        : autoRotateControlContainer && createPortal(autoRotateControl, autoRotateControlContainer)}
 
       <style>{`
         .pnlm-container { background: ${chromeTone === "maroon" ? "#1c0a0e" : "#0a0f18"} !important; }

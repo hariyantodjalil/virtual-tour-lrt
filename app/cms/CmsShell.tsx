@@ -90,6 +90,9 @@ function getPageMeta(pathname: string) {
       subtitle: "Kelola status mode maintenance dan konfigurasi sistem",
     };
   }
+  if (pathname.startsWith("/cms/inquiry-workflow")) {
+    return { title: "Alur Pengajuan", subtitle: "Versi tahapan dan keterangan untuk mitra" };
+  }
   if (pathname.startsWith("/cms/dashboard")) {
     return { title: "Dashboard", subtitle: "Ringkasan performa komersial dan aktivitas tenant" };
   }

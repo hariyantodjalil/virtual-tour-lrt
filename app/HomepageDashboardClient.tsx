@@ -392,6 +392,7 @@ export default function HomepageDashboardClient({ stations }: Props) {
           key={selectedSpace.id}
           space={selectedSpace}
           stationName={activeStation.name}
+          stationSlug={activeStation.slug}
           onClose={() => setSelectedSpace(null)}
         />
       )}

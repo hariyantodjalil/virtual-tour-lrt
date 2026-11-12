@@ -33,7 +33,7 @@ export default function StationPickerCard({
             }`
       } ${className}`}
     >
-      <span className="relative block h-[140px] w-full shrink-0 overflow-hidden sm:h-[150px]">
+      <span className={`relative block h-[140px] w-full shrink-0 overflow-hidden sm:h-[150px] ${isDark ? "bg-[#171717]" : "bg-slate-100"}`}>
         <Image
           src={coverSrc}
           alt={`Stasiun ${station.name}`}

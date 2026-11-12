@@ -2,6 +2,21 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model Trainset {
+  id        String   @id @default(cuid())
+  trainId   String
+  train     Train    @relation(fields: [trainId], references: [id], onDelete: Cascade)
+  code      String
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([trainId, code])
+  @@index([trainId, isActive, order])
+  @@map("trainsets")
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -58,7 +73,7 @@ model CommercialProfile {
   id                     String   @id @default("default")
   teamName               String   @default("Tim Komersial LRT Jabodebek")
   contactPersonName      String?
-  whatsappNumber         String   @default("628118012012")
+  whatsappNumber         String   @default("")
   phoneNumber            String?
   email                  String?
   officeAddress          String?
@@ -233,10 +248,17 @@ model SpaceOccupancy {
 
 model TenantLead {
   id               String           @id @default(cuid())
+  inquiryCode      String           @unique @default(dbgenerated("'LRT-'::text || nextval('inquiry_code_seq'::regclass)::text"))
+  workflowVersionId String?
+  workflowVersion PipelineWorkflowVersion? @relation(fields: [workflowVersionId], references: [id])
+  rejectionReason String?           @db.Text
+  mediaAttachments InquiryMedia[]
+  stepLogs         InquiryStepLog[]
   userId           String?
   user             User?            @relation(fields: [userId], references: [id])
   spaceId          String?
   space            CommercialSpace? @relation(fields: [spaceId], references: [id])
+  trainInquiry     TrainInquiry?
   companyName      String
   contactName      String
   phone            String
@@ -260,6 +282,74 @@ model TenantLead {
   @@index([status])
   @@index([createdAt])
   @@map("tenant_leads")
+}
+
+model PipelineWorkflowVersion {
+  id          String       @id @default(cuid())
+  version     Int          @unique
+  title       String
+  description String?
+  status      String       @default("DRAFT")
+  publishedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  steps       PipelineStep[]
+  leads       TenantLead[]
+
+  @@index([status])
+  @@map("pipeline_workflow_versions")
+}
+
+model PipelineStep {
+  id                String                  @id @default(cuid())
+  workflowVersionId String
+  workflowVersion   PipelineWorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  stepOrder         Int
+  leadStatus        LeadStatus
+  title             String
+  description       String?
+  publicMessage     String                  @db.Text
+  requiresMedia     Boolean                 @default(false)
+  showInSummary     Boolean                 @default(false)
+  stepLogs          InquiryStepLog[]
+
+  @@unique([workflowVersionId, stepOrder])
+  @@unique([workflowVersionId, leadStatus])
+  @@map("pipeline_steps")
+}
+
+model InquiryMedia {
+  id               String     @id @default(cuid())
+  tenantLeadId     String
+  tenantLead       TenantLead @relation(fields: [tenantLeadId], references: [id], onDelete: Cascade)
+  stepOrder        Int
+  mediaTitle       String
+  documentNumber   String?
+  mediaLink        String
+  isVisibleToMitra Boolean    @default(false)
+  uploadedByAdmin  String
+  createdAt        DateTime   @default(now())
+
+  @@index([tenantLeadId, stepOrder])
+  @@map("inquiry_media")
+}
+
+model InquiryStepLog {
+  id             String        @id @default(cuid())
+  tenantLeadId   String
+  tenantLead     TenantLead    @relation(fields: [tenantLeadId], references: [id], onDelete: Cascade)
+  pipelineStepId String?
+  pipelineStep   PipelineStep? @relation(fields: [pipelineStepId], references: [id], onDelete: SetNull)
+  stepOrder      Int
+  status         LeadStatus
+  fromStatus     LeadStatus?
+  action         String
+  notes          String?       @db.Text
+  performedBy    String
+  createdAt      DateTime      @default(now())
+
+  @@index([tenantLeadId, createdAt])
+  @@map("inquiry_step_logs")
 }
 
 model VisitEvent {
@@ -357,6 +447,10 @@ model Train {
   trainTourScenes TrainTourScene[]
   virtualTour     TrainVirtualTour?
   rentalSpaces    TrainRentalSpace[]
+  advertisingCapacity Int?
+  infoNotices     Json              @default("[]")
+  inquiries       TrainInquiry[]
+  trainsets       Trainset[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -385,6 +479,9 @@ model TrainTourCar {
   label     String
   color     String           @default("#3b82f6")
   hint      String?
+  description String?
+  facilities String[]       @default([])
+  infoNotices Json          @default("[]")
   order     Int              @default(0)
   isActive  Boolean          @default(true)
   zones     TrainTourZone[]
@@ -452,6 +549,8 @@ model TrainRentalSpace {
   objectPosition      String            @default("50% 50%")
   availableTrainsets  String[]          @default([])
   availableByCar      Json              @default("{}")
+  inquiryMode         TrainInquiryMode  @default(MEDIA)
+  inquiries           TrainInquiry[]
   howToOrder          String?
   status              TrainRentalStatus @default(TERSEDIA)
   monthlyRent         Float?
@@ -463,4 +562,42 @@ model TrainRentalSpace {
   @@unique([trainId, displayNumber])
   @@index([trainId, isActive, order])
   @@map("train_rental_spaces")
+}
+
+enum TrainInquiryMode {
+  MEDIA
+  FULL_BRANDING
+}
+
+model TrainInquiry {
+  id                    String           @id @default(cuid())
+  leadId                String           @unique
+  lead                  TenantLead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  trainId               String
+  train                 Train            @relation(fields: [trainId], references: [id], onDelete: Restrict)
+  mediaId               String?
+  media                 TrainRentalSpace? @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+  mediaCode             String
+  mediaTitle            String
+  mode                  TrainInquiryMode
+  requestedTrainsetCount Int?
+  campaignStart         DateTime?        @db.Date
+  campaignEnd           DateTime?        @db.Date
+  campaignNeeds         String?          @db.Text
+  allocatedTrainsets    String[]         @default([])
+  allocationNotes       String?          @db.Text
+  carPreferences        TrainInquiryCar[]
+
+  @@index([mediaId])
+  @@map("train_inquiries")
+}
+
+model TrainInquiryCar {
+  inquiryId String
+  inquiry   TrainInquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  carSlug   String
+  carLabel  String
+
+  @@id([inquiryId, carSlug])
+  @@map("train_inquiry_cars")
 }

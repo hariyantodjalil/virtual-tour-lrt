@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { inquiryCreationData, publicWorkflowSelect } from "@/lib/partner-inquiries";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -148,6 +149,7 @@ export async function POST(req: NextRequest) {
 
     const lead = await prisma.tenantLead.create({
       data: {
+        ...await inquiryCreationData(user.id),
         ...(commercialSpaceId ? { spaceId: commercialSpaceId } : {}),
         companyName: data.companyName,
         contactName: data.contactName,
@@ -160,6 +162,7 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         siteVisitStatus: data.surveyPreference ? "REQUESTED" : "NONE",
       },
+      include: { workflowVersion: { select: publicWorkflowSelect } },
     });
 
     // Track analytics

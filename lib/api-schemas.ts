@@ -85,8 +85,9 @@ export const trainRentalSpaceMutationSchema = z.object({
   description: optionalText(5_000),
   imageUrl: nullableUrl,
   objectPosition: z.string().trim().min(1).max(32).default("50% 50%"),
-  availableTrainsets: z.array(z.string().trim().min(1).max(16)).max(40).default([]),
+  availableTrainsets: z.array(z.string().trim().min(1).max(16)).max(40).optional(),
   availableByCar: z.record(z.string(), z.array(z.string().trim().min(1).max(16)).max(40)).optional(),
+  inquiryMode: z.enum(["MEDIA", "FULL_BRANDING"]).optional(),
   howToOrder: optionalText(2_000),
   status: z.enum(["TERSEDIA", "TERBATAS", "PENUH"]).default("TERSEDIA"),
   monthlyRent: nonNegativeNumber.nullable().optional(),
@@ -171,6 +172,7 @@ export const leadUpdateSchema = z.object({
   followUpAt: optionalDate,
   rdsOfferNo: optionalText(80),
   baNegotiationNo: optionalText(80),
+  rejectionReason: optionalText(2_000),
 }).strict().refine((value) => Object.keys(value).length > 1, "Minimal satu perubahan harus diisi");
 
 const orderItem = z.object({ sceneId: id, order: safeInteger }).strict();

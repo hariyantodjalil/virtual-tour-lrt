@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ensureDefaultTrain } from "@/lib/default-train";
 import TrainTourEditor from "./TrainTourEditor";
+import TrainBootstrap from "./TrainBootstrap";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
@@ -35,14 +36,15 @@ export default async function CmsVirtualTrainPage() {
           ? "Tabel database kereta belum dibuat. Jalankan migrasi Prisma sekali di terminal project:"
           : error?.message}
       </p>
+      {!error?.needsMigration && <TrainBootstrap />}
       {error?.needsMigration && (
         <pre className="mt-4 overflow-x-auto rounded-lg bg-[#1C0A0E] p-3 text-xs text-emerald-300">
           npx prisma migrate deploy
         </pre>
       )}
-      <p className="mt-3 text-xs text-[#A88990]">
+      {error?.needsMigration && <p className="mt-3 text-xs text-[#A88990]">
         Setelah migrasi selesai, refresh halaman ini.
-      </p>
+      </p>}
       <Button asChild variant="outline" className="mt-4 border-[rgba(255,214,218,0.14)]">
         <Link href="/cms/dashboard">Kembali ke Dashboard</Link>
       </Button>

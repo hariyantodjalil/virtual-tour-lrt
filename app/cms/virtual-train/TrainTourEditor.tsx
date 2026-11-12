@@ -1414,6 +1414,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           {currentScene?.panoramaUrl ? (
             isPreview ? (
               <PannellumPreview
+                spaceMarker="info-pin"
                 key={`preview-${currentScene.sceneId}-${hotspots.length}-${privacyBlurs.length}`}
                 panoramaUrl={currentScene.panoramaUrl}
                 hotspots={hotspots}
@@ -1428,6 +1429,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
               />
             ) : (
               <PannellumEditor
+                spaceMarker="info-pin"
                 ref={editorRef}
                 key={`editor-${currentScene.sceneId}`}
                 panoramaUrl={currentScene.panoramaUrl}

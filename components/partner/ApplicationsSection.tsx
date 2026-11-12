@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  AlertCircle,
   Building2,
   CalendarDays,
   CheckCircle2,
@@ -279,7 +278,7 @@ export default function ApplicationsSection({
                     setFilter(tab.id);
                     setShowAll(false);
                   }}
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                  className={`min-h-11 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
                     active
                       ? "bg-[#c41230] text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"

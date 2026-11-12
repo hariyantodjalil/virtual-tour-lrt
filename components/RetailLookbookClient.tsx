@@ -1,11 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import StationTourClient from "./StationTourClient";
 import { formatNumber } from "@/lib/utils";
 import { MapPin, Search, ChevronRight, Store, MoveRight, Users, Eye } from "lucide-react";
-import type { LandingStation } from "@/lib/landing-data";
 import type { StationInfo } from "@/lib/stations-data";
+
+type LandingStation = {
+  id: string;
+  name: string;
+  slug: string;
+  line: string;
+  dailyPassengers: number;
+  spaces: ComponentProps<typeof StationTourClient>["spaces"];
+};
 
 interface Props {
   stations: LandingStation[];

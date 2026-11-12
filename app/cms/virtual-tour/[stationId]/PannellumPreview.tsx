@@ -7,7 +7,7 @@ import type { HotspotItem } from "@/lib/hotspot-types";
 import type { PrivacyBlurItem } from "@/lib/privacy-blur-types";
 import type { PanoramaScene, SceneInitialView, TourLevelPublic } from "@/lib/tour-types";
 import { resolveSceneEntryView } from "@/lib/scene-entry-view";
-import { setupHotspotElement, resolveSceneHotspotTitle } from "@/lib/pannellum-hotspot";
+import { setupHotspotElement, resolveSceneHotspotTitle, type SpaceHotspotMarker } from "@/lib/pannellum-hotspot";
 import {
   findSpaceStatus,
   type SpaceAvailabilityStatus,
@@ -49,6 +49,7 @@ type PreviewScene = {
 };
 
 interface Props {
+  spaceMarker?: SpaceHotspotMarker;
   panoramaUrl: string;
   hotspots: HotspotItem[];
   privacyBlurs?: PrivacyBlurItem[];
@@ -115,6 +116,7 @@ export function PannellumPreview({
   levels = [],
   spaces = [],
   spatialEntities = [],
+  spaceMarker = "footprint",
   stationName = "",
   onSceneNavigate,
   initialView = null,
@@ -240,6 +242,7 @@ export function PannellumPreview({
                   ? findSpaceStatus(spacesRef.current, h.spaceCode)
                   : undefined;
               setupHotspotElement(div, {
+                spaceMarker,
                 type: h.type,
                 onClick,
                 scale: h.scale,
@@ -300,7 +303,7 @@ export function PannellumPreview({
         viewerRef.current = null;
       }
     };
-  }, [panoramaUrl, hotspots, scenes, initialView]);
+  }, [panoramaUrl, hotspots, scenes, initialView, spaceMarker]);
 
   if (!panoramaUrl) {
     return (

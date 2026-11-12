@@ -1,7 +1,7 @@
 import type { Hotspot, PanoramaScene, SceneInitialView } from "@/lib/tour-types";
 import { resolveSceneEntryView } from "./scene-entry-view";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
-import { setupHotspotElement, resolveSceneHotspotTitle } from "@/lib/pannellum-hotspot";
+import { setupHotspotElement, resolveSceneHotspotTitle, type SpaceHotspotMarker } from "@/lib/pannellum-hotspot";
 import { findSpaceStatus, type SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { SCENE_FADE_MS } from "@/lib/pannellum-tour-dive";
 import { PANNELLUM_HFOV, PANNELLUM_INTERACTION, PANNELLUM_PITCH_LIMITS } from "@/lib/pannellum-viewer-defaults";
@@ -16,6 +16,7 @@ export type AdHotspotPayload = {
 };
 
 type SceneHandlers = {
+  spaceMarker?: SpaceHotspotMarker;
   onSceneHotspot: (targetSceneId: string, pitch: number, yaw: number, entryView: SceneInitialView) => void;
   onScenePreload?: (targetSceneId: string) => void;
   onSpaceClick: (spaceCode: string) => void;
@@ -71,6 +72,7 @@ function buildHotSpots(scene: PanoramaScene, allScenes: PanoramaScene[], handler
             : undefined;
         setupHotspotElement(div, {
           type: h.type,
+          spaceMarker: handlers.spaceMarker,
           onClick,
           scale: h.scale,
           spaceStatus,

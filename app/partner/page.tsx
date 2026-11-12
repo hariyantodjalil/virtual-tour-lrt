@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowUpRight,
   Bell,
   Building2,
   CheckCircle2,
@@ -45,7 +44,6 @@ import {
   LEAD_STATUS_LABELS,
   type CommercialLeadStatus,
 } from "@/lib/commercial-pipeline";
-import { formatRupiah } from "@/lib/utils";
 
 type User = {
   id: string;
@@ -85,7 +83,11 @@ export default function PartnerPage() {
 
     refreshFavorites();
     window.addEventListener(FAVORITES_UPDATED_EVENT, refreshFavorites);
-    return () => window.removeEventListener(FAVORITES_UPDATED_EVENT, refreshFavorites);
+    window.addEventListener("storage", refreshFavorites);
+    return () => {
+      window.removeEventListener(FAVORITES_UPDATED_EVENT, refreshFavorites);
+      window.removeEventListener("storage", refreshFavorites);
+    };
   }, []);
 
   useEffect(() => {
@@ -845,7 +847,7 @@ function FavoritesSection({
                       Hapus
                     </button>
                     <Link
-                      href={`/station/${item.stationSlug}`}
+                      href={`/station/${encodeURIComponent(item.stationSlug)}?unit=${encodeURIComponent(item.spaceId)}`}
                       className="inline-flex items-center justify-center rounded-lg bg-[#c41230] px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
                     >
                       Lihat Unit

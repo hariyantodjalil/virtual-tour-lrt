@@ -46,6 +46,7 @@ export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
     );
   });
   const [uiCleared, setUiCleared] = useState(false);
+  const [autoRotateControlContainer, setAutoRotateControlContainer] = useState<HTMLDivElement | null>(null);
 
   const currentCar =
     trainInfo.levels.find((l) => l.id === activeLevelId) ?? trainInfo.levels[0];
@@ -104,6 +105,8 @@ export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
           status: trainRentalStatusToSpaceStatus(space.status),
         }))}
         hideSceneBar
+        spaceMarker="info-pin"
+        autoRotateControlContainer={autoRotateControlContainer}
         chromeTone="maroon"
       />
 
@@ -131,6 +134,8 @@ export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
           pickLabel="Pilih Tour"
           homeHref={VIRTUAL_TOUR_LANDING}
           onPickStation={() => router.push(TRAIN_TOUR_LANDING)}
+          railClassName="[@media(max-height:480px)]:top-auto [@media(max-height:480px)]:bottom-16 [@media(max-height:480px)]:translate-y-0 [@media(max-height:480px)]:flex-row"
+          railClassName="[@media(max-height:480px)]:top-auto [@media(max-height:480px)]:bottom-24 [@media(max-height:480px)]:translate-y-0 [@media(max-height:480px)]:flex-row"
           clearUiControl={
             <button
               type="button"

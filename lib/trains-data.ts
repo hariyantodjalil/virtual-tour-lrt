@@ -5,7 +5,7 @@ import { normalizeHotspots } from "@/lib/hotspot-normalize";
 import { extractPrivacyBlursFromCanvasData } from "@/lib/privacy-blur-normalize";
 import { extractInitialViewFromCanvasData } from "@/lib/scene-initial-view";
 import { extractMultiResFromCanvasData } from "@/lib/panorama-multires";
-import { sortTrainScenesByTourOrder, ensureTrainTourStructure } from "@/lib/train-tour-structure";
+import { sortTrainScenesByTourOrder } from "@/lib/train-tour-structure";
 import { buildPublicTrainTourLevels } from "@/lib/public-train-tour-structure";
 
 export type TrainInfo = {

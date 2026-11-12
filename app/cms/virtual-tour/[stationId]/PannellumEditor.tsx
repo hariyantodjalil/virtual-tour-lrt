@@ -13,6 +13,7 @@ import {
   setHotspotSelected,
   setHotspotScale,
   setSceneNavDirection,
+  type SpaceHotspotMarker,
 } from "@/lib/pannellum-hotspot";
 import {
   bindPrivacyBlursInContainer,
@@ -73,12 +74,14 @@ function buildEditorHotspotEl(
   getSpaceStatus: (code: string) => SpaceAvailabilityStatus | undefined,
   getSceneTitle: (sceneId: string | undefined, fallback: string) => string,
   onPointerDownRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string, e: PointerEvent) => void>,
-  onDeleteRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string) => void>
+  onDeleteRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string) => void>,
+  spaceMarker: SpaceHotspotMarker
 ) {
   const spaceStatus =
     h.type === "space" && h.spaceCode ? getSpaceStatus(h.spaceCode) : undefined;
   setupHotspotElement(div, {
     type: h.type,
+    spaceMarker,
     selected: isSelected,
     scale: h.scale,
     spaceStatus,
@@ -137,6 +140,7 @@ function buildEditorBlurEl(
 }
 
 interface Props {
+  spaceMarker?: SpaceHotspotMarker;
   panoramaUrl: string;
   hotspots: HotspotItem[];
   privacyBlurs: PrivacyBlurItem[];
@@ -193,6 +197,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
     initialView = null,
     minHfov = PANNELLUM_EDITOR_HFOV.minHfov,
     privacyBlurGuideOnly = false,
+    spaceMarker = "footprint",
     spatialEntities = [],
     draftSpatialVertices = [],
     selectedSpatialId = null,
@@ -416,7 +421,8 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
                 (sceneId, fallback) =>
                   resolveSceneHotspotTitle(sceneId, scenesRef.current, fallback),
                 onPointerDownItemRef,
-                onDeleteItemRef
+                onDeleteItemRef,
+                spaceMarker
               );
             },
           });
@@ -424,7 +430,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         } catch { /* ignore */ }
       }
     },
-    []
+    [spaceMarker]
   );
 
   const syncAllOverlays = useCallback(

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import InquiryDocuments from "./InquiryDocuments";
 import {
   AlertTriangle,
   Building2,
@@ -38,6 +39,8 @@ import {
 
 export type LeadItem = {
   id: string;
+  inquiryCode: string;
+  rejectionReason: string | null;
   userId: string | null;
   companyName: string;
   contactName: string;
@@ -231,6 +234,7 @@ export default function LeadsClient({
       status,
       rdsOfferNo: lead.rdsOfferNo,
       baNegotiationNo: lead.baNegotiationNo,
+      rejectionReason: lead.rejectionReason,
     });
   }
 
@@ -242,6 +246,7 @@ export default function LeadsClient({
       siteVisitStatus: lead.siteVisitStatus,
       siteVisitScheduledAt: scheduledAt,
       notes: lead.notes || null,
+      rejectionReason: lead.rejectionReason || null,
     });
   }
 
@@ -498,6 +503,7 @@ function LeadCard({
               )}
             </span>
             <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#C4A8AD]">
+              <span>{lead.inquiryCode}</span>
               <span className="inline-flex items-center gap-1.5">
                 <UserRound className="h-3.5 w-3.5" />
                 {lead.contactName} · {lead.phone}
@@ -663,6 +669,12 @@ function LeadCard({
                   </Button>
                 </div>
 
+                <div>
+                  <label htmlFor={`rejection-${lead.id}`} className="mb-1.5 block text-xs font-semibold text-[#C4A8AD]">Alasan penghentian untuk mitra</label>
+                  <textarea id={`rejection-${lead.id}`} value={lead.rejectionReason ?? ""} maxLength={2000} rows={2} onChange={event => onUpdateLocal({ rejectionReason: event.target.value })} className="w-full rounded-md border border-white/15 bg-[#261015] px-3 py-2 text-sm text-[#F8ECEE]" />
+                  <Button size="sm" className="mt-2" onClick={onSaveSiteVisit} disabled={saving}>Simpan alasan</Button>
+                </div>
+                <InquiryDocuments leadId={lead.id} />
                 <Button
                   size="sm"
                   variant="ghost"

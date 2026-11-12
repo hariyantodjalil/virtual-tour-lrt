@@ -16,6 +16,8 @@ async function getLeads(): Promise<{
     return {
       leads: leads.map((lead) => ({
         id: lead.id,
+        inquiryCode: lead.inquiryCode,
+        rejectionReason: lead.rejectionReason,
         userId: lead.userId,
         companyName: lead.companyName,
         contactName: lead.contactName,

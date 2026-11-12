@@ -464,6 +464,7 @@ export default function TrainRentalSpaceDetail({
                   </button>
                   <button
                     type="button"
+                    disabled={maxTrainsetQty === 0}
                     onClick={() => {
                       setRentMode("trainset");
                       setSelectedCarSlugs(DEFAULT_TRAIN_CARS.map((car) => car.slug));
