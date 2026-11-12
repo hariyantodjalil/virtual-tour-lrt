@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       },
     });
     await writeTrainRentalSalesFields(space.id, {
-      availableTrainsets: parsed.data.availableTrainsets,
+      availableTrainsets: parsed.data.availableTrainsets ?? [],
       availableByCar: parsed.data.availableByCar,
       howToOrder: parsed.data.howToOrder ?? null,
       status: parsed.data.status,

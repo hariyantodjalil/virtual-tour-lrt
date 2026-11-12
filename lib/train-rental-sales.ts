@@ -47,11 +47,11 @@ export function unionCarTrainsets(map: CarTrainsetMap): string[] {
   return normalizeTrainsets(Object.values(map).flat());
 }
 
-export function isAllTrainsets(values: string[], options: string[]): boolean {
+export function isAllTrainsets(values: string[], options: string[] = []): boolean {
   return options.length > 0 && options.every((trainset) => values.includes(trainset));
 }
 
-export function formatCarTrainsetSummary(map: CarTrainsetMap, fleetCars: Pick<TrainFleetCar, "slug" | "label">[], trainsets: string[]): string {
+export function formatCarTrainsetSummary(map: CarTrainsetMap, fleetCars: Pick<TrainFleetCar, "slug" | "label">[] = [], trainsets: string[] = []): string {
   const cars = fleetCars.map((car) => {
     const items = map[car.slug] ?? [];
     if (items.length === 0) return `${car.label}: belum diatur`;

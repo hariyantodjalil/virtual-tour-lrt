@@ -1,7 +1,7 @@
 import type { TrainFleet } from "@/lib/train-fleet-shared";
 
 export type TrainRentalSpacePublic = {
-  fleet: TrainFleet;
+  fleet?: TrainFleet;
   id: string;
   displayNumber: string;
   title: string;

@@ -21,7 +21,6 @@ import { useCommercialProfile } from "@/components/commercial/CommercialProfileP
 import TenantInterestForm from "@/components/tour/TenantInterestForm";
 import {
   TRAIN_RENTAL_STATUS_LABELS,
-  TRAINSET_OPTIONS,
   isAllTrainsets,
   parseCarTrainsetMap,
   type TrainRentalStatus,
@@ -51,10 +50,10 @@ type Props = {
   initialCarSlug?: string;
 };
 
-function resolveCarIndex(slug?: string) {
+function resolveCarIndex(slug: string | undefined, cars: { slug: string; label: string }[] = DEFAULT_TRAIN_CARS) {
   if (!slug) return 0;
   const needle = slug.trim().toLowerCase();
-  const index = DEFAULT_TRAIN_CARS.findIndex(
+  const index = cars.findIndex(
     (car) => car.slug === needle || car.label.toLowerCase() === needle
   );
   return index >= 0 ? index : 0;
@@ -122,28 +121,30 @@ export default function TrainRentalSpaceDetail({
   backLabel = "Kembali ke Daftar Fasilitas",
   initialCarSlug,
 }: Props) {
+  const fleetCars = space.fleet?.cars?.length ? space.fleet.cars : DEFAULT_TRAIN_CARS;
+  const trainsetOptions = space.fleet?.trainsets?.map((set) => set.code) ?? [];
   const profile = useCommercialProfile();
   const mounted = useSyncExternalStore(
     subscribeToHydration,
     () => true,
     () => false
   );
-  const [carIndex, setCarIndex] = useState(() => resolveCarIndex(initialCarSlug));
+  const [carIndex, setCarIndex] = useState(() => resolveCarIndex(initialCarSlug, fleetCars));
   const [showInterestModal, setShowInterestModal] = useState(false);
   const [rentMode, setRentMode] = useState<"gerbong" | "trainset">("gerbong");
   const [trainsetQty, setTrainsetQty] = useState(1);
   const [selectedCarSlugs, setSelectedCarSlugs] = useState<string[]>(() => {
-    const car = DEFAULT_TRAIN_CARS[resolveCarIndex(initialCarSlug)];
-    return car ? [car.slug] : [DEFAULT_TRAIN_CARS[0].slug];
+    const car = fleetCars[resolveCarIndex(initialCarSlug, fleetCars)];
+    return car ? [car.slug] : [fleetCars[0].slug];
   });
 
-  const selectedCar = DEFAULT_TRAIN_CARS[carIndex] ?? DEFAULT_TRAIN_CARS[0];
+  const selectedCar = fleetCars[carIndex] ?? fleetCars[0];
   const carLabel = selectedCar.label;
-  const maxTrainsetQty = TRAINSET_OPTIONS.length;
-  const carTrainsets = parseCarTrainsetMap(space.availableByCar, space.availableTrainsets)[
+  const maxTrainsetQty = trainsetOptions.length;
+  const carTrainsets = parseCarTrainsetMap(space.availableByCar, space.availableTrainsets, fleetCars)[
     selectedCar.slug
   ] ?? [];
-  const allTrainsetsAvailable = isAllTrainsets(carTrainsets);
+  const allTrainsetsAvailable = isAllTrainsets(carTrainsets, trainsetOptions);
   const trainsetCount = allTrainsetsAvailable
     ? maxTrainsetQty
     : carTrainsets.length > 0
@@ -167,7 +168,7 @@ export default function TrainRentalSpaceDetail({
     [profile.teamName, space.title, space.displayNumber, carLabel]
   );
 
-  const selectedCars = DEFAULT_TRAIN_CARS.filter((car) => selectedCarSlugs.includes(car.slug));
+  const selectedCars = fleetCars.filter((car) => selectedCarSlugs.includes(car.slug));
   const unitSummary =
     rentMode === "trainset"
       ? `${trainsetQty} train set utuh (masing-masing 6 gerbong)`
@@ -178,7 +179,7 @@ export default function TrainRentalSpaceDetail({
   const canApply = space.status !== "PENUH";
 
   function openApplyForm() {
-    const current = DEFAULT_TRAIN_CARS[carIndex] ?? DEFAULT_TRAIN_CARS[0];
+    const current = fleetCars[carIndex] ?? fleetCars[0];
     setRentMode("gerbong");
     setSelectedCarSlugs([current.slug]);
     setTrainsetQty(1);
@@ -261,7 +262,7 @@ export default function TrainRentalSpaceDetail({
           role="tablist"
           aria-label="Pilih gerbong"
         >
-          {DEFAULT_TRAIN_CARS.map((car, index) => {
+          {fleetCars.map((car, index) => {
             const selected = index === carIndex;
             return (
               <button
@@ -274,7 +275,7 @@ export default function TrainRentalSpaceDetail({
               >
                 <CarriageIcon
                   index={index}
-                  total={DEFAULT_TRAIN_CARS.length}
+                  total={fleetCars.length}
                   selected={selected}
                 />
                 <span
@@ -448,8 +449,8 @@ export default function TrainRentalSpaceDetail({
                     type="button"
                     onClick={() => {
                       setRentMode("gerbong");
-                      if (selectedCarSlugs.length === DEFAULT_TRAIN_CARS.length) {
-                        const current = DEFAULT_TRAIN_CARS[carIndex] ?? DEFAULT_TRAIN_CARS[0];
+                      if (selectedCarSlugs.length === fleetCars.length) {
+                        const current = fleetCars[carIndex] ?? fleetCars[0];
                         setSelectedCarSlugs([current.slug]);
                       }
                     }}
@@ -467,7 +468,7 @@ export default function TrainRentalSpaceDetail({
                     disabled={maxTrainsetQty === 0}
                     onClick={() => {
                       setRentMode("trainset");
-                      setSelectedCarSlugs(DEFAULT_TRAIN_CARS.map((car) => car.slug));
+                      setSelectedCarSlugs(fleetCars.map((car) => car.slug));
                       setTrainsetQty((qty) => Math.min(Math.max(qty, 1), maxTrainsetQty));
                     }}
                     className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-[12px] font-semibold transition ${
@@ -488,7 +489,7 @@ export default function TrainRentalSpaceDetail({
                       role="group"
                       aria-label="Pilih gerbong"
                     >
-                      {DEFAULT_TRAIN_CARS.map((car, index) => {
+                      {fleetCars.map((car, index) => {
                         const selected = selectedCarSlugs.includes(car.slug);
                         return (
                           <button
@@ -499,7 +500,7 @@ export default function TrainRentalSpaceDetail({
                           >
                             <CarriageIcon
                               index={index}
-                              total={DEFAULT_TRAIN_CARS.length}
+                              total={fleetCars.length}
                               selected={selected}
                             />
                             <span

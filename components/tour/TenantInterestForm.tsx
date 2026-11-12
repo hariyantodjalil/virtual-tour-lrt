@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { PUBLIC_LEASING_STEPS } from "@/lib/commercial-pipeline";
 import {
   Briefcase,
   Building2,

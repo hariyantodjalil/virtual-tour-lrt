@@ -27,11 +27,6 @@ const PUBLIC_LEAD_STAGE_DETAILS = {
   COMMERCIAL_OPERATION: "Unit memasuki tahap operasional komersial.",
 } satisfies Record<Exclude<(typeof LEAD_PIPELINE_STATUSES)[number], "CLOSED_LOST">, string>;
 
-/** Mengikuti urutan status yang juga digunakan CMS dan Portal Mitra GitDev. */
-export const PUBLIC_LEAD_PROCESS_STEPS = LEAD_PIPELINE_STATUSES
-  .filter(status => status !== "CLOSED_LOST")
-  .map(status => ({ status, title: LEAD_STATUS_LABELS[status], detail: PUBLIC_LEAD_STAGE_DETAILS[status] }));
-
 export const LEAD_STATUS_VALUES = [
   ...LEAD_PIPELINE_STATUSES,
   "CLOSED_WON",
@@ -54,6 +49,12 @@ export const LEAD_STATUS_LABELS: Record<CommercialLeadStatus, string> = {
   CLOSED_WON: "Operasional Komersial (Legacy)",
   CLOSED_LOST: "Drop-off",
 };
+
+/** Mengikuti urutan status yang juga digunakan CMS dan Portal Mitra GitDev. */
+export const PUBLIC_LEAD_PROCESS_STEPS = LEAD_PIPELINE_STATUSES
+  .filter(status => status !== "CLOSED_LOST")
+  .map(status => ({ status, title: LEAD_STATUS_LABELS[status], detail: PUBLIC_LEAD_STAGE_DETAILS[status] }));
+
 
 export const ACTIVE_LEAD_STATUSES: CommercialLeadStatus[] = [
   "NEW",

@@ -278,7 +278,7 @@ export default function TrainSpacesClient() {
                   <p className="mb-1 text-xs italic text-[#A88990]">Belum diatur trainset (TS) mana yang tersedia.</p>
                 ) : (
                   <p className="mb-1 text-xs text-[#C4A8AD]">
-                    {formatCarTrainsetSummary(parseCarTrainsetMap(space.availableByCar, space.availableTrainsets))}
+                    {formatCarTrainsetSummary(parseCarTrainsetMap(space.availableByCar, space.availableTrainsets), [], [])}
                   </p>
                 )}
                 {space.description ? (

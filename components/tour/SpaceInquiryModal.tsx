@@ -49,7 +49,7 @@ export default function SpaceInquiryModal({ space, stationName, stationSlug, con
     { label: "Jenis Ruang", value: TYPE_LABELS[space.type] ?? space.type, hint: space.description?.trim() || null, icon: <Store className="size-4" /> },
     { label: "Pasokan Listrik", value: space.powerSupply?.trim() || "-", icon: <Zap className="size-4" /> },
     { label: "Utilitas", value: [space.waterAccess ? "Air" : null, space.airConditioning ? "AC / ventilasi" : null].filter(Boolean).join(" · ") || "-", icon: <Wrench className="size-4" /> },
-    { label: "Ketersediaan", value: SPACE_STATUS_LABELS[space.status], hint: tenant ? `Penyewa: ${tenant}` : null, icon: <CalendarDays className="size-4" /> },
+    { label: "Ketersediaan", value: SPACE_STATUS_LABELS[space.status as keyof typeof SPACE_STATUS_LABELS], hint: tenant ? `Penyewa: ${tenant}` : null, icon: <CalendarDays className="size-4" /> },
   ];
   const waUrl = getWhatsAppUrl(phone, `Halo, saya tertarik dengan unit komersial ${space.code} (${space.name}) di Stasiun ${stationName}. Mohon informasi lebih lanjut.`);
   const afterSteps = <ol className="mt-5 space-y-5">
@@ -238,7 +238,7 @@ export default function SpaceInquiryModal({ space, stationName, stationSlug, con
           <div className={stage === "details" ? "lg:sr-only" : "sr-only"}>
             <Dialog.Title className="pr-2 text-lg leading-snug font-semibold [overflow-wrap:anywhere]">{space.name || space.code}</Dialog.Title>
             <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-slate-600">{space.code} · {space.floor}{space.location ? ` · ${space.location}` : ""}</p>
-            {stage === "details" && <span className={cn("mt-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", statusColor)}><span aria-hidden="true" className="size-1.5 rounded-full bg-current" />{space.status === "TERSEDIA" ? "Tersedia untuk disewa" : SPACE_STATUS_LABELS[space.status]}</span>}
+            {stage === "details" && <span className={cn("mt-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", statusColor)}><span aria-hidden="true" className="size-1.5 rounded-full bg-current" />{space.status === "TERSEDIA" ? "Tersedia untuk disewa" : SPACE_STATUS_LABELS[space.status as keyof typeof SPACE_STATUS_LABELS]}</span>}
           </div>
         </header>
 
@@ -272,7 +272,7 @@ export default function SpaceInquiryModal({ space, stationName, stationSlug, con
                 <div className="py-3 lg:hidden">
                   <h3 className="text-sm font-semibold">Informasi Unit</h3>
                   <dl className="mt-3 grid grid-cols-2 gap-2.5">
-                    {[["Stasiun", stationName], ["Area", location], ["Luas", `${space.area} m²`], ["Status", SPACE_STATUS_LABELS[space.status]]].map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-slate-100 bg-slate-50 p-3"><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-sm font-semibold">{value}</dd></div>)}
+                    {[["Stasiun", stationName], ["Area", location], ["Luas", `${space.area} m²`], ["Status", SPACE_STATUS_LABELS[space.status as keyof typeof SPACE_STATUS_LABELS]]].map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-slate-100 bg-slate-50 p-3"><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-sm font-semibold">{value}</dd></div>)}
                   </dl>
                   {tenant && <p className="mt-3 text-sm text-slate-600">Penyewa: {tenant}</p>}
                   <details className="mt-3 border-b border-slate-200 pb-3"><summary className="cursor-pointer py-2 text-sm font-medium text-slate-700">Spesifikasi dan utilitas</summary><dl className="divide-y divide-slate-200">{specRows}</dl></details>

@@ -21,7 +21,9 @@ import {
   MapPin,
   Plus,
   Settings,
+  ArrowUpRight,
 } from "lucide-react";
+import { formatRupiah } from "@/lib/utils";
 import StationPickerModal, {
   type StationPickerItem,
 } from "@/components/tour/StationPickerModal";

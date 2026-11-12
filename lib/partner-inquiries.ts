@@ -53,7 +53,7 @@ export function toPartnerInquiry(lead: InquiryRow) {
 export async function recordInquiryStatus(tx: Prisma.TransactionClient, input: { id: string; workflowVersionId: string | null; fromStatus: LeadStatus; status: LeadStatus; rejectionReason?: string | null; actor: string }) {
   const effective = input.status === "CLOSED_LOST" ? input.fromStatus : input.status;
   const leadStatus = isCommercialOperation(effective) ? "COMMERCIAL_OPERATION" : effective;
-  const step = await tx.pipelineStep.findFirst({ where: { workflowVersionId: input.workflowVersionId, leadStatus } });
+  const step = await tx.pipelineStep.findFirst({ where: { workflowVersionId: input.workflowVersionId ?? undefined, leadStatus } });
   if (!input.workflowVersionId || !step) throw new Error("INQUIRY_STAGE_MISSING");
   await tx.inquiryStepLog.create({ data: {
     tenantLeadId: input.id, pipelineStepId: step.id, stepOrder: step.stepOrder,
