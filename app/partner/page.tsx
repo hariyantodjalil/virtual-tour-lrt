@@ -666,10 +666,10 @@ function ApplicationProgressList({ leads }: { leads: Lead[] }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="truncate text-sm font-bold text-[#101828] sm:text-base">
-                      {lead.space?.code ?? "-"} — {lead.space?.name ?? "Unit Komersial"}
+                      {lead.space?.code ?? lead.trainInquiry?.mediaCode ?? "-"} — {lead.space?.name ?? lead.trainInquiry?.mediaTitle ?? "Unit Komersial"}
                     </h3>
                     <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-600 sm:text-[13px]">
-                      {lead.space?.station?.name ?? "Stasiun"}
+                      {lead.space?.station?.name ?? lead.trainInquiry?.train.name ?? "Stasiun"}
                       {lead.space?.floor ? ` · ${lead.space.floor}` : ""}
                       {lead.businessType ? ` · ${lead.businessType}` : ""}
                       {lead.space ? ` · ${lead.space.area} m²` : ""}

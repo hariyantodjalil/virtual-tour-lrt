@@ -1,4 +1,5 @@
 import type { LeadStatus, Prisma } from "@prisma/client";
+import { publicTrainInquirySelect } from "@/lib/train-advertising";
 import { prisma } from "@/lib/prisma";
 import { isCommercialOperation } from "@/lib/commercial-pipeline";
 
@@ -8,6 +9,7 @@ export const publicWorkflowSelect = {
 } satisfies Prisma.PipelineWorkflowVersionSelect;
 
 export const partnerInquiryInclude = {
+  trainInquiry: { select: publicTrainInquirySelect },
   space: { include: { station: true } },
   workflowVersion: { select: publicWorkflowSelect },
   stepLogs: { orderBy: { createdAt: "asc" }, include: { pipelineStep: { select: { id: true, stepOrder: true, title: true } } } },
@@ -26,6 +28,7 @@ export function toPartnerInquiry(lead: InquiryRow) {
     companyName: lead.companyName, contactName: lead.contactName, email: lead.email,
     phone: lead.phone, businessType: lead.businessType, spaceRequirement: lead.spaceRequirement,
     message: lead.message, status: lead.status,
+    trainInquiry: lead.trainInquiry ? { ...lead.trainInquiry, campaignStart: lead.trainInquiry.campaignStart?.toISOString() ?? null, campaignEnd: lead.trainInquiry.campaignEnd?.toISOString() ?? null } : null,
     currentStepOrder: currentStep?.stepOrder ?? latestLog?.stepOrder ?? 1,
     rejectionReason: lead.status === "CLOSED_LOST" ? lead.rejectionReason : null,
     createdAt: lead.createdAt, updatedAt: lead.updatedAt,

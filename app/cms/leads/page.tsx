@@ -1,3 +1,4 @@
+import { cmsTrainInquirySelect } from "@/lib/train-advertising";
 import { prisma } from "@/lib/prisma";
 import LeadsClient, { type LeadItem } from "./LeadsClient";
 
@@ -10,13 +11,14 @@ async function getLeads(): Promise<{
   try {
     const leads = await prisma.tenantLead.findMany({
       orderBy: { createdAt: "desc" },
-      include: { space: { include: { station: { select: { name: true } } } } },
+      include: { trainInquiry: { select: cmsTrainInquirySelect }, space: { include: { station: { select: { name: true } } } } },
     });
 
     return {
       leads: leads.map((lead) => ({
         id: lead.id,
         inquiryCode: lead.inquiryCode,
+        trainInquiry: lead.trainInquiry ? { ...lead.trainInquiry, campaignStart: lead.trainInquiry.campaignStart?.toISOString() ?? null, campaignEnd: lead.trainInquiry.campaignEnd?.toISOString() ?? null } : null,
         rejectionReason: lead.rejectionReason,
         userId: lead.userId,
         companyName: lead.companyName,

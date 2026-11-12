@@ -1,5 +1,7 @@
 "use client";
 
+import type { CmsTrainInquiry } from "@/lib/train-advertising-shared";
+import TrainInquiryAllocation from "./TrainInquiryAllocation";
 import { useMemo, useState } from "react";
 import InquiryDocuments from "./InquiryDocuments";
 import {
@@ -38,6 +40,7 @@ import {
 } from "@/components/ui/select";
 
 export type LeadItem = {
+  trainInquiry?: CmsTrainInquiry | null;
   id: string;
   inquiryCode: string;
   rejectionReason: string | null;
@@ -220,7 +223,7 @@ export default function LeadsClient({
   async function updateStatus(lead: LeadItem, status: string) {
     if (status === "COMMERCIAL_OPERATION") {
       const confirmed = confirm(
-        `Ubah "${lead.companyName}" menjadi Operasional Komersial?\n\nSistem akan otomatis membuat atau memperbarui Penyewa Aktif dan mengisi unit ${lead.space?.code ?? ""}.`
+        lead.trainInquiry ? `Aktifkan operasional media ${lead.trainInquiry.mediaTitle} sesuai alokasi trainset?` : `Ubah "${lead.companyName}" menjadi Operasional Komersial?\n\nSistem akan otomatis membuat atau memperbarui Penyewa Aktif dan mengisi unit ${lead.space?.code ?? ""}.`
       );
       if (!confirmed) return;
     }
@@ -412,6 +415,7 @@ export default function LeadsClient({
             onUpdateLocal={(patch) => updateLocal(lead.id, patch)}
             onSaveSiteVisit={() => saveSiteVisit(lead)}
             onDelete={() => deleteLead(lead)}
+            onReload={load}
           />
         ))}
 
@@ -454,6 +458,7 @@ function LeadCard({
   onUpdateLocal,
   onSaveSiteVisit,
   onDelete,
+  onReload,
 }: {
   lead: LeadItem;
   expanded: boolean;
@@ -463,6 +468,7 @@ function LeadCard({
   onUpdateLocal: (patch: Partial<LeadItem>) => void;
   onSaveSiteVisit: () => void;
   onDelete: () => void;
+  onReload: () => Promise<void>;
 }) {
   const detailId = `lead-detail-${lead.id}`;
 
@@ -512,7 +518,7 @@ function LeadCard({
                 <Building2 className="h-3.5 w-3.5" />
                 {lead.space
                   ? `${lead.space.code} · ${lead.space.station.name}`
-                  : "Tanpa unit"}
+                  : lead.trainInquiry?.mediaTitle ?? "Tanpa unit"}
               </span>
             </span>
           </span>
@@ -535,6 +541,7 @@ function LeadCard({
                   {lead.contactName} · {lead.phone} · {lead.email}
                 </p>
 
+                {lead.trainInquiry && <TrainInquiryAllocation leadId={lead.id} inquiry={lead.trainInquiry} onSaved={onReload} />}
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl bg-[#1C0A0E]/60 p-3">
                     <p className="flex items-center gap-1.5 text-xs font-semibold text-[#C4A8AD]">
@@ -544,7 +551,7 @@ function LeadCard({
                     <p className="mt-1 text-sm font-medium text-[#F8ECEE]">
                       {lead.space
                         ? `${lead.space.code} — ${lead.space.name}`
-                        : "Tanpa unit spesifik"}
+                        : lead.trainInquiry?.mediaTitle ?? "Tanpa unit spesifik"}
                     </p>
                     {lead.space && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-[#C4A8AD]">

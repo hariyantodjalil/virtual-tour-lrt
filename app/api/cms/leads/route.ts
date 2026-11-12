@@ -1,3 +1,4 @@
+import { cmsTrainInquirySelect } from "@/lib/train-advertising";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   const leads = await prisma.tenantLead.findMany({
     orderBy: { createdAt: "desc" },
-    include: { space: { include: { station: true } } },
+    include: { trainInquiry: { select: cmsTrainInquirySelect }, space: { include: { station: true } } },
   });
   return NextResponse.json(leads);
 }
@@ -44,6 +45,7 @@ export async function PATCH(request: NextRequest) {
   const existing = await prisma.tenantLead.findUnique({
     where: { id },
     include: {
+      trainInquiry: { select: cmsTrainInquirySelect },
       space: {
         select: {
           id: true,
@@ -106,7 +108,7 @@ export async function PATCH(request: NextRequest) {
     );
   }
   if (targetStatus && isAtOrAfterLeadStage(targetStatus, "BA_SIGNED")) {
-    if (nextVisit !== "COMPLETED") {
+    if (!existing.trainInquiry && nextVisit !== "COMPLETED") {
       return NextResponse.json(
         { error: "Verifikasi lokasi harus selesai sebelum BA Negosiasi." },
         { status: 400 }
@@ -122,11 +124,19 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const lead = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM tenant_leads WHERE id = ${id} FOR UPDATE`;
+      if (existing.trainInquiry && targetStatus === "COMMERCIAL_OPERATION") {
+        const inquiry = await tx.trainInquiry.findUnique({ where: { leadId: id } });
+        if (!inquiry?.allocatedTrainsets.length) throw new Error("TRAIN_ALLOCATION_REQUIRED");
+        const activeCount = await tx.trainset.count({ where: { trainId: inquiry.trainId, code: { in: inquiry.allocatedTrainsets }, isActive: true } });
+        if (activeCount !== inquiry.allocatedTrainsets.length) throw new Error("TRAIN_ALLOCATION_INVALID");
+        if (inquiry.mode === "FULL_BRANDING" && inquiry.requestedTrainsetCount !== null && inquiry.allocatedTrainsets.length !== inquiry.requestedTrainsetCount) throw new Error("TRAIN_ALLOCATION_COUNT");
+      }
       const spaceId = existing.spaceId;
       const space = existing.space;
 
       const holdsSpace = targetStatus ? SPACE_HOLD_STATUSES.includes(targetStatus) : false;
-      if (holdsSpace || targetStatus === "FIT_OUT_HANDOVER") {
+      if (!existing.trainInquiry && (holdsSpace || targetStatus === "FIT_OUT_HANDOVER")) {
         if (!spaceId || !space) {
           throw new Error("SPACE_REQUIRED");
         }
@@ -169,7 +179,7 @@ export async function PATCH(request: NextRequest) {
         }
       }
 
-      if (targetStatus === "COMMERCIAL_OPERATION") {
+      if (targetStatus === "COMMERCIAL_OPERATION" && !existing.trainInquiry) {
         if (!spaceId || !space) {
           throw new Error("SPACE_REQUIRED");
         }
@@ -293,7 +303,7 @@ export async function PATCH(request: NextRequest) {
           ...(rejectionReason !== undefined && { rejectionReason: rejectionReason || null }),
           ...(targetStatus && targetStatus !== "CLOSED_LOST" && { rejectionReason: null }),
         },
-        include: { space: { include: { station: true } } },
+        include: { trainInquiry: { select: cmsTrainInquirySelect }, space: { include: { station: true } } },
       });
       if (targetStatus && targetStatus !== existing.status) await recordInquiryStatus(tx, { id, workflowVersionId: existing.workflowVersionId, fromStatus: existing.status, status: targetStatus, rejectionReason: rejectionReason ?? existing.rejectionReason, actor: auth.user.userId });
       return updated;
@@ -301,6 +311,10 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json(lead);
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("TRAIN_ALLOCATION_")) {
+      const message = error.message === "TRAIN_ALLOCATION_COUNT" ? "Jumlah alokasi trainset harus sesuai permintaan full branding." : "Alokasikan trainset aktif sebelum tahap operasional.";
+      return NextResponse.json({ error: message }, { status: 409 });
+    }
     const message = error instanceof Error ? error.message : "";
     if (message === "SPACE_REQUIRED") {
       return NextResponse.json(

@@ -5,7 +5,7 @@ import { normalizeHotspots } from "@/lib/hotspot-normalize";
 import { extractPrivacyBlursFromCanvasData } from "@/lib/privacy-blur-normalize";
 import { extractInitialViewFromCanvasData } from "@/lib/scene-initial-view";
 import { extractMultiResFromCanvasData } from "@/lib/panorama-multires";
-import { ensureTrainTourStructure, sortTrainScenesByTourOrder } from "@/lib/train-tour-structure";
+import { sortTrainScenesByTourOrder } from "@/lib/train-tour-structure";
 import { buildPublicTrainTourLevels } from "@/lib/public-train-tour-structure";
 
 export type TrainInfo = {
@@ -85,7 +85,6 @@ export const getTrainBySlug = cache(async (slug: string): Promise<TrainInfo | nu
     },
   });
   if (!train) return null;
-  await ensureTrainTourStructure(train.id);
   return mapTrainToInfo(train);
 });
 

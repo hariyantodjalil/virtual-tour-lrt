@@ -9,6 +9,12 @@ export const publicTrainInquirySelect = {
   media: { select: { imageUrl: true, description: true } },
 } satisfies Prisma.TrainInquirySelect;
 
+export const cmsTrainInquirySelect = {
+  ...publicTrainInquirySelect,
+  allocatedTrainsets: true, allocationNotes: true,
+  train: { select: { name: true, slug: true, trainsets: { select: { code: true, isActive: true }, orderBy: { code: "asc" } } } },
+} satisfies Prisma.TrainInquirySelect;
+
 export class TrainInquiryError extends Error {}
 
 export async function resolveTrainInquiry(mediaId: string, input: TrainInquiryInput = {}) {

@@ -5,27 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
 import {
-  DEFAULT_TRAIN_RENTAL_SPACES,
   type TrainRentalSpacePublic,
 } from "@/lib/train-rental-spaces-shared";
 import { DEFAULT_TRAIN_SLUG } from "@/lib/train-constants";
 import { resolvePublicAssetUrl, shouldUnoptimizeImage } from "@/lib/s3-utils";
 
 type SlideItem = TrainRentalSpacePublic & { slideKey: string; loopIndex: number };
-
-const FALLBACK_SPACES: TrainRentalSpacePublic[] = DEFAULT_TRAIN_RENTAL_SPACES.map((space) => ({
-  id: space.displayNumber,
-  displayNumber: space.displayNumber,
-  title: space.title,
-  description: space.description,
-  image: space.image,
-  objectPosition: space.objectPosition,
-  availableTrainsets: [...space.availableTrainsets],
-  availableByCar: { ...space.availableByCar },
-  howToOrder: space.howToOrder,
-  status: space.status,
-  monthlyRent: space.monthlyRent,
-}));
 
 function getVisibleCount(width: number) {
   if (width >= 1280) return 4;
@@ -73,7 +58,7 @@ function RentalCard({
         className="absolute inset-0 text-left"
         aria-label={`Buka virtual tour ${space.title}`}
       >
-        <Image
+        {space.image && <Image
           src={resolvePublicAssetUrl(space.image)}
           alt={space.title}
           fill
@@ -82,7 +67,7 @@ function RentalCard({
           style={{ objectPosition: space.objectPosition }}
           draggable={false}
           unoptimized={shouldUnoptimizeImage(resolvePublicAssetUrl(space.image))}
-        />
+        />}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
 
         <span className="pointer-events-none absolute top-3 left-3 inline-flex size-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
@@ -99,13 +84,13 @@ function RentalCard({
 }
 
 export default function TrainRentalSpacesCarousel({
-  spaces = FALLBACK_SPACES,
+  spaces = [],
   tourHref = `/train/${DEFAULT_TRAIN_SLUG}`,
 }: {
   spaces?: TrainRentalSpacePublic[];
   tourHref?: string;
 }) {
-  const rentalSpaces = spaces.length > 0 ? spaces : FALLBACK_SPACES;
+  const rentalSpaces = spaces;
 
   const loopSlides = useMemo<SlideItem[]>(
     () =>
@@ -286,6 +271,8 @@ export default function TrainRentalSpacesCarousel({
     },
     [pageCount, realCount, scrollToSlideIndex, startIndex, visibleCount]
   );
+
+  if (realCount === 0) return <p className="p-6 text-sm text-slate-600">Belum ada media iklan kereta.</p>;
 
   return (
     <section id="ruang-sewa" className="scroll-mt-28 bg-white py-14 md:py-20">

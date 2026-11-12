@@ -4,6 +4,7 @@ import { PUBLIC_LEAD_PROCESS_STEPS, type CommercialLeadStatus } from "@/lib/comm
 
 type Props = {
   id: string;
+  isTrain?: boolean;
   inquiryCode?: string;
   workflowSteps?: { stepOrder: number; leadStatus: CommercialLeadStatus; title: string; publicMessage: string }[];
   status: CommercialLeadStatus;
@@ -12,7 +13,7 @@ type Props = {
   onClose: () => void;
 };
 
-export default function InquiryConfirmation({ id, inquiryCode, workflowSteps, status, spaceCode, stationName, onClose }: Props) {
+export default function InquiryConfirmation({ id, inquiryCode, workflowSteps, status, spaceCode, stationName, isTrain = false, onClose }: Props) {
   const steps = workflowSteps?.length ? workflowSteps : PUBLIC_LEAD_PROCESS_STEPS.map((step, index) => ({ stepOrder: index + 1, leadStatus: step.status, title: step.title, publicMessage: step.detail }));
   const activeIndex = steps.findIndex(step => step.leadStatus === (status === "CLOSED_WON" ? "COMMERCIAL_OPERATION" : status));
   return <>
@@ -21,7 +22,7 @@ export default function InquiryConfirmation({ id, inquiryCode, workflowSteps, st
         <CheckCircle2 aria-hidden="true" className="size-8 shrink-0 text-emerald-700" />
         <h3 className="text-lg font-semibold">Minat sewa tercatat</h3>
       </div>
-      <p className="mt-2 text-sm leading-relaxed text-slate-600">Pengajuan untuk <strong className="font-semibold text-slate-900">{spaceCode}</strong> di Stasiun {stationName} sudah diterima.</p>
+      <p className="mt-2 text-sm leading-relaxed text-slate-600">Pengajuan untuk <strong className="font-semibold text-slate-900">{spaceCode}</strong> di {isTrain ? "" : "Stasiun "}{stationName} sudah diterima.</p>
       <dl className="mt-3 border-b border-slate-200 pb-3">
         <dt className="text-xs text-slate-600">Referensi pengajuan</dt>
         <dd className="mt-1 text-sm font-medium break-all text-slate-900">{inquiryCode || id}</dd>

@@ -1,17 +1,20 @@
+import { trainInquiryInputSchema } from "@/lib/train-advertising-shared";
+import { resolveTrainInquiry, TrainInquiryError } from "@/lib/train-advertising";
+import { createInquiryOnce } from "@/lib/active-inquiry";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { z } from "zod";
 import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/rate-limit";
-import { ACTIVE_LEAD_STATUSES } from "@/lib/commercial-pipeline";
-import { findTrainRentalSpaceForLead, trainLeadRequirement } from "@/lib/train-rental-spaces";
-import { inquiryCreationData, partnerInquiryInclude, publicWorkflowSelect, toPartnerInquiry } from "@/lib/partner-inquiries";
+import { trainLeadRequirement } from "@/lib/train-rental-spaces";
+import { inquiryCreationData, partnerInquiryInclude, toPartnerInquiry } from "@/lib/partner-inquiries";
 
 const partnerLeadSchema = z
   .object({
     spaceId: z.string().trim().min(1).max(128).optional(),
     trainRentalSpaceId: z.string().trim().min(1).max(128).optional(),
+    trainInquiry: trainInquiryInputSchema.optional(),
     businessType: z.string().trim().min(3).max(120),
     message: z.string().trim().max(2_000).optional(),
     companyName: z.string().trim().min(2).max(160).optional(),
@@ -71,13 +74,19 @@ export async function POST(request: NextRequest) {
 
   let commercialSpaceId: string | undefined;
   let trainRequirement: string | undefined;
+  let trainRequest: Awaited<ReturnType<typeof resolveTrainInquiry>> | undefined;
+  if (parsed.data.trainInquiry && !parsed.data.trainRentalSpaceId) {
+    return NextResponse.json({ error: "Media iklan kereta wajib dipilih." }, { status: 400 });
+  }
 
   if (parsed.data.trainRentalSpaceId) {
-    const trainSpace = await findTrainRentalSpaceForLead(parsed.data.trainRentalSpaceId);
-    if (!trainSpace) {
-      return NextResponse.json({ error: "Space kereta tidak tersedia." }, { status: 409 });
+    try {
+      trainRequest = await resolveTrainInquiry(parsed.data.trainRentalSpaceId, parsed.data.trainInquiry);
+      trainRequirement = trainLeadRequirement(trainRequest.media);
+    } catch (error) {
+      if (error instanceof TrainInquiryError) return NextResponse.json({ error: error.message }, { status: 400 });
+      throw error;
     }
-    trainRequirement = trainLeadRequirement(trainSpace);
   } else if (parsed.data.spaceId) {
     const space = await prisma.commercialSpace.findFirst({
       where: {
@@ -115,33 +124,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const existingOpen = commercialSpaceId
-    ? await prisma.tenantLead.findFirst({
-        where: {
-          userId: user.id,
-          spaceId: commercialSpaceId,
-          status: { in: ACTIVE_LEAD_STATUSES },
-        },
-        select: { id: true },
-      })
-    : await prisma.tenantLead.findFirst({
-        where: {
-          userId: user.id,
-          spaceRequirement: trainRequirement,
-          status: { in: ACTIVE_LEAD_STATUSES },
-        },
-        select: { id: true },
-      });
-  if (existingOpen) {
-    return NextResponse.json(
-      { error: "Anda sudah punya pengajuan aktif untuk unit ini." },
-      { status: 409 }
-    );
-  }
-
-  const lead = await prisma.tenantLead.create({
+  const result = await createInquiryOnce({
+    userId: user.id,
+    target: commercialSpaceId ? { kind: "space", id: commercialSpaceId }
+      : parsed.data.trainRentalSpaceId ? { kind: "train", id: parsed.data.trainRentalSpaceId } : null,
     data: {
       ...await inquiryCreationData(user.id),
+      ...(trainRequest ? { trainInquiry: { create: trainRequest.create } } : {}),
       userId: user.id,
       spaceId: commercialSpaceId,
       companyName,
@@ -154,8 +143,14 @@ export async function POST(request: NextRequest) {
       surveyPreference: parsed.data.surveyPreference || null,
       siteVisitStatus: parsed.data.surveyPreference ? "REQUESTED" : "NONE",
     },
-    include: { workflowVersion: { select: publicWorkflowSelect } },
   });
+  if (!result.created) {
+    return NextResponse.json({
+      error: "Anda sudah punya pengajuan aktif untuk unit ini.",
+      existingInquiryId: result.existingInquiryId,
+    }, { status: 409 });
+  }
+  const lead = result.lead;
 
   if (commercialSpaceId) {
     await prisma.visitEvent.create({

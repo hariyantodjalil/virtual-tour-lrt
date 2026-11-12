@@ -35,6 +35,7 @@ type TrainSpace = {
   availableTrainsets: string[];
   availableByCar: CarTrainsetMap;
   howToOrder: string | null;
+  inquiryMode?: "MEDIA" | "FULL_BRANDING";
   status: TrainRentalStatus;
   monthlyRent: number | null;
   order: number;
@@ -53,6 +54,7 @@ function createDraft(order: number): TrainSpace {
     availableTrainsets: [],
     availableByCar: emptyCarTrainsetMap(),
     howToOrder: "",
+    inquiryMode: "MEDIA",
     status: "TERSEDIA",
     monthlyRent: null,
     order,
@@ -65,6 +67,7 @@ function toPayload(space: TrainSpace) {
   return {
     displayNumber: space.displayNumber.trim(),
     title: space.title.trim(),
+    inquiryMode: space.inquiryMode ?? "MEDIA",
     description: space.description?.trim() || null,
     imageUrl: space.imageUrl?.trim() || null,
     objectPosition: space.objectPosition.trim() || "50% 50%",
@@ -392,6 +395,13 @@ export default function TrainSpacesClient() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
+                  <Label className="text-[#F0DDE1]">Jenis pengajuan</Label>
+                  <select value={editing.inquiryMode ?? "MEDIA"} onChange={event => {
+                    const value = event.target.value;
+                    if (value === "MEDIA" || value === "FULL_BRANDING") setEditing(current => current ? { ...current, inquiryMode: value } : current);
+                  }} className="mt-1.5 mb-4 h-11 w-full rounded-md border border-white/15 bg-[#1C0A0E] px-3 text-sm text-white">
+                    <option value="MEDIA">Media iklan</option><option value="FULL_BRANDING">Full branding</option>
+                  </select>
                   <Label className="text-[#F0DDE1]">Status Penjualan</Label>
                   <select
                     value={editing.status}

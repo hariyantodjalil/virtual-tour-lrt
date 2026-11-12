@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
         trainId: train.id,
         displayNumber: parsed.data.displayNumber,
         title: parsed.data.title,
+        ...(parsed.data.inquiryMode ? { inquiryMode: parsed.data.inquiryMode } : {}),
         description: parsed.data.description ?? null,
         imageUrl: parsed.data.imageUrl ?? null,
         objectPosition: parsed.data.objectPosition ?? "50% 50%",

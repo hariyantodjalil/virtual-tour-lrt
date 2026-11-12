@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { trainCampaignPeriod, type PublicTrainInquiry } from "@/lib/train-advertising-shared";
 import {
   AlertCircle,
   Building2,
@@ -31,6 +33,7 @@ import {
 } from "@/lib/commercial-pipeline";
 
 export type PartnerLead = {
+  trainInquiry?: PublicTrainInquiry | null;
   id: string;
   companyName: string;
   contactName: string;
@@ -115,7 +118,7 @@ function matchesFilter(status: string, filter: FilterTab) {
 }
 
 function coverUrl(panoramaUrl: string | null | undefined) {
-  if (!panoramaUrl) return "/brand/landing/space-card.jpg";
+  if (!panoramaUrl) return "";
   return getS3ProxyUrl(panoramaUrl);
 }
 
@@ -142,6 +145,7 @@ export default function ApplicationsSection({
   contactPhone,
 }: Props) {
   const commercialProfile = useCommercialProfile();
+  const router = useRouter();
   const resolvedContactPhone =
     contactPhone || commercialProfile.whatsappNumber;
   const [filter, setFilter] = useState<FilterTab>("semua");
@@ -302,7 +306,7 @@ export default function ApplicationsSection({
               <ApplicationCard
                 key={lead.id}
                 lead={lead}
-                onDetail={() => setDetailLead(lead)}
+                onDetail={() => lead.trainInquiry ? router.push(`/partner/inquiries/${encodeURIComponent(lead.id)}`) : setDetailLead(lead)}
               />
             ))
           )}
@@ -333,14 +337,14 @@ export default function ApplicationsSection({
                 className="overflow-hidden rounded-xl border border-slate-100 bg-slate-50"
               >
                 <div className="relative aspect-[16/9] w-full bg-slate-200">
-                  <Image
+                  {space.panoramaUrl && <Image
                     src={coverUrl(space.panoramaUrl)}
                     alt={space.name}
                     fill
                     sizes="280px"
                     className="object-cover"
                     unoptimized={coverUrl(space.panoramaUrl).startsWith("/api/")}
-                  />
+                  />}
                 </div>
                 <div className="p-3">
                   <p className="truncate text-sm font-bold text-[#101828]">
@@ -479,20 +483,20 @@ function ApplicationCard({
   const badge = statusBadge(lead.status);
   const stepIdx = currentStepIndex(lead.status);
   const space = lead.space;
-  const cover = coverUrl(space?.panoramaUrl);
+  const cover = coverUrl(lead.trainInquiry?.media?.imageUrl ?? space?.panoramaUrl);
 
   return (
     <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="grid gap-0 lg:grid-cols-[200px_minmax(0,1fr)_200px]">
         <div className="relative min-h-[160px] bg-slate-200 lg:min-h-full">
-          <Image
+          {cover && <Image
             src={cover}
             alt={space?.name ?? "Unit"}
             fill
             sizes="200px"
             className="object-cover"
             unoptimized={cover.startsWith("/api/")}
-          />
+          />}
           <span
             className={`absolute bottom-3 left-3 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${badge.className}`}
           >
@@ -504,7 +508,7 @@ function ApplicationCard({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="text-base font-bold text-[#101828] md:text-lg">
-                {space?.code ?? "-"} — {space?.name ?? "Unit Komersial"}
+                {space?.code ?? lead.trainInquiry?.mediaCode ?? "-"} — {space?.name ?? lead.trainInquiry?.mediaTitle ?? "Unit Komersial"}
               </h3>
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
                 <span className="inline-flex items-center gap-1">
@@ -527,7 +531,11 @@ function ApplicationCard({
             </button>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-slate-50 px-3 py-3">
+          {lead.trainInquiry ? <div className="mt-4 rounded-xl bg-slate-50 px-3 py-3 text-sm">
+            <p className="font-semibold">{lead.trainInquiry.train.name}</p>
+            {lead.trainInquiry.requestedTrainsetCount !== null && <p className="mt-1">Permintaan {lead.trainInquiry.requestedTrainsetCount} trainset</p>}
+            <p className="mt-1 text-slate-600">{trainCampaignPeriod(lead.trainInquiry)}</p>
+          </div> : <div className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-slate-50 px-3 py-3">
             <div>
               <p className="text-[10px] font-medium tracking-wide text-slate-400 uppercase">
                 Luas
@@ -556,7 +564,7 @@ function ApplicationCard({
                 })}
               </p>
             </div>
-          </div>
+          </div>}
 
           <button
             type="button"
@@ -633,7 +641,7 @@ function DetailModal({ lead, onClose }: { lead: PartnerLead; onClose: () => void
               {badge.label}
             </span>
             <h3 className="mt-2 text-xl font-bold text-[#101828]">
-              {space?.code ?? "-"} — {space?.name ?? "Unit"}
+              {space?.code ?? lead.trainInquiry?.mediaCode ?? "-"} — {space?.name ?? "Unit"}
             </h3>
             <p className="mt-1 text-sm text-slate-500">
               {space?.station?.name ?? "-"} · {space?.floor || space?.location || "-"}

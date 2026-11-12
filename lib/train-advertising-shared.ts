@@ -28,3 +28,9 @@ export function trainCampaignPeriod(request: Pick<PublicTrainInquiry, "campaignS
   const format = (value: string) => new Date(value).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" });
   return request.campaignStart && request.campaignEnd ? `${format(request.campaignStart)} – ${format(request.campaignEnd)}` : "Belum ditentukan";
 }
+
+export type CmsTrainInquiry = PublicTrainInquiry & {
+  allocatedTrainsets: string[];
+  allocationNotes: string | null;
+  train: PublicTrainInquiry["train"] & { trainsets: { code: string; isActive: boolean }[] };
+};

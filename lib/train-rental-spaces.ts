@@ -27,22 +27,10 @@ type TrainRentalSalesRow = {
   monthlyRent: number | null;
 };
 
-let availableByCarReady = false;
-
-async function ensureAvailableByCarColumn() {
-  if (availableByCarReady) return;
-  await prisma.$executeRawUnsafe(`
-    ALTER TABLE "train_rental_spaces"
-    ADD COLUMN IF NOT EXISTS "availableByCar" JSONB NOT NULL DEFAULT '{}'::jsonb
-  `);
-  availableByCarReady = true;
-}
-
 export async function fetchTrainRentalSalesMap(ids: string[]) {
   const unique = [...new Set(ids.filter(Boolean))];
   if (unique.length === 0) return new Map<string, TrainRentalSalesRow>();
 
-  await ensureAvailableByCarColumn();
 
   const rows = await prisma.$queryRaw<TrainRentalSalesRow[]>`
     SELECT
@@ -71,7 +59,6 @@ export async function writeTrainRentalSalesFields(
 ) {
   const byCar = parseCarTrainsetMap(data.availableByCar, data.availableTrainsets);
   const trainsets = unionCarTrainsets(byCar);
-  await ensureAvailableByCarColumn();
   const trainsetSql =
     trainsets.length === 0
       ? Prisma.sql`'{}'::text[]`
@@ -131,6 +118,8 @@ export async function findTrainRentalSpaceForLead(idOrNumber: string) {
 }
 
 function toPublicSpace(space: {
+  inquiryMode?: "MEDIA" | "FULL_BRANDING";
+  train?: { name: string; slug: string; advertisingCapacity: number | null };
   id: string;
   displayNumber: string;
   title: string;
@@ -143,20 +132,16 @@ function toPublicSpace(space: {
   status?: TrainRentalStatus | string;
   monthlyRent?: number | null;
 }): TrainRentalSpacePublic {
-  const fallback =
-    DEFAULT_TRAIN_RENTAL_SPACES.find((item) => item.displayNumber === space.displayNumber) ??
-    DEFAULT_TRAIN_RENTAL_SPACES[0];
-  const availableByCar = parseCarTrainsetMap(space.availableByCar, space.availableTrainsets ?? []);
 
   return {
     id: space.id,
     displayNumber: space.displayNumber,
     title: space.title,
     description: space.description,
-    image: resolvePublicAssetUrl(space.imageUrl?.trim() || fallback.image),
-    objectPosition: space.objectPosition || fallback.objectPosition,
-    availableTrainsets: unionCarTrainsets(availableByCar),
-    availableByCar,
+    image: space.imageUrl?.trim() ? resolvePublicAssetUrl(space.imageUrl.trim()) : "",
+    objectPosition: space.objectPosition || "50% 50%",
+    inquiryMode: space.inquiryMode,
+    train: space.train,
     howToOrder: space.howToOrder ?? null,
     status: isTrainRentalStatus(space.status) ? space.status : "TERSEDIA",
     monthlyRent: space.monthlyRent ?? null,
@@ -181,50 +166,17 @@ export async function ensureDefaultTrainRentalSpaces(trainId: string) {
   });
 }
 
-export const getTrainRentalSpaces = cache(async (): Promise<TrainRentalSpacePublic[]> => {
-  try {
-    const train = await ensureDefaultTrain();
-    await ensureDefaultTrainRentalSpaces(train.id);
-
-    const spaces = await prisma.trainRentalSpace.findMany({
-      where: { trainId: train.id, isActive: true },
-      orderBy: { order: "asc" },
-    });
-
-    if (spaces.length === 0) {
-      return DEFAULT_TRAIN_RENTAL_SPACES.map((space) => ({
-        id: space.displayNumber,
-        displayNumber: space.displayNumber,
-        title: space.title,
-        description: space.description,
-        image: space.image,
-        objectPosition: space.objectPosition,
-        availableTrainsets: [...space.availableTrainsets],
-        availableByCar: { ...space.availableByCar },
-        howToOrder: space.howToOrder,
-        status: space.status,
-        monthlyRent: space.monthlyRent,
-      }));
-    }
-
-    const sales = await fetchTrainRentalSalesMap(spaces.map((space) => space.id));
-    return spaces.map((space) => toPublicSpace(withSalesFields(space, sales.get(space.id))));
-  } catch (error) {
-    console.error("[train-rental-spaces] fallback to default carousel", error);
-    return DEFAULT_TRAIN_RENTAL_SPACES.map((space) => ({
-      id: space.displayNumber,
-      displayNumber: space.displayNumber,
-      title: space.title,
-      description: space.description,
-      image: space.image,
-      objectPosition: space.objectPosition,
-      availableTrainsets: [...space.availableTrainsets],
-      availableByCar: { ...space.availableByCar },
-      howToOrder: space.howToOrder,
-      status: space.status,
-      monthlyRent: space.monthlyRent,
-    }));
-  }
+export const getTrainRentalSpaces = cache(async (trainSlug?: string): Promise<TrainRentalSpacePublic[]> => {
+  const train = await prisma.train.findFirst({
+    where: { isActive: true, ...(trainSlug ? { slug: trainSlug } : {}) },
+    orderBy: { order: "asc" },
+    select: { id: true, name: true, slug: true, advertisingCapacity: true },
+  });
+  if (!train) return [];
+  const spaces = await prisma.trainRentalSpace.findMany({
+    where: { trainId: train.id, isActive: true }, orderBy: { order: "asc" },
+  });
+  return spaces.map(space => toPublicSpace({ ...space, train }));
 });
 
 export async function getTrainRentalSpacesForCms(): Promise<TrainRentalSpaceCms[]> {
@@ -241,6 +193,8 @@ export async function getTrainRentalSpacesForCms(): Promise<TrainRentalSpaceCms[
     const publicSpace = toPublicSpace(withSalesFields(space, sales.get(space.id)));
     return {
       ...publicSpace,
+      availableTrainsets: space.availableTrainsets,
+      availableByCar: parseCarTrainsetMap(space.availableByCar, space.availableTrainsets),
       order: space.order,
       isActive: space.isActive,
       imageUrl: space.imageUrl,
