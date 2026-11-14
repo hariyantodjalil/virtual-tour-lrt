@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { cmsFetch } from "@/lib/cms-fetch";
 import { cmsUi } from "@/lib/cms-ui";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LayoutGrid, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { LayoutGrid, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import {
   TRAIN_RENTAL_STATUS_LABELS,
   TRAIN_RENTAL_STATUS_VALUES,
@@ -25,6 +25,7 @@ import {
 } from "@/lib/train-rental-sales";
 import TrainCarTrainsetPicker from "@/components/train/TrainCarTrainsetPicker";
 import ScaledUnitPlan from "@/components/commercial/ScaledUnitPlan";
+import CmsSlideOver from "@/components/cms/CmsSlideOver";
 import { TRAIN_DIMENSION_LIMITS, formatDimensions, validateDimensions } from "@/lib/unit-dimensions";
 
 type HotspotLinkInfo = { sceneId: string; title: string; hotspots: number };
@@ -105,6 +106,7 @@ export default function TrainSpacesClient() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const closeEditor = useCallback(() => setEditing(null), []);
 
   async function load() {
     const response = await cmsFetch("/api/cms/train-rental-spaces");
@@ -281,21 +283,21 @@ export default function TrainSpacesClient() {
       </div>
 
       {message ? (
-        <p className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+        <p className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700">
           {message}
         </p>
       ) : null}
       {error ? (
-        <p className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <p className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600">
           {error}
         </p>
       ) : null}
 
       <div className="grid gap-3">
         {spaces.map((space) => (
-          <Card key={space.id} className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
+          <Card key={space.id} className="border-slate-200 bg-white text-[#101828]">
             <CardContent className="grid gap-4 p-4 sm:grid-cols-[88px_minmax(0,1fr)_auto] sm:items-center">
-              <div className="relative h-24 w-full overflow-hidden rounded-lg bg-[#261015] sm:h-[88px] sm:w-[88px]">
+              <div className="relative h-24 w-full overflow-hidden rounded-lg bg-slate-50 sm:h-[88px] sm:w-[88px]">
                 {space.imageUrl ? (
                   <Image
                     src={resolvePublicAssetUrl(space.imageUrl)}
@@ -307,7 +309,7 @@ export default function TrainSpacesClient() {
                     unoptimized={shouldUnoptimizeImage(resolvePublicAssetUrl(space.imageUrl))}
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-[#A88990]">
+                  <div className="flex h-full items-center justify-center text-slate-500">
                     <LayoutGrid className="size-6" />
                   </div>
                 )}
@@ -315,7 +317,7 @@ export default function TrainSpacesClient() {
 
               <div className="min-w-0">
                 <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-white">
+                  <p className="font-semibold text-[#101828]">
                     {space.displayNumber} · {space.title}
                   </p>
                   <Badge
@@ -327,22 +329,22 @@ export default function TrainSpacesClient() {
                   <Badge variant="outline" className={cmsUi.outlineBadge}>
                     {TRAIN_RENTAL_STATUS_LABELS[space.status]}
                   </Badge>
-                  <span className="text-xs text-[#A88990]">Urutan {space.order + 1}</span>
+                  <span className="text-xs text-slate-500">Urutan {space.order + 1}</span>
                 </div>
-                <p className="mb-1 text-xs text-[#C4A8AD]">
-                  {formatDimensions(space) || <span className="italic text-[#A88990]">Ukuran belum diisi.</span>}
+                <p className="mb-1 text-xs text-slate-600">
+                  {formatDimensions(space) || <span className="italic text-slate-500">Ukuran belum diisi.</span>}
                 </p>
                 {unionCarTrainsets(parseCarTrainsetMap(space.availableByCar, space.availableTrainsets)).length === 0 ? (
-                  <p className="mb-1 text-xs italic text-[#A88990]">Belum diatur trainset (TS) mana yang tersedia.</p>
+                  <p className="mb-1 text-xs italic text-slate-500">Belum diatur trainset (TS) mana yang tersedia.</p>
                 ) : (
-                  <p className="mb-1 text-xs text-[#C4A8AD]">
+                  <p className="mb-1 text-xs text-slate-600">
                     {formatCarTrainsetSummary(parseCarTrainsetMap(space.availableByCar, space.availableTrainsets))}
                   </p>
                 )}
                 {space.description ? (
-                  <p className="line-clamp-2 text-sm text-[#C4A8AD]">{space.description}</p>
+                  <p className="line-clamp-2 text-sm text-slate-600">{space.description}</p>
                 ) : (
-                  <p className="text-sm italic text-[#A88990]">Belum ada deskripsi detail.</p>
+                  <p className="text-sm italic text-slate-500">Belum ada deskripsi detail.</p>
                 )}
               </div>
 
@@ -351,7 +353,7 @@ export default function TrainSpacesClient() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="border-[rgba(255,214,218,0.14)]"
+                  className="border-slate-200"
                   onClick={() => openEdit(space)}
                 >
                   <Pencil className="mr-1.5 size-3.5" />
@@ -361,7 +363,7 @@ export default function TrainSpacesClient() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="border-[rgba(255,214,218,0.14)] text-red-400 hover:text-red-300"
+                  className="border-slate-200 text-red-600 hover:text-red-600"
                   onClick={() => void deleteSpace(space)}
                 >
                   <Trash2 className="size-3.5" />
@@ -373,25 +375,36 @@ export default function TrainSpacesClient() {
       </div>
 
       {editing ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] p-5 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">
-                {editing.id ? "Edit Ruang Sewa" : "Tambah Ruang Sewa"}
-              </h2>
-              <button
+        <CmsSlideOver
+          eyebrow={editing.id ? "Edit Ruang Sewa" : "Tambah Ruang Sewa"}
+          title={editing.title || `Ruang ${editing.displayNumber || "baru"}`}
+          onClose={closeEditor}
+          footer={
+            <>
+              {error ? <p className="mr-auto text-sm text-red-600">{error}</p> : null}
+              <Button
                 type="button"
-                onClick={() => setEditing(null)}
-                className="rounded-lg p-1 text-[#C4A8AD] hover:bg-[#261015] hover:text-white"
+                variant="outline"
+                className="border-slate-200"
+                onClick={closeEditor}
               >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
+                Batal
+              </Button>
+              <Button
+                type="button"
+                disabled={saving}
+                className={cmsUi.primaryBtn}
+                onClick={() => void saveSpace()}
+              >
+                {saving ? "Menyimpan..." : "Simpan"}
+              </Button>
+            </>
+          }
+        >
+            <div className="mx-auto max-w-3xl space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label className="text-[#F0DDE1]">Nomor Tampilan</Label>
+                  <Label className="text-slate-700">Nomor Tampilan</Label>
                   <Input
                     value={editing.displayNumber}
                     onChange={(event) =>
@@ -400,11 +413,11 @@ export default function TrainSpacesClient() {
                       )
                     }
                     placeholder="01"
-                    className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                    className="mt-1.5 border-slate-200 bg-white"
                   />
                 </div>
                 <div>
-                  <Label className="text-[#F0DDE1]">Urutan</Label>
+                  <Label className="text-slate-700">Urutan</Label>
                   <Input
                     type="number"
                     min={0}
@@ -414,13 +427,13 @@ export default function TrainSpacesClient() {
                         current ? { ...current, order: Number(event.target.value) || 0 } : current
                       )
                     }
-                    className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                    className="mt-1.5 border-slate-200 bg-white"
                   />
                 </div>
               </div>
 
               <div>
-                <Label className="text-[#F0DDE1]">Judul</Label>
+                <Label className="text-slate-700">Judul</Label>
                 <Input
                   value={editing.title}
                   onChange={(event) =>
@@ -429,12 +442,12 @@ export default function TrainSpacesClient() {
                     )
                   }
                   placeholder="Handgrip"
-                  className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="mt-1.5 border-slate-200 bg-white"
                 />
               </div>
 
               <div>
-                <Label className="text-[#F0DDE1]">Deskripsi Detail</Label>
+                <Label className="text-slate-700">Deskripsi Detail</Label>
                 <Textarea
                   value={editing.description ?? ""}
                   onChange={(event) =>
@@ -444,13 +457,13 @@ export default function TrainSpacesClient() {
                   }
                   rows={4}
                   placeholder="Jelaskan ruang sewa ini untuk calon mitra iklan..."
-                  className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="mt-1.5 border-slate-200 bg-white"
                 />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label className="text-[#F0DDE1]">Status Penjualan</Label>
+                  <Label className="text-slate-700">Status Penjualan</Label>
                   <select
                     value={editing.status}
                     onChange={(event) =>
@@ -460,7 +473,7 @@ export default function TrainSpacesClient() {
                           : current
                       )
                     }
-                    className="mt-1.5 h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm text-white"
+                    className="mt-1.5 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-[#101828]"
                   >
                     {TRAIN_RENTAL_STATUS_VALUES.map((value) => (
                       <option key={value} value={value}>
@@ -470,7 +483,7 @@ export default function TrainSpacesClient() {
                   </select>
                 </div>
                 <div>
-                  <Label className="text-[#F0DDE1]">Harga sewa / bulan (opsional)</Label>
+                  <Label className="text-slate-700">Harga sewa / bulan (opsional)</Label>
                   <Input
                     type="number"
                     min={0}
@@ -486,13 +499,13 @@ export default function TrainSpacesClient() {
                       )
                     }
                     placeholder="Kosongkan jika nego"
-                    className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                    className="mt-1.5 border-slate-200 bg-white"
                   />
                 </div>
               </div>
 
-              <div className="rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C]/60 p-4">
-                <p className="mb-3 text-sm font-semibold text-white">Ukuran Media</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="mb-3 text-sm font-semibold text-[#101828]">Ukuran Media</p>
                 <div className="grid grid-cols-3 gap-3">
                   {(
                     [
@@ -502,7 +515,7 @@ export default function TrainSpacesClient() {
                     ] as const
                   ).map(([key, label]) => (
                     <div key={key}>
-                      <Label className="text-[#F0DDE1]">{label}</Label>
+                      <Label className="text-slate-700">{label}</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -513,12 +526,12 @@ export default function TrainSpacesClient() {
                             current ? { ...current, [key]: numberOrNull(event.target.value) } : current
                           )
                         }
-                        className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                        className="mt-1.5 border-slate-200 bg-white"
                       />
                     </div>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-[#A88990]">
+                <p className="mt-2 text-xs text-slate-500">
                   Batas: panjang/lebar {TRAIN_DIMENSION_LIMITS.maxLength} m, tinggi {TRAIN_DIMENSION_LIMITS.maxHeight} m.
                 </p>
                 <div className="mt-3">
@@ -527,7 +540,7 @@ export default function TrainSpacesClient() {
               </div>
 
               <div>
-                <Label className="text-[#F0DDE1]">Tersedia di gerbong & train set</Label>
+                <Label className="text-slate-700">Tersedia di gerbong & train set</Label>
                 <div className="mt-1.5">
                   <TrainCarTrainsetPicker
                     value={parseCarTrainsetMap(editing.availableByCar, editing.availableTrainsets)}
@@ -547,7 +560,7 @@ export default function TrainSpacesClient() {
               </div>
 
               <div>
-                <Label className="text-[#F0DDE1]">Cara Pemesanan</Label>
+                <Label className="text-slate-700">Cara Pemesanan</Label>
                 <Textarea
                   value={editing.howToOrder ?? ""}
                   onChange={(event) =>
@@ -557,12 +570,12 @@ export default function TrainSpacesClient() {
                   }
                   rows={3}
                   placeholder="Contoh: Hubungi tim komersial via WhatsApp, sebutkan jenis media dan nomor TS yang diinginkan."
-                  className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="mt-1.5 border-slate-200 bg-white"
                 />
               </div>
 
               <div>
-                <Label className="text-[#F0DDE1]">Posisi Crop Gambar (object-position)</Label>
+                <Label className="text-slate-700">Posisi Crop Gambar (object-position)</Label>
                 <Input
                   value={editing.objectPosition}
                   onChange={(event) =>
@@ -571,9 +584,9 @@ export default function TrainSpacesClient() {
                     )
                   }
                   placeholder="50% 50%"
-                  className="mt-1.5 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="mt-1.5 border-slate-200 bg-white"
                 />
-                <p className="mt-1 text-xs text-[#A88990]">
+                <p className="mt-1 text-xs text-slate-500">
                   Contoh: 50% 12% (horizontal vertical). Atur fokus crop gambar di kartu carousel.
                 </p>
               </div>
@@ -588,18 +601,18 @@ export default function TrainSpacesClient() {
                       current ? { ...current, isActive: event.target.checked } : current
                     )
                   }
-                  className="size-4 rounded border-[rgba(255,214,218,0.18)]"
+                  className="size-4 rounded border-slate-200"
                 />
-                <Label htmlFor="space-active" className="text-[#F0DDE1]">
+                <Label htmlFor="space-active" className="text-slate-700">
                   Tampilkan di carousel publik
                 </Label>
               </div>
 
               {editing.id ? (
                 <div>
-                  <Label className="text-[#F0DDE1]">Gambar Kartu</Label>
+                  <Label className="text-slate-700">Gambar Kartu</Label>
                   <div className="mt-1.5 flex items-center gap-3">
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(255,214,218,0.14)] px-3 py-2 text-sm text-[#F8ECEE] hover:bg-[#261015]">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-[#101828] hover:bg-slate-50">
                       <Upload className="size-4" />
                       Upload Gambar
                       <input
@@ -614,37 +627,18 @@ export default function TrainSpacesClient() {
                       />
                     </label>
                     {editing.imageUrl ? (
-                      <span className="truncate text-xs text-[#C4A8AD]">{editing.imageUrl}</span>
+                      <span className="truncate text-xs text-slate-600">{editing.imageUrl}</span>
                     ) : null}
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-[#A88990]">
+                <p className="text-xs text-slate-500">
                   Simpan dulu untuk mengupload gambar. Sebelum upload, kartu memakai gambar default.
                 </p>
               )}
 
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-[rgba(255,214,218,0.14)]"
-                  onClick={() => setEditing(null)}
-                >
-                  Batal
-                </Button>
-                <Button
-                  type="button"
-                  disabled={saving}
-                  className={cmsUi.primaryBtn}
-                  onClick={() => void saveSpace()}
-                >
-                  {saving ? "Menyimpan..." : "Simpan"}
-                </Button>
-              </div>
             </div>
-          </div>
-        </div>
+        </CmsSlideOver>
       ) : null}
     </div>
   );

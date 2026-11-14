@@ -31,7 +31,7 @@ export default async function CmsSpacesIndexPage() {
         {stations.map((s) => (
           <Card key={s.id} className={cmsUi.card}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base text-[#F8ECEE]">{s.name}</CardTitle>
+              <CardTitle className="text-base text-[#101828]">{s.name}</CardTitle>
             </CardHeader>
             <CardContent className="flex items-center justify-between">
               <span className={`text-sm ${cmsUi.muted}`}>{s._count.commercialSpaces} unit</span>

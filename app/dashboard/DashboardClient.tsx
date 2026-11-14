@@ -51,7 +51,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   PDF_DOWNLOAD: "Unduh PDF",
 };
 
-const CHIP = "border-[rgba(255,214,218,0.22)] bg-[#261015] text-[#F8ECEE]";
+const CHIP = "border-slate-200 bg-slate-50 text-slate-700";
 const LEAD_STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   NEW: { label: LEAD_STATUS_LABELS.NEW, color: CHIP, icon: <Clock className="h-3 w-3" /> },
   CONTACTED: { label: LEAD_STATUS_LABELS.CONTACTED, color: CHIP, icon: <MessageCircle className="h-3 w-3" /> },
@@ -63,21 +63,21 @@ const LEAD_STATUS_CONFIG: Record<string, { label: string; color: string; icon: R
   PKS: { label: LEAD_STATUS_LABELS.PKS, color: CHIP, icon: <CheckCircle className="h-3 w-3" /> },
   BILLING: { label: LEAD_STATUS_LABELS.BILLING, color: CHIP, icon: <Clock className="h-3 w-3" /> },
   FIT_OUT_HANDOVER: { label: LEAD_STATUS_LABELS.FIT_OUT_HANDOVER, color: CHIP, icon: <Clock className="h-3 w-3" /> },
-  COMMERCIAL_OPERATION: { label: LEAD_STATUS_LABELS.COMMERCIAL_OPERATION, color: "border-emerald-400/30 bg-emerald-500/10 text-emerald-100", icon: <CheckCircle className="h-3 w-3" /> },
-  CLOSED_WON: { label: LEAD_STATUS_LABELS.CLOSED_WON, color: "border-emerald-400/30 bg-emerald-500/10 text-emerald-100", icon: <CheckCircle className="h-3 w-3" /> },
-  CLOSED_LOST: { label: LEAD_STATUS_LABELS.CLOSED_LOST, color: "border-red-400/30 bg-red-500/10 text-red-100", icon: <XCircle className="h-3 w-3" /> },
+  COMMERCIAL_OPERATION: { label: LEAD_STATUS_LABELS.COMMERCIAL_OPERATION, color: "border-emerald-200 bg-emerald-50 text-emerald-800", icon: <CheckCircle className="h-3 w-3" /> },
+  CLOSED_WON: { label: LEAD_STATUS_LABELS.CLOSED_WON, color: "border-emerald-200 bg-emerald-50 text-emerald-800", icon: <CheckCircle className="h-3 w-3" /> },
+  CLOSED_LOST: { label: LEAD_STATUS_LABELS.CLOSED_LOST, color: "border-red-200 bg-red-50 text-red-800", icon: <XCircle className="h-3 w-3" /> },
 };
 
-const CHART_COLORS = ["#fb3444", "#34d399", "#38bdf8", "#f59e0b", "#a78bfa"];
-const PANEL_CLASS = "border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]";
-const GRID_COLOR = "rgba(255,214,218,.12)";
-const AXIS_COLOR = "#C4A8AD";
+const CHART_COLORS = ["#c41230", "#1e293b", "#64748b", "#f2a7b4", "#94a3b8"];
+const PANEL_CLASS = "border-slate-200 bg-white text-[#101828] shadow-sm";
+const GRID_COLOR = "#e5e7eb";
+const AXIS_COLOR = "#6b7280";
 const TOOLTIP_STYLE = {
-  backgroundColor: "#261015",
-  border: "1px solid rgba(255,214,218,.18)",
+  backgroundColor: "#ffffff",
+  border: "1px solid #e5e7eb",
   borderRadius: 12,
-  color: "#F8ECEE",
-  boxShadow: "0 18px 50px rgba(0,0,0,.35)",
+  color: "#101828",
+  boxShadow: "0 12px 32px rgba(16,24,40,.12)",
 };
 
 function StatCard({ title, value, subtitle, icon: Icon, color }: {
@@ -88,12 +88,12 @@ function StatCard({ title, value, subtitle, icon: Icon, color }: {
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-sm font-medium text-[#C4A8AD]">{title}</p>
-            <p className="mt-1 text-3xl font-black text-white">{value}</p>
-            {subtitle && <p className="mt-1 text-xs text-[#C4A8AD]">{subtitle}</p>}
+            <p className="text-sm font-medium text-slate-500">{title}</p>
+            <p className="mt-1 text-3xl font-black text-[#101828]">{value}</p>
+            {subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}
           </div>
-          <div className={`rounded-xl p-3 shadow-lg ${color}`}>
-            <Icon className="h-5 w-5 text-white" />
+          <div className={`rounded-xl p-3 ${color}`}>
+            <Icon className="h-5 w-5" />
           </div>
         </div>
       </CardContent>
@@ -127,12 +127,12 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
       {errors.length > 0 && (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-amber-50"
+          className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900"
         >
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
           <div>
             <p className="font-semibold">Sebagian data dashboard gagal dimuat</p>
-            <p className="mt-0.5 text-sm text-amber-100/80">
+            <p className="mt-0.5 text-sm text-amber-800">
               Nilai yang tidak tersedia ditandai dengan garis. Muat ulang halaman untuk mencoba lagi.
             </p>
           </div>
@@ -140,21 +140,21 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
       )}
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Kunjungan" value={stats.totalVisits === null ? unavailable : formatNumber(stats.totalVisits)} icon={Eye} color="bg-sky-500/80" subtitle="Semua sesi virtual tour" />
-        <StatCard title="Total Lead" value={stats.totalLeads === null ? unavailable : formatNumber(stats.totalLeads)} icon={Users} color="bg-[#E31E2D]" subtitle="Calon tenant terdaftar" />
-        <StatCard title="Unit Tersedia" value={stats.availableSpaces ?? unavailable} icon={Building2} color="bg-emerald-500/85" subtitle={`dari ${stats.totalSpaces ?? unavailable} total unit`} />
-        <StatCard title="Tingkat Hunian" value={stats.occupancyRate === null ? unavailable : `${stats.occupancyRate}%`} icon={TrendingUp} color="bg-amber-500/85" subtitle={stats.occupiedSpaces === null ? "Data unit tidak tersedia" : `${stats.occupiedSpaces} unit terisi`} />
+        <StatCard title="Total Kunjungan" value={stats.totalVisits === null ? unavailable : formatNumber(stats.totalVisits)} icon={Eye} color="bg-[#c41230]/10 text-[#c41230]" subtitle="Semua sesi virtual tour" />
+        <StatCard title="Total Lead" value={stats.totalLeads === null ? unavailable : formatNumber(stats.totalLeads)} icon={Users} color="bg-[#c41230]/10 text-[#c41230]" subtitle="Calon tenant terdaftar" />
+        <StatCard title="Unit Tersedia" value={stats.availableSpaces ?? unavailable} icon={Building2} color="bg-[#c41230]/10 text-[#c41230]" subtitle={`dari ${stats.totalSpaces ?? unavailable} total unit`} />
+        <StatCard title="Tingkat Hunian" value={stats.occupancyRate === null ? unavailable : `${stats.occupancyRate}%`} icon={TrendingUp} color="bg-[#c41230]/10 text-[#c41230]" subtitle={stats.occupiedSpaces === null ? "Data unit tidak tersedia" : `${stats.occupiedSpaces} unit terisi`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Daily Visits Chart */}
         <Card className={`lg:col-span-2 ${PANEL_CLASS}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-white">Kunjungan 7 Hari Terakhir</CardTitle>
+            <CardTitle className="text-base text-[#101828]">Kunjungan 7 Hari Terakhir</CardTitle>
           </CardHeader>
           <CardContent>
             {hasError("dailyVisits") ? (
-              <div className="h-52 flex items-center justify-center text-amber-200 text-sm">
+              <div className="h-52 flex items-center justify-center text-amber-700 text-sm">
                 Data kunjungan gagal dimuat
               </div>
             ) : dailyVisits.length > 0 ? (
@@ -164,11 +164,11 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={(d) => d.slice(5)} />
                   <YAxis tick={{ fontSize: 11, fill: AXIS_COLOR }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [formatNumber(Number(v)), "Kunjungan"]} />
-                  <Line type="monotone" dataKey="count" stroke="#34d399" strokeWidth={2.5} dot={{ fill: "#34d399", r: 4 }} />
+                  <Line type="monotone" dataKey="count" stroke="#c41230" strokeWidth={2.5} dot={{ fill: "#ffffff", stroke: "#c41230", strokeWidth: 2, r: 4 }} activeDot={{ fill: "#c41230", r: 5 }} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-52 flex items-center justify-center text-[#C4A8AD] text-sm">
+              <div className="h-52 flex items-center justify-center text-slate-500 text-sm">
                 Data kunjungan belum tersedia
               </div>
             )}
@@ -178,11 +178,11 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         {/* Occupancy Pie */}
         <Card className={PANEL_CLASS}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-white">Status Hunian</CardTitle>
+            <CardTitle className="text-base text-[#101828]">Status Hunian</CardTitle>
           </CardHeader>
           <CardContent>
             {stats.occupiedSpaces === null || stats.availableSpaces === null ? (
-              <div className="h-52 flex items-center justify-center text-amber-200 text-sm">
+              <div className="h-52 flex items-center justify-center text-amber-700 text-sm">
                 Data hunian gagal dimuat
               </div>
             ) : (
@@ -201,15 +201,15 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                       dataKey="value"
                     >
                       {[0, 1].map((_, i) => (
-                        <Cell key={i} fill={i === 0 ? "#E31E2D" : "#10B981"} />
+                        <Cell key={i} fill={i === 0 ? "#c41230" : "#e2e8f0"} />
                       ))}
                     </Pie>
                     <Tooltip contentStyle={TOOLTIP_STYLE} />
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="flex justify-center gap-4 text-xs text-[#F8ECEE]">
-                  <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-[#E31E2D]" /> Terisi ({stats.occupiedSpaces})</div>
-                  <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Tersedia ({stats.availableSpaces})</div>
+                <div className="flex justify-center gap-4 text-xs text-slate-700">
+                  <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-[#c41230]" /> Terisi ({stats.occupiedSpaces})</div>
+                  <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-slate-200" /> Tersedia ({stats.availableSpaces})</div>
                 </div>
               </>
             )}
@@ -221,11 +221,11 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         {/* Top Stations */}
         <Card className={PANEL_CLASS}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-white">Stasiun Paling Banyak Dikunjungi</CardTitle>
+            <CardTitle className="text-base text-[#101828]">Stasiun Paling Banyak Dikunjungi</CardTitle>
           </CardHeader>
           <CardContent>
             {hasError("topStations") ? (
-              <div className="h-52 flex items-center justify-center text-amber-200 text-sm">
+              <div className="h-52 flex items-center justify-center text-amber-700 text-sm">
                 Data stasiun gagal dimuat
               </div>
             ) : topStations.length > 0 ? (
@@ -235,11 +235,11 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                   <XAxis type="number" tick={{ fontSize: 11, fill: AXIS_COLOR }} axisLine={false} tickLine={false} />
                   <YAxis dataKey="stationName" type="category" tick={{ fontSize: 10, fill: AXIS_COLOR }} width={120} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [formatNumber(Number(v)), "Kunjungan"]} />
-                  <Bar dataKey="visits" fill="#34d399" radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="visits" fill="#c41230" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-52 flex items-center justify-center text-[#C4A8AD] text-sm">
+              <div className="h-52 flex items-center justify-center text-slate-500 text-sm">
                 Belum ada data kunjungan per stasiun
               </div>
             )}
@@ -249,11 +249,11 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         {/* Event breakdown */}
         <Card className={PANEL_CLASS}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-white">Aktivitas Pengguna</CardTitle>
+            <CardTitle className="text-base text-[#101828]">Aktivitas Pengguna</CardTitle>
           </CardHeader>
           <CardContent>
             {hasError("eventsByType") ? (
-              <div className="h-52 flex items-center justify-center text-amber-200 text-sm">
+              <div className="h-52 flex items-center justify-center text-amber-700 text-sm">
                 Data aktivitas gagal dimuat
               </div>
             ) : eventsByType.length > 0 ? (
@@ -271,7 +271,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-52 flex items-center justify-center text-[#C4A8AD] text-sm">
+              <div className="h-52 flex items-center justify-center text-slate-500 text-sm">
                 Belum ada data aktivitas
               </div>
             )}
@@ -283,12 +283,12 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
       <Card className={PANEL_CLASS}>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base text-white">Pipeline Lead Tenant</CardTitle>
+            <CardTitle className="text-base text-[#101828]">Pipeline Lead Tenant</CardTitle>
             <Button
               variant="outline"
               size="sm"
               onClick={() => exportCSV(recentLeads)}
-              className="flex items-center gap-1.5 border-white/15 bg-white/5 text-[#F8ECEE] hover:bg-white/10"
+              className="flex items-center gap-1.5 border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
             >
               <Download className="h-4 w-4" />
               Export CSV
@@ -297,11 +297,11 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
           {/* Status summary */}
           <div className="flex flex-wrap gap-2 mt-3">
             {hasError("leadsByStatus") ? (
-              <span className="text-sm text-amber-200">Ringkasan status gagal dimuat</span>
+              <span className="text-sm text-amber-700">Ringkasan status gagal dimuat</span>
             ) : leadsByStatus.map((l) => {
               const cfg = LEAD_STATUS_CONFIG[l.status];
               return (
-                <span key={l.status} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${cfg?.color ?? "border-white/10 bg-white/5 text-[#F8ECEE]"}`}>
+                <span key={l.status} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${cfg?.color ?? "border-slate-200 bg-slate-50 text-slate-700"}`}>
                   {cfg?.icon}
                   {cfg?.label ?? LEAD_STATUS_LABELS[l.status as CommercialLeadStatus] ?? l.status}: {l.count}
                 </span>
@@ -313,22 +313,22 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10">
+                <tr className="border-b border-slate-200">
                   {["Perusahaan", "Kontak", "Jenis Usaha", "Unit", "Stasiun", "Status", "Tanggal"].map((h) => (
-                    <th key={h} className="text-left py-2.5 px-3 text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/8">
+              <tbody className="divide-y divide-slate-100">
                 {hasError("recentLeads") ? (
                   <tr>
-                    <td colSpan={7} className="py-10 text-center text-amber-200 text-sm">
+                    <td colSpan={7} className="py-10 text-center text-amber-700 text-sm">
                       Data lead terbaru gagal dimuat
                     </td>
                   </tr>
                 ) : recentLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-10 text-center text-[#C4A8AD] text-sm">
+                    <td colSpan={7} className="py-10 text-center text-slate-500 text-sm">
                       Belum ada lead masuk
                     </td>
                   </tr>
@@ -336,22 +336,22 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                   recentLeads.map((lead) => {
                     const cfg = LEAD_STATUS_CONFIG[lead.status];
                     return (
-                      <tr key={lead.id} className="transition-colors hover:bg-white/[0.04]">
-                        <td className="py-3 px-3 font-semibold text-white">{lead.companyName}</td>
-                        <td className="py-3 px-3 text-[#F8ECEE]">
+                      <tr key={lead.id} className="transition-colors hover:bg-slate-50">
+                        <td className="py-3 px-3 font-semibold text-[#101828]">{lead.companyName}</td>
+                        <td className="py-3 px-3 text-slate-700">
                           <div>{lead.contactName}</div>
-                          <div className="text-xs text-[#C4A8AD]">{lead.phone}</div>
+                          <div className="text-xs text-slate-500">{lead.phone}</div>
                         </td>
-                        <td className="py-3 px-3 text-[#F8ECEE]">{lead.businessType}</td>
-                        <td className="py-3 px-3 text-[#F8ECEE] font-mono text-xs">{lead.spaceName}</td>
-                        <td className="py-3 px-3 text-[#F8ECEE]">{lead.stationName}</td>
+                        <td className="py-3 px-3 text-slate-700">{lead.businessType}</td>
+                        <td className="py-3 px-3 text-slate-700 font-mono text-xs">{lead.spaceName}</td>
+                        <td className="py-3 px-3 text-slate-700">{lead.stationName}</td>
                         <td className="py-3 px-3">
-                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${cfg?.color ?? "border-white/10 bg-white/5 text-[#F8ECEE]"}`}>
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${cfg?.color ?? "border-slate-200 bg-slate-50 text-slate-700"}`}>
                             {cfg?.icon}
                             {cfg?.label ?? LEAD_STATUS_LABELS[lead.status as CommercialLeadStatus] ?? lead.status}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-[#C4A8AD] text-xs whitespace-nowrap">
+                        <td className="py-3 px-3 text-slate-500 text-xs whitespace-nowrap">
                           {new Date(lead.createdAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
                         </td>
                       </tr>

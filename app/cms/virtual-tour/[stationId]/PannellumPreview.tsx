@@ -307,7 +307,7 @@ export function PannellumPreview({
 
   if (!panoramaUrl) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-[#1C0A0E] text-[#C4A8AD]">
+      <div className="w-full h-full flex flex-col items-center justify-center bg-white text-slate-600">
         <div className="text-5xl mb-3">360</div>
         <p className="text-sm">Upload panorama terlebih dahulu untuk melihat preview</p>
       </div>
@@ -404,7 +404,7 @@ export function PannellumPreview({
         >
           <Grid3X3 className="h-5 w-5" />
           {availableCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#E31E2D] text-[9px] font-black text-white">
+            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#c41230] text-[9px] font-black text-white">
               {availableCount}
             </span>
           )}
@@ -414,11 +414,11 @@ export function PannellumPreview({
       {infoOpen && !selectedSpace && (
         <PreviewPanel title={stationName || "Info Stasiun"} onClose={() => setInfoOpen(false)}>
           <div className="grid grid-cols-3 gap-2 text-center">
-            <Metric value={availableCount} label="Tersedia" tone="text-emerald-300" />
-            <Metric value={occupiedCount} label="Terisi" tone="text-red-300" />
-            <Metric value={spaces.length} label="Total" tone="text-white" />
+            <Metric value={availableCount} label="Tersedia" tone="text-emerald-700" />
+            <Metric value={occupiedCount} label="Terisi" tone="text-red-600" />
+            <Metric value={spaces.length} label="Total" tone="text-[#101828]" />
           </div>
-          <div className="rounded-xl bg-white/8 p-3 text-xs text-white/65">
+          <div className="rounded-xl bg-slate-50 p-3 text-xs text-white/65">
             Preview ini memakai navigasi publik untuk validasi alur scene, tab level, area, hotspot, dan blur privasi.
           </div>
         </PreviewPanel>
@@ -435,7 +435,7 @@ export function PannellumPreview({
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-xs transition-colors ${
                   scene.sceneId === currentScene?.sceneId
                     ? "bg-white text-[#1B3A6B]"
-                    : "bg-white/8 text-white/75 hover:bg-white/14 hover:text-white"
+                    : "bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-[#101828]"
                 }`}
               >
                 <span className="font-mono text-[10px] opacity-60">{index + 1}</span>
@@ -454,13 +454,13 @@ export function PannellumPreview({
                 key={space.id}
                 type="button"
                 onClick={() => setSelectedSpace(space)}
-                className="flex w-full items-center justify-between gap-3 rounded-xl bg-white/8 px-3 py-2 text-left text-xs text-white/75 transition-colors hover:bg-white/14 hover:text-white"
+                className="flex w-full items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-left text-xs text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#101828]"
               >
                 <span className="min-w-0">
-                  <span className="block truncate font-bold text-white">{space.code}</span>
+                  <span className="block truncate font-bold text-[#101828]">{space.code}</span>
                   <span className="block truncate text-white/50">{space.name}</span>
                 </span>
-                <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px]">
+                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px]">
                   {formatNumber(Math.round(space.exposure))}
                 </span>
               </button>
@@ -469,11 +469,11 @@ export function PannellumPreview({
         </PreviewPanel>
       )}
 
-      <div className="absolute top-3 left-3 bg-[#261015]/90 backdrop-blur text-[#F8ECEE] text-xs px-3 py-1.5 rounded-full border border-[rgba(255,214,218,0.18)] pointer-events-none flex items-center gap-1.5 z-20">
+      <div className="absolute top-3 left-3 bg-slate-50/90 backdrop-blur text-[#101828] text-xs px-3 py-1.5 rounded-full border border-slate-200 pointer-events-none flex items-center gap-1.5 z-20">
         <span className="w-2 h-2 rounded-full bg-purple-400 inline-block" />
         Preview - {sceneName}
       </div>
-      <div className="absolute top-3 right-3 bg-[#261015]/90 backdrop-blur text-[#C4A8AD] text-xs px-3 py-1.5 rounded-full border border-[rgba(255,214,218,0.18)] pointer-events-none z-20">
+      <div className="absolute top-3 right-3 bg-slate-50/90 backdrop-blur text-slate-600 text-xs px-3 py-1.5 rounded-full border border-slate-200 pointer-events-none z-20">
         {hotspots.length} hotspot
         {privacyBlurs.length > 0 ? ` · ${privacyBlurs.length} blur (bake)` : ""} · klik untuk interaksi
       </div>
@@ -517,10 +517,10 @@ function PreviewPanel({
   children: ReactNode;
 }) {
   return (
-    <div className="pointer-events-auto absolute left-16 top-1/2 z-30 w-72 -translate-y-1/2 rounded-2xl border border-white/15 bg-[#261015]/90 text-white shadow-2xl backdrop-blur-xl">
+    <div className="pointer-events-auto absolute left-16 top-1/2 z-30 w-72 -translate-y-1/2 rounded-2xl border border-slate-200 bg-slate-50/90 text-[#101828] shadow-2xl backdrop-blur-xl">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <h2 className="min-w-0 truncate text-sm font-black">{title}</h2>
-        <button type="button" onClick={onClose} className="rounded-full p-1 transition-colors hover:bg-white/10">
+        <button type="button" onClick={onClose} className="rounded-full p-1 transition-colors hover:bg-slate-100">
           <X className="h-4 w-4 text-white/60" />
         </button>
       </div>
@@ -531,7 +531,7 @@ function PreviewPanel({
 
 function Metric({ value, label, tone }: { value: number; label: string; tone: string }) {
   return (
-    <div className="rounded-xl bg-white/8 py-2.5">
+    <div className="rounded-xl bg-slate-50 py-2.5">
       <p className={`text-base font-black ${tone}`}>{value}</p>
       <p className="text-[10px] text-white/55">{label}</p>
     </div>

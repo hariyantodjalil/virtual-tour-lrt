@@ -28,22 +28,22 @@ export default async function CmsVirtualTrainPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE] p-6">
-      <h1 className="text-lg font-bold text-[#F8ECEE]">Train Virtual Tour belum siap</h1>
-      <p className="mt-2 text-sm text-[#C4A8AD]">
+    <div className="mx-auto max-w-lg rounded-xl border border-slate-200 bg-white text-[#101828] p-6">
+      <h1 className="text-lg font-bold text-[#101828]">Train Virtual Tour belum siap</h1>
+      <p className="mt-2 text-sm text-slate-600">
         {error?.needsMigration
           ? "Tabel database kereta belum dibuat. Jalankan migrasi Prisma sekali di terminal project:"
           : error?.message}
       </p>
       {error?.needsMigration && (
-        <pre className="mt-4 overflow-x-auto rounded-lg bg-[#1C0A0E] p-3 text-xs text-emerald-300">
+        <pre className="mt-4 overflow-x-auto rounded-lg bg-white p-3 text-xs text-emerald-700">
           npx prisma migrate deploy
         </pre>
       )}
-      <p className="mt-3 text-xs text-[#A88990]">
+      <p className="mt-3 text-xs text-slate-500">
         Setelah migrasi selesai, refresh halaman ini.
       </p>
-      <Button asChild variant="outline" className="mt-4 border-[rgba(255,214,218,0.14)]">
+      <Button asChild variant="outline" className="mt-4 border-slate-200">
         <Link href="/cms/dashboard">Kembali ke Dashboard</Link>
       </Button>
     </div>

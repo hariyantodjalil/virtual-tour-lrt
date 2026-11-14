@@ -1069,3 +1069,25 @@ body {
     animation: none;
   }
 }
+
+/* Dialog form CMS (CmsSlideOver) — muncul di tengah layar */
+@keyframes cms-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.cms-dialog-in {
+  animation: cms-dialog-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cms-dialog-in {
+    animation: none;
+  }
+}

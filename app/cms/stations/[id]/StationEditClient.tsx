@@ -97,13 +97,13 @@ export default function StationEditClient({ initialStation }: { initialStation: 
 
   return (
     <div>
-      <Button asChild variant="ghost" className="mb-4 text-[#F0DDE1]">
+      <Button asChild variant="ghost" className="mb-4 text-slate-700">
         <Link href="/cms/stations">
           <ArrowLeft className="mr-1 h-4 w-4" /> Kembali
         </Link>
       </Button>
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
+        <Card className="border-slate-200 bg-white text-[#101828]">
           <CardHeader>
             <CardTitle>Informasi</CardTitle>
           </CardHeader>
@@ -115,7 +115,7 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                   value={station.code ?? ""}
                   onChange={(e) => setStation({ ...station, code: e.target.value })}
                   placeholder="Contoh: DKA"
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="border-slate-200 bg-white"
                 />
               </div>
               <div>
@@ -123,7 +123,7 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                 <Input
                   value={station.name}
                   onChange={(e) => setStation({ ...station, name: e.target.value })}
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="border-slate-200 bg-white"
                 />
               </div>
               <div>
@@ -131,7 +131,7 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                 <Input
                   value={station.line}
                   onChange={(e) => setStation({ ...station, line: e.target.value })}
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="border-slate-200 bg-white"
                 />
               </div>
               <div>
@@ -139,7 +139,7 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                 <Input
                   value={station.slug}
                   onChange={(e) => setStation({ ...station, slug: e.target.value })}
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="border-slate-200 bg-white"
                 />
               </div>
               <div>
@@ -148,7 +148,7 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                   value={station.location ?? ""}
                   onChange={(e) => setStation({ ...station, location: e.target.value })}
                   placeholder="Contoh: Jakarta Selatan"
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="border-slate-200 bg-white"
                 />
               </div>
               <div>
@@ -156,7 +156,7 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                 <Input
                   value={station.address}
                   onChange={(e) => setStation({ ...station, address: e.target.value })}
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="border-slate-200 bg-white"
                 />
               </div>
               <div>
@@ -166,7 +166,7 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                   min={0}
                   value={station.order}
                   onChange={(e) => setStation({ ...station, order: Number(e.target.value) })}
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="border-slate-200 bg-white"
                 />
               </div>
               <div>
@@ -176,7 +176,7 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                   onChange={(e) =>
                     setStation({ ...station, isActive: e.target.value === "active" })
                   }
-                  className="mt-2 h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm"
+                  className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
                 >
                   <option value="active">Aktif — tampil di halaman publik</option>
                   <option value="inactive">Nonaktif — sembunyikan beserta tenant dan tur</option>
@@ -190,7 +190,7 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                   onChange={(e) =>
                     setStation({ ...station, dailyPassengers: Number(e.target.value) })
                   }
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="border-slate-200 bg-white"
                 />
               </div>
               <div>
@@ -201,9 +201,9 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                     setStation({ ...station, commercialContactPhone: e.target.value })
                   }
                   placeholder="Kosong = mengikuti profil tim komersial"
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="border-slate-200 bg-white"
                 />
-                <p className="mt-1 text-xs text-[#A88990]">
+                <p className="mt-1 text-xs text-slate-500">
                   Isi hanya jika stasiun ini memiliki nomor kontak khusus.
                 </p>
               </div>
@@ -212,21 +212,21 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                 <Textarea
                   value={station.description ?? ""}
                   onChange={(e) => setStation({ ...station, description: e.target.value })}
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="border-slate-200 bg-white"
                   rows={4}
                 />
               </div>
               <Button
                 type="submit"
                 disabled={saving}
-                className="bg-[#E31E2D] hover:bg-[#c41926]"
+                className="bg-[#c41230] hover:bg-[#a30f28]"
               >
                 {saving ? "Menyimpan..." : "Simpan"}
               </Button>
               {message && (
                 <p
                   role={isError ? "alert" : "status"}
-                  className={`text-sm ${isError ? "text-red-400" : "text-emerald-400"}`}
+                  className={`text-sm ${isError ? "text-red-600" : "text-emerald-700"}`}
                 >
                   {message}
                 </p>
@@ -234,7 +234,7 @@ export default function StationEditClient({ initialStation }: { initialStation: 
             </form>
           </CardContent>
         </Card>
-        <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
+        <Card className="border-slate-200 bg-white text-[#101828]">
           <CardHeader>
             <CardTitle>Foto Stasiun</CardTitle>
           </CardHeader>
@@ -251,7 +251,7 @@ export default function StationEditClient({ initialStation }: { initialStation: 
                 />
               </div>
             )}
-            <Label className="flex items-center gap-2 cursor-pointer border border-dashed border-[rgba(255,214,218,0.18)] rounded-lg p-4 hover:border-emerald-500">
+            <Label className="flex items-center gap-2 cursor-pointer border border-dashed border-slate-200 rounded-lg p-4 hover:border-emerald-500">
               <Upload className="h-4 w-4" />
               Upload foto stasiun
               <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />

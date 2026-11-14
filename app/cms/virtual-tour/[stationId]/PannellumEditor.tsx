@@ -181,6 +181,8 @@ interface Props {
 
 export type PannellumEditorHandle = {
   getView: () => { yaw: number; pitch: number; hfov: number } | null;
+  /** Gerakkan kamera editor ke POV tertentu (dipakai panel POV kamera). */
+  setView: (view: { yaw: number; pitch: number; hfov: number }) => void;
   getViewerBakeContext: () => ViewerBakeContext | null;
 };
 
@@ -281,6 +283,15 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         };
       } catch {
         return null;
+      }
+    },
+    setView: (view) => {
+      const viewer = viewerRef.current;
+      if (!viewer || !viewerReadyRef.current) return;
+      try {
+        viewer.lookAt(view.pitch, view.yaw, view.hfov, false);
+      } catch {
+        /* viewer belum siap */
       }
     },
   }));
@@ -833,7 +844,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
 
       {dragging && (
         <div className="absolute inset-0 z-50 pointer-events-none">
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#261015]/90 backdrop-blur border border-amber-500/60 text-amber-300 text-xs px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-50/90 backdrop-blur border border-amber-500/60 text-amber-700 text-xs px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
             <span className="text-base">✥</span>
             Lepas untuk menetapkan posisi baru
           </div>
@@ -844,10 +855,10 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         <div
           className={`absolute left-1/2 top-3 z-20 -translate-x-1/2 pointer-events-none rounded-full border px-3 py-1.5 text-xs shadow-md backdrop-blur ${
             addMode === "blur"
-              ? "border-[rgba(255,214,218,0.28)] bg-[#261015]/90 text-[#E8C4D0]"
+              ? "border-slate-300 bg-slate-50/90 text-[#E8C4D0]"
               : addMode === "spatial"
-                ? "border-emerald-500/50 bg-[#261015]/90 text-emerald-200"
-                : "border-emerald-500/40 bg-[#261015]/90 text-emerald-200"
+                ? "border-emerald-500/50 bg-slate-50/90 text-emerald-800"
+                : "border-emerald-500/40 bg-slate-50/90 text-emerald-800"
           }`}
         >
           {addMode === "spatial"
@@ -863,13 +874,13 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
       )}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-2 px-3 pb-3">
-        <div className="rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/85 px-2.5 py-1.5 font-mono text-[10px] tabular-nums text-[#C4A8AD] backdrop-blur">
+        <div className="rounded-md border border-slate-200 bg-white/85 px-2.5 py-1.5 font-mono text-[10px] tabular-nums text-slate-600 backdrop-blur">
           {liveView
             ? `Yaw ${liveView.yaw.toFixed(1)}° · Pitch ${liveView.pitch.toFixed(1)}° · HFOV ${liveView.hfov.toFixed(0)}°`
             : "Yaw — · Pitch — · HFOV —"}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <span className="rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/85 px-2 py-1 text-[10px] text-[#C4A8AD] backdrop-blur">
+          <span className="rounded-md border border-slate-200 bg-white/85 px-2 py-1 text-[10px] text-slate-600 backdrop-blur">
             {hotspots.length} hotspot
             {spatialEntities.length > 0 ? ` · ${spatialEntities.length} spatial` : ""}
             {privacyBlurs.length > 0 ? ` · ${privacyBlurs.length} blur` : ""}
@@ -878,7 +889,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
       </div>
 
       {!panoramaUrl && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1C0A0E] text-[#C4A8AD] z-30">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white text-slate-600 z-30">
           <div className="text-5xl mb-3">🌐</div>
           <p className="text-sm">Upload panorama equirectangular untuk mulai edit</p>
         </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import {
+  House,
   LayoutDashboard,
   LogOut,
   Map,
@@ -187,24 +188,24 @@ export default function CmsShell({
   }, [fullWidth]);
 
   return (
-    <div className="cms-shell flex h-screen overflow-hidden bg-[#1C0A0E] text-[#F8ECEE]">
+    <div className="cms-shell flex h-screen overflow-hidden bg-[#f3f4f6] text-[#101828]">
       <aside
-        className={`relative z-20 flex h-full min-h-0 flex-none flex-col border-r border-[rgba(255,214,218,0.14)] bg-[#261015] transition-all duration-200 ${
+        className={`relative z-20 flex h-full min-h-0 flex-none flex-col border-r border-slate-200 bg-white transition-all duration-200 ${
           collapsed ? "w-14" : "w-56"
         }`}
       >
         <div
-          className={`border-b border-[rgba(255,214,218,0.14)] flex items-center ${
-            collapsed ? "justify-center p-3" : "gap-2.5 p-4"
+          className={`flex h-16 flex-none items-center border-b border-slate-200 ${
+            collapsed ? "justify-center px-2" : "gap-2.5 px-4"
           }`}
         >
-          <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-[#E31E2D] text-xs font-black text-white">
+          <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-[#c41230] text-xs font-black text-white">
             LRT
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-sm font-black text-white leading-tight">Virtual Tour CMS</p>
-              <p className="text-xs text-[#C4A8AD]">LRT Jabodebek</p>
+              <p className="text-sm font-black text-[#101828] leading-tight">Virtual Tour CMS</p>
+              <p className="text-xs text-slate-500">LRT Jabodebek</p>
             </div>
           )}
         </div>
@@ -222,8 +223,8 @@ export default function CmsShell({
                   collapsed ? "justify-center w-10 h-10 mx-auto" : "gap-3 px-3 py-2"
                 } ${
                   active
-                    ? "bg-[#E31E2D] text-white"
-                    : "text-[#C4A8AD] hover:bg-white/8 hover:text-[#F8ECEE]"
+                    ? "bg-[#c41230] text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-[#101828]"
                 }`}
               >
                 <Icon className="h-4 w-4 flex-none" />
@@ -233,27 +234,39 @@ export default function CmsShell({
           })}
         </nav>
 
-        <div className={`border-t border-[rgba(255,214,218,0.14)] p-2 ${collapsed ? "flex flex-col items-center gap-2" : "space-y-2"}`}>
+        <div className={`border-t border-slate-200 p-2 ${collapsed ? "flex flex-col items-center gap-2" : "space-y-2"}`}>
           <div
             title={collapsed ? initialUser?.name ?? initialUser?.email ?? "User" : undefined}
-            className={`flex items-center rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE] ${
+            className={`flex items-center rounded-xl border border-slate-200 bg-slate-50 text-[#101828] ${
               collapsed ? "h-10 w-10 justify-center" : "gap-3 p-2"
             }`}
           >
-            <UserCircle className="h-5 w-5 flex-none text-[#FF6B4A]" />
+            <UserCircle className="h-5 w-5 flex-none text-[#c41230]" />
             {!collapsed && (
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">
+                <p className="truncate text-sm font-semibold text-[#101828]">
                   {initialUser?.name ?? initialUser?.email ?? "User"}
                 </p>
               </div>
             )}
           </div>
 
+          {/* Ke halaman utama publik tanpa logout; sesi admin tetap aktif sehingga bisa kembali ke CMS. */}
+          <Link
+            href="/"
+            title={collapsed ? "Halaman Utama" : undefined}
+            className={`flex items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#101828] ${
+              collapsed ? "w-10 h-10" : "w-full h-9 gap-2 px-3"
+            }`}
+          >
+            <House className="h-4 w-4 flex-none" />
+            {!collapsed && <span className="text-sm flex-1 text-left">Halaman Utama</span>}
+          </Link>
+
           <button
             onClick={handleLogout}
             title={collapsed ? "Logout" : undefined}
-            className={`flex items-center justify-center rounded-lg text-[#C4A8AD] hover:bg-red-900/30 hover:text-red-300 transition-colors ${
+            className={`flex items-center justify-center rounded-lg text-slate-600 hover:bg-red-50 hover:text-red-700 transition-colors ${
               collapsed ? "w-10 h-10" : "w-full h-9 gap-2 px-3"
             }`}
           >
@@ -264,14 +277,14 @@ export default function CmsShell({
       </aside>
 
       <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="relative z-20 border-b border-[rgba(255,214,218,0.14)] bg-[#261015]">
+        <header className="relative z-20 bg-[#c41230] text-white shadow-md">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
             <button
               type="button"
               onClick={toggleSidebar}
               title={collapsed ? "Perluas sidebar" : "Sembunyikan sidebar"}
               aria-label={collapsed ? "Perluas sidebar" : "Sembunyikan sidebar"}
-              className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE] transition hover:bg-[#E31E2D]"
+              className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white transition hover:bg-white/20"
             >
               {collapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
             </button>
@@ -280,12 +293,13 @@ export default function CmsShell({
               <h1 className="truncate text-base font-black text-white sm:text-lg">{pageMeta.title}</h1>
             </div>
 
-            <CmsNotifications />
+            <div className="ml-auto flex-none">
+              <CmsNotifications />
+            </div>
           </div>
         </header>
 
         <div className={`relative min-h-0 flex-1 ${fullWidth ? "overflow-hidden" : "overflow-auto"}`}>
-          <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(227,30,45,.16),transparent_32%),radial-gradient(circle_at_85%_8%,rgba(27,58,107,.2),transparent_28%)]" />
 
           {fullWidth ? (
             <div className="relative z-10 flex h-full min-h-0 w-full flex-col overflow-hidden">{children}</div>

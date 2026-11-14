@@ -277,12 +277,12 @@ export default function LeadsClient({
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Pengajuan & Site Visit</h1>
-          <p className="mt-1 text-sm text-[#C4A8AD]">
+          <p className="mt-1 text-sm text-slate-600">
             Alur calon mitra: penawaran resmi, verifikasi lokasi, BA Negosiasi, lalu perjanjian.
           </p>
         </div>
-        <p className="text-sm text-[#C4A8AD]" aria-live="polite">
-          <span className="font-semibold text-white">{filteredLeads.length}</span> dari{" "}
+        <p className="text-sm text-slate-600" aria-live="polite">
+          <span className="font-semibold text-[#101828]">{filteredLeads.length}</span> dari{" "}
           {leads.length} pengajuan
         </p>
       </div>
@@ -290,10 +290,10 @@ export default function LeadsClient({
       {loadError && (
         <div
           role="alert"
-          className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-amber-50 sm:flex-row sm:items-center sm:justify-between"
+          className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-amber-900 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
             <div>
               <p className="font-semibold">Pengajuan tidak dapat dimuat</p>
               <p className="mt-0.5 text-sm text-amber-100/80">{loadError}</p>
@@ -305,7 +305,7 @@ export default function LeadsClient({
             variant="outline"
             onClick={load}
             disabled={isLoading}
-            className="shrink-0 border-amber-200/30 bg-transparent text-amber-50 hover:bg-amber-100/10"
+            className="shrink-0 border-amber-200/30 bg-transparent text-amber-900 hover:bg-amber-100/10"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
             {isLoading ? "Memuat..." : "Coba lagi"}
@@ -313,28 +313,28 @@ export default function LeadsClient({
         </div>
       )}
 
-      <div className="mb-5 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#261015] p-3">
+      <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-3">
         <div className="flex flex-col gap-2 lg:flex-row">
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Cari pengajuan</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#C4A8AD]" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Cari brand, PIC, telepon, email, unit, atau stasiun..."
-              className="h-10 w-full rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] pl-9 pr-3 text-sm text-[#F8ECEE] outline-none placeholder:text-[#C4A8AD] focus:border-[#E31E2D] focus:ring-2 focus:ring-[#E31E2D]/25"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-[#101828] outline-none placeholder:text-slate-600 focus:border-[#c41230] focus:ring-2 focus:ring-[#c41230]/25"
             />
           </label>
 
           <div className="grid gap-2 sm:grid-cols-2 lg:w-[430px]">
             <label className="relative">
               <span className="sr-only">Filter tahap proses</span>
-              <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-[#C4A8AD]" />
+              <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-slate-600" />
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="h-10 w-full appearance-none rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] pl-9 pr-8 text-sm text-[#F8ECEE] outline-none focus:border-[#E31E2D] focus:ring-2 focus:ring-[#E31E2D]/25"
+                className="h-10 w-full appearance-none rounded-lg border border-slate-200 bg-white pl-9 pr-8 text-sm text-[#101828] outline-none focus:border-[#c41230] focus:ring-2 focus:ring-[#c41230]/25"
               >
                 <option value="ALL">Semua tahap</option>
                 {LEAD_PIPELINE_STATUSES.map((status) => (
@@ -343,16 +343,16 @@ export default function LeadsClient({
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#C4A8AD]" />
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
             </label>
 
             <label className="relative">
               <span className="sr-only">Filter status site visit</span>
-              <CalendarClock className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-[#C4A8AD]" />
+              <CalendarClock className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-slate-600" />
               <select
                 value={siteVisitFilter}
                 onChange={(event) => setSiteVisitFilter(event.target.value)}
-                className="h-10 w-full appearance-none rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] pl-9 pr-8 text-sm text-[#F8ECEE] outline-none focus:border-[#E31E2D] focus:ring-2 focus:ring-[#E31E2D]/25"
+                className="h-10 w-full appearance-none rounded-lg border border-slate-200 bg-white pl-9 pr-8 text-sm text-[#101828] outline-none focus:border-[#c41230] focus:ring-2 focus:ring-[#c41230]/25"
               >
                 <option value="ALL">Semua site visit</option>
                 {SITE_VISIT_STATUS_VALUES.map((status) => (
@@ -361,12 +361,12 @@ export default function LeadsClient({
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#C4A8AD]" />
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
             </label>
           </div>
         </div>
 
-        <div className="mt-3 flex min-h-8 flex-wrap items-center justify-between gap-2 border-t border-[rgba(255,214,218,0.14)] pt-3">
+        <div className="mt-3 flex min-h-8 flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
           <div>
             {filtersActive && (
               <Button
@@ -374,7 +374,7 @@ export default function LeadsClient({
                 size="sm"
                 variant="ghost"
                 onClick={clearFilters}
-                className="h-8 text-[#F8ECEE]"
+                className="h-8 text-[#101828]"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 Reset filter
@@ -387,7 +387,7 @@ export default function LeadsClient({
               size="sm"
               variant="ghost"
               onClick={toggleAllVisible}
-              className="h-8 text-[#F8ECEE]"
+              className="h-8 text-[#101828]"
             >
               {allVisibleExpanded ? (
                 <ChevronUp className="h-3.5 w-3.5" />
@@ -416,16 +416,16 @@ export default function LeadsClient({
         ))}
 
         {!loadError && leads.length === 0 && (
-          <div className="rounded-xl border border-dashed border-[rgba(255,214,218,0.14)] py-14 text-center text-[#C4A8AD]">
+          <div className="rounded-xl border border-dashed border-slate-200 py-14 text-center text-slate-600">
             Belum ada pengajuan.
           </div>
         )}
 
         {leads.length > 0 && filteredLeads.length === 0 && (
-          <div className="rounded-xl border border-dashed border-[rgba(255,214,218,0.14)] px-5 py-14 text-center">
-            <Search className="mx-auto h-8 w-8 text-[#C4A8AD]" />
-            <p className="mt-3 font-medium text-[#F8ECEE]">Pengajuan tidak ditemukan</p>
-            <p className="mt-1 text-sm text-[#C4A8AD]">
+          <div className="rounded-xl border border-dashed border-slate-200 px-5 py-14 text-center">
+            <Search className="mx-auto h-8 w-8 text-slate-600" />
+            <p className="mt-3 font-medium text-[#101828]">Pengajuan tidak ditemukan</p>
+            <p className="mt-1 text-sm text-slate-600">
               Coba kata kunci lain atau reset filter.
             </p>
             <Button
@@ -467,16 +467,16 @@ function LeadCard({
   const detailId = `lead-detail-${lead.id}`;
 
   return (
-    <Card className="overflow-hidden border-[rgba(255,214,218,0.14)] bg-[#3A161C]">
+    <Card className="overflow-hidden border-slate-200 bg-white">
       <CardContent className="p-0">
         <button
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
           aria-controls={detailId}
-          className="flex w-full items-start gap-3 px-4 py-3.5 text-left outline-none transition hover:bg-white/[0.035] focus-visible:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E31E2D]"
+          className="flex w-full items-start gap-3 px-4 py-3.5 text-left outline-none transition hover:bg-white/[0.035] focus-visible:bg-slate-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#c41230]"
         >
-          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#261015] text-[#F8ECEE]">
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-[#101828]">
             {expanded ? (
               <ChevronUp className="h-4 w-4" />
             ) : (
@@ -486,23 +486,23 @@ function LeadCard({
 
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-white">{lead.companyName}</span>
+              <span className="font-semibold text-[#101828]">{lead.companyName}</span>
               <Badge
                 variant="outline"
-                className="border-[rgba(255,214,218,0.18)] bg-transparent text-[#F0DDE1]"
+                className="border-slate-200 bg-transparent text-slate-700"
               >
                 {leadStatusLabel(lead.status)}
               </Badge>
               {lead.siteVisitStatus !== "NONE" && (
                 <Badge
                   variant="outline"
-                  className="border-[rgba(255,214,218,0.2)] bg-[#261015] text-[#F8ECEE]"
+                  className="border-slate-200 bg-slate-50 text-[#101828]"
                 >
                   Site Visit: {siteVisitLabel(lead.siteVisitStatus)}
                 </Badge>
               )}
             </span>
-            <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#C4A8AD]">
+            <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
               <span>{lead.inquiryCode}</span>
               <span className="inline-flex items-center gap-1.5">
                 <UserRound className="h-3.5 w-3.5" />
@@ -517,7 +517,7 @@ function LeadCard({
             </span>
           </span>
 
-          <span className="hidden shrink-0 pt-1 text-xs text-[#C4A8AD] sm:block">
+          <span className="hidden shrink-0 pt-1 text-xs text-slate-600 sm:block">
             {new Date(lead.createdAt).toLocaleDateString("id-ID", {
               day: "numeric",
               month: "short",
@@ -527,37 +527,37 @@ function LeadCard({
         </button>
 
         {expanded && (
-          <div id={detailId} className="border-t border-[rgba(255,214,218,0.14)] px-4 py-4">
+          <div id={detailId} className="border-t border-slate-200 px-4 py-4">
             <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
               <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-1.5 text-sm text-[#C4A8AD]">
+                <p className="flex items-center gap-1.5 text-sm text-slate-600">
                   <UserRound className="h-3.5 w-3.5" />
                   {lead.contactName} · {lead.phone} · {lead.email}
                 </p>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl bg-[#1C0A0E]/60 p-3">
-                    <p className="flex items-center gap-1.5 text-xs font-semibold text-[#C4A8AD]">
+                  <div className="rounded-xl bg-white/60 p-3">
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
                       <Building2 className="h-3.5 w-3.5" />
                       Unit
                     </p>
-                    <p className="mt-1 text-sm font-medium text-[#F8ECEE]">
+                    <p className="mt-1 text-sm font-medium text-[#101828]">
                       {lead.space
                         ? `${lead.space.code} — ${lead.space.name}`
                         : "Tanpa unit spesifik"}
                     </p>
                     {lead.space && (
-                      <p className="mt-1 flex items-center gap-1 text-xs text-[#C4A8AD]">
+                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-600">
                         <MapPin className="h-3 w-3" />
                         {lead.space.station.name} · {lead.space.status}
                       </p>
                     )}
                   </div>
-                  <div className="rounded-xl bg-[#1C0A0E]/60 p-3">
-                    <p className="text-xs font-semibold text-[#C4A8AD]">Kebutuhan</p>
-                    <p className="mt-1 text-sm text-[#F8ECEE]">{lead.businessType}</p>
+                  <div className="rounded-xl bg-white/60 p-3">
+                    <p className="text-xs font-semibold text-slate-600">Kebutuhan</p>
+                    <p className="mt-1 text-sm text-[#101828]">{lead.businessType}</p>
                     {lead.message && (
-                      <p className="mt-1 text-xs leading-relaxed text-[#C4A8AD]">
+                      <p className="mt-1 text-xs leading-relaxed text-slate-600">
                         {lead.message}
                       </p>
                     )}
@@ -567,29 +567,29 @@ function LeadCard({
 
               <div className="w-full shrink-0 space-y-3 xl:w-[340px]">
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#C4A8AD]">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                     Nomor penawaran resmi
                   </label>
                   <input
                     value={lead.rdsOfferNo ?? ""}
                     onChange={(event) => onUpdateLocal({ rdsOfferNo: event.target.value })}
                     placeholder="Nomor dari RDS KAI"
-                    className="h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#261015] px-3 text-sm text-[#F8ECEE] placeholder:text-[#C4A8AD]"
+                    className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-[#101828] placeholder:text-slate-600"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#C4A8AD]">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                     Nomor BA Negosiasi
                   </label>
                   <input
                     value={lead.baNegotiationNo ?? ""}
                     onChange={(event) => onUpdateLocal({ baNegotiationNo: event.target.value })}
                     placeholder="Diisi setelah kesepakatan komersial"
-                    className="h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#261015] px-3 text-sm text-[#F8ECEE] placeholder:text-[#C4A8AD]"
+                    className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-[#101828] placeholder:text-slate-600"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#C4A8AD]">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                     Tahap Proses
                   </label>
                   <Select
@@ -601,7 +601,7 @@ function LeadCard({
                     onValueChange={onUpdateStatus}
                     disabled={saving}
                   >
-                    <SelectTrigger className="w-full border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE]">
+                    <SelectTrigger className="w-full border-slate-200 bg-slate-50 text-[#101828]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -614,13 +614,13 @@ function LeadCard({
                   </Select>
                 </div>
 
-                <div className="rounded-xl bg-[#1C0A0E]/50 p-3">
-                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-[#F8ECEE]">
+                <div className="rounded-xl bg-white/50 p-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-[#101828]">
                     <CalendarClock className="h-3.5 w-3.5" />
                     Site Visit
                   </p>
                   {lead.surveyPreference && (
-                    <p className="mb-2 rounded-lg bg-[#1C0A0E] px-2.5 py-2 text-xs text-[#F8ECEE]">
+                    <p className="mb-2 rounded-lg bg-white px-2.5 py-2 text-xs text-[#101828]">
                       Preferensi Mitra: {lead.surveyPreference}
                     </p>
                   )}
@@ -630,7 +630,7 @@ function LeadCard({
                       onUpdateLocal({ siteVisitStatus: value })
                     }
                   >
-                    <SelectTrigger className="w-full border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE]">
+                    <SelectTrigger className="w-full border-slate-200 bg-slate-50 text-[#101828]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -649,14 +649,14 @@ function LeadCard({
                         siteVisitScheduledAt: event.target.value || null,
                       })
                     }
-                    className="mt-2 h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#261015] px-3 text-sm text-[#F8ECEE]"
+                    className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-[#101828]"
                   />
                   <textarea
                     value={lead.notes ?? ""}
                     onChange={(event) => onUpdateLocal({ notes: event.target.value })}
                     placeholder="Catatan internal tim leasing"
                     rows={2}
-                    className="mt-2 w-full resize-none rounded-md border border-[rgba(255,214,218,0.14)] bg-[#261015] px-3 py-2 text-sm text-[#F8ECEE] placeholder:text-[#C4A8AD]"
+                    className="mt-2 w-full resize-none rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-[#101828] placeholder:text-slate-600"
                   />
                   <Button
                     size="sm"
@@ -670,15 +670,15 @@ function LeadCard({
                 </div>
 
                 <div>
-                  <label htmlFor={`rejection-${lead.id}`} className="mb-1.5 block text-xs font-semibold text-[#C4A8AD]">Alasan penghentian untuk mitra</label>
-                  <textarea id={`rejection-${lead.id}`} value={lead.rejectionReason ?? ""} maxLength={2000} rows={2} onChange={event => onUpdateLocal({ rejectionReason: event.target.value })} className="w-full rounded-md border border-white/15 bg-[#261015] px-3 py-2 text-sm text-[#F8ECEE]" />
+                  <label htmlFor={`rejection-${lead.id}`} className="mb-1.5 block text-xs font-semibold text-slate-600">Alasan penghentian untuk mitra</label>
+                  <textarea id={`rejection-${lead.id}`} value={lead.rejectionReason ?? ""} maxLength={2000} rows={2} onChange={event => onUpdateLocal({ rejectionReason: event.target.value })} className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-[#101828]" />
                   <Button size="sm" className="mt-2" onClick={onSaveSiteVisit} disabled={saving}>Simpan alasan</Button>
                 </div>
                 <InquiryDocuments leadId={lead.id} />
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="w-full text-red-400 hover:bg-red-950/40"
+                  className="w-full text-red-600 hover:bg-red-50"
                   onClick={onDelete}
                   disabled={saving}
                 >

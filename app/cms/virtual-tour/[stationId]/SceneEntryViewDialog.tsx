@@ -27,14 +27,14 @@ export function SceneEntryViewDialog({ selection, onClose, onApply }: {
   const [error, setError] = useState("");
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="flex max-h-[92dvh] w-[calc(100%-1.5rem)] max-w-5xl flex-col overflow-hidden border border-[rgba(255,214,218,0.18)] bg-[#261015] p-4 text-[#F8ECEE] sm:p-5">
+      <DialogContent className="flex max-h-[92dvh] w-[calc(100%-1.5rem)] max-w-5xl flex-col overflow-hidden border border-slate-200 bg-slate-50 p-4 text-[#101828] sm:p-5">
         <div className="pr-8">
           <DialogTitle>Arah kamera saat tiba</DialogTitle>
-          <DialogDescription className="mt-2 text-[#C4A8AD]">
+          <DialogDescription className="mt-2 text-slate-600">
             {selection.sourceTitle} → {selection.title}. Geser panorama untuk menentukan arah tiba.
           </DialogDescription>
         </div>
-        <div className="relative flex h-[52dvh] min-h-48 overflow-hidden rounded-xl border border-[rgba(255,214,218,0.18)]" data-scene-entry-camera>
+        <div className="relative flex h-[52dvh] min-h-48 overflow-hidden rounded-xl border border-slate-200" data-scene-entry-camera>
           <PannellumEditor
             ref={editorRef}
             panoramaUrl={selection.panoramaUrl}
@@ -58,9 +58,9 @@ export function SceneEntryViewDialog({ selection, onClose, onApply }: {
             <span className="h-5 w-5 rounded-full border-2 border-white/90 shadow-[0_0_0_1px_#0008]" />
           </div>
         </div>
-        {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button variant="ghost" className="text-[#C4A8AD] hover:bg-[#3A161C] hover:text-[#F8ECEE]" onClick={onClose}>Batal</Button>
+          <Button variant="ghost" className="text-slate-600 hover:bg-slate-100 hover:text-[#101828]" onClick={onClose}>Batal</Button>
           <Button onClick={() => {
             const view = editorRef.current?.getView();
             if (!view) { setError("Tunggu panorama selesai dimuat."); return; }

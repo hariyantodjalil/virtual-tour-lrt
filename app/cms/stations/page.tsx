@@ -32,7 +32,7 @@ export default async function CmsStationsPage() {
           <Card key={station.id} className={cmsUi.card}>
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between gap-3">
-                <CardTitle className="text-base text-[#F8ECEE]">{station.name}</CardTitle>
+                <CardTitle className="text-base text-[#101828]">{station.name}</CardTitle>
                 <Badge
                   variant="outline"
                   className={station.isActive ? cmsUi.successBadge : cmsUi.inactiveBadge}

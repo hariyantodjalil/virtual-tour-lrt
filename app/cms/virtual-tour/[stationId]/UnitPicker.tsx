@@ -84,13 +84,13 @@ export function UnitPicker({
   const picker = (
     <div className="space-y-2">
       <div className="relative">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#C4A8AD]" />
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-600" />
         <Input
           aria-label="Cari unit"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
-          className="h-8 bg-[#3A161C] border-[rgba(255,214,218,0.18)] pl-8 text-xs text-[#F8ECEE]"
+          className="h-8 bg-white border-slate-200 pl-8 text-xs text-[#101828]"
         />
       </div>
       <div className="flex gap-1.5">
@@ -98,7 +98,7 @@ export function UnitPicker({
           aria-label="Filter tipe unit"
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
-          className="h-7 flex-1 rounded-md border border-[rgba(255,214,218,0.18)] bg-[#3A161C] px-1.5 text-[10px] text-[#F0DDE1]"
+          className="h-7 flex-1 rounded-md border border-slate-200 bg-white px-1.5 text-[10px] text-slate-700"
         >
           <option value="ALL">Semua tipe</option>
           {types.map((t) => (
@@ -111,7 +111,7 @@ export function UnitPicker({
           aria-label="Filter status unit"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-          className="h-7 flex-1 rounded-md border border-[rgba(255,214,218,0.18)] bg-[#3A161C] px-1.5 text-[10px] text-[#F0DDE1]"
+          className="h-7 flex-1 rounded-md border border-slate-200 bg-white px-1.5 text-[10px] text-slate-700"
         >
           <option value="ALL">Semua status</option>
           <option value="TERSEDIA">Tersedia</option>
@@ -122,9 +122,9 @@ export function UnitPicker({
         </select>
       </div>
 
-      <div className="max-h-44 overflow-y-auto rounded-lg border border-[rgba(255,214,218,0.18)] divide-y divide-[rgba(255,214,218,0.12)]">
+      <div className="max-h-44 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-200">
         {filtered.length === 0 ? (
-          <p className="px-2.5 py-3 text-center text-[11px] text-[#C4A8AD]">Tidak ada unit</p>
+          <p className="px-2.5 py-3 text-center text-[11px] text-slate-600">Tidak ada unit</p>
         ) : (
           filtered.map((s) => {
             const active = s.code === value;
@@ -143,7 +143,7 @@ export function UnitPicker({
                   }
                 }}
                 className={`flex w-full items-start gap-2 px-2.5 py-2 text-left transition-colors ${
-                  active ? "bg-emerald-950/50" : "hover:bg-[#3A161C]/80"
+                  active ? "bg-emerald-50" : "hover:bg-slate-100/80"
                 }`}
               >
                 <span
@@ -153,22 +153,22 @@ export function UnitPicker({
                 <span className="min-w-0 flex-1">
                   {tenantBrand ? (
                     <>
-                      <span className="block truncate text-[11px] font-semibold text-[#F8ECEE]">
+                      <span className="block truncate text-[11px] font-semibold text-[#101828]">
                         {tenantBrand}
                       </span>
-                      <span className="block truncate text-[10px] text-[#C4A8AD]">
+                      <span className="block truncate text-[10px] text-slate-600">
                         <span className="font-mono">{s.code}</span> · {s.name}
                       </span>
                     </>
                   ) : (
                     <>
-                      <span className="block truncate font-mono text-[11px] font-semibold text-[#F8ECEE]">
+                      <span className="block truncate font-mono text-[11px] font-semibold text-[#101828]">
                         {s.code}
                       </span>
-                      <span className="block truncate text-[10px] text-[#C4A8AD]">{s.name}</span>
+                      <span className="block truncate text-[10px] text-slate-600">{s.name}</span>
                     </>
                   )}
-                  <span className="mt-0.5 block text-[9px] text-[#C4A8AD]">
+                  <span className="mt-0.5 block text-[9px] text-slate-600">
                     {TYPE_LABELS[s.type] ?? s.type} · {STATUS_LABELS[s.status]}
                   </span>
                 </span>
@@ -183,13 +183,13 @@ export function UnitPicker({
   if (!selected) return picker;
   return (
     <details className="group space-y-2" data-unit-picker>
-      <summary aria-label={`Ganti unit ${selected.code}`} className="flex cursor-pointer list-none items-center gap-2 rounded-md border border-[rgba(255,214,218,0.18)] bg-[#3A161C] px-2.5 py-2 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+      <summary aria-label={`Ganti unit ${selected.code}`} className="flex cursor-pointer list-none items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: spaceStatusColor(selected.status) }} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium text-[#F8ECEE]">{selectedTenant || selected.code}</span>
-          <span className="block truncate text-[#C4A8AD]">{selectedTenant ? `${selected.code} · ` : ""}{selected.name} · {STATUS_LABELS[selected.status]}</span>
+          <span className="block truncate font-medium text-[#101828]">{selectedTenant || selected.code}</span>
+          <span className="block truncate text-slate-600">{selectedTenant ? `${selected.code} · ` : ""}{selected.name} · {STATUS_LABELS[selected.status]}</span>
         </span>
-        <span className="shrink-0 text-[#C4A8AD]">Ganti unit</span>
+        <span className="shrink-0 text-slate-600">Ganti unit</span>
       </summary>
       {picker}
     </details>

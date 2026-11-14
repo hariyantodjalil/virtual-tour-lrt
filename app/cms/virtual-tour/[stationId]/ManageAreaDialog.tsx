@@ -90,20 +90,20 @@ export function ManageAreaDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] [&>button]:text-[#C4A8AD] [&>button]:hover:text-white">
+      <DialogContent className="max-w-md border-slate-200 bg-white text-[#101828] [&>button]:text-slate-600 [&>button]:hover:text-[#101828]">
         {state?.mode === "delete" ? (
           <>
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-[#F8ECEE]">
-                <Trash2 className="h-5 w-5 text-red-400" />
+              <DialogTitle className="flex items-center gap-2 text-[#101828]">
+                <Trash2 className="h-5 w-5 text-red-600" />
                 Hapus Area
               </DialogTitle>
-              <DialogDescription className="text-[#C4A8AD]">
-                Hapus area <strong className="text-[#F8ECEE]">{state.area.label}</strong> dari{" "}
-                <strong className="text-[#F8ECEE]">{state.levelLabel}</strong>? Area harus kosong dari scene.
+              <DialogDescription className="text-slate-600">
+                Hapus area <strong className="text-[#101828]">{state.area.label}</strong> dari{" "}
+                <strong className="text-[#101828]">{state.levelLabel}</strong>? Area harus kosong dari scene.
               </DialogDescription>
             </DialogHeader>
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className="text-sm text-red-600">{error}</p>}
             <DialogFooter className="gap-2 sm:gap-2">
               <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
                 Batal
@@ -121,12 +121,12 @@ export function ManageAreaDialog({
         ) : state ? (
           <form onSubmit={handleSubmit}>
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-[#F8ECEE]">
-                <MapPin className="h-5 w-5 text-emerald-400" />
+              <DialogTitle className="flex items-center gap-2 text-[#101828]">
+                <MapPin className="h-5 w-5 text-emerald-700" />
                 {state.mode === "add" ? "Tambah Area" : "Edit Area"}
               </DialogTitle>
-              <DialogDescription className="text-[#C4A8AD]">
-                Level: <span className="font-medium text-[#F0DDE1]">{state.levelLabel}</span>
+              <DialogDescription className="text-slate-600">
+                Level: <span className="font-medium text-slate-700">{state.levelLabel}</span>
                 {state.mode === "add"
                   ? " — contoh: Concourse Paid, Concourse Unpaid, Koridor A"
                   : ` — slug: ${state.area.slug}`}
@@ -134,7 +134,7 @@ export function ManageAreaDialog({
             </DialogHeader>
 
             <div className="py-4">
-              <Label htmlFor="area-label" className="mb-1.5 block text-xs text-[#C4A8AD]">
+              <Label htmlFor="area-label" className="mb-1.5 block text-xs text-slate-600">
                 Nama Area
               </Label>
               <Input
@@ -142,11 +142,11 @@ export function ManageAreaDialog({
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="Nama area"
-                className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE]"
+                className="border-slate-200 bg-white text-[#101828]"
                 autoFocus
                 required
               />
-              {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+              {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
             </div>
 
             <DialogFooter className="gap-2 sm:gap-2">
@@ -156,7 +156,7 @@ export function ManageAreaDialog({
               <Button
                 type="submit"
                 disabled={busy || !label.trim()}
-                className="bg-[#E31E2D] hover:bg-[#c41926]"
+                className="bg-[#c41230] hover:bg-[#a30f28]"
               >
                 {busy ? "Menyimpan…" : state.mode === "add" ? "Tambah Area" : "Simpan"}
               </Button>

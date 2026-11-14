@@ -1,28 +1,27 @@
 /**
- * Shared CMS surface tokens — align with CmsShell / Leads Void Portal maroon.
- * Prefer these over slate-* so list pages don't read as cool blue-gray.
+ * Shared CMS surface tokens — tema terang mengikuti Panel Mitra (putih, abu-abu slate, merah #c41230).
  */
 export const cmsUi = {
-  card: "border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]",
-  cardSoft: "border-[rgba(255,214,218,0.14)] bg-[#3A161C]/60 text-[#F8ECEE]",
-  nested: "border-[rgba(255,214,218,0.14)] bg-[#261015]",
-  void: "bg-[#1C0A0E]",
-  panel: "bg-[#3A161C]",
-  surface: "bg-[#261015]",
-  ink: "text-[#F8ECEE]",
-  muted: "text-[#C4A8AD]",
-  faint: "text-[#A88990]",
-  hairline: "border-[rgba(255,214,218,0.14)]",
+  card: "border-slate-200 bg-white text-[#101828] shadow-sm",
+  cardSoft: "border-slate-200 bg-white/80 text-[#101828]",
+  nested: "border-slate-200 bg-slate-50",
+  void: "bg-[#f3f4f6]",
+  panel: "bg-white",
+  surface: "bg-slate-100",
+  ink: "text-[#101828]",
+  muted: "text-slate-600",
+  faint: "text-slate-500",
+  hairline: "border-slate-200",
   input:
-    "border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] placeholder:text-[#C4A8AD] focus-visible:border-[#E31E2D] focus-visible:ring-[#E31E2D]/25",
+    "border-slate-300 bg-white text-[#101828] placeholder:text-slate-400 focus-visible:border-[#c41230] focus-visible:ring-[#c41230]/20",
   select:
-    "border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] focus:border-[#E31E2D] focus:ring-[#E31E2D]/25",
+    "border-slate-300 bg-white text-[#101828] focus:border-[#c41230] focus:ring-[#c41230]/20",
   outlineBtn:
-    "border-[rgba(255,214,218,0.14)] bg-transparent text-[#F8ECEE] hover:bg-[#261015] hover:text-[#F8ECEE]",
-  primaryBtn: "bg-[#E31E2D] text-white hover:bg-[#c41926]",
-  successBadge: "border-emerald-700/50 bg-emerald-950/40 text-emerald-300",
-  inactiveBadge: "border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#C4A8AD]",
-  outlineBadge: "border-[rgba(255,214,218,0.18)] bg-transparent text-[#F0DDE1]",
-  softBadge: "border-transparent bg-[#261015] text-[#C4A8AD]",
-  modal: "border-[rgba(255,214,218,0.18)] bg-[#261015] text-[#F8ECEE]",
+    "border-slate-300 bg-white text-[#101828] hover:bg-slate-50 hover:text-[#101828]",
+  primaryBtn: "bg-[#c41230] text-white hover:bg-[#a30f28]",
+  successBadge: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  inactiveBadge: "border-slate-200 bg-slate-100 text-slate-600",
+  outlineBadge: "border-slate-300 bg-transparent text-slate-700",
+  softBadge: "border-transparent bg-slate-100 text-slate-600",
+  modal: "border-slate-200 bg-white text-[#101828]",
 } as const;
