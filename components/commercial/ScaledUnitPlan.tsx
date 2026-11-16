@@ -266,6 +266,7 @@ function Volume3D({
 
   return (
     <svg
+      id="scaled-unit-plan-svg"
       viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
       className="h-auto w-full"
       role="img"
@@ -404,6 +405,7 @@ function Plan2D({
 
   return (
     <svg
+      id="scaled-unit-plan-svg"
       viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
       className="h-auto w-full"
       role="img"

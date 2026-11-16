@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
 import { Navigation, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PanoramaScene, SceneInitialView } from "@/lib/tour-types";
@@ -20,9 +20,10 @@ import {
 } from "@/lib/pannellum-tour-dive";
 import { bindPrivacyBlursInContainer } from "@/lib/pannellum-privacy-blur";
 import { SpatialOverlay } from "@/components/tour/spatial/SpatialOverlay";
-import { canBuildPinVolume, pinVolumeEntity, pinVolumeOptions, type PinPlacement } from "@/lib/spatial/unit-volume";
+import { buildPinVolume, canBuildPinVolume, pinVolumeEntity, pinVolumeOptions, type PinPlacement } from "@/lib/spatial/unit-volume";
+import { projectPoint } from "@/lib/spatial/geometry/projection";
 import { isSpatialHotspotEnabled } from "@/lib/spatial-feature";
-import type { SpatialEntity } from "@/lib/spatial/types";
+import type { CameraState, SpatialEntity } from "@/lib/spatial/types";
 import { runSpatialAction } from "@/lib/spatial/actions";
 import { resolveSceneEntryView } from "@/lib/scene-entry-view";
 
@@ -30,8 +31,35 @@ declare global {
   interface Window {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     pannellum: any;
+    __webglPreservePatched?: boolean;
   }
 }
+
+if (typeof window !== "undefined" && !window.__webglPreservePatched) {
+  window.__webglPreservePatched = true;
+  const origGetContext = HTMLCanvasElement.prototype.getContext;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (HTMLCanvasElement.prototype as any).getContext = function (
+    this: HTMLCanvasElement,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    type: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    attributes?: any
+  ) {
+    if (type === "webgl" || type === "experimental-webgl") {
+      attributes = { ...(typeof attributes === "object" && attributes ? attributes : {}), preserveDrawingBuffer: true };
+    }
+    return origGetContext.call(this, type, attributes);
+  };
+}
+
+export type VirtualTourViewerHandle = {
+  downloadMockupSnapshot: (options: {
+    spaceCode: string;
+    spaceTitle?: string;
+    mockupImageUrl?: string | null;
+  }) => Promise<boolean>;
+};
 
 const ZERO_OVERLAY: DiveOverlayState = { blur: 0, fade: 0, vignette: 0 };
 
@@ -42,6 +70,7 @@ type SpaceStatusRef = {
   lengthM?: number | null;
   widthM?: number | null;
   heightM?: number | null;
+  mockupImageUrl?: string | null;
 };
 
 type Props = {
@@ -118,7 +147,7 @@ function stopViewerAutoRotate(viewer: unknown) {
   }
 }
 
-export default function VirtualTourViewer({
+const VirtualTourViewer = forwardRef<VirtualTourViewerHandle, Props>(function VirtualTourViewer({
   scenes,
   spaces = [],
   onSpaceClick,
@@ -132,7 +161,7 @@ export default function VirtualTourViewer({
   hideSceneBar = false,
   chromeTone = "default",
   pinVolumeDistanceM,
-}: Props) {
+}: Props, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const onSpaceClickRef = useRef(onSpaceClick);
@@ -218,6 +247,175 @@ export default function VirtualTourViewer({
     focusTokenRef.current = focusToken;
     activeSceneIdRef.current = activeSceneId;
   });
+
+  useImperativeHandle(ref, () => ({
+    downloadMockupSnapshot: async ({ spaceCode, spaceTitle, mockupImageUrl }) => {
+      const viewer = viewerRef.current;
+      const container = containerRef.current;
+      if (!viewer || !container) return false;
+
+      const scene =
+        scenesRef.current.find((s) => s.id === activeSceneIdRef.current) ??
+        scenesRef.current[0];
+      const hotspot = scene?.hotspots.find(
+        (h) => h.type === "space" && h.spaceCode === spaceCode
+      );
+
+      if (hotspot) {
+        const currYaw = viewer.getYaw();
+        const currPitch = viewer.getPitch();
+        const currHfov = viewer.getHfov();
+
+        // Cek apakah posisi hotspot berada di dalam viewport kamera saat ini
+        const diffYaw = ((hotspot.yaw - currYaw + 540) % 360) - 180;
+        const diffPitch = hotspot.pitch - currPitch;
+        const inView =
+          Math.abs(diffYaw) < currHfov / 2.2 &&
+          Math.abs(diffPitch) < (currHfov * 9) / 16 / 2.2;
+
+        if (!inView) {
+          viewer.lookAt(hotspot.pitch, hotspot.yaw, currHfov, 500);
+          await new Promise((r) => setTimeout(r, 600));
+        }
+      }
+
+      const webglCanvas = container.querySelector("canvas");
+      if (!webglCanvas) return false;
+
+      const yaw = viewer.getYaw();
+      const pitch = viewer.getPitch();
+      const hfov = viewer.getHfov();
+
+      const exportCanvas = document.createElement("canvas");
+      exportCanvas.width = 1920;
+      exportCanvas.height = 1080;
+      const ctx = exportCanvas.getContext("2d");
+      if (!ctx) return false;
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(webglCanvas, 0, 0, 1920, 1080);
+
+      const spaceDim = spacesRef.current.find((s) => s.code === spaceCode);
+      const placement = pinVolumeDistanceRef.current
+        ? ({ mode: "distance", distanceM: pinVolumeDistanceRef.current } as const)
+        : ({ mode: "floor" } as const);
+
+      if (hotspot && spaceDim) {
+        const faces = buildPinVolume(
+          { pitch: hotspot.pitch, yaw: hotspot.yaw },
+          spaceDim,
+          pinVolumeOptions(hotspot, placement)
+        );
+
+        const cameraHD: CameraState = {
+          yawDeg: yaw,
+          pitchDeg: pitch,
+          hfovDeg: hfov,
+          widthCssPx: 1920,
+          heightCssPx: 1080,
+        };
+
+        // 1. Gambar garis sisi belakang (garis hijau putus-putus)
+        for (const face of faces ?? []) {
+          if (face.facesCamera || face.vertices.length < 3) continue;
+          const corners = face.vertices
+            .map((v) => projectPoint(v, cameraHD))
+            .filter((p): p is { x: number; y: number } => p != null && Number.isFinite(p.x) && Number.isFinite(p.y));
+          if (corners.length >= 3) {
+            ctx.save();
+            ctx.strokeStyle = "#4ADE80";
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([8, 8]);
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+            ctx.globalAlpha = 0.65;
+            ctx.beginPath();
+            ctx.moveTo(corners[0].x, corners[0].y);
+            for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        // 2. Gambar materi mockup iklan pada muka depan handgrip
+        const adFace =
+          faces?.find((f) => (f.key === "front" || f.key === "back") && f.facesCamera) ??
+          faces?.find((f) => f.key === "front");
+
+        if (adFace && adFace.vertices.length >= 4 && mockupImageUrl) {
+          const corners = adFace.vertices
+            .map((v) => projectPoint(v, cameraHD))
+            .filter((p): p is { x: number; y: number } => p != null && Number.isFinite(p.x) && Number.isFinite(p.y));
+
+          if (corners.length === 4) {
+            const sortedByY = [...corners].sort((a, b) => a.y - b.y);
+            const topPoints = sortedByY.slice(0, 2).sort((a, b) => a.x - b.x);
+            const botPoints = sortedByY.slice(2, 4).sort((a, b) => a.x - b.x);
+            const pTL = topPoints[0];
+            const pTR = topPoints[1];
+            const pBL = botPoints[0];
+
+            const a = (pTR.x - pTL.x) / 100;
+            const b = (pTR.y - pTL.y) / 100;
+            const c = (pBL.x - pTL.x) / 100;
+            const d = (pBL.y - pTL.y) / 100;
+            const e = pTL.x;
+            const f = pTL.y;
+
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            await new Promise<void>((resolve) => {
+              img.onload = () => {
+                ctx.save();
+                ctx.setTransform(a, b, c, d, e, f);
+                ctx.drawImage(img, 0, 0, 100, 100);
+                ctx.restore();
+                resolve();
+              };
+              img.onerror = () => resolve();
+              img.src = mockupImageUrl;
+            });
+          }
+        }
+
+        // 3. Gambar garis kotak hijau solid untuk sisi yang menghadap kamera
+        for (const face of faces ?? []) {
+          if (!face.facesCamera || face.vertices.length < 3) continue;
+          const corners = face.vertices
+            .map((v) => projectPoint(v, cameraHD))
+            .filter((p): p is { x: number; y: number } => p != null && Number.isFinite(p.x) && Number.isFinite(p.y));
+          if (corners.length >= 3) {
+            ctx.save();
+            // Garis bayangan gelap agar terbaca kontras
+            ctx.strokeStyle = "rgba(5, 46, 22, 0.65)";
+            ctx.lineWidth = 7;
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(corners[0].x, corners[0].y);
+            for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
+            ctx.closePath();
+            ctx.stroke();
+
+            // Garis hijau terang solid
+            ctx.strokeStyle = "#4ADE80";
+            ctx.lineWidth = 4.5;
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+      }
+
+      const safeTitle = (spaceTitle || "Handgrip").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const a = document.createElement("a");
+      a.download = `Mockup-LRT-${safeTitle}-${spaceCode}.png`;
+      a.href = exportCanvas.toDataURL("image/png");
+      a.click();
+      return true;
+    },
+  }));
 
   const overlayController = useMemo(
     () => ({
@@ -530,6 +728,17 @@ export default function VirtualTourViewer({
             interactive
             resolveSpaceStatus={(code) => findSpaceStatus(spacesRef.current, code)}
             resolveUnitDimensions={(code) => spaces.find((space) => space.code === code)}
+            resolveMockupImage={(code) => {
+              const target = code.trim().toLowerCase();
+              return (
+                spaces.find(
+                  (space) => space.code === code || space.code.trim().toLowerCase() === target
+                )?.mockupImageUrl ??
+                spacesRef.current.find(
+                  (space) => space.code === code || space.code.trim().toLowerCase() === target
+                )?.mockupImageUrl
+              );
+            }}
             onEntityClick={(entity) => {
               runSpatialAction(entity, {
                 openUnit: (code) => onSpaceClickRef.current?.(code),
@@ -632,4 +841,6 @@ export default function VirtualTourViewer({
       `}</style>
     </div>
   );
-}
+});
+
+export default VirtualTourViewer;

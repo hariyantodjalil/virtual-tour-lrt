@@ -4,11 +4,14 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
 import {
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Download,
   ImagePlus,
   Info,
   Layers,
+  Loader2,
   Minus,
   Phone,
   Plus,
@@ -52,6 +55,9 @@ type Props = {
   onClose: () => void;
   backLabel?: string;
   initialCarSlug?: string;
+  mockupImageUrl?: string | null;
+  onMockupImageChange?: (url: string | null) => void;
+  onDownloadMockup?: () => Promise<unknown> | unknown;
 };
 
 function resolveCarIndex(slug?: string) {
@@ -124,6 +130,9 @@ export default function TrainRentalSpaceDetail({
   onClose,
   backLabel = "Kembali ke Daftar Fasilitas",
   initialCarSlug,
+  mockupImageUrl,
+  onMockupImageChange,
+  onDownloadMockup,
 }: Props) {
   const profile = useCommercialProfile();
   const mounted = useSyncExternalStore(
@@ -132,12 +141,76 @@ export default function TrainRentalSpaceDetail({
     () => false
   );
   const [carIndex, setCarIndex] = useState(() => resolveCarIndex(initialCarSlug));
-  /** Pratinjau gambar produk calon mitra di volume media (object URL lokal, tidak diunggah). */
-  const [productPreviewUrl, setProductPreviewUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!productPreviewUrl) return;
-    return () => URL.revokeObjectURL(productPreviewUrl);
-  }, [productPreviewUrl]);
+  /** Pratinjau gambar produk calon mitra di volume media (data URL lokal, tidak diunggah ke server sebelum sewa). */
+  const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
+  const productPreviewUrl = localPreviewUrl ?? mockupImageUrl ?? null;
+  const [isLoadingMockup, setIsLoadingMockup] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [mockupLoadedToast, setMockupLoadedToast] = useState<string | null>(null);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setIsLoadingMockup(true);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setTimeout(() => {
+          setLocalPreviewUrl(dataUrl);
+          onMockupImageChange?.(dataUrl);
+          setIsLoadingMockup(false);
+          setMockupLoadedToast("Mockup berhasil dipasang ke spot kereta!");
+          setTimeout(() => setMockupLoadedToast(null), 3500);
+        }, 300);
+      };
+      reader.readAsDataURL(file);
+    }
+    event.target.value = "";
+  };
+
+  const handleClearMockup = () => {
+    setLocalPreviewUrl(null);
+    onMockupImageChange?.(null);
+  };
+
+  const handleDownloadMockup = async () => {
+    if (onDownloadMockup) {
+      setIsDownloading(true);
+      try {
+        await onDownloadMockup();
+      } catch (err) {
+        console.error("Gagal mengunduh snapshot mockup:", err);
+      } finally {
+        setIsDownloading(false);
+      }
+      return;
+    }
+
+    // Fallback: unduh dari SVG visual ukuran jika onDownloadMockup tidak tersedia
+    const svg = document.getElementById("scaled-unit-plan-svg") as SVGSVGElement | null;
+    if (!svg) return;
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const blobUrl = URL.createObjectURL(svgBlob);
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = (svg.clientWidth || 360) * 2;
+      canvas.height = (svg.clientHeight || 230) * 2;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#261015";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const a = document.createElement("a");
+        a.download = `Mockup-${space.title || "Space"}-${space.displayNumber}.png`;
+        a.href = canvas.toDataURL("image/png");
+        a.click();
+      }
+      URL.revokeObjectURL(blobUrl);
+    };
+    img.src = blobUrl;
+  };
   const [showInterestModal, setShowInterestModal] = useState(false);
   const [rentMode, setRentMode] = useState<"gerbong" | "trainset">("gerbong");
   const [trainsetQty, setTrainsetQty] = useState(1);
@@ -386,31 +459,64 @@ export default function TrainRentalSpaceDetail({
             />
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#E31E2D]/45 bg-[#161616] px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#1d1d1d]">
-                <ImagePlus className="size-3.5 text-[#E31E2D]" />
-                {productPreviewUrl ? "Ganti gambar produk" : "Coba gambar produkmu"}
+                {isLoadingMockup ? (
+                  <Loader2 className="size-3.5 animate-spin text-[#E31E2D]" />
+                ) : (
+                  <ImagePlus className="size-3.5 text-[#E31E2D]" />
+                )}
+                {isLoadingMockup
+                  ? "Sedang memproses..."
+                  : productPreviewUrl
+                    ? "Ganti gambar produk"
+                    : "Coba gambar produkmu"}
                 <input
                   type="file"
                   accept="image/*"
                   className="sr-only"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) setProductPreviewUrl(URL.createObjectURL(file));
-                    event.target.value = "";
-                  }}
+                  disabled={isLoadingMockup}
+                  onChange={handleFileChange}
                 />
               </label>
-              {productPreviewUrl ? (
-                <button
-                  type="button"
-                  onClick={() => setProductPreviewUrl(null)}
-                  className="text-[11px] text-white/60 underline-offset-2 hover:text-white hover:underline"
-                >
-                  Hapus gambar
-                </button>
+              {productPreviewUrl && !isLoadingMockup ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={isDownloading}
+                    onClick={handleDownloadMockup}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-400 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Unduh mockup review di dalam kereta"
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="size-3.5 animate-spin text-emerald-400" />
+                    ) : (
+                      <Download className="size-3.5" />
+                    )}
+                    {isDownloading ? "Mengunduh Mockup..." : "Unduh Mockup"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearMockup}
+                    className="text-[11px] text-white/60 underline-offset-2 hover:text-white hover:underline"
+                  >
+                    Hapus gambar
+                  </button>
+                </>
               ) : null}
             </div>
+            {isLoadingMockup && (
+              <div className="mt-2 flex items-center gap-2 rounded-lg border border-emerald-500/35 bg-emerald-500/15 px-2.5 py-2 text-[11px] font-medium text-emerald-300 animate-pulse">
+                <Loader2 className="size-3.5 animate-spin text-emerald-400 shrink-0" />
+                <span>Memproyeksikan mockup ke spot kereta 360°...</span>
+              </div>
+            )}
+            {mockupLoadedToast && !isLoadingMockup && (
+              <div className="mt-2 flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/20 px-2.5 py-2 text-[11px] font-medium text-emerald-300">
+                <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />
+                <span>{mockupLoadedToast}</span>
+              </div>
+            )}
             <p className="mt-1.5 text-[10px] leading-relaxed text-white/45">
-              Gambar produk ditempel di muka depan volume untuk pratinjau, hanya di browser ini dan tidak diunggah.
+              Gambar produk ditempel di muka depan volume 3D dan otomatis tampil pada titik media iklan di dalam tur.
             </p>
           </div>
         ) : null}
