@@ -40,6 +40,8 @@ type Props = {
   compact?: boolean;
   /** Aktifkan zoom in/out (1x–2x) saat kursor diarahkan dan di-scroll pada diagram 3D/2D. */
   zoomable?: boolean;
+  /** Atribut id opsional pada elemen <svg> (mis. untuk ekspor/fallback SVG). */
+  svgId?: string;
 };
 
 type View = "3d" | "2d";
@@ -126,6 +128,7 @@ export default function ScaledUnitPlan({
   context,
   compact = false,
   zoomable = false,
+  svgId,
 }: Props) {
   const [view, setView] = useState<View>("3d");
   const [desktopHeight, setDesktopHeight] = useState(MIN_DESKTOP_HEIGHT);
@@ -260,6 +263,7 @@ export default function ScaledUnitPlan({
               frontImageUrl={frontImageUrl}
               context={context}
               compact={compact}
+              svgId={svgId}
             />
           ) : (
             <div className={`flex ${compact ? "h-[164px]" : "h-[200px]"} items-center justify-center rounded-lg border border-dashed text-center text-xs ${t.empty}`}>
@@ -274,6 +278,7 @@ export default function ScaledUnitPlan({
             allocatedArea={allocatedArea}
             t={t}
             compact={compact}
+            svgId={svgId}
           />
         )}
 
@@ -312,6 +317,7 @@ export default function ScaledUnitPlan({
             zoomable
             insets={insets}
             wheelHostRef={figureRef}
+            svgId={svgId}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center px-3 pt-12 pb-9">
@@ -331,6 +337,7 @@ export default function ScaledUnitPlan({
           zoomable
           insets={insets}
           wheelHostRef={figureRef}
+          svgId={svgId}
         />
       )}
 
@@ -368,6 +375,7 @@ function PlanSvg({
   insets,
   wheelHostRef,
   ariaLabel,
+  svgId,
   children,
 }: {
   compact: boolean;
@@ -375,6 +383,7 @@ function PlanSvg({
   insets?: ViewportInsets;
   wheelHostRef?: RefObject<HTMLElement | null>;
   ariaLabel: string;
+  svgId?: string;
   children: ReactNode;
 }) {
   const [rectSize, setRectSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
@@ -658,6 +667,7 @@ function PlanSvg({
 
   return (
     <svg
+      id={svgId}
       ref={svgRef}
       viewBox={
         zoomable
@@ -709,6 +719,7 @@ function Volume3D({
   zoomable = false,
   insets,
   wheelHostRef,
+  svgId,
 }: {
   lengthM: number;
   widthM: number;
@@ -720,6 +731,7 @@ function Volume3D({
   zoomable?: boolean;
   insets?: ViewportInsets;
   wheelHostRef?: RefObject<HTMLElement | null>;
+  svgId?: string;
 }) {
   // Sumbu x = panjang, y = lebar, z = tinggi; sudut pandang dari pojok depan (L, W).
   const iso = (x: number, y: number, z: number): [number, number] => [(x - y) * COS30, (x + y) * SIN30 - z];
@@ -805,6 +817,7 @@ function Volume3D({
       insets={insets}
       wheelHostRef={wheelHostRef}
       ariaLabel={`Volume ${formatDimensions({ lengthM, widthM, heightM })}`}
+      svgId={svgId}
     >
       {/* Lantai dan grid lantai (terlihat menembus dinding transparan) */}
       <polygon points={poly([P(0, 0, 0), P(L, 0, 0), P(L, W, 0), P(0, W, 0)])} fill="rgba(227,30,45,0.10)" />
@@ -912,6 +925,7 @@ function Plan2D({
   zoomable = false,
   insets,
   wheelHostRef,
+  svgId,
 }: {
   lengthM: number;
   widthM: number;
@@ -922,6 +936,7 @@ function Plan2D({
   zoomable?: boolean;
   insets?: ViewportInsets;
   wheelHostRef?: RefObject<HTMLElement | null>;
+  svgId?: string;
 }) {
   const scale = Math.min((VIEW_W - PAD * 2) / lengthM, (VIEW_H - PAD * 2) / widthM);
   const rectW = lengthM * scale;
@@ -953,6 +968,7 @@ function Plan2D({
       insets={insets}
       wheelHostRef={wheelHostRef}
       ariaLabel={`Denah berskala ${formatDimensions({ lengthM, widthM, heightM })}`}
+      svgId={svgId}
     >
       <defs>
         <pattern id="unit-plan-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">

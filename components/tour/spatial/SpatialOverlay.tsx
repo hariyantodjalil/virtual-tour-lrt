@@ -35,6 +35,8 @@ type Props = {
   resolveSpaceStatus?: (spaceCode: string) => SpaceAvailabilityStatus | undefined;
   /** Bila diisi, area yang tertaut unit berdimensi lengkap digambar sebagai volume 3D. */
   resolveUnitDimensions?: (spaceCode: string) => UnitVolumeDimensions | undefined;
+  /** Gambar pratinjau materi promosi/mockup yang diproyeksikan ke permukaan volume unit. */
+  resolveMockupImage?: (spaceCode: string) => string | null | undefined;
   /** false = volume dari pin unit hanya tampilan (editor CMS memakai titik pegangan pin untuk memilih). */
   pinVolumesInteractive?: boolean;
   onSelect?: (id: string | null) => void;
@@ -97,6 +99,7 @@ function SpatialOverlayContent({
   interactive = false,
   resolveSpaceStatus,
   resolveUnitDimensions,
+  resolveMockupImage,
   pinVolumesInteractive = true,
   onSelect,
   onEntityClick,
@@ -187,11 +190,12 @@ function SpatialOverlayContent({
         const shapes = faces
           ? faces.map((face) => ({
               key: face.key,
+              vertices: face.vertices,
               fragments: projectPolygonFragments(face.vertices, camera),
               back: !face.facesCamera,
               top: face.key === "top",
             }))
-          : [{ key: "area", fragments: projectPolygonFragments(verts, camera), back: false, top: false }];
+          : [{ key: "area", vertices: verts, fragments: projectPolygonFragments(verts, camera), back: false, top: false }];
         const fragments = shapes.flatMap((shape) => shape.fragments);
         const handles =
           entity.id === selectedId
@@ -287,6 +291,9 @@ function SpatialOverlayContent({
         const status = entity.spaceCode
           ? resolveSpaceStatus?.(entity.spaceCode)
           : undefined;
+        const mockupImage = entity.spaceCode
+          ? resolveMockupImage?.(entity.spaceCode)
+          : undefined;
         // Volume dari pin unit mengikuti warna status seperti kotak pin lama; Spatial Area memakai gaya entitasnya.
         const pinVolume = isPinVolumeEntity(entity);
         const stroke = pinVolume
@@ -322,13 +329,63 @@ function SpatialOverlayContent({
               // Volume: arsir per sisi (samping paling gelap, depan paling terang) agar kotak terbaca 3D;
               // sisi belakang tipis putus-putus seperti garis tersembunyi.
               const boost = Math.max(0, fillOp - (style.fillOpacity ?? 0.1));
+
+              // Sisi muka yang memuat iklan: untuk volume 3D (sisi front/back yang menghadap kamera), atau area 2D
+              const isAdFace = (!isVolume && shape.key === "area") || (isVolume && !shape.back && (shape.key === "front" || shape.key === "back"));
+              const hasMockup = isAdFace && !!mockupImage;
+
+              let matrixTransform: string | null = null;
+              if (hasMockup) {
+                const faceVerts = shape.vertices && shape.vertices.length >= 4 ? shape.vertices : verts;
+                const corners = (faceVerts || [])
+                  .map((v) => projectPoint(v, camera))
+                  .filter((p): p is { x: number; y: number } => p != null && Number.isFinite(p.x) && Number.isFinite(p.y));
+
+                const srcPoints = corners.length === 4 ? corners : (frag.points.length >= 4 ? frag.points : []);
+                if (srcPoints.length >= 4) {
+                  const sortedByY = [...srcPoints].sort((a, b) => a.y - b.y);
+                  const topPoints = sortedByY.slice(0, 2).sort((a, b) => a.x - b.x);
+                  const botPoints = sortedByY.slice(-2).sort((a, b) => a.x - b.x);
+                  const pTL = topPoints[0];
+                  const pTR = topPoints[1];
+                  const pBL = botPoints[0];
+
+                  const a = (pTR.x - pTL.x) / 100;
+                  const b = (pTR.y - pTL.y) / 100;
+                  const c = (pBL.x - pTL.x) / 100;
+                  const d = (pBL.y - pTL.y) / 100;
+                  const e = pTL.x;
+                  const f = pTL.y;
+                  const det = a * d - b * c;
+                  if (Math.abs(det) > 0.00001) {
+                    matrixTransform = `matrix(${a.toFixed(4)} ${b.toFixed(4)} ${c.toFixed(4)} ${d.toFixed(4)} ${e.toFixed(2)} ${f.toFixed(2)})`;
+                  }
+                }
+              }
+
               const shapeFill = !isVolume
-                ? fillOp
+                ? (hasMockup ? 0 : fillOp)
                 : shape.back
                   ? 0.06
-                  : Math.min(1, (shape.key === "front" ? 0.16 : shape.key === "floor" ? 0.34 : shape.top ? 0.24 : 0.32) + boost);
+                  : hasMockup
+                    ? 0
+                    : Math.min(1, (shape.key === "front" ? 0.16 : shape.key === "floor" ? 0.34 : shape.top ? 0.24 : 0.32) + boost);
+
               return (
                 <g key={`${entity.id}-${shape.key}-${i}`}>
+                  {matrixTransform && (
+                    <image
+                      href={mockupImage ?? undefined}
+                      x="0"
+                      y="0"
+                      width="100"
+                      height="100"
+                      preserveAspectRatio="none"
+                      transform={matrixTransform}
+                      className="pointer-events-none"
+                      opacity={0.98}
+                    />
+                  )}
                   {/* Invisible hit target: isi polygon + stroke lebar */}
                   {entityInteractive && !shape.back && (
                     <polygon
