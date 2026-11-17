@@ -1,7 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { formatArea, formatDimensions, formatVolume } from "@/lib/unit-dimensions";
+import {
+  UNIT_PLAN_MIN_ZOOM,
+  createInitialZoomViewport,
+  panZoomViewport,
+  pinchZoomViewport,
+  viewportToViewBox,
+  zoomViewportAtPoint,
+  type ViewportInsets,
+  type ZoomViewport,
+} from "@/lib/unit-plan-zoom";
 
 type Tone = "dark" | "light";
 
@@ -17,6 +36,10 @@ type Props = {
   frontImageUrl?: string | null;
   /** "handgrip" = media digantung pada tali dan rel pegangan di kabin kereta. */
   context?: "handgrip";
+  /** Mode padat untuk modal pratinjau ruang agar tinggi visual proporsional. */
+  compact?: boolean;
+  /** Aktifkan zoom in/out (1x–2x) saat kursor diarahkan dan di-scroll pada diagram 3D/2D. */
+  zoomable?: boolean;
 };
 
 type View = "3d" | "2d";
@@ -24,6 +47,9 @@ type View = "3d" | "2d";
 const VIEW_W = 360;
 const VIEW_H = 230;
 const PAD = 34;
+const MIN_DESKTOP_HEIGHT = 256;
+const MAX_DESKTOP_HEIGHT = 440;
+const DEFAULT_ZOOM_INSETS: Required<ViewportInsets> = { top: 48, right: 12, bottom: 36, left: 12 };
 /** Tampak atas orang dewasa ≈ diameter bahu 0,5 m — pembanding skala denah. */
 const PERSON_M = 0.5;
 /** Tinggi orang dewasa — pembanding skala volume. */
@@ -98,9 +124,77 @@ export default function ScaledUnitPlan({
   tone = "dark",
   frontImageUrl,
   context,
+  compact = false,
+  zoomable = false,
 }: Props) {
   const [view, setView] = useState<View>("3d");
+  const [desktopHeight, setDesktopHeight] = useState(MIN_DESKTOP_HEIGHT);
+  const [insets, setInsets] = useState<Required<ViewportInsets>>(DEFAULT_ZOOM_INSETS);
+  const figureRef = useRef<HTMLElement>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const captionRef = useRef<HTMLElement>(null);
+  const resizeDragRef = useRef<{ pointerId: number; startY: number; startHeight: number } | null>(null);
   const t = THEMES[tone];
+
+  useEffect(() => {
+    if (!zoomable) return;
+    const figure = figureRef.current;
+    const tabs = tabsRef.current;
+    const caption = captionRef.current;
+    if (!figure && !tabs && !caption) return;
+
+    const updateInsets = () => {
+      const tabsH = tabs?.offsetHeight ?? 0;
+      const captionH = caption?.offsetHeight ?? 0;
+      const nextTop = tabsH > 0 ? tabsH + 6 : DEFAULT_ZOOM_INSETS.top;
+      const nextBottom = captionH > 0 ? captionH : DEFAULT_ZOOM_INSETS.bottom;
+      setInsets((prev) =>
+        prev.top === nextTop && prev.bottom === nextBottom
+          ? prev
+          : { ...DEFAULT_ZOOM_INSETS, top: nextTop, bottom: nextBottom }
+      );
+    };
+
+    const observer = new ResizeObserver(updateInsets);
+    if (figure) observer.observe(figure);
+    if (tabs) observer.observe(tabs);
+    if (caption) observer.observe(caption);
+    return () => observer.disconnect();
+  }, [zoomable, view]);
+
+  function startResize(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!event.isPrimary || event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const currentHeight = figureRef.current?.getBoundingClientRect().height ?? desktopHeight;
+    resizeDragRef.current = { pointerId: event.pointerId, startY: event.clientY, startHeight: currentHeight };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveResize(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = resizeDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const nextHeight = Math.round(
+      Math.min(MAX_DESKTOP_HEIGHT, Math.max(MIN_DESKTOP_HEIGHT, drag.startHeight + (event.clientY - drag.startY)))
+    );
+    setDesktopHeight(nextHeight);
+  }
+
+  function endResize(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = resizeDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    resizeDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function handleResizeKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    const delta = event.key === "ArrowDown" ? 16 : -16;
+    setDesktopHeight((prev) => Math.min(MAX_DESKTOP_HEIGHT, Math.max(MIN_DESKTOP_HEIGHT, prev + delta)));
+  }
 
   if (!lengthM || !widthM || lengthM <= 0 || widthM <= 0) {
     return (
@@ -113,27 +207,96 @@ export default function ScaledUnitPlan({
   const area = lengthM * widthM;
   const hasHeight = !!heightM && heightM > 0;
 
+  const tabsList = (
+    <div className={`inline-flex rounded-lg border p-0.5 text-xs ${zoomable ? "pointer-events-auto shadow-xs " : "mb-2 "}${t.tabs}`}>
+      {(
+        [
+          ["3d", "Volume 3D"],
+          ["2d", "Denah 2D"],
+        ] as const
+      ).map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => setView(value)}
+          aria-pressed={view === value}
+          className={`rounded-md px-3 py-1 font-semibold transition ${
+            view === value ? "bg-[#E31E2D] text-white" : t.tabIdle
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const captionContent = (
+    <>
+      <span>
+        {formatArea(area)}
+        {hasHeight ? ` · tinggi ${formatMeter(heightM)} m · volume ${formatVolume(area * heightM)}` : ""}
+        {allocatedArea && allocatedArea > 0
+          ? ` · terbagi ${formatArea(allocatedArea)}, sisa ${formatArea(Math.max(area - allocatedArea, 0))}`
+          : ""}
+      </span>
+      <span className={t.captionMuted}>
+        Grid {formatMeter(gridStepFor(lengthM, widthM))} m · ilustrasi, bukan gambar teknis
+      </span>
+    </>
+  );
+
+  if (!zoomable) {
+    return (
+      <figure className={`rounded-xl border p-3 ${t.frame}`}>
+        {tabsList}
+
+        {view === "3d" ? (
+          hasHeight ? (
+            <Volume3D
+              lengthM={lengthM}
+              widthM={widthM}
+              heightM={heightM}
+              t={t}
+              frontImageUrl={frontImageUrl}
+              context={context}
+              compact={compact}
+            />
+          ) : (
+            <div className={`flex ${compact ? "h-[164px]" : "h-[200px]"} items-center justify-center rounded-lg border border-dashed text-center text-xs ${t.empty}`}>
+              Tinggi belum diisi, volume 3D belum bisa ditampilkan.
+            </div>
+          )
+        ) : (
+          <Plan2D
+            lengthM={lengthM}
+            widthM={widthM}
+            heightM={heightM}
+            allocatedArea={allocatedArea}
+            t={t}
+            compact={compact}
+          />
+        )}
+
+        <figcaption className={`mt-2 flex flex-wrap items-center justify-between gap-2 text-xs ${t.caption}`}>
+          {captionContent}
+        </figcaption>
+      </figure>
+    );
+  }
+
+  const captionGradient =
+    tone === "light"
+      ? "bg-gradient-to-t from-slate-50/95 via-slate-50/80 to-transparent"
+      : "bg-gradient-to-t from-[#261015]/95 via-[#261015]/80 to-transparent";
+
   return (
-    <figure className={`rounded-xl border p-3 ${t.frame}`}>
-      <div className={`mb-2 inline-flex rounded-lg border p-0.5 text-xs ${t.tabs}`}>
-        {(
-          [
-            ["3d", "Volume 3D"],
-            ["2d", "Denah 2D"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setView(value)}
-            aria-pressed={view === value}
-            className={`rounded-md px-3 py-1 font-semibold transition ${
-              view === value ? "bg-[#E31E2D] text-white" : t.tabIdle
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+    <figure
+      ref={figureRef}
+      style={{ "--unit-plan-height": `${desktopHeight}px` } as CSSProperties}
+      className={`relative h-[256px] overflow-hidden rounded-xl border ${t.frame} lg:h-[var(--unit-plan-height)]`}
+    >
+      <div ref={tabsRef} className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start p-3 pb-0">
+        {tabsList}
       </div>
 
       {view === "3d" ? (
@@ -145,29 +308,391 @@ export default function ScaledUnitPlan({
             t={t}
             frontImageUrl={frontImageUrl}
             context={context}
+            compact={compact}
+            zoomable
+            insets={insets}
+            wheelHostRef={figureRef}
           />
         ) : (
-          <div className={`flex h-[200px] items-center justify-center rounded-lg border border-dashed text-center text-xs ${t.empty}`}>
-            Tinggi belum diisi, volume 3D belum bisa ditampilkan.
+          <div className="flex h-full w-full items-center justify-center px-3 pt-12 pb-9">
+            <div className={`flex h-full w-full items-center justify-center rounded-lg border border-dashed text-center text-xs ${t.empty}`}>
+              Tinggi belum diisi, volume 3D belum bisa ditampilkan.
+            </div>
           </div>
         )
       ) : (
-        <Plan2D lengthM={lengthM} widthM={widthM} heightM={heightM} allocatedArea={allocatedArea} t={t} />
+        <Plan2D
+          lengthM={lengthM}
+          widthM={widthM}
+          heightM={heightM}
+          allocatedArea={allocatedArea}
+          t={t}
+          compact={compact}
+          zoomable
+          insets={insets}
+          wheelHostRef={figureRef}
+        />
       )}
 
-      <figcaption className={`mt-2 flex flex-wrap items-center justify-between gap-2 text-xs ${t.caption}`}>
-        <span>
-          {formatArea(area)}
-          {hasHeight ? ` · tinggi ${formatMeter(heightM)} m · volume ${formatVolume(area * heightM)}` : ""}
-          {allocatedArea && allocatedArea > 0
-            ? ` · terbagi ${formatArea(allocatedArea)}, sisa ${formatArea(Math.max(area - allocatedArea, 0))}`
-            : ""}
-        </span>
-        <span className={t.captionMuted}>
-          Grid {formatMeter(gridStepFor(lengthM, widthM))} m · ilustrasi, bukan gambar teknis
-        </span>
+      <figcaption
+        ref={captionRef}
+        className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-wrap items-center justify-between gap-2 px-3 pt-2 pb-3 text-xs ${captionGradient} ${t.caption}`}
+      >
+        {captionContent}
       </figcaption>
+
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Ubah tinggi area visual ukuran"
+        aria-valuemin={MIN_DESKTOP_HEIGHT}
+        aria-valuemax={MAX_DESKTOP_HEIGHT}
+        aria-valuenow={desktopHeight}
+        tabIndex={0}
+        onKeyDown={handleResizeKeyDown}
+        onPointerDown={startResize}
+        onPointerMove={moveResize}
+        onPointerUp={endResize}
+        onPointerCancel={endResize}
+        onLostPointerCapture={endResize}
+        className="absolute inset-x-0 bottom-0 z-20 hidden h-2 cursor-ns-resize touch-none lg:block"
+      />
     </figure>
+  );
+}
+
+/** Pembungkus SVG agar gambar 3D dan 2D mengisi container penuh serta mendukung zoom 1x–2x (scroll/pinch) & pan. */
+function PlanSvg({
+  compact,
+  zoomable,
+  insets,
+  wheelHostRef,
+  ariaLabel,
+  children,
+}: {
+  compact: boolean;
+  zoomable: boolean;
+  insets?: ViewportInsets;
+  wheelHostRef?: RefObject<HTMLElement | null>;
+  ariaLabel: string;
+  children: ReactNode;
+}) {
+  const [rectSize, setRectSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [viewport, setViewport] = useState<ZoomViewport>(() => createInitialZoomViewport(VIEW_W, VIEW_H));
+  const [dragging, setDragging] = useState(false);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const dragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const viewportRef = useRef(viewport);
+  const insetsRef = useRef(insets);
+
+  useEffect(() => {
+    viewportRef.current = viewport;
+  }, [viewport]);
+
+  useEffect(() => {
+    insetsRef.current = insets;
+  }, [insets]);
+
+  useEffect(() => {
+    if (!zoomable) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) {
+        setRectSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
+      }
+    });
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, [zoomable]);
+
+  useEffect(() => {
+    if (!zoomable) return;
+    const svg = svgRef.current;
+    const wheelHost = wheelHostRef?.current ?? svg;
+    if (!svg || !wheelHost) return;
+
+    const handleWheel = (rawEvent: Event) => {
+      const event = rawEvent as WheelEvent;
+      const rect = svg.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0 || event.deltaY === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const deltaPx =
+        event.deltaMode === 1
+          ? event.deltaY * 33
+          : event.deltaMode === 2
+            ? event.deltaY * rect.height
+            : event.deltaY;
+      const sensitivity = event.ctrlKey ? 0.008 : 0.002;
+      const pointerX = event.clientX - rect.left;
+      const pointerY = event.clientY - rect.top;
+
+      setViewport((prev) =>
+        zoomViewportAtPoint(prev, {
+          deltaPx,
+          pointerX,
+          pointerY,
+          rectW: rect.width,
+          rectH: rect.height,
+          viewW: VIEW_W,
+          viewH: VIEW_H,
+          insets: insetsRef.current,
+          sensitivity,
+        })
+      );
+    };
+
+    wheelHost.addEventListener("wheel", handleWheel, { passive: false });
+    return () => wheelHost.removeEventListener("wheel", handleWheel);
+  }, [zoomable, wheelHostRef]);
+
+  useEffect(() => {
+    if (!zoomable) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    type TouchState =
+      | { mode: "none" }
+      | { mode: "pan"; startX: number; startY: number; lastX: number; lastY: number; moved: boolean }
+      | { mode: "pinch"; prevDist: number; prevMidX: number; prevMidY: number };
+
+    let touchState: TouchState = { mode: "none" };
+    let lastTap: { time: number; x: number; y: number } | null = null;
+
+    const handleTouchStart = (event: TouchEvent) => {
+      const rect = svg.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      if (event.touches.length === 2) {
+        event.preventDefault();
+        lastTap = null;
+        const t0 = event.touches[0];
+        const t1 = event.touches[1];
+        const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+        const midX = (t0.clientX + t1.clientX) / 2 - rect.left;
+        const midY = (t0.clientY + t1.clientY) / 2 - rect.top;
+        touchState = { mode: "pinch", prevDist: Math.max(dist, 1), prevMidX: midX, prevMidY: midY };
+        return;
+      }
+
+      if (event.touches.length === 1) {
+        const t0 = event.touches[0];
+        if (viewportRef.current.zoom > UNIT_PLAN_MIN_ZOOM) {
+          touchState = { mode: "pan", startX: t0.clientX, startY: t0.clientY, lastX: t0.clientX, lastY: t0.clientY, moved: false };
+        } else {
+          touchState = { mode: "none" };
+        }
+      }
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const rect = svg.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      if (event.touches.length === 2) {
+        event.preventDefault();
+        lastTap = null;
+        const t0 = event.touches[0];
+        const t1 = event.touches[1];
+        const dist = Math.max(Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), 1);
+        const midX = (t0.clientX + t1.clientX) / 2 - rect.left;
+        const midY = (t0.clientY + t1.clientY) / 2 - rect.top;
+
+        if (touchState.mode !== "pinch") {
+          touchState = { mode: "pinch", prevDist: dist, prevMidX: midX, prevMidY: midY };
+          return;
+        }
+
+        const scaleRatio = dist / touchState.prevDist;
+        const panDx = midX - touchState.prevMidX;
+        const panDy = midY - touchState.prevMidY;
+        touchState.prevDist = dist;
+        touchState.prevMidX = midX;
+        touchState.prevMidY = midY;
+
+        setViewport((prev) =>
+          pinchZoomViewport(prev, {
+            scaleRatio,
+            anchorX: midX,
+            anchorY: midY,
+            panDx,
+            panDy,
+            rectW: rect.width,
+            rectH: rect.height,
+            viewW: VIEW_W,
+            viewH: VIEW_H,
+            insets: insetsRef.current,
+          })
+        );
+        return;
+      }
+
+      if (event.touches.length === 1 && touchState.mode === "pan") {
+        event.preventDefault();
+        const t0 = event.touches[0];
+        const dx = t0.clientX - touchState.lastX;
+        const dy = t0.clientY - touchState.lastY;
+        if (Math.hypot(t0.clientX - touchState.startX, t0.clientY - touchState.startY) > 6) {
+          touchState.moved = true;
+        }
+        touchState.lastX = t0.clientX;
+        touchState.lastY = t0.clientY;
+        setViewport((prev) =>
+          panZoomViewport(prev, {
+            dx,
+            dy,
+            rectW: rect.width,
+            rectH: rect.height,
+            viewW: VIEW_W,
+            viewH: VIEW_H,
+            insets: insetsRef.current,
+          })
+        );
+      }
+    };
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      if (event.touches.length === 1 && touchState.mode === "pinch") {
+        if (viewportRef.current.zoom > UNIT_PLAN_MIN_ZOOM) {
+          const t0 = event.touches[0];
+          touchState = { mode: "pan", startX: t0.clientX, startY: t0.clientY, lastX: t0.clientX, lastY: t0.clientY, moved: true };
+        } else {
+          touchState = { mode: "none" };
+        }
+        return;
+      }
+
+      if (event.touches.length === 0) {
+        if (event.type === "touchend" && touchState.mode === "pan" && !touchState.moved && event.changedTouches[0]) {
+          const t0 = event.changedTouches[0];
+          const now = performance.now();
+          if (lastTap && now - lastTap.time < 300 && Math.hypot(t0.clientX - lastTap.x, t0.clientY - lastTap.y) < 28) {
+            const rect = svg.getBoundingClientRect();
+            setViewport(createInitialZoomViewport(VIEW_W, VIEW_H, rect.width, rect.height, insetsRef.current));
+            lastTap = null;
+          } else {
+            lastTap = { time: now, x: t0.clientX, y: t0.clientY };
+          }
+        }
+        touchState = { mode: "none" };
+      }
+    };
+
+    svg.addEventListener("touchstart", handleTouchStart, { passive: false });
+    svg.addEventListener("touchmove", handleTouchMove, { passive: false });
+    svg.addEventListener("touchend", handleTouchEnd);
+    svg.addEventListener("touchcancel", handleTouchEnd);
+    return () => {
+      svg.removeEventListener("touchstart", handleTouchStart);
+      svg.removeEventListener("touchmove", handleTouchMove);
+      svg.removeEventListener("touchend", handleTouchEnd);
+      svg.removeEventListener("touchcancel", handleTouchEnd);
+    };
+  }, [zoomable]);
+
+  function handlePointerDown(event: ReactPointerEvent<SVGSVGElement>) {
+    if (
+      !zoomable ||
+      event.pointerType !== "mouse" ||
+      viewport.zoom <= UNIT_PLAN_MIN_ZOOM ||
+      !event.isPrimary ||
+      event.button !== 0
+    ) {
+      return;
+    }
+    dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    setDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handlePointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+    setViewport((prev) =>
+      panZoomViewport(prev, {
+        dx,
+        dy,
+        rectW: rect.width,
+        rectH: rect.height,
+        viewW: VIEW_W,
+        viewH: VIEW_H,
+        insets: insetsRef.current,
+      })
+    );
+  }
+
+  function endDrag(event: ReactPointerEvent<SVGSVGElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    setDragging(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  const isZoomed = zoomable && viewport.zoom > UNIT_PLAN_MIN_ZOOM;
+  const baseClass = zoomable
+    ? "absolute inset-0 block h-full w-full"
+    : compact
+      ? "mx-auto block h-auto max-h-[168px] w-full"
+      : "h-auto w-full";
+  const interactionClass = !zoomable
+    ? ""
+    : isZoomed
+      ? dragging
+        ? " select-none cursor-grabbing touch-none"
+        : " select-none cursor-grab touch-none"
+      : " select-none touch-pan-y";
+
+  return (
+    <svg
+      ref={svgRef}
+      viewBox={
+        zoomable
+          ? viewportToViewBox(viewport, VIEW_W, VIEW_H, rectSize.width, rectSize.height, insets)
+          : `0 0 ${VIEW_W} ${VIEW_H}`
+      }
+      className={`${baseClass}${interactionClass}`}
+      role="img"
+      aria-label={ariaLabel}
+      onPointerDown={zoomable ? handlePointerDown : undefined}
+      onPointerMove={zoomable ? handlePointerMove : undefined}
+      onPointerUp={zoomable ? endDrag : undefined}
+      onPointerCancel={zoomable ? endDrag : undefined}
+      onLostPointerCapture={zoomable ? endDrag : undefined}
+      onDoubleClick={
+        zoomable
+          ? () => {
+              if (viewport.zoom > UNIT_PLAN_MIN_ZOOM) {
+                const rect = svgRef.current?.getBoundingClientRect();
+                setViewport(
+                  createInitialZoomViewport(
+                    VIEW_W,
+                    VIEW_H,
+                    rect?.width ?? rectSize.width,
+                    rect?.height ?? rectSize.height,
+                    insetsRef.current
+                  )
+                );
+              }
+            }
+          : undefined
+      }
+    >
+      {children}
+    </svg>
   );
 }
 
@@ -180,6 +705,10 @@ function Volume3D({
   t,
   frontImageUrl,
   context,
+  compact = false,
+  zoomable = false,
+  insets,
+  wheelHostRef,
 }: {
   lengthM: number;
   widthM: number;
@@ -187,6 +716,10 @@ function Volume3D({
   t: Theme;
   frontImageUrl?: string | null;
   context?: "handgrip";
+  compact?: boolean;
+  zoomable?: boolean;
+  insets?: ViewportInsets;
+  wheelHostRef?: RefObject<HTMLElement | null>;
 }) {
   // Sumbu x = panjang, y = lebar, z = tinggi; sudut pandang dari pojok depan (L, W).
   const iso = (x: number, y: number, z: number): [number, number] => [(x - y) * COS30, (x + y) * SIN30 - z];
@@ -265,11 +798,13 @@ function Volume3D({
   const strapBottom = P(L / 2, W / 2, H);
 
   return (
-    <svg
-      viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-      className="h-auto w-full"
-      role="img"
-      aria-label={`Volume ${formatDimensions({ lengthM, widthM, heightM })}`}
+    <PlanSvg
+      key={`${lengthM}-${widthM}-${heightM}`}
+      compact={compact}
+      zoomable={zoomable}
+      insets={insets}
+      wheelHostRef={wheelHostRef}
+      ariaLabel={`Volume ${formatDimensions({ lengthM, widthM, heightM })}`}
     >
       {/* Lantai dan grid lantai (terlihat menembus dinding transparan) */}
       <polygon points={poly([P(0, 0, 0), P(L, 0, 0), P(L, W, 0), P(0, W, 0)])} fill="rgba(227,30,45,0.10)" />
@@ -361,7 +896,7 @@ function Volume3D({
           {small ? "tangan ±18 cm" : "orang ±1,7 m"}
         </text>
       </g>
-    </svg>
+    </PlanSvg>
   );
 }
 
@@ -373,12 +908,20 @@ function Plan2D({
   heightM,
   allocatedArea,
   t,
+  compact = false,
+  zoomable = false,
+  insets,
+  wheelHostRef,
 }: {
   lengthM: number;
   widthM: number;
   heightM?: number | null;
   allocatedArea?: number | null;
   t: Theme;
+  compact?: boolean;
+  zoomable?: boolean;
+  insets?: ViewportInsets;
+  wheelHostRef?: RefObject<HTMLElement | null>;
 }) {
   const scale = Math.min((VIEW_W - PAD * 2) / lengthM, (VIEW_H - PAD * 2) / widthM);
   const rectW = lengthM * scale;
@@ -403,11 +946,13 @@ function Plan2D({
   const personFits = PERSON_M * 2 < Math.min(lengthM, widthM);
 
   return (
-    <svg
-      viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-      className="h-auto w-full"
-      role="img"
-      aria-label={`Denah berskala ${formatDimensions({ lengthM, widthM, heightM })}`}
+    <PlanSvg
+      key={`${lengthM}-${widthM}-${heightM ?? ""}`}
+      compact={compact}
+      zoomable={zoomable}
+      insets={insets}
+      wheelHostRef={wheelHostRef}
+      ariaLabel={`Denah berskala ${formatDimensions({ lengthM, widthM, heightM })}`}
     >
       <defs>
         <pattern id="unit-plan-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -465,6 +1010,6 @@ function Plan2D({
           </text>
         </g>
       ) : null}
-    </svg>
+    </PlanSvg>
   );
 }

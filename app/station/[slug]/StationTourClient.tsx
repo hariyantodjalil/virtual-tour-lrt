@@ -7,7 +7,7 @@
 */
 "use client";
 
-import { useState, useCallback, useEffect, type ReactNode } from "react";
+import { useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -62,6 +62,7 @@ type Space = {
   type: string;
   status: SpaceAvailabilityStatus;
   area: number;
+  areaKind?: string | null;
   monthlyRent?: number;
   deposit: number;
   floor: string;
@@ -100,6 +101,33 @@ function buildRoute(sceneIds: string[], from: string, to: string) {
   const ti = sceneIds.indexOf(to);
   if (fi < 0 || ti < 0) return sceneIds.slice(0, 1);
   return fi <= ti ? sceneIds.slice(fi, ti + 1) : sceneIds.slice(ti, fi + 1).reverse();
+}
+
+/** Resolusi unit, scene, dan arah kamera awal saat tour dibuka dengan query ?unit=. */
+function resolveUnitFocusTarget(
+  scenes: StationInfo["scenes"],
+  levels: StationInfo["levels"],
+  spaces: Space[],
+  unitId: string | null,
+  fallbackSceneId: string
+) {
+  const space = unitId ? spaces.find((item) => item.id === unitId) ?? null : null;
+  const hotspot = space ? findSpaceHotspotPlacement(scenes, space.code) : null;
+  const sceneId = hotspot?.sceneId ?? fallbackSceneId;
+  const placement = findScenePlacement(levels, sceneId);
+  const level = placement?.level ?? levels[0];
+
+  return {
+    unitId,
+    space,
+    sceneId,
+    levelId: level?.id ?? "",
+    areaId: placement?.area?.id ?? level?.areas[0]?.id ?? null,
+    cameraFocus: hotspot
+      ? { yaw: hotspot.yaw, pitch: hotspot.pitch, hfov: 78 }
+      : null,
+    focusToken: hotspot ? 1 : 0,
+  };
 }
 
 /** Urutan rute tetap, tapi tampilan dikelompokkan per level (Ground, Concourse, Peron). */
@@ -219,23 +247,26 @@ export default function StationTourClient({
     "concourse";
   const lastScene = stationInfo.scenes.at(-1)?.id ?? firstScene;
 
+  const [initialUnitLaunch] = useState(() =>
+    resolveUnitFocusTarget(
+      stationInfo.scenes,
+      stationInfo.levels,
+      spaces,
+      searchParams.get("unit"),
+      firstScene
+    )
+  );
+  const lastUnitParamRef = useRef<string | null>(initialUnitLaunch.unitId);
+
   const [pickerOpen, setPickerOpen] = useState(
     () => searchParams.get("pilih") === "1" || searchParams.get("pilih") === "true"
   );
-  const [selectedSpace, setSelectedSpace] = useState<Space | null>(() => {
-    const unitId = searchParams.get("unit");
-    if (!unitId) return null;
-    return spaces.find((item) => item.id === unitId) ?? null;
-  });
+  const [selectedSpace, setSelectedSpace] = useState<Space | null>(initialUnitLaunch.space);
   const [selectedAd, setSelectedAd] = useState<AdHotspotPayload | null>(null);
   const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
-  const [activeSceneId, setActiveSceneId] = useState(firstScene);
-  const [, setActiveLevelId] = useState(
-    initialPlacement?.level.id ?? firstLevel?.id ?? ""
-  );
-  const [activeAreaId, setActiveAreaId] = useState<string | null>(
-    initialPlacement?.area?.id ?? firstLevel?.areas[0]?.id ?? null
-  );
+  const [activeSceneId, setActiveSceneId] = useState(initialUnitLaunch.sceneId);
+  const [, setActiveLevelId] = useState(initialUnitLaunch.levelId);
+  const [, setActiveAreaId] = useState<string | null>(initialUnitLaunch.areaId);
   const [routeFrom, setRouteFrom] = useState(firstScene);
   const [routeTo, setRouteTo] = useState(lastScene);
 
@@ -252,8 +283,8 @@ export default function StationTourClient({
     yaw: number;
     pitch: number;
     hfov?: number;
-  } | null>(null);
-  const [focusToken, setFocusToken] = useState(0);
+  } | null>(initialUnitLaunch.cameraFocus);
+  const [focusToken, setFocusToken] = useState(initialUnitLaunch.focusToken);
   const [activeFacilityId, setActiveFacilityId] = useState<FacilityIconId | null>(null);
   const mobilePanel: MobileTourPanel | null = unitsOpen ? "units" : infoOpen ? "info" : routeOpen ? "route" : null;
 
@@ -269,19 +300,22 @@ export default function StationTourClient({
   // Nav tetap terlihat saat unit drawer kanan terbuka; sembunyi hanya saat detail unit / clear UI
   const showTourNav = !selectedSpace && !uiCleared;
 
-  function activateScene(sceneId: string) {
-    const placement = findScenePlacement(stationInfo.levels, sceneId);
-    setActiveSceneId(sceneId);
-    if (placement) {
-      setActiveLevelId(placement.level.id);
-      setActiveAreaId(placement.area?.id ?? placement.level.areas[0]?.id ?? null);
-    }
-  }
+  const activateScene = useCallback(
+    (sceneId: string) => {
+      const placement = findScenePlacement(stationInfo.levels, sceneId);
+      setActiveSceneId(sceneId);
+      if (placement) {
+        setActiveLevelId(placement.level.id);
+        setActiveAreaId(placement.area?.id ?? placement.level.areas[0]?.id ?? null);
+      }
+    },
+    [stationInfo.levels]
+  );
 
-  function clearCameraFocus() {
+  const clearCameraFocus = useCallback(() => {
     setCameraFocus(null);
     setFocusToken(0);
-  }
+  }, []);
 
   const selectedRoute = buildRoute(sceneIds, routeFrom, routeTo);
   const groupedRoute = groupRouteByLevel(selectedRoute, stationInfo.levels, stationInfo.scenes);
@@ -357,17 +391,53 @@ export default function StationTourClient({
     }
   }, [popupBlocksAutoplay]);
 
-  function focusOnSpaceHotspot(spaceCode: string) {
-    const placement = findSpaceHotspotPlacement(stationInfo.scenes, spaceCode);
-    if (!placement) return;
-    activateScene(placement.sceneId);
-    setCameraFocus({
-      yaw: placement.yaw,
-      pitch: placement.pitch,
-      hfov: 78,
-    });
-    setFocusToken((token) => token + 1);
-  }
+  const focusOnSpaceHotspot = useCallback(
+    (spaceCode: string) => {
+      const placement = findSpaceHotspotPlacement(stationInfo.scenes, spaceCode);
+      if (!placement) return false;
+      activateScene(placement.sceneId);
+      setCameraFocus({
+        yaw: placement.yaw,
+        pitch: placement.pitch,
+        hfov: 78,
+      });
+      setFocusToken((token) => token + 1);
+      return true;
+    },
+    [activateScene, stationInfo.scenes]
+  );
+
+  useEffect(() => {
+    const unitId = searchParams.get("unit");
+    if (!unitId) {
+      lastUnitParamRef.current = null;
+      return;
+    }
+    if (unitId === lastUnitParamRef.current) return;
+
+    const space = spaces.find((item) => item.id === unitId);
+    if (!space) {
+      lastUnitParamRef.current = unitId;
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      lastUnitParamRef.current = unitId;
+      setOpenedFromUnitsList(false);
+      setInfoOpen(false);
+      setRouteOpen(false);
+      setUnitsOpen(false);
+      setFacilityOpen(false);
+      setSelectedAd(null);
+      setInfoPopup(null);
+      setSelectedSpace(space);
+      if (!focusOnSpaceHotspot(space.code)) {
+        clearCameraFocus();
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [searchParams, spaces, focusOnSpaceHotspot, clearCameraFocus]);
 
   function focusOnFacility(facilityIcon: FacilityIconId) {
     const placement = findFacilityHotspotPlacement(

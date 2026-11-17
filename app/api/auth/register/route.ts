@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       message: "Pendaftaran berhasil",
       user,
-      redirectTo: "/partner",
+      redirectTo: "/partner/dashboard",
     }, { status: 201 });
 
     response.cookies.set(

@@ -84,6 +84,7 @@ export default async function StationPage({ params }: Props) {
             type: s.type,
             status: s.status as SpaceAvailabilityStatus,
             area: s.area,
+            areaKind: s.areaKind,
             monthlyRent: s.monthlyRent,
             deposit: s.deposit,
             floor: s.floor,
