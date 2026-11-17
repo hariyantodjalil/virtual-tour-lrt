@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Bell, UserCircle, X } from "lucide-react";
+import { CMS_LEADS_UPDATED_EVENT } from "@/lib/inquiry-sync-events";
+import { useInquiryRealtimeSync } from "@/components/realtime/useInquiryRealtimeSync";
 
 type LeadNotif = {
   id: string;
@@ -42,6 +44,24 @@ function timeAgo(iso: string) {
   return `${days} hari lalu`;
 }
 
+async function fetchNewLeadNotifications(): Promise<LeadNotif[] | null> {
+  try {
+    const res = await fetch("/api/cms/leads", { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : [];
+    return list
+      .filter((l: LeadNotif) => l.status === "NEW")
+      .sort(
+        (a: LeadNotif, b: LeadNotif) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
+      .slice(0, 12);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Lonceng notifikasi CMS — lead baru (status NEW) di header.
  */
@@ -51,37 +71,36 @@ export default function CmsNotifications() {
   const [readIds, setReadIds] = useState<Set<string>>(loadReadIds);
   const [loaded, setLoaded] = useState(false);
 
+  const loadLeads = useCallback(async () => {
+    const fresh = await fetchNewLeadNotifications();
+    if (fresh) {
+      setLeads(fresh);
+    }
+    setLoaded(true);
+  }, []);
+
   useEffect(() => {
     let active = true;
-    async function load() {
-      try {
-        const res = await fetch("/api/cms/leads");
-        if (!res.ok || !active) return;
-        const data = await res.json();
-        if (!active) return;
-        const list = Array.isArray(data) ? data : [];
-        const fresh = list
-          .filter((l: LeadNotif) => l.status === "NEW")
-          .sort(
-            (a: LeadNotif, b: LeadNotif) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          )
-          .slice(0, 12);
+    async function init() {
+      const fresh = await fetchNewLeadNotifications();
+      if (!active) return;
+      if (fresh) {
         setLeads(fresh);
-      } catch {
-        /* ignore */
-      } finally {
-        if (active) setLoaded(true);
       }
+      setLoaded(true);
     }
-
-    void load();
-    const id = window.setInterval(() => void load(), 60_000);
+    void init();
     return () => {
       active = false;
-      window.clearInterval(id);
     };
   }, []);
+
+  useInquiryRealtimeSync({
+    enabled: true,
+    localEvents: [CMS_LEADS_UPDATED_EVENT],
+    fallbackIntervalMs: 60_000,
+    onSync: loadLeads,
+  });
 
   const unread = leads.filter((l) => !readIds.has(l.id));
   const unreadCount = unread.length;
@@ -171,7 +190,7 @@ export default function CmsNotifications() {
                 return (
                   <li key={lead.id} className="border-b border-slate-200 last:border-0">
                     <Link
-                      href="/cms/leads"
+                      href={`/cms/leads/${lead.id}`}
                       onClick={() => {
                         markRead(lead.id);
                         setOpen(false);

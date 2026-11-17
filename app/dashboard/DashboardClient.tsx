@@ -31,6 +31,7 @@ type DashboardData = {
     email: string;
     businessType: string;
     status: string;
+    stageLabel?: string;
     spaceName: string;
     stationName: string;
     stationSlug: string;
@@ -53,6 +54,12 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 
 const CHIP = "border-slate-200 bg-slate-50 text-slate-700";
 const LEAD_STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  PHASE_NEW: { label: "Pengajuan Baru", color: CHIP, icon: <Clock className="h-3 w-3" /> },
+  PHASE_IN_PROGRESS: { label: "Dalam Proses", color: CHIP, icon: <TrendingUp className="h-3 w-3" /> },
+  PHASE_RESERVED: { label: "Unit Dipesan", color: "border-amber-200 bg-amber-50 text-amber-800", icon: <Clock className="h-3 w-3" /> },
+  PHASE_FIT_OUT: { label: "Tahap Fit-Out", color: "border-sky-200 bg-sky-50 text-sky-700", icon: <Clock className="h-3 w-3" /> },
+  PHASE_WON: { label: "Selesai", color: "border-emerald-200 bg-emerald-50 text-emerald-800", icon: <CheckCircle className="h-3 w-3" /> },
+  PHASE_LOST: { label: "Dihentikan", color: "border-red-200 bg-red-50 text-red-800", icon: <XCircle className="h-3 w-3" /> },
   NEW: { label: LEAD_STATUS_LABELS.NEW, color: CHIP, icon: <Clock className="h-3 w-3" /> },
   CONTACTED: { label: LEAD_STATUS_LABELS.CONTACTED, color: CHIP, icon: <MessageCircle className="h-3 w-3" /> },
   RDS_OFFER: { label: LEAD_STATUS_LABELS.RDS_OFFER, color: CHIP, icon: <MessageCircle className="h-3 w-3" /> },
@@ -102,10 +109,10 @@ function StatCard({ title, value, subtitle, icon: Icon, color }: {
 }
 
 function exportCSV(leads: DashboardData["recentLeads"]) {
-  const headers = ["ID", "Perusahaan", "Kontak", "Telepon", "Email", "Jenis Usaha", "Status", "Ruang", "Stasiun", "Tanggal"];
+  const headers = ["ID", "Perusahaan", "Kontak", "Telepon", "Email", "Jenis Usaha", "Tahapan / Status", "Ruang", "Stasiun", "Tanggal"];
   const rows = leads.map((l) => [
     l.id, l.companyName, l.contactName, l.phone, l.email,
-    l.businessType, l.status, l.spaceName, l.stationName,
+    l.businessType, l.stageLabel ?? l.status, l.spaceName, l.stationName,
     new Date(l.createdAt).toLocaleDateString("id-ID"),
   ]);
   const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
@@ -348,7 +355,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                         <td className="py-3 px-3">
                           <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${cfg?.color ?? "border-slate-200 bg-slate-50 text-slate-700"}`}>
                             {cfg?.icon}
-                            {cfg?.label ?? LEAD_STATUS_LABELS[lead.status as CommercialLeadStatus] ?? lead.status}
+                            {lead.stageLabel ?? cfg?.label ?? LEAD_STATUS_LABELS[lead.status as CommercialLeadStatus] ?? lead.status}
                           </span>
                         </td>
                         <td className="py-3 px-3 text-slate-500 text-xs whitespace-nowrap">

@@ -4,6 +4,7 @@ const S3_ROOT_FOLDERS = [
   "/virtual-tour/",
   "/stations/",
   "/spaces/",
+  "/inquiries/",
   "/misc/",
   // Legacy paths (backward compat untuk data lama)
   "/panoramas/",

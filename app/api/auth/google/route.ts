@@ -26,7 +26,7 @@ function emailFingerprint(email: string) {
 }
 
 function defaultRedirectForRole(role: string) {
-  return role === "MITRA" ? "/partner" : "/cms/dashboard";
+  return role === "MITRA" ? "/partner/dashboard" : "/cms/dashboard";
 }
 
 export async function POST(request: NextRequest) {

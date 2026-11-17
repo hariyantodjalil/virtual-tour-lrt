@@ -67,6 +67,7 @@ type CommercialSpace = {
   type: string;
   status: SpaceAvailabilityStatus;
   area: number;
+  areaKind?: string | null;
   monthlyRent?: number;
   deposit: number;
   floor: string;

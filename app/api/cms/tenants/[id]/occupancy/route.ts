@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { occupancySchema } from "@/lib/api-schemas";
+import { publishInquiryEvent } from "@/lib/realtime-events";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -51,6 +52,13 @@ export async function POST(request: NextRequest, { params }: Params) {
     return row;
   });
 
+  if (tenant.userId) {
+    await publishInquiryEvent({
+      kind: "tenancy-updated",
+      userId: tenant.userId,
+    });
+  }
+
   return NextResponse.json(occupancy);
 }
 
@@ -65,6 +73,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
   const occupancy = await prisma.spaceOccupancy.findFirst({
     where: { tenantId, spaceId },
+    include: { tenant: { select: { userId: true } } },
   });
   if (!occupancy) return NextResponse.json({ error: "Occupancy tidak ditemukan" }, { status: 404 });
 
@@ -75,6 +84,13 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       data: { status: "TERSEDIA" },
     });
   });
+
+  if (occupancy.tenant.userId) {
+    await publishInquiryEvent({
+      kind: "tenancy-updated",
+      userId: occupancy.tenant.userId,
+    });
+  }
 
   return NextResponse.json({ message: "Occupancy dihapus" });
 }

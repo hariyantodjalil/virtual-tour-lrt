@@ -13,6 +13,7 @@ type Props = {
 };
 
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
+import { announceAuthLogin } from "@/lib/auth-client";
 
 export default function LoginModal({ open, onClose, onSwitchToRegister, onSuccess }: Props) {
   const router = useRouter();
@@ -62,8 +63,12 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
         return;
       }
 
+      if (data.user) {
+        announceAuthLogin(data.user, "login");
+      }
       onSuccess?.(data.user!);
       onClose();
+      router.refresh();
 
       // Admin / editor → CMS; mitra tetap di halaman saat ini
       const role = data.user?.role as string | undefined;
@@ -209,8 +214,10 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
         <GoogleSignInButton
           remember={remember}
           onSuccess={(u, redirect) => {
+            announceAuthLogin(u, "login");
             onSuccess?.(u);
             onClose();
+            router.refresh();
             if (u.role === "ADMIN" || u.role === "EDITOR") {
               router.push(redirect || "/cms/dashboard");
             }

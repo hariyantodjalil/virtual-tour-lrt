@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail, User, X } from "lucide-react";
 
 type AuthUser = { id: string; email: string; name: string; role: string };
@@ -14,6 +15,7 @@ type Props = {
 };
 
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
+import { announceAuthLogin } from "@/lib/auth-client";
 
 export default function RegisterModal({
   open,
@@ -21,6 +23,7 @@ export default function RegisterModal({
   onSwitchToLogin,
   onSuccess,
 }: Props) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -50,8 +53,12 @@ export default function RegisterModal({
         return;
       }
 
+      if (data.user) {
+        announceAuthLogin(data.user, "register");
+      }
       onSuccess?.(data.user);
       onClose();
+      router.refresh();
       // Mitra tetap di halaman saat ini — panel bisa dibuka dari navbar
     } catch {
       setLoading(false);
@@ -215,9 +222,14 @@ export default function RegisterModal({
 
         <GoogleSignInButton
           remember={remember}
-          onSuccess={(u) => {
+          onSuccess={(u, redirect) => {
+            announceAuthLogin(u, "login");
             onSuccess?.(u);
             onClose();
+            router.refresh();
+            if (u.role === "ADMIN" || u.role === "EDITOR") {
+              router.push(redirect || "/cms/dashboard");
+            }
           }}
           onError={(err) => setError(err)}
           disabled={loading}

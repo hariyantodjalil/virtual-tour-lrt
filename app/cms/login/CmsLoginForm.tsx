@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
+import { announceAuthLogin } from "@/lib/auth-client";
 
 export default function CmsLoginForm() {
   const router = useRouter();
@@ -37,13 +38,19 @@ export default function CmsLoginForm() {
       return;
     }
 
+    if (data.user) {
+      announceAuthLogin(data.user, "login");
+    }
+
     if (data.user?.role === "MITRA") {
-      router.push("/partner");
+      router.push("/partner/dashboard");
+      router.refresh();
       return;
     }
 
     const redirect = searchParams.get("redirect") || data.redirectTo || "/cms/dashboard";
     router.push(redirect);
+    router.refresh();
   }
 
   return (
@@ -102,12 +109,15 @@ export default function CmsLoginForm() {
             className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[rgba(255,214,218,0.14)] bg-[#261015] text-xs font-medium text-[#F8ECEE] transition hover:bg-[#3A161C]"
             label="Masuk dengan Google"
             onSuccess={(u, redirect) => {
+              announceAuthLogin(u, "login");
               if (u.role === "MITRA") {
-                router.push("/partner");
+                router.push("/partner/dashboard");
+                router.refresh();
                 return;
               }
               const target = searchParams.get("redirect") || redirect || "/cms/dashboard";
               router.push(target);
+              router.refresh();
             }}
             onError={(err) => setError(err)}
             disabled={loading}

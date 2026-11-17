@@ -60,3 +60,12 @@ Thumbs.db
 
 # Penyimpanan file lokal (STORAGE_DRIVER=local, khusus development)
 /.local-storage/
+
+# Local development helper scripts & test files
+docker-compose.db.yml
+start-dev.ps1
+start-qa.ps1
+prisma/verify-fase-1.ts
+prisma/verify-fase-2.ts
+prisma/reset-passwords.ts
+public/brand/tour-pins/preview-pin.png

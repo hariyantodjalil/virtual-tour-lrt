@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { sceneEntryViewSchema } from "./scene-entry-view";
+import { ACTIVE_LEAD_STATUSES, SITE_VISIT_STATUS_VALUES } from "./commercial-pipeline";
 import {
   SPACE_AREA_KIND_VALUES,
   STATION_DIMENSION_LIMITS,
@@ -163,37 +164,43 @@ export const occupancySchema = z.object({
   { message: "endDate tidak boleh sebelum startDate", path: ["endDate"] }
 );
 
-export const leadUpdateSchema = z.object({
-  id,
-  status: z.enum([
-    "NEW",
-    "CONTACTED",
-    "RDS_OFFER",
-    "NEGOTIATING",
-    "SITE_CHECK",
-    "BA_SIGNED",
-    "DESIGN_REVIEW",
-    "PKS",
-    "BILLING",
-    "FIT_OUT_HANDOVER",
-    "COMMERCIAL_OPERATION",
-    "CLOSED_WON",
-    "CLOSED_LOST",
-  ]).optional(),
-  siteVisitStatus: z.enum([
-    "NONE",
-    "REQUESTED",
-    "SCHEDULED",
-    "COMPLETED",
-    "CANCELLED",
-  ]).optional(),
-  siteVisitScheduledAt: optionalDate,
-  notes: optionalText(5_000),
-  followUpAt: optionalDate,
-  rdsOfferNo: optionalText(80),
-  baNegotiationNo: optionalText(80),
-  rejectionReason: optionalText(2_000),
-}).strict().refine((value) => Object.keys(value).length > 1, "Minimal satu perubahan harus diisi");
+export const leadUpdateSchema = z
+  .object({
+    id,
+    operation: z
+      .enum([
+        "SAVE_CURRENT_STEP",
+        "ADVANCE_STAGE",
+        "REJECT_STAGE",
+        "SAVE_INTERNAL_NOTE",
+      ])
+      .default("SAVE_CURRENT_STEP"),
+    publicNote: optionalText(2_000),
+    documentNumber: optionalText(160),
+    siteVisitStatus: z.enum(SITE_VISIT_STATUS_VALUES).optional(),
+    siteVisitScheduledAt: optionalDate,
+    notes: optionalText(5_000),
+    rejectionReason: optionalText(1_000),
+    rdsOfferNo: optionalText(160),
+    baNegotiationNo: optionalText(160),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (data.operation === "REJECT_STAGE" && !data.rejectionReason?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["rejectionReason"],
+        message: "Alasan penghentian wajib diisi saat menghentikan pengajuan",
+      });
+    }
+    if (data.operation === "ADVANCE_STAGE" && !data.publicNote?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["publicNote"],
+        message: "Pesan publik tahapan wajib diisi sebelum menyelesaikan tahap ini",
+      });
+    }
+  });
 
 const orderItem = z.object({ sceneId: id, order: safeInteger }).strict();
 export const sceneOrderSchema = z.object({ orders: z.array(orderItem).min(1).max(500) }).strict();
@@ -284,4 +291,62 @@ export const googleAuthSchema = z.object({
   credential: z.string().trim().min(10).max(4096),
   remember: z.boolean().optional(),
 }).strict();
+
+export const workflowStepInputSchema = z
+  .object({
+    stepOrder: z.number().int().min(1),
+    leadStatus: z
+      .enum(ACTIVE_LEAD_STATUSES as [
+        (typeof ACTIVE_LEAD_STATUSES)[number],
+        ...(typeof ACTIVE_LEAD_STATUSES)[number][],
+      ])
+      .default("CONTACTED"),
+    stepType: z
+      .enum(["STANDARD", "DOCUMENT_ISSUANCE", "SITE_VISIT"])
+      .default("STANDARD"),
+    documentNumberLabel: z.string().trim().max(120).optional().nullable(),
+    slaHours: z.number().int().min(1).max(720).optional().nullable(),
+    mediaRequirement: z.enum(["NONE", "OPTIONAL", "REQUIRED"]).default("OPTIONAL"),
+    spaceEffect: z
+      .enum(["NONE", "RESERVE_SPACE", "FIT_OUT_SPACE", "ACTIVATE_TENANT"])
+      .default("NONE"),
+    title: z.string().trim().min(2, "Judul tahap minimal 2 karakter").max(120),
+    description: z.string().trim().max(500).optional().nullable(),
+    publicMessage: z
+      .string()
+      .trim()
+      .min(5, "Pesan panduan publik minimal 5 karakter")
+      .max(2000),
+  })
+  .strict()
+  .superRefine((step, ctx) => {
+    if (step.stepType === "DOCUMENT_ISSUANCE" && !step.documentNumberLabel?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["documentNumberLabel"],
+        message:
+          "Label nomor surat wajib diisi untuk tipe proses Penerbitan Nomor Surat Resmi",
+      });
+    }
+  });
+
+export const workflowDraftSaveSchema = z
+  .object({
+    title: z.string().trim().min(3, "Judul versi workflow minimal 3 karakter").max(160),
+    description: z.string().trim().max(1000).optional().nullable(),
+    steps: z
+      .array(workflowStepInputSchema)
+      .min(2, "Workflow wajib memiliki minimal 2 tahapan")
+      .max(30, "Workflow maksimal memiliki 30 tahapan"),
+  })
+  .strict();
+
+export const workflowCreateDraftSchema = z
+  .object({
+    sourceVersionId: id.optional(),
+    createNew: z.boolean().optional(),
+  })
+  .strict()
+  .default({});
+
 

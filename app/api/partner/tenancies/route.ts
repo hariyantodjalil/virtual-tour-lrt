@@ -55,5 +55,7 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  return NextResponse.json(tenants);
+  return NextResponse.json(tenants, {
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }

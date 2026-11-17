@@ -32,7 +32,7 @@ export const LEAD_STATUS_LABELS: Record<CommercialLeadStatus, string> = {
   BILLING: "Tagihan",
   FIT_OUT_HANDOVER: "Fit-Out & Serah Terima",
   COMMERCIAL_OPERATION: "Operasional Komersial",
-  CLOSED_WON: "Operasional Komersial (Legacy)",
+  CLOSED_WON: "Operasional Komersial (Selesai)",
   CLOSED_LOST: "Drop-off",
 };
 
@@ -47,6 +47,7 @@ export const ACTIVE_LEAD_STATUSES: CommercialLeadStatus[] = [
   "PKS",
   "BILLING",
   "FIT_OUT_HANDOVER",
+  "COMMERCIAL_OPERATION",
 ];
 
 /** Unit dikunci setelah BA Negosiasi, sebelum serah terima. */
@@ -134,6 +135,262 @@ export const SPACE_STATUS_LABELS: Record<CommercialSpaceStatus, string> = {
   MAINTENANCE: "Maintenance",
 };
 
+export const SPACE_TYPE_LABELS: Record<string, string> = {
+  KIOS: "Kios",
+  RUKO: "Ruko",
+  ATM: "ATM",
+  VENDING: "Vending Machine",
+  MEDIA_IKLAN: "Media Iklan",
+  AREA_PROMOSI: "Area Promosi",
+};
+
+export const STANDARD_LEASING_MODEL =
+  "Space-Only Leasing (Sewa Ruang Kosong)";
+export const STANDARD_FIT_OUT_TERMS =
+  "Fit-Out oleh Mitra (Wajib Persetujuan Desain Teknis KAI · Dilarang Menggunakan Tabung Gas LPG di Area Stasiun Layang)";
+
 export function isCommercialOperation(status: string) {
   return status === "COMMERCIAL_OPERATION" || status === "CLOSED_WON";
+}
+
+export function isInquiryFullyCompleted(status: string) {
+  return status === "CLOSED_WON";
+}
+
+export type PipelineStepTypeValue = "STANDARD" | "DOCUMENT_ISSUANCE" | "SITE_VISIT";
+export type StepMediaRequirementValue = "NONE" | "OPTIONAL" | "REQUIRED";
+export type StepSpaceEffectValue =
+  | "NONE"
+  | "RESERVE_SPACE"
+  | "FIT_OUT_SPACE"
+  | "ACTIVATE_TENANT";
+
+export const STEP_TYPE_LABELS: Record<PipelineStepTypeValue, string> = {
+  STANDARD: "Administrasi / Diskusi Standar",
+  DOCUMENT_ISSUANCE: "Penerbitan Nomor Surat Resmi",
+  SITE_VISIT: "Penjadwalan & Verifikasi Lokasi",
+};
+
+export const STEP_MEDIA_REQUIREMENT_LABELS: Record<StepMediaRequirementValue, string> = {
+  NONE: "Tidak Memerlukan Dokumen",
+  OPTIONAL: "Dokumen Opsional",
+  REQUIRED: "Wajib Unggah Dokumen",
+};
+
+export const STEP_SPACE_EFFECT_LABELS: Record<StepSpaceEffectValue, string> = {
+  NONE: "Tidak Mengubah Status Unit",
+  RESERVE_SPACE: "Kunci Unit menjadi RESERVED",
+  FIT_OUT_SPACE: "Ubah Unit menjadi FIT_OUT",
+  ACTIVATE_TENANT: "Ubah Unit menjadi TERISI & Aktifkan Penyewa",
+};
+
+export type StepSlaHealth = "SAFE" | "WARNING" | "BREACHED" | "MET" | "MISSED";
+
+export interface StepSlaInfo {
+  slaHours: number;
+  startedAt: string;
+  dueAt: string;
+  completedAt: string | null;
+  elapsedMs: number;
+  remainingMs: number;
+  health: StepSlaHealth;
+  isRunning: boolean;
+  label: string;
+}
+
+export interface StepTimingLog {
+  stepOrder: number;
+  status: string;
+  action: string;
+  createdAt: Date | string;
+}
+
+export function formatDurationCompact(ms: number): string {
+  const totalMinutes = Math.max(0, Math.floor(ms / 60_000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}j`;
+  return `${hours}j ${minutes}m`;
+}
+
+export function computeStepSla(input: {
+  slaHours: number | null | undefined;
+  stepStartedAt: Date | string;
+  stepCompletedAt?: Date | string | null;
+  isStepCurrentlyRunning: boolean;
+  now?: Date;
+}): StepSlaInfo | null {
+  const { slaHours, stepStartedAt, stepCompletedAt, isStepCurrentlyRunning, now } = input;
+  if (!slaHours || slaHours <= 0) return null;
+
+  const startMs = new Date(stepStartedAt).getTime();
+  if (Number.isNaN(startMs)) return null;
+
+  const slaMs = slaHours * 3600_000;
+  const dueMs = startMs + slaMs;
+
+  if (isStepCurrentlyRunning) {
+    const nowMs = (now ?? new Date()).getTime();
+    const elapsedMs = Math.max(0, nowMs - startMs);
+    const remainingMs = dueMs - nowMs;
+    const elapsedHours = elapsedMs / 3600_000;
+
+    let health: StepSlaHealth = "SAFE";
+    let label = `Sisa ${formatDurationCompact(remainingMs)}`;
+
+    if (elapsedHours > slaHours) {
+      health = "BREACHED";
+      label = `Lewat SLA ${formatDurationCompact(Math.abs(remainingMs))}`;
+    } else if (elapsedHours > slaHours * (2 / 3)) {
+      health = "WARNING";
+      label = `Sisa ${formatDurationCompact(remainingMs)}`;
+    }
+
+    return {
+      slaHours,
+      startedAt: new Date(startMs).toISOString(),
+      dueAt: new Date(dueMs).toISOString(),
+      completedAt: null,
+      elapsedMs,
+      remainingMs,
+      health,
+      isRunning: true,
+      label,
+    };
+  }
+
+  const endMs = stepCompletedAt ? new Date(stepCompletedAt).getTime() : startMs;
+  const elapsedMs = Math.max(0, endMs - startMs);
+  const remainingMs = dueMs - endMs;
+  const health: StepSlaHealth = elapsedMs <= slaMs ? "MET" : "MISSED";
+  const tag = health === "MET" ? "Tepat Waktu" : "Lewat SLA";
+
+  return {
+    slaHours,
+    startedAt: new Date(startMs).toISOString(),
+    dueAt: new Date(dueMs).toISOString(),
+    completedAt: new Date(endMs).toISOString(),
+    elapsedMs,
+    remainingMs,
+    health,
+    isRunning: false,
+    label: `Respons: ${formatDurationCompact(elapsedMs)} (${tag})`,
+  };
+}
+
+export function resolveLeadStepSla(input: {
+  stepOrder: number;
+  slaHours: number | null | undefined;
+  leadCreatedAt: Date | string;
+  leadStatus: string;
+  currentStepOrder: number;
+  stepLogs: StepTimingLog[];
+  now?: Date;
+}): StepSlaInfo | null {
+  if (!input.slaHours || input.slaHours <= 0) return null;
+
+  const sortedLogs = [...input.stepLogs].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+
+  const isTerminal = input.leadStatus === "CLOSED_WON" || input.leadStatus === "CLOSED_LOST";
+  const isCompletedStep =
+    input.leadStatus === "CLOSED_WON" ? true : input.stepOrder < input.currentStepOrder;
+  const isCurrentlyRunning = !isTerminal && input.stepOrder === input.currentStepOrder;
+  const isRejectedOnThisStep =
+    input.leadStatus === "CLOSED_LOST" && input.stepOrder === input.currentStepOrder;
+
+  if (!isCompletedStep && !isCurrentlyRunning && !isRejectedOnThisStep) {
+    return null;
+  }
+
+  const enteredLog = sortedLogs.find((log) => log.stepOrder === input.stepOrder);
+  const stepStartedAt =
+    input.stepOrder === 1
+      ? enteredLog?.createdAt ?? input.leadCreatedAt
+      : enteredLog?.createdAt;
+
+  if (!stepStartedAt) return null;
+
+  const nextStepLog = sortedLogs.find((log) => log.stepOrder > input.stepOrder);
+  const terminalOnThisStepLog = sortedLogs.find(
+    (log) =>
+      log.stepOrder === input.stepOrder &&
+      (log.action === "COMPLETED" ||
+        log.action === "REJECTED" ||
+        log.status === "CLOSED_WON" ||
+        log.status === "CLOSED_LOST")
+  );
+  const stepCompletedAt =
+    nextStepLog?.createdAt ?? terminalOnThisStepLog?.createdAt ?? null;
+
+  return computeStepSla({
+    slaHours: input.slaHours,
+    stepStartedAt,
+    stepCompletedAt,
+    isStepCurrentlyRunning: isCurrentlyRunning,
+    now: input.now,
+  });
+}
+
+export function formatSpaceRequirementLabel(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("TRAIN:")) {
+    const parts = trimmed
+      .slice("TRAIN:".length)
+      .split("|")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (parts.length >= 2) {
+      return `Media Kereta · ${parts.slice(1).join(" — ")}`;
+    }
+    return "Media Iklan Kereta";
+  }
+  return trimmed;
+}
+
+/**
+ * Menurunkan nilai enum legacy `LeadStatus` secara otomatis di balik layar
+ * dari posisi tahap, Tipe Proses, dan Efek Unit agar UI tidak perlu
+ * menampilkan pilihan kategori status yang membingungkan.
+ */
+export function deriveStepLeadStatus(input: {
+  index: number;
+  totalSteps: number;
+  stepType: PipelineStepTypeValue;
+  spaceEffect: StepSpaceEffectValue;
+  title?: string | null;
+  existingLeadStatus?: string | null;
+}): Exclude<CommercialLeadStatus, "CLOSED_WON" | "CLOSED_LOST"> {
+  const { index, totalSteps, stepType, spaceEffect, title, existingLeadStatus } =
+    input;
+  if (index <= 0) return "NEW";
+  if (index >= totalSteps - 1) return "COMMERCIAL_OPERATION";
+
+  if (stepType === "SITE_VISIT") return "SITE_CHECK";
+  if (stepType === "DOCUMENT_ISSUANCE") {
+    if (spaceEffect === "RESERVE_SPACE") {
+      return /pks|perjanjian/i.test(title ?? "") ? "PKS" : "BA_SIGNED";
+    }
+    if (spaceEffect === "FIT_OUT_SPACE") return "FIT_OUT_HANDOVER";
+    return "RDS_OFFER";
+  }
+
+  if (spaceEffect === "FIT_OUT_SPACE") return "FIT_OUT_HANDOVER";
+  if (spaceEffect === "RESERVE_SPACE") {
+    if (existingLeadStatus === "PKS" || existingLeadStatus === "BILLING") {
+      return existingLeadStatus;
+    }
+    if (/tagihan|billing|invoice/i.test(title ?? "")) return "BILLING";
+    if (/pks|perjanjian/i.test(title ?? "")) return "PKS";
+    return "DESIGN_REVIEW";
+  }
+
+  if (existingLeadStatus === "CONTACTED" || existingLeadStatus === "NEGOTIATING") {
+    return existingLeadStatus;
+  }
+  return index < Math.ceil(totalSteps / 2) ? "CONTACTED" : "NEGOTIATING";
 }
