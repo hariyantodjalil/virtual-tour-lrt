@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Building2, CalendarDays, Glasses, MapPin, Store } from "lucide-react";
+import PartnerSectionHeader from "@/components/partner/PartnerSectionHeader";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 
 export type ActiveTenancy = {
@@ -60,42 +61,37 @@ export default function ActiveTenanciesSection({
 
   return (
     <>
-      <div>
-        <p className="text-base text-slate-600 md:text-lg">
-          Halo, <span className="font-semibold text-[#101828]">{displayName}</span>
-        </p>
-        <h1 className="mt-3 text-2xl font-bold tracking-tight text-[#101828] md:text-[28px]">
-          Unit Aktif Saya
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-500">
-          Daftar brand dan ruang komersial yang sudah memasuki tahap operasional.
-        </p>
-      </div>
+      <PartnerSectionHeader
+        displayName={displayName}
+        title="Unit Aktif Saya"
+        subtitle="Daftar brand dan ruang komersial yang sudah memasuki tahap operasional"
+        action={null}
+      />
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
           <div className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
               <Building2 className="size-5" />
             </span>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Brand Aktif
+              <p className="text-xs font-medium text-slate-500">Brand Aktif</p>
+              <p className="text-2xl font-semibold tabular-nums text-[#101828]">
+                {tenancies.length}
               </p>
-              <p className="text-2xl font-bold text-[#101828]">{tenancies.length}</p>
             </div>
           </div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
           <div className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
               <Store className="size-5" />
             </span>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Unit Beroperasi
+              <p className="text-xs font-medium text-slate-500">Unit Beroperasi</p>
+              <p className="text-2xl font-semibold tabular-nums text-[#101828]">
+                {totalUnits}
               </p>
-              <p className="text-2xl font-bold text-[#101828]">{totalUnits}</p>
             </div>
           </div>
         </div>

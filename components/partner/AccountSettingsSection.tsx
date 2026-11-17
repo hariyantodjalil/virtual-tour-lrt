@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import PartnerSectionHeader from "@/components/partner/PartnerSectionHeader";
 import {
   Bell,
   ChevronRight,
@@ -159,29 +160,23 @@ export default function AccountSettingsSection({
 
   return (
     <>
-      <p className="text-base font-semibold text-[#101828] md:text-lg">
-        Halo, {displayName}      </p>
-
-      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#101828] md:text-[28px]">
-            Pengaturan Akun
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Kelola informasi akun dan preferensi Anda.
-          </p>
-        </div>
-        <label className="relative w-full sm:max-w-[240px]">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Cari pengaturan..."
-            className="h-10 w-full rounded-full border border-slate-200 bg-white pr-3 pl-9 text-sm text-[#101828] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
-          />
-        </label>
-      </div>
+      <PartnerSectionHeader
+        displayName={displayName}
+        title="Pengaturan Akun"
+        subtitle="Kelola informasi akun dan preferensi Anda"
+        action={
+          <label className="relative w-full sm:max-w-[240px]">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Cari pengaturan..."
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white pr-3 pl-9 text-sm text-[#101828] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
+            />
+          </label>
+        }
+      />
 
       <div className="mt-6 space-y-4">
         {groups.map((group, groupIndex) => (
