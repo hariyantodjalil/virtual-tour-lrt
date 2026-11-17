@@ -21,6 +21,7 @@ import {
   Store,
   Undo2,
   AlertCircle,
+  Map as MapIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AddMode } from "@/lib/hotspot-types";
@@ -49,6 +50,8 @@ type Props = {
   onDuplicate: () => void;
   onSetInitialView: () => void;
   onOpenConnectionMap: () => void;
+  minimapOpen?: boolean;
+  onToggleMinimap?: () => void;
   onTogglePreview: () => void;
   onReset: () => void;
   onSave: () => void;
@@ -83,6 +86,8 @@ export function EditorToolbar({
   onDuplicate,
   onSetInitialView,
   onOpenConnectionMap,
+  minimapOpen = false,
+  onToggleMinimap,
   onTogglePreview,
   onReset,
   onSave,
@@ -316,6 +321,20 @@ export function EditorToolbar({
           >
             <Network className="h-3.5 w-3.5" />
           </button>
+          {onToggleMinimap ? (
+            <button
+              type="button"
+              className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium ${
+                minimapOpen ? "bg-[#c41230] text-white" : "text-slate-600 hover:text-[#101828]"
+              }`}
+              onClick={onToggleMinimap}
+              disabled={isPreview}
+              title="Minimap denah: unggah denah, taruh scene, atur arah"
+              aria-pressed={minimapOpen}
+            >
+              <MapIcon className="h-3.5 w-3.5" /> Minimap
+            </button>
+          ) : null}
         </div>
         <details className="relative ml-auto text-xs text-slate-600" onKeyDown={(event) => {
           if (event.key !== "Escape") return;

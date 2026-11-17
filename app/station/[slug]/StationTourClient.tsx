@@ -54,6 +54,8 @@ import { FACILITY_ICONS, type FacilityIconId } from "@/lib/facility-icons";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 import { getTourLocationBreadcrumb } from "@/lib/tour-location-breadcrumb";
+import TourMinimap from "@/components/tour/TourMinimap";
+import { createMinimapViewStore } from "@/lib/minimap-view-store";
 
 type Space = {
   id: string;
@@ -265,6 +267,7 @@ export default function StationTourClient({
   const [selectedAd, setSelectedAd] = useState<AdHotspotPayload | null>(null);
   const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
   const [activeSceneId, setActiveSceneId] = useState(initialUnitLaunch.sceneId);
+  const [minimapView] = useState(createMinimapViewStore);
   const [, setActiveLevelId] = useState(initialUnitLaunch.levelId);
   const [, setActiveAreaId] = useState<string | null>(initialUnitLaunch.areaId);
   const [routeFrom, setRouteFrom] = useState(firstScene);
@@ -554,7 +557,20 @@ export default function StationTourClient({
         stationName={stationInfo.name}
         hideSceneBar
         chromeTone="maroon"
+        onViewChange={minimapView.set}
       />
+
+      {!uiCleared && (
+        <div className="pointer-events-none absolute bottom-24 right-3 z-[64] sm:bottom-28 sm:right-5">
+          <TourMinimap
+            levels={stationInfo.levels}
+            scenes={stationInfo.scenes}
+            activeSceneId={activeSceneId}
+            viewStore={minimapView}
+            onSelectScene={handleSceneChange}
+          />
+        </div>
+      )}
 
       {guidedActive && showTourNav && (
         <GuidedRouteBar

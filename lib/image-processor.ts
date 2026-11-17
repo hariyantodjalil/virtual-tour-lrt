@@ -220,3 +220,21 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+// ─── Denah minimap level ─────────────────────────────────────────────────────
+// Lebar maks 2400px agar tetap tajam saat minimap diperbesar; tidak dipotong.
+export async function processFloorPlan(input: Buffer): Promise<ProcessResult> {
+  const buffer = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS })
+    .rotate()
+    .resize(2400, 2400, { fit: "inside", withoutEnlargement: true, kernel: sharp.kernel.lanczos3 })
+    .webp({ quality: 88, effort: 4 })
+    .toBuffer();
+  const out = await sharp(buffer).metadata();
+  return {
+    buffer,
+    contentType: "image/webp",
+    width: out.width ?? 0,
+    height: out.height ?? 0,
+    sizeBytes: buffer.length,
+  };
+}

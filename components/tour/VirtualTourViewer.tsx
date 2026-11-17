@@ -64,6 +64,8 @@ type Props = {
    * bukan berdiri di lantai seperti ruang komersial stasiun.
    */
   pinVolumeDistanceM?: number;
+  /** Dipanggil saat yaw/HFOV kamera berubah (mis. untuk kerucut pandang minimap). */
+  onViewChange?: (view: { yaw: number; hfov: number }) => void;
 };
 
 function loadPannellum(): Promise<void> {
@@ -132,6 +134,7 @@ export default function VirtualTourViewer({
   hideSceneBar = false,
   chromeTone = "default",
   pinVolumeDistanceM,
+  onViewChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -152,6 +155,21 @@ export default function VirtualTourViewer({
   const [overlay, setOverlay] = useState<DiveOverlayState>(ZERO_OVERLAY);
   const [error, setError] = useState<string | null>(null);
   const [viewerReady, setViewerReady] = useState(false);
+
+  // Laporkan arah kamera berkala; hanya aktif bila ada pendengar (minimap).
+  useEffect(() => {
+    if (!onViewChange) return;
+    const timer = window.setInterval(() => {
+      const viewer = viewerRef.current;
+      if (!viewer) return;
+      try {
+        onViewChange({ yaw: viewer.getYaw(), hfov: viewer.getHfov() });
+      } catch {
+        /* viewer belum siap */
+      }
+    }, 120);
+    return () => window.clearInterval(timer);
+  }, [onViewChange]);
   const [internalSceneId, setInternalSceneId] = useState(initialScene ?? scenes[0]?.id);
   const [autoRotate, setAutoRotate] = useState(false);
   const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);

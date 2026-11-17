@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import { cmsFetch } from "@/lib/cms-fetch";
+import MinimapEditorPanel from "@/components/cms/MinimapEditorPanel";
 import {
   Plus,
   Trash2,
@@ -343,6 +344,7 @@ export default function VirtualTourEditorPage() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [showConnectionMap, setShowConnectionMap] = useState(false);
+  const [showMinimap, setShowMinimap] = useState(false);
   const [uploadingCreative, setUploadingCreative] = useState(false);
 
   // ─── Derived ─────────────────────────────────────────────────────────────
@@ -1846,6 +1848,8 @@ export default function VirtualTourEditorPage() {
         onDuplicate={duplicateSelected}
         onSetInitialView={handleSetInitialView}
         onOpenConnectionMap={() => setShowConnectionMap(true)}
+        minimapOpen={showMinimap}
+        onToggleMinimap={() => setShowMinimap((value) => !value)}
         onTogglePreview={() => {
           setPreviewEntryView(null);
           setIsPreview((p) => !p);
@@ -1911,6 +1915,19 @@ export default function VirtualTourEditorPage() {
 
         {/* ── Center: Canvas / Preview ─────────────────────────────── */}
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {showMinimap && !isPreview ? (
+            <MinimapEditorPanel
+              stationId={stationId}
+              levels={levels}
+              scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title, levelId: s.levelId }))}
+              currentSceneId={currentScene?.sceneId ?? null}
+              getView={getEditorView}
+              onSaved={(levelId, minimap) =>
+                setLevels((prev) => prev.map((level) => (level.id === levelId ? { ...level, minimap } : level)))
+              }
+              onClose={() => setShowMinimap(false)}
+            />
+          ) : null}
           {currentScene ? (
             isPreview ? (
               <PannellumPreview

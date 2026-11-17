@@ -104,6 +104,8 @@ model VirtualTourLevel {
   label     String
   color     String             @default("#10b981")
   hint      String?
+  /// Denah minimap level: gambar, kalibrasi 3 sudut lantai, dan pin posisi/arah tiap scene.
+  minimap   Json?
   order     Int                @default(0)
   isActive  Boolean            @default(true)
   areas     VirtualTourArea[]
