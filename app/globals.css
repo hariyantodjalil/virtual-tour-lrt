@@ -1091,3 +1091,21 @@ body {
     animation: none;
   }
 }
+
+/* Minimap: denyut penanda posisi scene aktif. */
+@keyframes minimap-pulse {
+  0% { transform: scale(0.7); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.minimap-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: minimap-pulse 1.8s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .minimap-pulse {
+    animation: none;
+  }
+}

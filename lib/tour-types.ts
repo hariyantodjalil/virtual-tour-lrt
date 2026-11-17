@@ -71,6 +71,8 @@ export type TourLevelPublic = {
   areas: TourAreaPublic[];
   /** Scene tanpa area (fallback) — urutan sceneId */
   sceneIds: string[];
+  /** Denah minimap level (gambar, kalibrasi, pin scene). */
+  minimap?: import("@/lib/minimap").LevelMinimap | null;
 };
 
 export type StationInfo = {

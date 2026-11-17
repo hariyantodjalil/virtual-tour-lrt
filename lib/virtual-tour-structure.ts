@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { withLevelMinimaps } from "@/lib/level-minimap-store";
 import { DEFAULT_TOUR_LEVELS, slugifyLabel } from "@/lib/virtual-tour-defaults";
 
 export type TourLevel = {
@@ -11,6 +12,8 @@ export type TourLevel = {
   order: number;
   isActive: boolean;
   areas: TourArea[];
+  /** JSON minimap mentah; baca dengan parseLevelMinimap. */
+  minimap?: unknown;
 };
 
 export type TourArea = {
@@ -136,7 +139,7 @@ export async function getTourStructure(stationId: string) {
     }),
   ]);
 
-  const levelsWithAreas: TourLevel[] = levels.map((level) => ({
+  const levelsWithAreas: TourLevel[] = (await withLevelMinimaps(stationId, levels)).map((level) => ({
     ...level,
     areas: areas.filter((a) => a.levelId === level.id),
   }));
