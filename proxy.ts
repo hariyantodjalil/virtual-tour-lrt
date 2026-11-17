@@ -75,7 +75,7 @@ export function proxy(request: NextRequest) {
     }
 
     if (!isAdminOrEditor) {
-      return NextResponse.redirect(new URL("/partner", request.url));
+      return NextResponse.redirect(new URL("/partner/dashboard", request.url));
     }
   }
 

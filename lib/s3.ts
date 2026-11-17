@@ -182,6 +182,7 @@ export function extractS3KeyFromUrl(url: string): string | null {
     "/virtual-tour/",
     "/stations/",
     "/spaces/",
+    "/inquiries/",
     "/misc/",
     // Legacy paths (backward compat)
     "/panoramas/",

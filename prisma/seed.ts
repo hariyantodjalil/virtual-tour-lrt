@@ -1,4 +1,12 @@
-import { PrismaClient, SpaceStatus, SpaceType } from "@prisma/client";
+import {
+  LeadStatus,
+  PipelineStepType,
+  PrismaClient,
+  SpaceStatus,
+  SpaceType,
+  StepMediaRequirement,
+  StepSpaceEffect,
+} from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import bcrypt from "bcryptjs";
@@ -107,6 +115,176 @@ function makeSceneData(stationCode: string, index: number) {
     },
   ];
 }
+
+const WORKFLOW_V1_STEPS: {
+  id: string;
+  stepOrder: number;
+  leadStatus: LeadStatus;
+  title: string;
+  description: string;
+  publicMessage: string;
+  stepType: PipelineStepType;
+  documentNumberLabel: string | null;
+  slaHours: number | null;
+  mediaRequirement: StepMediaRequirement;
+  requiresMedia: boolean;
+  spaceEffect: StepSpaceEffect;
+}[] = [
+  {
+    id: "gitdev-leasing-v1-NEW",
+    stepOrder: 1,
+    leadStatus: "NEW",
+    title: "Inquiry Baru",
+    description: "Data minat sewa masuk untuk ditinjau tim komersial.",
+    publicMessage: "Data minat sewa masuk untuk ditinjau tim komersial.",
+    stepType: "STANDARD",
+    documentNumberLabel: null,
+    slaHours: 24,
+    mediaRequirement: "OPTIONAL",
+    requiresMedia: false,
+    spaceEffect: "NONE",
+  },
+  {
+    id: "gitdev-leasing-v1-CONTACTED",
+    stepOrder: 2,
+    leadStatus: "CONTACTED",
+    title: "Sudah Dihubungi",
+    description: "Tim komersial menghubungi Anda untuk melengkapi informasi.",
+    publicMessage: "Tim komersial menghubungi Anda untuk melengkapi informasi.",
+    stepType: "STANDARD",
+    documentNumberLabel: null,
+    slaHours: null,
+    mediaRequirement: "OPTIONAL",
+    requiresMedia: false,
+    spaceEffect: "NONE",
+  },
+  {
+    id: "gitdev-leasing-v1-RDS_OFFER",
+    stepOrder: 3,
+    leadStatus: "RDS_OFFER",
+    title: "Penawaran Resmi",
+    description: "Tim komersial menyampaikan penawaran resmi.",
+    publicMessage: "Tim komersial menyampaikan penawaran resmi.",
+    stepType: "DOCUMENT_ISSUANCE",
+    documentNumberLabel: "Nomor Surat Penawaran Resmi (RDS)",
+    slaHours: null,
+    mediaRequirement: "REQUIRED",
+    requiresMedia: true,
+    spaceEffect: "NONE",
+  },
+  {
+    id: "gitdev-leasing-v1-NEGOTIATING",
+    stepOrder: 4,
+    leadStatus: "NEGOTIATING",
+    title: "Negosiasi",
+    description: "Pembahasan kebutuhan usaha dan ketentuan sewa.",
+    publicMessage: "Pembahasan kebutuhan usaha dan ketentuan sewa.",
+    stepType: "STANDARD",
+    documentNumberLabel: null,
+    slaHours: null,
+    mediaRequirement: "OPTIONAL",
+    requiresMedia: false,
+    spaceEffect: "NONE",
+  },
+  {
+    id: "gitdev-leasing-v1-SITE_CHECK",
+    stepOrder: 5,
+    leadStatus: "SITE_CHECK",
+    title: "Verifikasi Lokasi",
+    description: "Pemeriksaan lokasi dan batas area unit.",
+    publicMessage: "Pemeriksaan lokasi dan batas area unit.",
+    stepType: "SITE_VISIT",
+    documentNumberLabel: null,
+    slaHours: null,
+    mediaRequirement: "OPTIONAL",
+    requiresMedia: false,
+    spaceEffect: "NONE",
+  },
+  {
+    id: "gitdev-leasing-v1-BA_SIGNED",
+    stepOrder: 6,
+    leadStatus: "BA_SIGNED",
+    title: "BA Negosiasi",
+    description: "Penandatanganan berita acara negosiasi.",
+    publicMessage: "Penandatanganan berita acara negosiasi.",
+    stepType: "DOCUMENT_ISSUANCE",
+    documentNumberLabel: "Nomor Berita Acara (BA) Negosiasi",
+    slaHours: null,
+    mediaRequirement: "REQUIRED",
+    requiresMedia: true,
+    spaceEffect: "RESERVE_SPACE",
+  },
+  {
+    id: "gitdev-leasing-v1-DESIGN_REVIEW",
+    stepOrder: 7,
+    leadStatus: "DESIGN_REVIEW",
+    title: "Review Desain",
+    description: "Peninjauan rancangan penataan ruang dan kebutuhan teknis.",
+    publicMessage: "Peninjauan rancangan penataan ruang dan kebutuhan teknis.",
+    stepType: "STANDARD",
+    documentNumberLabel: null,
+    slaHours: null,
+    mediaRequirement: "OPTIONAL",
+    requiresMedia: false,
+    spaceEffect: "RESERVE_SPACE",
+  },
+  {
+    id: "gitdev-leasing-v1-PKS",
+    stepOrder: 8,
+    leadStatus: "PKS",
+    title: "Perjanjian Kerja Sama",
+    description: "Penyusunan dan penandatanganan perjanjian kerja sama.",
+    publicMessage: "Penyusunan dan penandatanganan perjanjian kerja sama.",
+    stepType: "DOCUMENT_ISSUANCE",
+    documentNumberLabel: "Nomor Perjanjian Kerja Sama (PKS)",
+    slaHours: null,
+    mediaRequirement: "REQUIRED",
+    requiresMedia: true,
+    spaceEffect: "RESERVE_SPACE",
+  },
+  {
+    id: "gitdev-leasing-v1-BILLING",
+    stepOrder: 9,
+    leadStatus: "BILLING",
+    title: "Tagihan",
+    description: "Proses tagihan sesuai kesepakatan.",
+    publicMessage: "Proses tagihan sesuai kesepakatan.",
+    stepType: "DOCUMENT_ISSUANCE",
+    documentNumberLabel: "Nomor Invoice / Tagihan",
+    slaHours: null,
+    mediaRequirement: "REQUIRED",
+    requiresMedia: true,
+    spaceEffect: "RESERVE_SPACE",
+  },
+  {
+    id: "gitdev-leasing-v1-FIT_OUT_HANDOVER",
+    stepOrder: 10,
+    leadStatus: "FIT_OUT_HANDOVER",
+    title: "Fit-Out & Serah Terima",
+    description: "Persiapan ruang, fit-out, dan serah terima.",
+    publicMessage: "Persiapan ruang, fit-out, dan serah terima.",
+    stepType: "STANDARD",
+    documentNumberLabel: null,
+    slaHours: null,
+    mediaRequirement: "REQUIRED",
+    requiresMedia: true,
+    spaceEffect: "FIT_OUT_SPACE",
+  },
+  {
+    id: "gitdev-leasing-v1-COMMERCIAL_OPERATION",
+    stepOrder: 11,
+    leadStatus: "COMMERCIAL_OPERATION",
+    title: "Operasional Komersial",
+    description: "Unit memasuki tahap operasional komersial.",
+    publicMessage: "Unit memasuki tahap operasional komersial.",
+    stepType: "STANDARD",
+    documentNumberLabel: null,
+    slaHours: null,
+    mediaRequirement: "OPTIONAL",
+    requiresMedia: false,
+    spaceEffect: "ACTIVATE_TENANT",
+  },
+];
 
 async function main() {
   if (process.env.ALLOW_DESTRUCTIVE_SEED !== "true") {
@@ -219,6 +397,54 @@ async function main() {
 
     console.log(`  ok ${stationData.name} [${stationData.code}] (${spaceTemplates.length} unit, 3 scenes)`);
   }
+
+  await prisma.pipelineWorkflowVersion.upsert({
+    where: { id: "gitdev-leasing-v1" },
+    create: {
+      id: "gitdev-leasing-v1",
+      version: 1,
+      title: "Alur pengajuan sewa LRT Jabodebek",
+      description: "Tahapan proses komersial yang berlaku.",
+      status: "ACTIVE",
+      publishedAt: new Date(),
+    },
+    update: {},
+  });
+
+  for (const step of WORKFLOW_V1_STEPS) {
+    await prisma.pipelineStep.upsert({
+      where: {
+        workflowVersionId_stepOrder: {
+          workflowVersionId: "gitdev-leasing-v1",
+          stepOrder: step.stepOrder,
+        },
+      },
+      create: {
+        id: step.id,
+        workflowVersionId: "gitdev-leasing-v1",
+        stepOrder: step.stepOrder,
+        leadStatus: step.leadStatus,
+        title: step.title,
+        description: step.description,
+        publicMessage: step.publicMessage,
+        stepType: step.stepType,
+        documentNumberLabel: step.documentNumberLabel,
+        slaHours: step.slaHours,
+        mediaRequirement: step.mediaRequirement,
+        requiresMedia: step.requiresMedia,
+        spaceEffect: step.spaceEffect,
+      },
+      update: {
+        stepType: step.stepType,
+        documentNumberLabel: step.documentNumberLabel,
+        slaHours: step.slaHours,
+        mediaRequirement: step.mediaRequirement,
+        requiresMedia: step.requiresMedia,
+        spaceEffect: step.spaceEffect,
+      },
+    });
+  }
+  console.log(`  ok Workflow V1 (${WORKFLOW_V1_STEPS.length} stages)`);
 
   console.log(`\nok Seeding selesai: ${stations.length} stasiun berhasil ditambahkan.`);
 }

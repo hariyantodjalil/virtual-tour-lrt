@@ -14,9 +14,10 @@ model User {
   avatarUrl   String?
   role        UserRole     @default(EDITOR)
   isActive    Boolean      @default(true)
-  tenantLeads TenantLead[]
-  tenants     Tenant[]
-  createdAt   DateTime     @default(now())
+  tenantLeads    TenantLead[]
+  tenants        Tenant[]
+  favoriteSpaces PartnerFavorite[]
+  createdAt      DateTime          @default(now())
   updatedAt   DateTime     @updatedAt
 
   @@map("users")
@@ -194,12 +195,27 @@ model CommercialSpace {
   tenantLeads     TenantLead[]
   visitEvents     VisitEvent[]
   occupancy       SpaceOccupancy?
+  favoritedBy     PartnerFavorite[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
   @@unique([stationId, code])
   @@index([parentZoneId])
   @@map("commercial_spaces")
+}
+
+/** Unit komersial yang disimpan sebagai favorit oleh akun Mitra. */
+model PartnerFavorite {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spaceId   String
+  space     CommercialSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+
+  @@unique([userId, spaceId])
+  @@index([userId, createdAt])
+  @@map("partner_favorites")
 }
 
 /** Jejak perubahan data tenant (unit stasiun & train space) — dasar cycle time analysis. */
@@ -283,8 +299,9 @@ model TenantLead {
   message          String?
   rdsOfferNo       String?
   baNegotiationNo  String?
-  status           LeadStatus       @default(NEW)
-  notes            String?
+  status               LeadStatus       @default(NEW)
+  currentStepOrder     Int              @default(1)
+  notes                String?
   followUpAt       DateTime?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -298,7 +315,7 @@ model TenantLead {
 
 model PipelineWorkflowVersion {
   id          String       @id @default(cuid())
-  version     Int          @unique
+  version     Int?         @unique
   title       String
   description String?
   status      String       @default("DRAFT")
@@ -313,19 +330,24 @@ model PipelineWorkflowVersion {
 }
 
 model PipelineStep {
-  id                String                  @id @default(cuid())
-  workflowVersionId String
-  workflowVersion   PipelineWorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
-  stepOrder         Int
-  leadStatus        LeadStatus
-  title             String
-  description       String?
-  publicMessage     String                  @db.Text
-  requiresMedia     Boolean                 @default(false)
-  stepLogs          InquiryStepLog[]
+  id                  String                  @id @default(cuid())
+  workflowVersionId   String
+  workflowVersion     PipelineWorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  stepOrder           Int
+  leadStatus          LeadStatus              @default(CONTACTED)
+  stepType            PipelineStepType        @default(STANDARD)
+  documentNumberLabel String?
+  slaHours            Int?
+  mediaRequirement    StepMediaRequirement    @default(OPTIONAL)
+  requiresMedia       Boolean                 @default(false)
+  spaceEffect         StepSpaceEffect         @default(NONE)
+  title               String
+  description         String?
+  publicMessage       String                  @db.Text
+  stepLogs            InquiryStepLog[]
 
   @@unique([workflowVersionId, stepOrder])
-  @@unique([workflowVersionId, leadStatus])
+  @@index([workflowVersionId, leadStatus])
   @@map("pipeline_steps")
 }
 
@@ -346,20 +368,24 @@ model InquiryMedia {
 }
 
 model InquiryStepLog {
-  id             String        @id @default(cuid())
+  id             String           @id @default(cuid())
   tenantLeadId   String
-  tenantLead     TenantLead    @relation(fields: [tenantLeadId], references: [id], onDelete: Cascade)
+  tenantLead     TenantLead       @relation(fields: [tenantLeadId], references: [id], onDelete: Cascade)
   pipelineStepId String?
-  pipelineStep   PipelineStep? @relation(fields: [pipelineStepId], references: [id], onDelete: SetNull)
+  pipelineStep   PipelineStep?    @relation(fields: [pipelineStepId], references: [id], onDelete: SetNull)
   stepOrder      Int
   status         LeadStatus
   fromStatus     LeadStatus?
   action         String
-  notes          String?       @db.Text
+  notes          String?          @db.Text
+  documentNumber String?
+  visitStatus    SiteVisitStatus?
+  scheduledAt    DateTime?
   performedBy    String
-  createdAt      DateTime      @default(now())
+  createdAt      DateTime         @default(now())
 
   @@index([tenantLeadId, createdAt])
+  @@index([tenantLeadId, stepOrder])
   @@map("inquiry_step_logs")
 }
 
@@ -441,6 +467,25 @@ enum SiteVisitStatus {
   SCHEDULED
   COMPLETED
   CANCELLED
+}
+
+enum PipelineStepType {
+  STANDARD
+  DOCUMENT_ISSUANCE
+  SITE_VISIT
+}
+
+enum StepMediaRequirement {
+  NONE
+  OPTIONAL
+  REQUIRED
+}
+
+enum StepSpaceEffect {
+  NONE
+  RESERVE_SPACE
+  FIT_OUT_SPACE
+  ACTIVATE_TENANT
 }
 
 enum EventType {

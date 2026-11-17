@@ -9,8 +9,13 @@ import path from "node:path";
  * Key yang sama dengan S3 (mis. "virtual-tour/panoramas/cawang/panorama_x.webp") disimpan sebagai file
  * di LOCAL_STORAGE_DIR (default ".local-storage/") dan dibaca lagi lewat /api/s3-proxy.
  */
+const PLACEHOLDER_S3_ENDPOINT = "https://object-storage.example.internal";
+
 export function isLocalStorageEnabled() {
-  return process.env.STORAGE_DRIVER === "local" && process.env.NODE_ENV !== "production";
+  if (process.env.NODE_ENV === "production") return false;
+  if (process.env.STORAGE_DRIVER === "local") return true;
+  if (process.env.STORAGE_DRIVER === "s3") return false;
+  return !process.env.S3_ENDPOINT || process.env.S3_ENDPOINT === PLACEHOLDER_S3_ENDPOINT;
 }
 
 function storageRoot() {

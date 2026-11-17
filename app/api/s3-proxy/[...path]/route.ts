@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, requireRole } from "@/lib/auth";
 import { isLocalStorageEnabled, readLocalObject } from "@/lib/local-storage";
+import { prisma } from "@/lib/prisma";
 
 const s3Client = new S3Client({
   endpoint: process.env.S3_ENDPOINT,
@@ -21,6 +22,7 @@ const CONTENT_TYPE_MAP: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".png": "image/png",
   ".webp": "image/webp",
+  ".pdf": "application/pdf",
   ".mp4": "video/mp4",
   ".json": "application/json",
 };
@@ -34,6 +36,10 @@ function shouldServeDirectly(path: string): boolean {
   const imageExtensions = [".jpg", ".jpeg", ".png", ".webp"];
   const ext = path.substring(path.lastIndexOf(".")).toLowerCase();
   return imageExtensions.includes(ext);
+}
+
+function shouldServeInquiryInline(path: string): boolean {
+  return path.startsWith("inquiries/") && (shouldServeDirectly(path) || path.toLowerCase().endsWith(".pdf"));
 }
 
 function validateS3Key(pathSegments: string[]): string | null {
@@ -89,13 +95,40 @@ export async function GET(
     }
 
     const isPublic = isPublicKey(s3Key);
+    const isInquiryObject = s3Key.startsWith("inquiries/");
     if (isPublic && !shouldServeDirectly(s3Key)) {
       return new NextResponse("Resource not found", { status: 404 });
     }
     if (!isPublic) {
-      const auth = await requireAuth(request);
-      if ("error" in auth) {
-        return new NextResponse("Resource not found", { status: 404 });
+      if (isInquiryObject) {
+        const auth = await requireRole(request, ["ADMIN", "EDITOR", "MITRA"]);
+        if ("error" in auth) {
+          return new NextResponse("Resource not found", { status: 404 });
+        }
+        if (auth.user.role === "MITRA") {
+          const [, leadId] = s3Key.split("/");
+          if (!leadId) {
+            return new NextResponse("Resource not found", { status: 404 });
+          }
+          const expectedProxyPath = `/api/s3-proxy/${s3Key}`;
+          const visibleMedia = await prisma.inquiryMedia.findFirst({
+            where: {
+              tenantLeadId: leadId,
+              isVisibleToMitra: true,
+              mediaLink: { in: [expectedProxyPath, `/${s3Key}`] },
+              tenantLead: { userId: auth.user.userId },
+            },
+            select: { id: true },
+          });
+          if (!visibleMedia) {
+            return new NextResponse("Resource not found", { status: 404 });
+          }
+        }
+      } else {
+        const auth = await requireAuth(request);
+        if ("error" in auth) {
+          return new NextResponse("Resource not found", { status: 404 });
+        }
       }
     }
 
@@ -105,18 +138,20 @@ export async function GET(
     if (isLocalStorageEnabled()) {
       const local = await readLocalObject(s3Key);
       if (!local) return new NextResponse("Resource not found", { status: 404 });
-      return new NextResponse(new Uint8Array(local), {
-        headers: {
-          "Content-Type": contentType,
-          "Content-Length": String(local.length),
-          "Cache-Control": isPublic ? "public, max-age=31536000, immutable" : "private, no-store",
-          "X-Content-Type-Options": "nosniff",
-          "Cross-Origin-Resource-Policy": "same-origin",
-        },
-      });
+      const headers: Record<string, string> = {
+        "Content-Type": contentType,
+        "Content-Length": String(local.length),
+        "Cache-Control": isPublic ? "public, max-age=31536000, immutable" : "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Cross-Origin-Resource-Policy": "same-origin",
+      };
+      if (isInquiryObject) {
+        headers["Content-Disposition"] = "inline";
+      }
+      return new NextResponse(new Uint8Array(local), { headers });
     }
 
-    if (shouldServeDirectly(s3Key) || s3Key.endsWith(".json")) {
+    if (shouldServeDirectly(s3Key) || s3Key.endsWith(".json") || shouldServeInquiryInline(s3Key)) {
       const getObjectCommand = new GetObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key });
       const s3Response = await s3Client.send(getObjectCommand);
       if (!s3Response.Body) {
@@ -136,6 +171,9 @@ export async function GET(
         "X-Content-Type-Options": "nosniff",
         "Cross-Origin-Resource-Policy": "same-origin",
       });
+      if (isInquiryObject) {
+        headers.set("Content-Disposition", "inline");
+      }
       if (typeof s3Response.ContentLength === "number") {
         headers.set("Content-Length", String(s3Response.ContentLength));
       }
