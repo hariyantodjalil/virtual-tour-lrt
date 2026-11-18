@@ -22,17 +22,18 @@ datasource db {
 }
 
 model User {
-  id          String       @id @default(cuid())
-  email       String       @unique
+  id          String            @id @default(cuid())
+  email       String            @unique
   password    String
   name        String
   avatarUrl   String?
-  role        UserRole     @default(EDITOR)
-  isActive    Boolean      @default(true)
+  role        UserRole          @default(EDITOR)
+  isActive    Boolean           @default(true)
   tenantLeads TenantLead[]
   tenants     Tenant[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  feedbacks   PartnerFeedback[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   @@map("users")
 }
@@ -639,4 +640,18 @@ model TrainInquiryCar {
 
   @@id([inquiryId, carSlug])
   @@map("train_inquiry_cars")
+}
+
+/** Masukan mitra dari portal partner — dibaca di CMS Feedback. */
+model PartnerFeedback {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic     String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@map("partner_feedbacks")
 }

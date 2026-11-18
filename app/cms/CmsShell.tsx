@@ -19,6 +19,9 @@ import {
   Sliders,
   LayoutGrid,
   ChevronDown,
+  ExternalLink,
+  Home,
+  MessageSquareHeart,
   type LucideIcon,
 } from "lucide-react";
 import CmsNotifications from "@/components/cms/CmsNotifications";
@@ -70,6 +73,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/cms/leads", label: "Pengajuan & Site Visit", icon: UserCircle },
       { href: "/cms/advertising-form", label: "Form Advertising", icon: Sliders },
+      { href: "/cms/feedback", label: "Feedback", icon: MessageSquareHeart },
     ],
   },
   {
@@ -118,6 +122,9 @@ function isFullWidthPage(pathname: string) {
 function getPageMeta(pathname: string) {
   if (pathname.startsWith("/cms/advertising-form")) {
     return { title: "Form Advertising", subtitle: "Opsi status pengaju dan kategori bisnis" };
+  }
+  if (pathname.startsWith("/cms/feedback")) {
+    return { title: "Feedback", subtitle: "Masukan mitra dari portal partner" };
   }
   if (pathname.startsWith("/cms/settings")) {
     return {
@@ -377,11 +384,33 @@ export default function CmsShell({
               {collapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
             </button>
 
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="truncate text-base font-black text-slate-900 sm:text-lg">{pageMeta.title}</h1>
             </div>
 
-            <CmsNotifications />
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                href="/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D81435]"
+              >
+                <Home className="size-4 shrink-0" aria-hidden />
+                <span className="hidden sm:inline">Beranda</span>
+                <ExternalLink className="size-3.5 shrink-0 text-slate-400" aria-hidden />
+              </Link>
+              <Link
+                href="/komersial"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D81435]"
+              >
+                <Map className="size-4 shrink-0" aria-hidden />
+                <span className="hidden sm:inline">Virtual Tour</span>
+                <ExternalLink className="size-3.5 shrink-0 text-slate-400" aria-hidden />
+              </Link>
+              <CmsNotifications />
+            </div>
           </div>
         </header>
 

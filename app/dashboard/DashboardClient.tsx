@@ -126,12 +126,9 @@ function buildLeadJourney(leadsByStatus: DashboardData["leadsByStatus"]) {
       count,
     };
   });
-  const dropOff = leadsByStatus
-    .filter((item) => item.status === "CLOSED_LOST")
-    .reduce((sum, item) => sum + item.count, 0);
   const inJourney = steps.reduce((sum, step) => sum + step.count, 0);
   const peak = Math.max(1, ...steps.map((step) => step.count));
-  return { steps, dropOff, inJourney, peak };
+  return { steps, inJourney, peak };
 }
 
 export default function DashboardClient({ data }: { data: DashboardData }) {
@@ -376,79 +373,69 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-8 text-center text-sm text-amber-900">
               Data journey gagal dimuat
             </div>
-          ) : journey.inJourney === 0 && journey.dropOff === 0 ? (
+          ) : journey.inJourney === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">
               Belum ada pengajuan di pipeline
             </div>
           ) : (
-            <div className="space-y-5">
-              <ol className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-                {journey.steps.map((step, index) => {
-                  const hasLeads = step.count > 0;
-                  const width = `${Math.max(8, Math.round((step.count / journey.peak) * 100))}%`;
-                  return (
-                    <li key={step.key} className="relative min-w-0">
-                      {index < journey.steps.length - 1 ? (
+            <ol className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+              {journey.steps.map((step, index) => {
+                const hasLeads = step.count > 0;
+                const width = `${Math.max(8, Math.round((step.count / journey.peak) * 100))}%`;
+                return (
+                  <li key={step.key} className="relative min-w-0">
+                    {index < journey.steps.length - 1 ? (
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute top-5 left-[calc(50%+1.25rem)] hidden h-px w-[calc(100%-1.5rem)] bg-slate-200 xl:block"
+                      />
+                    ) : null}
+                    <div
+                      className={cn(
+                        "relative flex h-full flex-col rounded-xl border px-3 py-4",
+                        hasLeads
+                          ? "border-slate-200 bg-white"
+                          : "border-dashed border-slate-200 bg-slate-50/70"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
                         <span
+                          className={cn(
+                            "inline-flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                            hasLeads
+                              ? "bg-[#E31E2D] text-white"
+                              : "border border-slate-200 bg-white text-slate-500"
+                          )}
                           aria-hidden
-                          className="pointer-events-none absolute top-5 left-[calc(50%+1.25rem)] hidden h-px w-[calc(100%-1.5rem)] bg-slate-200 xl:block"
-                        />
-                      ) : null}
-                      <div
-                        className={cn(
-                          "relative flex h-full flex-col rounded-xl border px-3 py-4",
-                          hasLeads
-                            ? "border-slate-200 bg-white"
-                            : "border-dashed border-slate-200 bg-slate-50/70"
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              "inline-flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                              hasLeads
-                                ? "bg-[#E31E2D] text-white"
-                                : "border border-slate-200 bg-white text-slate-500"
-                            )}
-                            aria-hidden
-                          >
-                            {hasLeads && index === journey.steps.length - 1 ? (
-                              <Check className="size-3.5" />
-                            ) : (
-                              index + 1
-                            )}
-                          </span>
-                          <p className="min-w-0 text-sm font-semibold text-slate-900" title={step.fullTitle}>
-                            {step.title}
-                          </p>
-                        </div>
-                        <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
-                          {formatNumber(step.count)}
+                        >
+                          {hasLeads && index === journey.steps.length - 1 ? (
+                            <Check className="size-3.5" />
+                          ) : (
+                            index + 1
+                          )}
+                        </span>
+                        <p className="min-w-0 text-sm font-semibold text-slate-900" title={step.fullTitle}>
+                          {step.title}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">pengajuan di tahap ini</p>
-                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100" aria-hidden>
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-[width]",
-                              hasLeads ? "bg-[#1B3A6B]" : "bg-transparent"
-                            )}
-                            style={{ width: hasLeads ? width : "0%" }}
-                          />
-                        </div>
                       </div>
-                    </li>
-                  );
-                })}
-              </ol>
-
-              {journey.dropOff > 0 ? (
-                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                  Drop-off di luar journey:{" "}
-                  <span className="font-semibold text-slate-900">{formatNumber(journey.dropOff)}</span>{" "}
-                  pengajuan
-                </p>
-              ) : null}
-            </div>
+                      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+                        {formatNumber(step.count)}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">pengajuan di tahap ini</p>
+                      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-[width]",
+                            hasLeads ? "bg-[#1B3A6B]" : "bg-transparent"
+                          )}
+                          style={{ width: hasLeads ? width : "0%" }}
+                        />
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
           )}
         </CardContent>
       </Card>

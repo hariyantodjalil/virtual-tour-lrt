@@ -101,7 +101,7 @@ export default function CmsNotifications() {
   };
 
   return (
-    <div className="relative ml-auto">
+    <div className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

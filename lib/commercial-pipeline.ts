@@ -75,6 +75,11 @@ export function completedLeadStageIndex(status: string): number {
   return publicLeadStageIndex(status);
 }
 
+export function inquiryStatusLabel(status: string) {
+  if (["RDS_OFFER", "NEGOTIATING", "SITE_CHECK"].includes(status)) return "Negosiasi berlangsung";
+  return PUBLIC_LEAD_PROCESS_STEPS[publicLeadStageIndex(status)]?.title ?? "Pengajuan tidak dilanjutkan";
+}
+
 export function canonicalLeadStatus(status: CommercialLeadStatus): CommercialLeadStatus {
   if (["RDS_OFFER", "SITE_CHECK"].includes(status)) return "NEGOTIATING";
   if (["BILLING", "FIT_OUT_HANDOVER"].includes(status)) return "PKS";

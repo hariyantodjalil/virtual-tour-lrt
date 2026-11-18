@@ -1,28 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Building2,
-  CheckCircle2,
   ChevronDown,
   CircleHelp,
-  ClipboardList,
-  Clock3,
+  ExternalLink,
   FileText,
   Glasses,
   Headset,
   Heart,
-  LayoutDashboard,
+  Home,
   LogOut,
   MapPin,
-  Plus,
   Settings,
-  ArrowUpRight,
 } from "lucide-react";
-import { formatRupiah } from "@/lib/utils";
+import { formatRupiah, getWhatsAppUrl } from "@/lib/utils";
 import StationPickerModal, {
   type StationPickerItem,
 } from "@/components/tour/StationPickerModal";
@@ -33,18 +29,14 @@ import AccountSettingsSection from "@/components/partner/AccountSettingsSection"
 import ActiveTenanciesSection, {
   type ActiveTenancy,
 } from "@/components/partner/ActiveTenanciesSection";
+import HelpSection from "@/components/partner/HelpSection";
 import {
   FAVORITES_UPDATED_EVENT,
   readFavoriteSpaces,
   removeFavoriteSpace,
   type FavoriteSpace,
 } from "@/lib/favorite-spaces";
-import {
-  ACTIVE_LEAD_STATUSES,
-  isCommercialOperation,
-} from "@/lib/commercial-pipeline";
-
-import InquiryTimeline, { inquiryStatusLabel } from "@/components/partner/InquiryTimeline";
+import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 
 type User = {
   id: string;
@@ -56,10 +48,8 @@ type User = {
 type Lead = PartnerLead;
 
 const NAV_ITEMS = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "pengajuan", label: "Pengajuan Sewa", icon: FileText },
   { id: "unit-aktif", label: "Unit Aktif Saya", icon: Building2 },
-  { id: "tour", label: "Virtual Tour", icon: Glasses },
   { id: "favorit", label: "Favorit", icon: Heart },
   { id: "akun", label: "Pengaturan Akun", icon: Settings },
   { id: "bantuan", label: "Bantuan", icon: CircleHelp },
@@ -67,6 +57,12 @@ const NAV_ITEMS = [
 
 export default function PartnerPage() {
   const router = useRouter();
+  const commercialProfile = useCommercialProfile();
+  const contactWhatsAppUrl = getWhatsAppUrl(
+    commercialProfile.whatsappNumber,
+    commercialProfile.defaultWhatsappMessage ||
+      "Halo, saya mitra portal LRT Jabodebek. Mohon bantuan untuk proses sewa ruang komersial."
+  );
   const [user, setUser] = useState<User | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [tenancies, setTenancies] = useState<ActiveTenancy[]>([]);
@@ -74,7 +70,7 @@ export default function PartnerPage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerStations, setPickerStations] = useState<StationPickerItem[]>([]);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [activeNav, setActiveNav] = useState<(typeof NAV_ITEMS)[number]["id"]>("dashboard");
+  const [activeNav, setActiveNav] = useState<(typeof NAV_ITEMS)[number]["id"]>("pengajuan");
   const [favorites, setFavorites] = useState<FavoriteSpace[]>([]);
 
   useEffect(() => {
@@ -137,20 +133,6 @@ export default function PartnerPage() {
     void load();
   }, []);
 
-  const summary = useMemo(
-    () => ({
-      total: leads.length,
-      active: leads.filter((lead) =>
-        ACTIVE_LEAD_STATUSES.includes(
-          lead.status as (typeof ACTIVE_LEAD_STATUSES)[number]
-        )
-      ).length,
-      won: leads.filter((lead) => isCommercialOperation(lead.status)).length,
-      lost: leads.filter((lead) => lead.status === "CLOSED_LOST").length,
-    }),
-    [leads]
-  );
-
   const displayName = user?.name?.trim() || user?.email?.split("@")[0] || "Mitra";
   const initial = displayName.charAt(0).toUpperCase();
 
@@ -170,10 +152,7 @@ export default function PartnerPage() {
 
   function onNavClick(id: (typeof NAV_ITEMS)[number]["id"]) {
     setActiveNav(id);
-    if (id === "tour") openStationPicker();
   }
-
-  const showComingSoon = activeNav === "bantuan";
 
   return (
     <div className="font-display min-h-screen bg-[#f3f4f6] text-[#101828]">
@@ -216,7 +195,26 @@ export default function PartnerPage() {
           </span>
         </Link>
 
-        <div className="flex items-center gap-3 md:gap-4">
+        <div className="flex items-center gap-2 md:gap-3">
+          <Link
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:px-3 sm:text-sm"
+          >
+            <Home className="size-3.5 shrink-0" aria-hidden />
+            <span className="hidden sm:inline">Beranda</span>
+            <ExternalLink className="size-3 shrink-0 opacity-80" aria-hidden />
+          </Link>
+          <button
+            type="button"
+            onClick={openStationPicker}
+            disabled={pickerStations.length === 0}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-60 sm:px-3 sm:text-sm"
+          >
+            <Glasses className="size-3.5 shrink-0" aria-hidden />
+            <span className="hidden sm:inline">Virtual Tour</span>
+          </button>
           <div className="relative">
             <button
               type="button"
@@ -291,13 +289,15 @@ export default function PartnerPage() {
               <p className="mt-1 text-xs leading-relaxed text-slate-500">
                 Tim komersial siap membantu proses sewa Anda.
               </p>
-              <Link
-                href="/#kontak"
+              <a
+                href={contactWhatsAppUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#c41230] px-3 py-2 text-xs font-semibold text-white transition hover:brightness-110"
               >
                 <Headset className="size-3.5" />
                 Hubungi Kami
-              </Link>
+              </a>
             </div>
 
             <div className="flex items-center justify-center gap-3 px-1 pb-1">
@@ -322,19 +322,7 @@ export default function PartnerPage() {
         {/* Main */}
         <main className="min-w-0 flex-1 md:ml-[240px]">
           <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
-            {activeNav === "dashboard" ? (
-              <DashboardOverview
-                displayName={displayName}
-                loading={loading}
-                leads={leads}
-                favorites={favorites}
-                summary={summary}
-                onExplore={openStationPicker}
-                onOpenPengajuan={() => setActiveNav("pengajuan")}
-                onOpenFavorit={() => setActiveNav("favorit")}
-                pickerReady={pickerStations.length > 0}
-              />
-            ) : activeNav === "pengajuan" ? (
+            {activeNav === "pengajuan" ? (
               <ApplicationsSection
                 displayName={displayName}
                 loading={loading}
@@ -361,14 +349,16 @@ export default function PartnerPage() {
                 user={user}
                 displayName={displayName}
                 onLogout={logout}
-                onOpenPengajuan={() => setActiveNav("pengajuan")}
-                onOpenBantuan={() => setActiveNav("bantuan")}
                 onUserUpdated={setUser}
               />
-            ) : showComingSoon ? (
-              <ComingSoonSection
+            ) : activeNav === "bantuan" ? (
+              <HelpSection
                 displayName={displayName}
-                title={NAV_ITEMS.find((item) => item.id === activeNav)?.label ?? "Menu"}
+                contactWhatsAppUrl={contactWhatsAppUrl}
+                teamName={commercialProfile.teamName}
+                onOpenPengajuan={() => setActiveNav("pengajuan")}
+                onOpenTour={openStationPicker}
+                tourReady={pickerStations.length > 0}
               />
             ) : null}
           </div>
@@ -399,227 +389,6 @@ export default function PartnerPage() {
         })}
       </nav>
     </div>
-  );
-}
-
-function DashboardOverview({
-  displayName,
-  loading,
-  leads,
-  favorites,
-  summary,
-  onExplore,
-  onOpenPengajuan,
-  onOpenFavorit,
-  pickerReady,
-}: {
-  displayName: string;
-  loading: boolean;
-  leads: Lead[];
-  favorites: FavoriteSpace[];
-  summary: { total: number; active: number; won: number; lost: number };
-  onExplore: () => void;
-  onOpenPengajuan: () => void;
-  onOpenFavorit: () => void;
-  pickerReady: boolean;
-}) {
-  const recentLeads = leads.slice(0, 5);
-  const recentFavorites = favorites.slice(0, 3);
-
-  return (
-    <>
-      <p className="text-base text-slate-600 md:text-lg">
-        Halo, <span className="font-semibold text-[#101828]">{displayName}</span>      </p>
-
-      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#101828] md:text-[28px]">
-            Dashboard Mitra
-          </h1>
-          <p className="mt-1 max-w-xl text-sm text-slate-500">
-            Ringkasan pengajuan, favorit, dan akses cepat ke virtual tour.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onExplore}
-          disabled={!pickerReady}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#c41230] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-50"
-        >
-          <Glasses className="size-4" />
-          Jelajahi Virtual Tour
-        </button>
-      </div>
-
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          title="Total Pengajuan"
-          value={summary.total}
-          caption="Semua pengajuan"
-          icon={<ClipboardList className="size-5" />}
-          tone="red"
-        />
-        <MetricCard
-          title="Sedang Diproses"
-          value={summary.active}
-          caption="Menunggu review"
-          icon={<Clock3 className="size-5" />}
-          tone="orange"
-        />
-        <MetricCard
-          title="Unit Favorit"
-          value={favorites.length}
-          caption="Disimpan dari tour"
-          icon={<Heart className="size-5" />}
-          tone="rose"
-        />
-        <MetricCard
-          title="Sewa Aktif"
-          value={summary.won}
-          caption="Pembayaran terverifikasi & sewa efektif"
-          icon={<CheckCircle2 className="size-5" />}
-          tone="green"
-        />
-      </div>
-
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        <QuickAction
-          icon={<FileText className="size-5" />}
-          title="Pengajuan Sewa"
-          description="Lihat semua status minat sewa"
-          onClick={onOpenPengajuan}
-        />
-        <QuickAction
-          icon={<Heart className="size-5" />}
-          title="Favorit"
-          description="Kelola unit yang Anda simpan"
-          onClick={onOpenFavorit}
-        />
-        <QuickAction
-          icon={<Plus className="size-5" />}
-          title="Ajukan Baru"
-          description="Pilih stasiun lalu ajukan unit"
-          onClick={onExplore}
-          disabled={!pickerReady}
-        />
-        </div>
-
-      {/* Pengajuan progress — gaya list kartu + timeline */}
-      <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-[#101828]">Pengajuan Saya</h2>
-          <button
-            type="button"
-            onClick={onOpenPengajuan}
-            className="text-sm font-semibold text-[#c41230] hover:underline"
-          >
-            Lihat semua
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="py-12 text-center text-sm text-slate-500">Memuat pengajuan...</div>
-        ) : recentLeads.length === 0 ? (
-          <div className="rounded-2xl bg-slate-50 px-5 py-10 text-center">
-            <p className="text-sm text-slate-500">
-              Belum ada pengajuan tenant. Ajukan unit dari virtual tour.
-            </p>
-            <button
-              type="button"
-              onClick={onExplore}
-              disabled={!pickerReady}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#c41230] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              <Glasses className="size-4" />
-              Jelajahi Virtual Tour
-            </button>
-          </div>
-        ) : (
-          <ApplicationProgressList leads={recentLeads} />
-        )}
-      </section>
-
-      {recentFavorites.length > 0 && (
-        <section className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-            <h2 className="text-base font-bold text-[#101828]">Favorit Terbaru</h2>
-            <button
-              type="button"
-              onClick={onOpenFavorit}
-              className="text-sm font-semibold text-[#c41230] hover:underline"
-            >
-              Lihat semua
-            </button>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {recentFavorites.map((item) => (
-              <div key={item.spaceId} className="flex items-start justify-between gap-3 px-5 py-4">
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-[#101828]">
-                    {item.code} — {item.name}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {item.stationName} · {item.area} m²
-                  </p>
-                </div>
-                <Link
-                  href={`/station/${item.stationSlug}?unit=${item.spaceId}`}
-                  className="shrink-0 text-sm font-semibold text-[#c41230] hover:underline"
-                >
-                  Buka
-                </Link>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-    </>
-  );
-}
-
-function ApplicationProgressList({ leads }: { leads: Lead[] }) {
-  return <ul className="divide-y divide-slate-200">
-    {leads.map(lead => {
-      const title = inquiryStatusLabel(lead.status);
-      return <li key={lead.id} className="grid gap-5 py-5 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="min-w-0">
-          <h3 className="break-words text-base font-semibold">{lead.space?.code ?? lead.trainInquiry?.mediaCode ?? "—"} — {lead.space?.name ?? lead.trainInquiry?.mediaTitle ?? "Unit Komersial"}</h3>
-          <p className="mt-2 text-sm text-slate-600">{lead.space?.station?.name ?? lead.trainInquiry?.train.name}</p>
-          <p className="mt-2 text-sm font-medium text-[#a81724]">{title}</p>
-          <Link href={"/partner/inquiries/" + encodeURIComponent(lead.id)} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-semibold text-[#c41230] hover:underline focus-visible:outline-2 focus-visible:outline-[#c41230]">Pantau pengajuan<ArrowUpRight className="size-4" /></Link>
-        </div>
-        <InquiryTimeline status={lead.status} compact />
-      </li>;
-    })}
-  </ul>;
-}
-
-function QuickAction({
-  icon,
-  title,
-  description,
-  onClick,
-  disabled,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-[#c41230]/30 hover:bg-[#c41230]/[0.02] disabled:opacity-50"
-    >
-      <span className="flex size-10 items-center justify-center rounded-xl bg-[#c41230]/10 text-[#c41230]">
-        {icon}
-      </span>
-      <p className="mt-3 text-sm font-bold text-[#101828]">{title}</p>
-      <p className="mt-1 text-xs text-slate-500">{description}</p>
-    </button>
   );
 }
 
@@ -740,62 +509,5 @@ function FavoritesSection({
         )}
       </section>
     </>
-  );
-}
-
-function ComingSoonSection({
-  displayName,
-  title,
-}: {
-  displayName: string;
-  title: string;
-}) {
-  return (
-    <>
-      <p className="text-base text-slate-600 md:text-lg">
-        Halo, <span className="font-semibold text-[#101828]">{displayName}</span>      </p>
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <h1 className="text-2xl font-bold text-[#101828]">{title}</h1>
-        <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-          Fitur ini segera hadir. Sementara itu, pantau pengajuan sewa atau jelajahi virtual tour.
-        </p>
-    </div>
-    </>
-  );
-}
-
-function MetricCard({
-  title,
-  value,
-  caption,
-  icon,
-  tone,
-}: {
-  title: string;
-  value: number;
-  caption: string;
-  icon: React.ReactNode;
-  tone: "red" | "orange" | "green" | "rose";
-}) {
-  const tones = {
-    red: "bg-[#c41230]/10 text-[#c41230]",
-    orange: "bg-orange-100 text-orange-600",
-    green: "bg-emerald-100 text-emerald-600",
-    rose: "bg-rose-100 text-rose-600",
-  };
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-slate-500">{title}</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-[#101828]">{value}</p>
-          <p className="mt-1 text-xs text-slate-400">{caption}</p>
-        </div>
-        <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${tones[tone]}`}>
-          {icon}
-        </span>
-      </div>
-    </div>
   );
 }
