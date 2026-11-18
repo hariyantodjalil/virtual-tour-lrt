@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Power, PowerOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cmsFetch } from "@/lib/cms-fetch";
 
 type Props = {
@@ -23,6 +24,7 @@ export default function StationActions({ station }: Props) {
   const router = useRouter();
   const [busyAction, setBusyAction] = useState<"status" | "delete" | null>(null);
   const [error, setError] = useState("");
+  const { confirmDialog, confirmElement } = useConfirmDialog();
 
   async function toggleStatus() {
     const nextActive = !station.isActive;
@@ -50,9 +52,12 @@ export default function StationActions({ station }: Props) {
   }
 
   async function deleteStation() {
-    const confirmed = window.confirm(
-      `Hapus stasiun "${station.name}" secara permanen?\n\nSemua unit, tenant, dan data virtual tour di stasiun ini juga akan dihapus.`
-    );
+    const confirmed = await confirmDialog({
+      title: `Hapus stasiun "${station.name}" secara permanen?`,
+      description: "Semua unit, tenant, dan data virtual tour di stasiun ini juga akan dihapus.",
+      confirmLabel: "Ya, Hapus Stasiun",
+      destructive: true,
+    });
     if (!confirmed) return;
 
     setBusyAction("delete");
@@ -77,48 +82,44 @@ export default function StationActions({ station }: Props) {
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busyAction !== null}
-          onClick={toggleStatus}
-          className={
-            station.isActive
-              ? "border-amber-700 text-amber-300 hover:bg-amber-950"
-              : "border-emerald-700 text-emerald-300 hover:bg-emerald-950"
-          }
-        >
-          {station.isActive ? (
-            <PowerOff className="h-3.5 w-3.5" />
-          ) : (
-            <Power className="h-3.5 w-3.5" />
-          )}
-          {busyAction === "status"
-            ? "Memproses..."
-            : station.isActive
-              ? "Nonaktifkan"
-              : "Aktifkan"}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busyAction !== null}
-          onClick={deleteStation}
-          className="border-red-800 text-red-300 hover:bg-red-950"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          {busyAction === "delete" ? "Menghapus..." : "Hapus"}
-        </Button>
-      </div>
-      {error && (
-        <p role="alert" className="text-xs text-red-400">
+    <>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={busyAction !== null}
+        onClick={toggleStatus}
+        aria-label={station.isActive ? "Nonaktifkan stasiun" : "Aktifkan stasiun"}
+        title={station.isActive ? "Nonaktifkan" : "Aktifkan"}
+        className={
+          station.isActive
+            ? "border-amber-300 text-amber-800 hover:bg-amber-50"
+            : "border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+        }
+      >
+        {station.isActive ? <PowerOff className="size-3.5" /> : <Power className="size-3.5" />}
+        <span className="sr-only">
+          {busyAction === "status" ? "Memproses" : station.isActive ? "Nonaktifkan" : "Aktifkan"}
+        </span>
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={busyAction !== null}
+        onClick={deleteStation}
+        aria-label={busyAction === "delete" ? "Menghapus stasiun" : "Hapus stasiun"}
+        title="Hapus"
+        className="border-red-300 text-red-700 hover:bg-red-50"
+      >
+        <Trash2 className="size-3.5" />
+      </Button>
+      {error ? (
+        <p role="alert" className="basis-full text-xs text-red-700">
           {error}
         </p>
-      )}
-    </div>
+      ) : null}
+      {confirmElement}
+    </>
   );
 }

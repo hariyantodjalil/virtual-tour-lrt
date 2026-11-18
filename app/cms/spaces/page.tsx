@@ -1,9 +1,6 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { cmsUi } from "@/lib/cms-ui";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Store } from "lucide-react";
+import { getS3ProxyUrl } from "@/lib/s3-utils";
+import SpacesIndexMediaGrid from "./SpacesIndexMediaGrid";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +11,9 @@ async function getStations() {
       select: {
         id: true,
         name: true,
+        address: true,
+        imageUrl: true,
+        isActive: true,
         _count: { select: { commercialSpaces: true } },
       },
     });
@@ -26,25 +26,15 @@ export default async function CmsSpacesIndexPage() {
   const stations = await getStations();
 
   return (
-    <div>
-      <div className="grid gap-3 md:grid-cols-2">
-        {stations.map((s) => (
-          <Card key={s.id} className={cmsUi.card}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base text-[#F8ECEE]">{s.name}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between">
-              <span className={`text-sm ${cmsUi.muted}`}>{s._count.commercialSpaces} unit</span>
-              <Button asChild size="sm" className={cmsUi.primaryBtn}>
-                <Link href={`/cms/spaces/${s.id}`}>
-                  <Store className="mr-1 h-3 w-3" /> Kelola
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      {stations.length === 0 && <p className={cmsUi.muted}>Belum ada stasiun.</p>}
-    </div>
+    <SpacesIndexMediaGrid
+      stations={stations.map((station) => ({
+        id: station.id,
+        name: station.name,
+        address: station.address,
+        isActive: station.isActive,
+        imageSrc: station.imageUrl ? getS3ProxyUrl(station.imageUrl) : null,
+        unitCount: station._count.commercialSpaces,
+      }))}
+    />
   );
 }
