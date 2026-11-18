@@ -1,7 +1,7 @@
 
 export type TrainRentalSpacePublic = {
   inquiryMode?: "MEDIA" | "FULL_BRANDING";
-  train?: { name: string; slug: string; advertisingCapacity: number | null };
+  train?: { name: string; slug: string; advertisingCapacity: number | null; cars?: { slug: string; label: string }[] };
   id: string;
   displayNumber: string;
   title: string;

@@ -1,8 +1,11 @@
 import { z } from "zod";
+import { advertisingApplicantInputSchema } from "./advertising-form-shared";
 
 export const TRAIN_INQUIRY_MODE_LABELS = { MEDIA: "Media iklan", FULL_BRANDING: "Full branding" };
 export const trainInquiryInputSchema = z.object({
-  requestedTrainsetCount: z.number().int().min(1).max(999).optional(),
+  ...advertisingApplicantInputSchema.partial().shape,
+  carSlugs: z.array(z.string().trim().min(1).max(100)).min(1, "Pilih minimal satu gerbong.").max(100).refine(slugs => new Set(slugs).size === slugs.length, "Gerbong tidak boleh duplikat.").optional(),
+  requestedTrainsetCount: z.number().int("Jumlah trainset harus bilangan bulat.").min(1, "Jumlah trainset minimal 1.").max(999, "Jumlah trainset maksimal 999.").optional(),
   campaignStart: z.iso.date().optional(),
   campaignEnd: z.iso.date().optional(),
   campaignNeeds: z.string().trim().max(2000).optional(),
@@ -12,6 +15,11 @@ export const trainInquiryInputSchema = z.object({
 });
 export type TrainInquiryInput = z.infer<typeof trainInquiryInputSchema>;
 export type PublicTrainInquiry = {
+  applicantStatusLabel: string | null;
+  representedBrand: string | null;
+  businessCategoryLabel: string | null;
+  businessCategoryOther: string | null;
+  carPreferences: { carSlug: string; carLabel: string }[];
   mediaId: string | null;
   mediaCode: string;
   mediaTitle: string;

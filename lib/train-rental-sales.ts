@@ -9,6 +9,19 @@ export const TRAIN_RENTAL_STATUS_LABELS: Record<TrainRentalStatus, string> = {
   PENUH: "Penuh",
 };
 
+export function trainRentalStatusBadgeClass(status: string): string {
+  switch (status) {
+    case "TERSEDIA":
+      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    case "TERBATAS":
+      return "border-amber-200 bg-amber-50 text-amber-900";
+    case "PENUH":
+      return "border-violet-200 bg-violet-50 text-violet-800";
+    default:
+      return "border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-muted)]";
+  }
+}
+
 export type CarTrainsetMap = Record<string, string[]>;
 
 export function emptyCarTrainsetMap(cars: Pick<TrainFleetCar, "slug">[] = []): CarTrainsetMap {

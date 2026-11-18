@@ -119,7 +119,7 @@ export async function findTrainRentalSpaceForLead(idOrNumber: string) {
 
 function toPublicSpace(space: {
   inquiryMode?: "MEDIA" | "FULL_BRANDING";
-  train?: { name: string; slug: string; advertisingCapacity: number | null };
+  train?: { name: string; slug: string; advertisingCapacity: number | null; cars?: { slug: string; label: string }[] };
   id: string;
   displayNumber: string;
   title: string;
@@ -170,13 +170,13 @@ export const getTrainRentalSpaces = cache(async (trainSlug?: string): Promise<Tr
   const train = await prisma.train.findFirst({
     where: { isActive: true, ...(trainSlug ? { slug: trainSlug } : {}) },
     orderBy: { order: "asc" },
-    select: { id: true, name: true, slug: true, advertisingCapacity: true },
+    select: { id: true, name: true, slug: true, advertisingCapacity: true, trainTourCars: { where: { isActive: true }, orderBy: { order: "asc" }, select: { slug: true, label: true } } },
   });
   if (!train) return [];
   const spaces = await prisma.trainRentalSpace.findMany({
     where: { trainId: train.id, isActive: true }, orderBy: { order: "asc" },
   });
-  return spaces.map(space => toPublicSpace({ ...space, train }));
+  return spaces.map(space => toPublicSpace({ ...space, train: { ...train, cars: train.trainTourCars } }));
 });
 
 export async function getTrainRentalSpacesForCms(): Promise<TrainRentalSpaceCms[]> {
