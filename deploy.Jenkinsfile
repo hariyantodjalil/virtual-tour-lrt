@@ -375,11 +375,27 @@ sudo docker run --rm \
 
 echo "Deploy ulang Docker Stack"
 
-sudo -E docker stack deploy \
-    --resolve-image=always \
-    --with-registry-auth \
-    -c "$COMPOSE_FILE" \
-    "$STACK_NAME"
+# Swarm bisa "update out of sequence" bila ada deploy/update paralel —
+# retry singkat agar pipeline tidak gagal setelah migrate sukses.
+STACK_DEPLOY_OK=0
+for attempt in 1 2 3 4 5; do
+    if sudo -E docker stack deploy \
+        --resolve-image=always \
+        --with-registry-auth \
+        -c "$COMPOSE_FILE" \
+        "$STACK_NAME"
+    then
+        STACK_DEPLOY_OK=1
+        break
+    fi
+    echo "stack deploy gagal (percobaan $attempt/5), menunggu sebelum retry"
+    sleep 5
+done
+
+if [ "$STACK_DEPLOY_OK" -ne 1 ]; then
+    echo "Docker stack deploy gagal setelah retry" >&2
+    exit 1
+fi
 
 echo "Menunggu image baru healthy"
 
