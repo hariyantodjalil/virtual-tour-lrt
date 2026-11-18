@@ -327,12 +327,27 @@ fi
 
 echo "Menjalankan Prisma migration"
 
+# Pull dulu supaya docker run tidak nunggu lama setelah ID container diambil
+# (race: task Swarm postgres bisa diganti saat image masih di-pull).
+sudo docker pull "$IMAGE_REF"
+
 sudo docker container prune -f 2>/dev/null || true
 sudo docker network prune -f 2>/dev/null || true
 
-POSTGRES_CONT_ID="$(sudo docker ps -q -f name="${STACK_NAME}_postgres" -f status=running | head -n 1)"
-if [ -z "$POSTGRES_CONT_ID" ]; then
-    echo "Container PostgreSQL tidak ditemukan" >&2
+READY=0
+for i in $(seq 1 30); do
+    POSTGRES_CONT_ID="$(sudo docker ps -q -f name="${STACK_NAME}_postgres" -f status=running | head -n 1)"
+    if [ -n "$POSTGRES_CONT_ID" ] && \
+        sudo docker exec "$POSTGRES_CONT_ID" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
+        READY=1
+        break
+    fi
+    echo "Menunggu PostgreSQL sebelum migrate: percobaan $i/30"
+    sleep 3
+done
+
+if [ "$READY" -ne 1 ] || [ -z "${POSTGRES_CONT_ID:-}" ]; then
+    echo "Container PostgreSQL running tidak ditemukan sebelum migrate" >&2
     exit 1
 fi
 
@@ -340,6 +355,9 @@ fi
 # container aplikasi lama dan baru dapat hidup bersamaan sehingga memilih
 # container running pertama berisiko menjalankan migration bundle versi lama.
 MIGRATE_URL="$(printf '%s' "$DATABASE_URL" | sed -E 's#@[^/?]+#@127.0.0.1:5432#')"
+
+# Ambil ulang ID tepat sebelum run — jangan reuse ID yang bisa sudah exited.
+POSTGRES_CONT_ID="$(sudo docker ps -q -f name="${STACK_NAME}_postgres" -f status=running | head -n 1)"
 sudo docker run --rm \
     --network "container:${POSTGRES_CONT_ID}" \
     -e DATABASE_URL="$MIGRATE_URL" \
@@ -348,6 +366,7 @@ sudo docker run --rm \
 
 echo "Memverifikasi status Prisma migration"
 
+POSTGRES_CONT_ID="$(sudo docker ps -q -f name="${STACK_NAME}_postgres" -f status=running | head -n 1)"
 sudo docker run --rm \
     --network "container:${POSTGRES_CONT_ID}" \
     -e DATABASE_URL="$MIGRATE_URL" \
