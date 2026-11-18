@@ -18,6 +18,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cmsFetch } from "@/lib/cms-fetch";
 
 type MaintenanceData = {
@@ -129,182 +137,121 @@ export default function SystemSettingsPage() {
     initialData !== null && data.maintenanceMessage !== initialData.maintenanceMessage;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 pb-12">
-      {/* Toast Notification */}
+    <div className="space-y-6">
       {toast && (
         <div
-          className={`fixed top-5 right-5 z-50 flex items-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold shadow-2xl transition-all ${
+          role="status"
+          className={`fixed top-5 right-5 z-50 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg ${
             toast.type === "ok"
-              ? "border border-emerald-500/40 bg-emerald-950 text-emerald-200"
-              : "border border-red-500/40 bg-red-950 text-red-200"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-red-200 bg-red-50 text-red-800"
           }`}
         >
           {toast.type === "ok" ? (
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
           ) : (
-            <AlertTriangle className="h-4 w-4 text-red-400" />
+            <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
           )}
           {toast.msg}
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Pengaturan Sistem</h1>
-          <p className="text-xs text-[#C4A8AD]">
-            Kelola status operasional situs publik dan pembatasan akses sistem
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchSettings(true)}
-            disabled={loading}
-            className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-xs text-[#F0DDE1] hover:bg-[#261015]"
-          >
-            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-xs text-[#F0DDE1] hover:bg-[#261015]"
-          >
-            <Link href="/maintenance" target="_blank">
-              <Eye className="mr-1.5 h-3.5 w-3.5 text-sky-400" />
-              Preview Halaman Maintenance
-            </Link>
-          </Button>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fetchSettings(true)}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin motion-reduce:animate-none" : ""}`} />
+          Refresh
+        </Button>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/maintenance" target="_blank">
+            <Eye className="h-3.5 w-3.5" />
+            Preview Halaman Maintenance
+          </Link>
+        </Button>
       </div>
 
-      {/* Mode Status Banner Card */}
       <div
-        className={`relative overflow-hidden rounded-2xl border p-6 transition-all ${
+        className={`flex flex-col gap-4 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${
           data.isMaintenanceMode
-            ? "border-rose-500/40 bg-gradient-to-r from-rose-950/60 via-[#261015]/90 to-[#261015]"
-            : "border-emerald-500/40 bg-gradient-to-r from-emerald-950/40 via-[#261015]/90 to-[#261015]"
+            ? "border-rose-200 bg-rose-50"
+            : "border-slate-200 bg-slate-50"
         }`}
       >
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-4">
-            <div
-              className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border shadow-xl ${
-                data.isMaintenanceMode
-                  ? "border-rose-500/50 bg-rose-500/20 text-rose-300 shadow-rose-900/30"
-                  : "border-emerald-500/50 bg-emerald-500/20 text-emerald-300 shadow-emerald-900/30"
-              }`}
-            >
-              {data.isMaintenanceMode ? (
-                <Wrench className="h-7 w-7 animate-pulse text-rose-400" />
-              ) : (
-                <ShieldCheck className="h-7 w-7 text-emerald-400" />
-              )}
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-semibold ${
-                    data.isMaintenanceMode
-                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                      : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                  }`}
-                >
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      data.isMaintenanceMode ? "bg-rose-400 animate-ping" : "bg-emerald-400"
-                    }`}
-                  />
-                  {data.isMaintenanceMode
-                    ? "MODE MAINTENANCE AKTIF"
-                    : "SITUS PUBLIK AKTIF NORMAL"}
-                </span>
-              </div>
-              <h2 className="text-lg font-bold text-white">
-                {data.isMaintenanceMode
-                  ? "Akses Pengunjung Publik Ditutup Sementara"
-                  : "Seluruh Pengunjung Publik Dapat Mengakses Virtual Tour"}
-              </h2>
-              <p className="text-xs text-[#C4A8AD] max-w-xl">
-                {data.isMaintenanceMode
-                  ? "Pengunjung publik dialihkan ke halaman pemeliharaan sistem. Hanya Administrator dan Editor yang dapat mengakses CMS dan meninjau tur."
-                  : "Platform virtual tour, katalog unit komersial, dan portal mitra dapat diakses secara leluasa oleh semua pengunjung."}
-              </p>
-            </div>
-          </div>
-
-          {/* Big Action Toggle */}
-          <div className="flex shrink-0 items-center gap-3">
-            <Button
-              type="button"
-              size="lg"
-              disabled={saving || loading}
-              onClick={() => handleToggleClick(!data.isMaintenanceMode)}
-              className={`font-semibold shadow-lg transition-all ${
-                data.isMaintenanceMode
-                  ? "bg-[#E31E2D] hover:bg-[#c41926] text-white shadow-emerald-950/40"
-                  : "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/40"
-              }`}
-            >
-              {data.isMaintenanceMode ? (
-                <>
-                  <ShieldCheck className="mr-2 h-4 w-4" />
-                  Matikan Maintenance (Buka Publik)
-                </>
-              ) : (
-                <>
-                  <Wrench className="mr-2 h-4 w-4" />
-                  Aktifkan Mode Maintenance
-                </>
-              )}
-            </Button>
-          </div>
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className={`size-2.5 shrink-0 rounded-full ${
+              data.isMaintenanceMode ? "bg-rose-500" : "bg-slate-400"
+            }`}
+          />
+          <p className="text-sm font-semibold text-slate-900">
+            {data.isMaintenanceMode
+              ? "Mode maintenance aktif — pengunjung publik dialihkan."
+              : "Situs publik aktif normal."}
+          </p>
         </div>
+
+        <Button
+          type="button"
+          size="lg"
+          disabled={saving || loading}
+          onClick={() => handleToggleClick(!data.isMaintenanceMode)}
+          className={`shrink-0 font-semibold ${
+            data.isMaintenanceMode ? "" : "bg-rose-600 text-white hover:bg-rose-500"
+          }`}
+        >
+          {data.isMaintenanceMode ? (
+            <>
+              <ShieldCheck className="h-4 w-4" />
+              Matikan Maintenance
+            </>
+          ) : (
+            <>
+              <Wrench className="h-4 w-4" />
+              Aktifkan Mode Maintenance
+            </>
+          )}
+        </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main Settings Form */}
         <div className="space-y-6 lg:col-span-2">
-          <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C]/60 backdrop-blur">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-base font-semibold text-white">
-                Pesan Pemeliharaan Publik
-              </CardTitle>
-              <CardDescription className="text-xs text-[#C4A8AD]">
-                Pesan ini akan ditampilkan kepada pengunjung yang membuka situs saat mode
-                maintenance aktif.
-              </CardDescription>
+              <CardTitle className="text-base">Pesan Pemeliharaan Publik</CardTitle>
+              <CardDescription>Tampil di halaman pemeliharaan saat mode aktif.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs text-[#F0DDE1]">Isi Pesan</Label>
+                  <Label htmlFor="maintenance-message">Isi Pesan</Label>
                   <button
                     type="button"
                     onClick={() => setData({ ...data, maintenanceMessage: DEFAULT_MESSAGE })}
-                    className="text-[11px] text-sky-400 hover:underline"
+                    className="text-xs font-medium text-[#D81435] hover:underline focus-visible:outline-2 focus-visible:outline-[#D81435]"
                   >
                     Gunakan Pesan Standar
                   </button>
                 </div>
                 <Textarea
+                  id="maintenance-message"
                   value={data.maintenanceMessage}
                   onChange={(e) => setData({ ...data, maintenanceMessage: e.target.value })}
-                  placeholder="Ketik pesan pemeliharaan untuk pengunjung..."
+                  placeholder="Ketik pesan pemeliharaan untuk pengunjung…"
                   rows={4}
-                  className="bg-[#1C0A0E] border-[rgba(255,214,218,0.14)] text-xs text-[#F8ECEE] focus:border-rose-500"
                 />
-                <div className="flex justify-between text-[11px] text-[#A88990]">
+                <div className="flex justify-between text-xs text-slate-500">
                   <span>Maksimal 300 karakter</span>
                   <span>{data.maintenanceMessage.length} karakter</span>
                 </div>
               </div>
 
               {hasUnsavedMessage && (
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[rgba(255,214,218,0.14)]">
+                <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -314,17 +261,11 @@ export default function SystemSettingsPage() {
                         maintenanceMessage: initialData?.maintenanceMessage || DEFAULT_MESSAGE,
                       })
                     }
-                    className="text-xs text-[#C4A8AD] hover:text-white"
                   >
                     Batal
                   </Button>
-                  <Button
-                    size="sm"
-                    disabled={saving}
-                    onClick={() => executeSave()}
-                    className="bg-rose-600 hover:bg-rose-500 text-xs text-white"
-                  >
-                    <Save className="mr-1.5 h-3.5 w-3.5" />
+                  <Button size="sm" disabled={saving} onClick={() => executeSave()}>
+                    <Save className="h-3.5 w-3.5" />
                     {saving ? "Menyimpan…" : "Simpan Pesan"}
                   </Button>
                 </div>
@@ -332,65 +273,55 @@ export default function SystemSettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Petunjuk Akses */}
-          <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C]/60 backdrop-blur">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-base font-semibold text-white">
-                Aturan & Hak Akses
-              </CardTitle>
+              <CardTitle className="text-base">Aturan & Hak Akses</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-xs text-[#F0DDE1]">
-              <div className="flex items-start gap-2.5 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/40 p-3">
-                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <CardContent className="space-y-3 text-sm text-slate-600">
+              <div className="flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                 <div>
-                  <span className="font-semibold text-[#F8ECEE]">Akses CMS & Editor:</span>
-                  <p className="mt-0.5 text-[#C4A8AD]">
-                    Administrator dan Editor tetap dapat login dan menggunakan seluruh menu CMS
-                    untuk upload aset dan memperbarui stasiun.
-                  </p>
+                  <span className="font-semibold text-slate-900">Akses CMS & Editor</span>
+                  <p className="mt-0.5">ADMIN dan EDITOR tetap masuk CMS selama maintenance.</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-2.5 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/40 p-3">
-                <Eye className="mt-0.5 h-4 w-4 shrink-0 text-sky-400" />
+              <div className="flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <Eye className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
                 <div>
-                  <span className="font-semibold text-[#F8ECEE]">Live Preview Admin:</span>
-                  <p className="mt-0.5 text-[#C4A8AD]">
-                    Admin yang sudah login tetap dapat membuka halaman depan / tur 3D stasiun untuk
-                    memastikan kualitas sebelum publik dibuka.
-                  </p>
+                  <span className="font-semibold text-slate-900">Live Preview Admin</span>
+                  <p className="mt-0.5">Admin login tetap bisa membuka tur 3D untuk cek kualitas.</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Audit & Info Sidebar */}
-        <div className="space-y-6">
-          <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C]/60 backdrop-blur">
+        <div>
+          <Card>
             <CardHeader>
-              <CardTitle className="text-sm font-semibold text-white">Informasi Log</CardTitle>
+              <CardTitle className="text-sm">Informasi Log</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 text-xs">
+            <CardContent className="space-y-4 text-sm">
               <div className="space-y-1">
-                <span className="text-[11px] text-[#A88990]">Terakhir Diperbarui Oleh:</span>
-                <div className="flex items-center gap-1.5 font-medium text-[#F8ECEE]">
-                  <User className="h-3.5 w-3.5 text-[#C4A8AD]" />
+                <span className="text-xs text-slate-500">Terakhir Diperbarui Oleh:</span>
+                <div className="flex items-center gap-1.5 font-medium text-slate-900">
+                  <User className="h-3.5 w-3.5 text-slate-500" />
                   <span className="truncate">{data.updatedBy || "Sistem"}</span>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[11px] text-[#A88990]">Waktu Pembaruan:</span>
-                <div className="flex items-center gap-1.5 font-medium text-[#F8ECEE]">
-                  <Clock className="h-3.5 w-3.5 text-[#C4A8AD]" />
+                <span className="text-xs text-slate-500">Waktu Pembaruan:</span>
+                <div className="flex items-center gap-1.5 font-medium text-slate-900">
+                  <Clock className="h-3.5 w-3.5 text-slate-500" />
                   <span>
                     {data.updatedAt
                       ? new Date(data.updatedAt).toLocaleString("id-ID", {
                           dateStyle: "medium",
                           timeStyle: "short",
                         })
-                      : "-"}
+                      : "—"}
                   </span>
                 </div>
               </div>
@@ -399,63 +330,53 @@ export default function SystemSettingsPage() {
         </div>
       </div>
 
-      {/* Confirmation Modal */}
-      {showConfirmModal && pendingMode !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] p-6 shadow-2xl">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]">
-              {pendingMode ? (
-                <Wrench className="h-6 w-6 text-rose-400" />
-              ) : (
-                <ShieldCheck className="h-6 w-6 text-emerald-400" />
-              )}
-            </div>
-
-            <h3 className="text-lg font-bold text-white">
+      <Dialog
+        open={showConfirmModal && pendingMode !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowConfirmModal(false);
+            setPendingMode(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
               {pendingMode
                 ? "Konfirmasi Aktifkan Mode Maintenance?"
                 : "Buka Kembali Situs untuk Publik?"}
-            </h3>
-
-            <p className="mt-2 text-xs leading-relaxed text-[#F0DDE1]">
+            </DialogTitle>
+            <DialogDescription>
               {pendingMode
                 ? "Seluruh pengunjung umum akan dialihkan ke halaman pemeliharaan sistem. Anda dan tim admin tetap dapat mengakses CMS."
                 : "Situs publik akan langsung dapat diakses kembali oleh seluruh pengunjung secara normal."}
-            </p>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={saving}
-                onClick={() => {
-                  setShowConfirmModal(false);
-                  setPendingMode(null);
-                }}
-                className="text-xs text-[#F0DDE1] hover:text-white"
-              >
-                Batal
-              </Button>
-              <Button
-                size="sm"
-                disabled={saving}
-                onClick={() => executeSave(pendingMode)}
-                className={`text-xs font-semibold ${
-                  pendingMode
-                    ? "bg-rose-600 hover:bg-rose-500 text-white"
-                    : "bg-[#E31E2D] hover:bg-[#c41926] text-white"
-                }`}
-              >
-                {saving
-                  ? "Memproses…"
-                  : pendingMode
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              disabled={saving}
+              onClick={() => {
+                setShowConfirmModal(false);
+                setPendingMode(null);
+              }}
+            >
+              Batal
+            </Button>
+            <Button
+              disabled={saving}
+              onClick={() => void executeSave(pendingMode ?? undefined)}
+              className={pendingMode ? "bg-rose-600 text-white hover:bg-rose-500" : ""}
+            >
+              {saving
+                ? "Memproses…"
+                : pendingMode
                   ? "Ya, Aktifkan Maintenance"
                   : "Ya, Buka Situs Publik"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

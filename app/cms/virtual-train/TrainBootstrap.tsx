@@ -20,8 +20,8 @@ export default function TrainBootstrap() {
   }
   return <form onSubmit={create} className="mt-5 space-y-3">
     <label htmlFor="first-train-name" className="block text-sm">Nama kereta</label>
-    <input id="first-train-name" required minLength={2} maxLength={120} value={name} onChange={event => setName(event.target.value)} className="min-h-11 w-full rounded-lg border border-white/20 bg-[#1C0A0E] px-3 text-sm text-[#F8ECEE]" />
-    {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+    <input id="first-train-name" required minLength={2} maxLength={120} value={name} onChange={event => setName(event.target.value)} className="min-h-11 w-full rounded-lg border border-[var(--work-control)] bg-[var(--work-subtle)] px-3 text-sm text-[var(--work-text)]" />
+    {error && <p role="alert" className="text-sm text-[var(--work-danger)]">{error}</p>}
     <button disabled={saving} className="min-h-11 rounded-lg bg-[#E31E2D] px-4 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Tambah kereta"}</button>
   </form>;
 }

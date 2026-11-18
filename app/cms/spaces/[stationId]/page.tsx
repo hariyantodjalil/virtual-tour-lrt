@@ -1,21 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { cmsFetch } from "@/lib/cms-fetch";
+import { cmsUi } from "@/lib/cms-ui";
+import { resolvePublicAssetUrl, shouldUnoptimizeImage } from "@/lib/s3-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import CmsMediaSearch from "@/components/cms/CmsMediaSearch";
+import { ArrowLeft, ImageIcon, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { FACILITY_ICONS, isFacilityIconId, type FacilityIconId } from "@/lib/facility-icons";
 import { compressImageClient } from "@/lib/client-image-compression";
 import {
   SPACE_STATUS_LABELS,
   SPACE_STATUS_VALUES,
+  spaceStatusBadgeClass,
   type CommercialSpaceStatus,
 } from "@/lib/commercial-pipeline";
 
@@ -28,7 +34,7 @@ type Space = {
   type: string;
   status: SpaceStatus;
   area: number;
-  monthlyRent: number;
+  monthlyRent: number | null;
   deposit: number;
   floor: string;
   location: string;
@@ -36,6 +42,7 @@ type Space = {
   nearbyFacilities: FacilityIconId[];
   exposure: number;
   powerSupply: string | null;
+  preferredUses: string[];
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;
@@ -74,7 +81,7 @@ function createDraft(): Space {
     type: "KIOS",
     status: "TERSEDIA",
     area: 12,
-    monthlyRent: 0,
+    monthlyRent: null,
     deposit: 0,
     floor: "G",
     location: "Concourse",
@@ -82,6 +89,7 @@ function createDraft(): Space {
     nearbyFacilities: [],
     exposure: 0,
     powerSupply: "",
+    preferredUses: [],
     waterAccess: false,
     airConditioning: false,
     description: "",
@@ -98,7 +106,7 @@ function toPayload(space: Space) {
     type: space.type,
     status: space.status,
     area: Number(space.area) || 0,
-    monthlyRent: Number(space.monthlyRent) || 0,
+    monthlyRent: space.monthlyRent,
     deposit: Number(space.deposit) || 0,
     floor: space.floor.trim() || "G",
     location: space.location.trim(),
@@ -106,6 +114,9 @@ function toPayload(space: Space) {
     nearbyFacilities: space.nearbyFacilities,
     exposure: Math.round(Number(space.exposure) || 0),
     powerSupply: space.powerSupply?.trim() || null,
+    preferredUses: Array.isArray(space.preferredUses)
+      ? space.preferredUses.map((item) => item.trim()).filter(Boolean)
+      : [],
     waterAccess: Boolean(space.waterAccess),
     airConditioning: Boolean(space.airConditioning),
     description: space.description?.trim() || null,
@@ -164,6 +175,7 @@ export default function CmsSpacesStationPage() {
   const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [editing, setEditing] = useState<Space | null>(null);
   const [saving, setSaving] = useState(false);
+  const { confirmDialog, confirmElement } = useConfirmDialog();
   const [message, setMessage] = useState("");
 
   async function load() {
@@ -178,6 +190,9 @@ export default function CmsSpacesStationPage() {
       list.map((item: Space) => ({
         ...item,
         nearbyFacilities: normalizeFacilities(item.nearbyFacilities),
+        preferredUses: Array.isArray(item.preferredUses)
+          ? item.preferredUses.map((value) => String(value).trim()).filter(Boolean)
+          : [],
       }))
     );
     if (tenantsRes.ok) {
@@ -206,9 +221,11 @@ export default function CmsSpacesStationPage() {
       editing.id &&
       editing.tenantBrand &&
       editing.status !== "TERISI" &&
-      !confirm(
-        `Ubah unit menjadi ${editing.status}? Occupancy ${editing.tenantBrand} akan dilepas dari unit ini.`
-      )
+      !(await confirmDialog({
+        title: `Ubah unit menjadi ${editing.status}?`,
+        description: `Occupancy ${editing.tenantBrand} akan dilepas dari unit ini.`,
+        confirmLabel: "Ya, Ubah Status",
+      }))
     ) {
       return;
     }
@@ -267,84 +284,160 @@ export default function CmsSpacesStationPage() {
   }
 
   async function deleteSpace(id: string) {
-    if (!confirm("Hapus unit ini?")) return;
+    const confirmed = await confirmDialog({
+      title: "Hapus unit ini?",
+      description: "Data unit akan dihapus dari inventori stasiun ini.",
+      confirmLabel: "Ya, Hapus",
+      destructive: true,
+    });
+    if (!confirmed) return;
     await cmsFetch(`/api/cms/spaces/${id}`, { method: "DELETE" });
     await load();
   }
 
+  const getSpaceSearchText = useCallback(
+    (space: Space) =>
+      [
+        space.code,
+        space.name,
+        space.type,
+        SPACE_TYPES.find((t) => t.value === space.type)?.label ?? "",
+        SPACE_STATUS_LABELS[space.status] ?? space.status,
+        space.floor,
+        space.location,
+        space.tenantBrand ?? "",
+        space.nearestExit ?? "",
+      ].join(" "),
+    []
+  );
+
   return (
     <div>
-      <Button asChild variant="ghost" className="mb-4 text-[#F0DDE1]">
-        <Link href="/cms/spaces"><ArrowLeft className="h-4 w-4 mr-1" /> Kembali</Link>
+      <Button asChild variant="ghost" className={`mb-4 ${cmsUi.muted}`}>
+        <Link href="/cms/spaces">
+          <ArrowLeft className="mr-1 size-4" /> Kembali
+        </Link>
       </Button>
 
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Ruang Komersial</h1>
-          <p className="mt-1 text-sm text-[#C4A8AD]">Kelola semua field yang muncul di virtual tour publik.</p>
-        </div>
-        <Button onClick={() => { setMessage(""); setEditing(createDraft()); }} className="bg-[#E31E2D] hover:bg-[#c41926]">
-          <Plus className="h-4 w-4" />
-          Tambah Unit
-        </Button>
+      <div className="mb-4">
+        <h1 className="text-xl font-semibold tracking-tight text-[var(--work-text)]">Ruang Komersial</h1>
+        <p className={`mt-1 text-sm ${cmsUi.muted}`}>Kelola unit yang tampil di virtual tour publik.</p>
       </div>
 
-      <div className="grid gap-3">
-        {spaces.map((space) => (
-          <Card key={space.id} className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
-            <CardContent className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-              <div className="min-w-0">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-white">{space.code} - {space.name}</p>
-                  <Badge variant="outline" className="border-[rgba(255,214,218,0.14)] text-[#F0DDE1]">{space.status}</Badge>
-                  <Badge variant="outline" className="border-[rgba(255,214,218,0.14)] text-[#F0DDE1]">{SPACE_TYPES.find((t) => t.value === space.type)?.label ?? space.type}</Badge>
-                  {space.status === "TERISI" && space.tenantBrand && (
+      <CmsMediaSearch
+        items={spaces}
+        placeholder="Cari kode, nama, status, atau penyewa…"
+        emptyLabel="Belum ada unit di stasiun ini."
+        getSearchText={getSpaceSearchText}
+        toolbar={
+          <Button
+            onClick={() => {
+              setMessage("");
+              setEditing(createDraft());
+            }}
+            className={cmsUi.primaryBtn}
+          >
+            <Plus className="size-4" />
+            Tambah Unit
+          </Button>
+        }
+      >
+        {(filtered) => (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((space) => {
+              const thumb = space.panoramaUrl ? resolvePublicAssetUrl(space.panoramaUrl) : null;
+              return (
+                <Card key={space.id} className={`overflow-hidden p-0 ${cmsUi.card}`}>
+                  <div className={`relative aspect-[16/10] ${cmsUi.void}`}>
+                    {thumb ? (
+                      <Image
+                        src={thumb}
+                        alt={space.name}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                        unoptimized={shouldUnoptimizeImage(thumb)}
+                      />
+                    ) : (
+                      <div className={`flex h-full items-center justify-center ${cmsUi.muted}`}>
+                        <ImageIcon className="size-8 opacity-40" />
+                      </div>
+                    )}
                     <Badge
                       variant="outline"
-                      className="border-emerald-700 bg-emerald-950/40 text-emerald-300"
+                      className={`absolute left-3 top-3 bg-[var(--work-surface)]/95 ${spaceStatusBadgeClass(space.status)}`}
                     >
-                      Penyewa: {space.tenantBrand}
+                      {SPACE_STATUS_LABELS[space.status] ?? space.status}
                     </Badge>
-                  )}
-                </div>
-                <p className="text-sm text-[#C4A8AD]">
-                  {space.floor} · {space.location} · {space.area} m²
-                </p>
-                <p className="mt-1 text-xs text-[#A88990]">
-                  Exposure {Number(space.exposure).toLocaleString("id-ID")} orang/hari
-                  {space.nearestExit ? ` · ${space.nearestExit}` : ""}
-                  {space.powerSupply ? ` · ${space.powerSupply}` : ""}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" className="border-[rgba(255,214,218,0.14)]" onClick={() => { setMessage(""); setEditing({ ...space, nearbyFacilities: normalizeFacilities(space.nearbyFacilities) }); }}>
-                  <Pencil className="h-3.5 w-3.5" />
-                  Edit
-                </Button>
-                <Button size="sm" variant="ghost" className="text-red-400 hover:bg-red-950/40" onClick={() => deleteSpace(space.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Hapus
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                  </div>
+
+                  <CardContent className="space-y-3 p-4">
+                    <div>
+                      <p className="font-semibold tracking-tight text-[var(--work-text)]">
+                        {space.code} · {space.name}
+                      </p>
+                      <p className={`mt-0.5 text-sm ${cmsUi.muted}`}>
+                        {SPACE_TYPES.find((t) => t.value === space.type)?.label ?? space.type}
+                        {" · "}
+                        {space.floor} · {space.location} · {space.area} m²
+                      </p>
+                      {space.status === "TERISI" && space.tenantBrand ? (
+                        <p className="mt-1 text-xs text-violet-800">Penyewa: {space.tenantBrand}</p>
+                      ) : (
+                        <p className={`mt-1 text-xs ${cmsUi.muted}`}>
+                          Exposure {Number(space.exposure).toLocaleString("id-ID")}/hari
+                          {space.nearestExit ? ` · ${space.nearestExit}` : ""}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={cmsUi.outlineBtn}
+                        onClick={() => {
+                          setMessage("");
+                          setEditing({
+                            ...space,
+                            nearbyFacilities: normalizeFacilities(space.nearbyFacilities),
+                          });
+                        }}
+                      >
+                        <Pencil className="size-3.5" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-300 text-red-700 hover:bg-red-50"
+                        onClick={() => deleteSpace(space.id)}
+                      >
+                        <Trash2 className="size-3.5" />
+                        Hapus
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </CmsMediaSearch>
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[calc(100vh-32px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] shadow-2xl">
-            <div className="flex items-start justify-between border-b border-[rgba(255,214,218,0.14)] px-6 py-4">
+          <div className="flex max-h-[calc(100vh-32px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[var(--work-line)] bg-[var(--work-subtle)] shadow-2xl">
+            <div className="flex items-start justify-between border-b border-[var(--work-line)] px-6 py-4">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-300">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--work-success)]">
                   {editing.id ? "Edit Unit" : "Tambah Unit"}
                 </p>
-                <h2 className="mt-1 text-xl font-black text-white">{editing.code || "Unit Baru"}</h2>
+                <h2 className="mt-1 text-xl font-black text-[var(--work-text)]">{editing.code || "Unit Baru"}</h2>
               </div>
               <button
                 type="button"
                 onClick={() => setEditing(null)}
-                className="rounded-lg p-2 text-[#C4A8AD] hover:bg-white/10 hover:text-white"
+                className="rounded-lg p-2 text-[var(--work-muted)] hover:bg-[var(--work-subtle)] hover:text-[var(--work-text)]"
                 aria-label="Tutup form"
               >
                 <X className="h-5 w-5" />
@@ -354,13 +447,13 @@ export default function CmsSpacesStationPage() {
             <div className="min-h-0 flex-1 overflow-y-auto p-6">
               <div className="grid gap-5 md:grid-cols-2">
                 <Field label="Kode Unit" required>
-                  <Input value={editing.code} onChange={(e) => setEditing({ ...editing, code: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                  <Input value={editing.code} onChange={(e) => setEditing({ ...editing, code: e.target.value })} className="border-[var(--work-line)] bg-[var(--work-subtle)]" />
                 </Field>
                 <Field label="Nama Unit" required>
-                  <Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                  <Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="border-[var(--work-line)] bg-[var(--work-subtle)]" />
                 </Field>
                 <Field label="Tipe">
-                  <select value={editing.type} onChange={(e) => setEditing({ ...editing, type: e.target.value })} className="h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm text-white">
+                  <select value={editing.type} onChange={(e) => setEditing({ ...editing, type: e.target.value })} className="h-10 w-full rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] px-3 text-sm text-[var(--work-text)]">
                     {SPACE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
                   </select>
                 </Field>
@@ -375,7 +468,7 @@ export default function CmsSpacesStationPage() {
                         tenantId: status === "TERISI" ? editing.tenantId : null,
                       });
                     }}
-                    className="h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm text-white"
+                    className="h-10 w-full rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] px-3 text-sm text-[var(--work-text)]"
                   >
                     {STATUSES.map((status) => (
                       <option key={status} value={status}>
@@ -397,7 +490,7 @@ export default function CmsSpacesStationPage() {
                           tenantBrand: tenant?.brandName ?? null,
                         });
                       }}
-                      className="h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm text-white"
+                      className="h-10 w-full rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] px-3 text-sm text-[var(--work-text)]"
                     >
                       <option value="">Pilih penyewa</option>
                       {tenants.map((tenant) => (
@@ -407,12 +500,12 @@ export default function CmsSpacesStationPage() {
                       ))}
                     </select>
                     <div className="mt-2 flex items-center justify-between gap-3">
-                      <p className="text-xs text-[#A88990]">
+                      <p className="text-xs text-[var(--work-muted)]">
                         Memilih penyewa akan membuat status occupancy unit menjadi terisi.
                       </p>
                       <Link
                         href="/cms/tenants"
-                        className="shrink-0 text-xs font-semibold text-emerald-400 hover:text-emerald-300"
+                        className="shrink-0 text-xs font-semibold text-emerald-400 hover:text-[var(--work-success)]"
                       >
                         Tambah penyewa
                       </Link>
@@ -420,38 +513,55 @@ export default function CmsSpacesStationPage() {
                   </Field>
                 )}
                 <Field label="Luas (m2)">
-                  <Input type="number" value={editing.area} onChange={(e) => setEditing({ ...editing, area: Number(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                  <Input type="number" value={editing.area} onChange={(e) => setEditing({ ...editing, area: Number(e.target.value) })} className="border-[var(--work-line)] bg-[var(--work-subtle)]" />
                 </Field>
                 <Field label="Sewa Bulanan (Rp)">
-                  <Input type="number" value={editing.monthlyRent} onChange={(e) => setEditing({ ...editing, monthlyRent: Number(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                  <Input type="number" value={editing.monthlyRent ?? ""} onChange={(e) => setEditing({ ...editing, monthlyRent: e.target.value === "" ? null : Number(e.target.value) })} className="border-[var(--work-line)] bg-[var(--work-subtle)]" />
                 </Field>
                 <Field label="Deposit">
-                  <Input type="number" value={editing.deposit} onChange={(e) => setEditing({ ...editing, deposit: Number(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                  <Input type="number" value={editing.deposit} onChange={(e) => setEditing({ ...editing, deposit: Number(e.target.value) })} className="border-[var(--work-line)] bg-[var(--work-subtle)]" />
                 </Field>
                 <Field label="Eksposur Penumpang / Hari">
-                  <Input type="number" value={editing.exposure} onChange={(e) => setEditing({ ...editing, exposure: Number(e.target.value) })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                  <Input type="number" value={editing.exposure} onChange={(e) => setEditing({ ...editing, exposure: Number(e.target.value) })} className="border-[var(--work-line)] bg-[var(--work-subtle)]" />
                 </Field>
                 <Field label="Lantai" required>
-                  <Input value={editing.floor} onChange={(e) => setEditing({ ...editing, floor: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                  <Input value={editing.floor} onChange={(e) => setEditing({ ...editing, floor: e.target.value })} className="border-[var(--work-line)] bg-[var(--work-subtle)]" />
                 </Field>
                 <Field label="Lokasi" required>
-                  <Input value={editing.location} onChange={(e) => setEditing({ ...editing, location: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                  <Input value={editing.location} onChange={(e) => setEditing({ ...editing, location: e.target.value })} className="border-[var(--work-line)] bg-[var(--work-subtle)]" />
                 </Field>
                 <Field label="Exit Terdekat">
-                  <Input value={editing.nearestExit ?? ""} onChange={(e) => setEditing({ ...editing, nearestExit: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                  <Input value={editing.nearestExit ?? ""} onChange={(e) => setEditing({ ...editing, nearestExit: e.target.value })} className="border-[var(--work-line)] bg-[var(--work-subtle)]" />
                 </Field>
                 <Field label="Daya Listrik">
-                  <Input value={editing.powerSupply ?? ""} onChange={(e) => setEditing({ ...editing, powerSupply: e.target.value })} placeholder="contoh: 2200 VA" className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                  <Input value={editing.powerSupply ?? ""} onChange={(e) => setEditing({ ...editing, powerSupply: e.target.value })} placeholder="contoh: 2200 VA" className="border-[var(--work-line)] bg-[var(--work-subtle)]" />
+                </Field>
+                <Field label="Preferred Use">
+                  <Input
+                    value={editing.preferredUses.join(", ")}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        preferredUses: e.target.value
+                          .split(",")
+                          .map((value) => value.trim())
+                          .filter(Boolean),
+                      })
+                    }
+                    placeholder="contoh: F&B, Retail, Services"
+                    className="border-[var(--work-line)] bg-[var(--work-subtle)]"
+                  />
+                  <p className="mt-1 text-[11px] text-[var(--work-muted)]">Pisahkan dengan koma. Kosong = tampil as-is di modal publik.</p>
                 </Field>
                 <div className="md:col-span-2">
                   <Label>Daftar Fasilitas Terdekat</Label>
-                  <div className="mt-2 grid gap-2 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]/60 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="mt-2 grid gap-2 rounded-xl border border-[var(--work-line)] bg-[var(--work-surface)] text-[var(--work-text)]/60 p-4 sm:grid-cols-2 lg:grid-cols-3">
                     {FACILITY_ICONS.map((facility) => {
                       const checked = editing.nearbyFacilities.includes(facility.id);
                       return (
                         <label
                           key={facility.id}
-                          className="flex cursor-pointer items-center gap-3 rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/50 px-3 py-2.5 text-sm text-[#F8ECEE] transition hover:border-[rgba(255,214,218,0.28)]"
+                          className="flex cursor-pointer items-center gap-3 rounded-lg border border-[var(--work-line)] bg-[var(--work-subtle)]/50 px-3 py-2.5 text-sm text-[var(--work-text)] transition hover:border-[var(--work-line)]"
                         >
                           <input
                             type="checkbox"
@@ -472,18 +582,18 @@ export default function CmsSpacesStationPage() {
                   </div>
                 </div>
                 <Field label="URL Foto/Panorama Unit">
-                  <Input value={editing.panoramaUrl ?? ""} onChange={(e) => setEditing({ ...editing, panoramaUrl: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                  <Input value={editing.panoramaUrl ?? ""} onChange={(e) => setEditing({ ...editing, panoramaUrl: e.target.value })} className="border-[var(--work-line)] bg-[var(--work-subtle)]" />
                 </Field>
-                <div className="grid gap-3 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]/60 p-4 md:col-span-2 md:grid-cols-3">
-                  <label className="flex items-center gap-3 text-sm text-[#F8ECEE]">
+                <div className="grid gap-3 rounded-xl border border-[var(--work-line)] bg-[var(--work-surface)] text-[var(--work-text)]/60 p-4 md:col-span-2 md:grid-cols-3">
+                  <label className="flex items-center gap-3 text-sm text-[var(--work-text)]">
                     <input type="checkbox" checked={editing.waterAccess} onChange={(e) => setEditing({ ...editing, waterAccess: e.target.checked })} />
                     Air bersih tersedia
                   </label>
-                  <label className="flex items-center gap-3 text-sm text-[#F8ECEE]">
+                  <label className="flex items-center gap-3 text-sm text-[var(--work-text)]">
                     <input type="checkbox" checked={editing.airConditioning} onChange={(e) => setEditing({ ...editing, airConditioning: e.target.checked })} />
                     AC tersedia
                   </label>
-                  <Label className="flex cursor-pointer items-center gap-3 text-sm text-[#F8ECEE]">
+                  <Label className="flex cursor-pointer items-center gap-3 text-sm text-[var(--work-text)]">
                     <Upload className="h-4 w-4" />
                     Upload foto unit
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadSpacePhoto(e.target.files[0])} />
@@ -491,13 +601,13 @@ export default function CmsSpacesStationPage() {
                 </div>
                 <div className="md:col-span-2">
                   <Label>Deskripsi</Label>
-                  <Textarea value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} className="mt-2 min-h-28 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" />
+                  <Textarea value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} className="mt-2 min-h-28 border-[var(--work-line)] bg-[var(--work-subtle)]" />
                 </div>
               </div>
               {message && <p className="mt-4 text-sm text-amber-300">{message}</p>}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-[rgba(255,214,218,0.14)] px-6 py-4">
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--work-line)] px-6 py-4">
               <Button variant="ghost" onClick={() => setEditing(null)}>Batal</Button>
               <Button onClick={saveSpace} disabled={saving} className="bg-[#E31E2D] hover:bg-[#c41926]">
                 {saving ? "Menyimpan..." : "Simpan Unit"}
@@ -506,6 +616,7 @@ export default function CmsSpacesStationPage() {
           </div>
         </div>
       )}
+      {confirmElement}
     </div>
   );
 }

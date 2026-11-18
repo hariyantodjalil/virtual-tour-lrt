@@ -62,11 +62,20 @@ import {
   Network,
   RotateCcw,
 } from "lucide-react";
-import { PannellumEditor, type PannellumEditorHandle } from "../virtual-tour/[stationId]/PannellumEditor";
+import {
+  PannellumEditor,
+  type EditorPanoramaPreviewMode,
+  type PannellumEditorHandle,
+} from "../virtual-tour/[stationId]/PannellumEditor";
 import { PannellumPreview } from "../virtual-tour/[stationId]/PannellumPreview";
 import { TourStructureSidebar } from "../virtual-tour/[stationId]/TourStructureSidebar";
 import { ConnectionMapDialog } from "../virtual-tour/[stationId]/ConnectionMapDialog";
 import { TrainTourEditorSidebar } from "./TrainTourEditorSidebar";
+import { BakePrivacyBlurDialog } from "@/components/cms/BakePrivacyBlurDialog";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import type { PrivacyBlurBakeTarget } from "@/components/cms/BakePrivacyBlurDialog";
+import { extractMultiResProfilesFromCanvasData } from "@/lib/panorama-profile";
+import { extractHdMultiResProfilesFromCanvasData } from "@/lib/panorama-hd-profile";
 
 type Scene = {
   id: string;
@@ -79,6 +88,7 @@ type Scene = {
   areaId?: string | null;
   levelId?: string | null;
   panoramaUrl: string;
+  originalPanoramaUrl?: string | null;
   thumbnailUrl?: string | null;
   order: number;
   hotspots: Omit<HotspotItem, "_id">[];
@@ -294,6 +304,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
 
   const [cars, setCars] = useState<TrainTourCar[]>([]);
   const [scenes, setScenes] = useState<Scene[]>([]);
+  const { confirmDialog, confirmElement } = useConfirmDialog();
   const [rentalSpaces, setRentalSpaces] = useState<TrainEditorSpace[]>([]);
   const [selectedSceneIndex, setSelectedSceneIndex] = useState(0);
   const [hotspots, setHotspots] = useState<HotspotItem[]>([]);
@@ -306,6 +317,13 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
   const [uploading, setUploading] = useState(false);
   const [uploadingCreative, setUploadingCreative] = useState(false);
   const [bakingPrivacyBlur, setBakingPrivacyBlur] = useState(false);
+  const [bakePrivacyProgress, setBakePrivacyProgress] = useState<{
+    percent: number;
+    label: string;
+  } | null>(null);
+  const [bakeBlurConfirmOpen, setBakeBlurConfirmOpen] = useState(false);
+  const [editorPreviewMode, setEditorPreviewMode] =
+    useState<EditorPanoramaPreviewMode>("display");
   const [blurSizeLinked, setBlurSizeLinked] = useState(true);
   const [isPreview, setIsPreview] = useState(false);
   const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
@@ -328,6 +346,15 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
   const currentScene = scenes[selectedSceneIndex] ?? null;
   const selectedHotspot = hotspots.find((h) => h._id === selectedHotspotId) ?? null;
   const selectedBlur = privacyBlurs.find((b) => b._id === selectedBlurId) ?? null;
+  const editorHematMultiRes = currentScene
+    ? extractMultiResProfilesFromCanvasData(currentScene.canvasData)?.desktop ?? null
+    : null;
+  const editorHdMultiRes = currentScene
+    ? extractHdMultiResProfilesFromCanvasData(
+        currentScene.canvasData,
+        currentScene.panoramaUrl
+      )?.desktop ?? null
+    : null;
   const privacyBlurGuideOnly = currentScene
     ? isPrivacyBlurBakedInPanorama(currentScene.canvasData)
     : false;
@@ -514,9 +541,14 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSceneIndex]);
 
-  function selectScene(index: number) {
+  async function selectScene(index: number) {
     if (hasUnsaved) {
-      if (!confirm("Ada perubahan belum disimpan. Pindah scene?")) return;
+      const confirmed = await confirmDialog({
+        title: "Pindah scene?",
+        description: "Ada perubahan belum disimpan pada scene ini. Perubahan tersebut akan dibuang.",
+        confirmLabel: "Pindah Scene",
+      });
+      if (!confirmed) return;
       const saved = savedSceneRef.current;
       if (saved) {
         setScenes((prev) => prev.map((s) => (s.sceneId === saved.sceneId ? { ...saved } : s)));
@@ -525,14 +557,20 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     const next = scenes[index];
     if (!next) return;
     setSelectedSceneIndex(index);
+    setEditorPreviewMode("display");
     rememberSavedScene(next);
     restoreSceneState(next);
     setIsPreview(false);
   }
 
-  function resetChanges() {
+  async function resetChanges() {
     if (!hasUnsaved || !currentScene) return;
-    if (!confirm("Buang semua perubahan yang belum disimpan pada scene ini?")) return;
+    const confirmed = await confirmDialog({
+      title: "Buang semua perubahan yang belum disimpan?",
+      description: "Scene akan dikembalikan ke versi terakhir yang tersimpan.",
+      confirmLabel: "Ya, Buang Perubahan",
+    });
+    if (!confirmed) return;
     const saved = savedSceneRef.current;
     if (saved && saved.sceneId === currentScene.sceneId) {
       setScenes((prev) => prev.map((s, i) => (i === selectedSceneIndex ? { ...saved } : s)));
@@ -585,46 +623,70 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     }
   }
 
-  async function bakePrivacyBlursToPanorama() {
+  function requestBakePrivacyBlurs() {
+    if (!currentScene?.panoramaUrl || privacyBlurs.length === 0 || bakingPrivacyBlur) return;
+    setBakeBlurConfirmOpen(true);
+  }
+
+  async function bakePrivacyBlursToPanorama(target: PrivacyBlurBakeTarget = "both") {
     if (!currentScene?.panoramaUrl || privacyBlurs.length === 0) return;
-    if (
-      !window.confirm(
-        privacyBlurGuideOnly
-          ? "Perubahan blur akan dibake ulang ke panorama dari file master. Lanjutkan?"
-          : "Blur akan dibake permanen ke file panorama. Lanjutkan?"
-      )
-    ) {
-      return;
-    }
+    setBakeBlurConfirmOpen(false);
 
     const viewerCtx = editorRef.current?.getViewerBakeContext();
     setBakingPrivacyBlur(true);
+    setBakePrivacyProgress({ percent: 0, label: "Menyiapkan…" });
     try {
       const res = await cmsFetch(
         `/api/cms/virtual-train/${trainId}/${currentScene.sceneId}/bake-privacy-blur`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/x-ndjson",
+          },
           body: JSON.stringify({
             privacyBlurs: blursToSave(privacyBlurs),
             viewerWidth: viewerCtx?.viewerWidth,
             viewerHeight: viewerCtx?.viewerHeight,
             hfov: viewerCtx?.hfov,
+            target,
           }),
         }
       );
-      if (res.ok) {
-        showToast("ok", "Blur dibake ke panorama");
-        setHasUnsaved(false);
-        await load(selectedSceneIndex);
-      } else {
+      if (res.status === 401) return;
+      if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        showToast("err", data.error ?? "Gagal bake blur ke panorama");
+        showToast("err", (data as { error?: string }).error ?? "Gagal bake blur ke panorama");
+        return;
       }
-    } catch {
-      showToast("err", "Error jaringan saat bake blur");
+      const { consumeBakePrivacyBlurStream } = await import("@/lib/cms-bake-progress-client");
+      const data = await consumeBakePrivacyBlurStream(res, {
+        onProgress: (percent, label) => setBakePrivacyProgress({ percent, label }),
+      });
+      const hd = data.hd as { status?: string; reason?: string } | undefined;
+      if (target === "hd") {
+        showToast(
+          "ok",
+          hd?.status === "done" ? "Tile HD dibake" : data.message || "Bake HD selesai"
+        );
+        setEditorPreviewMode("hd");
+      } else {
+        const hdMsg =
+          hd?.status === "queued"
+            ? " · HD diantrikan"
+            : hd?.status === "skipped"
+              ? ` · HD dilewati (${hd.reason ?? "tidak tersedia"})`
+              : "";
+        showToast("ok", `Blur dibake ke panorama Hemat${hdMsg}`);
+        setEditorPreviewMode("display");
+      }
+      setHasUnsaved(false);
+      await load(selectedSceneIndex);
+    } catch (err) {
+      showToast("err", err instanceof Error ? err.message : "Error jaringan saat bake blur");
     } finally {
       setBakingPrivacyBlur(false);
+      setBakePrivacyProgress(null);
     }
   }
 
@@ -691,7 +753,13 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
   }
 
   async function deleteScene(scene: Scene) {
-    if (!confirm(`Hapus scene "${scene.title}"?`)) return;
+    const confirmed = await confirmDialog({
+      title: `Hapus scene "${scene.title}"?`,
+      description: "Scene akan dihapus dari tur kereta ini.",
+      confirmLabel: "Ya, Hapus",
+      destructive: true,
+    });
+    if (!confirmed) return;
     const res = await cmsFetch(`/api/cms/virtual-train/${trainId}/${scene.sceneId}`, {
       method: "DELETE",
     });
@@ -1055,7 +1123,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     }
   }
 
-  function jumpToHotspot(sceneId: string, hotspotIndex: number) {
+  async function jumpToHotspot(sceneId: string, hotspotIndex: number) {
     const idx = scenes.findIndex((s) => s.sceneId === sceneId);
     if (idx < 0) return;
     const scene = scenes[idx];
@@ -1065,7 +1133,12 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
 
     if (idx !== selectedSceneIndex) {
       if (hasUnsaved) {
-        if (!confirm("Ada perubahan belum disimpan. Pindah scene?")) return;
+        const confirmed = await confirmDialog({
+          title: "Pindah scene?",
+          description: "Ada perubahan belum disimpan pada scene ini. Perubahan tersebut akan dibuang.",
+          confirmLabel: "Pindah Scene",
+        });
+        if (!confirmed) return;
         const saved = savedSceneRef.current;
         if (saved) {
           setScenes((prev) => prev.map((s) => (s.sceneId === saved.sceneId ? { ...saved } : s)));
@@ -1192,20 +1265,20 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
 
   return (
     <div className="cms-vt-editor flex h-full min-h-0 w-full flex-col overflow-hidden">
-      <div className="relative z-30 flex shrink-0 items-center gap-3 border-b border-[rgba(255,214,218,0.14)] bg-[#261015] px-4 py-3 text-[#F8ECEE]">
-        <Button asChild variant="ghost" size="sm" className="shrink-0 text-[#C4A8AD] hover:text-[#F8ECEE]">
+      <div className="relative z-30 flex shrink-0 items-center gap-3 border-b border-[var(--work-line)] bg-[var(--work-subtle)] px-4 py-3 text-[var(--work-text)]">
+        <Button asChild variant="ghost" size="sm" className="shrink-0 text-[var(--work-muted)] hover:text-[var(--work-text)]">
           <Link href="/cms/dashboard">
             <ArrowLeft className="mr-1 h-4 w-4" /> Dashboard
           </Link>
         </Button>
-        <div className="h-5 w-px bg-[#4A1F28]" />
+        <div className="h-5 w-px bg-[var(--work-subtle)]" />
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className="shrink-0 text-sm text-[#C4A8AD]">Train Virtual Tour</span>
-          <span className="text-[#A88990]">›</span>
-          <span className="truncate text-sm font-semibold text-[#F8ECEE]">{trainName}</span>
+          <span className="shrink-0 text-sm text-[var(--work-muted)]">Train Virtual Tour</span>
+          <span className="text-[var(--work-muted)]">›</span>
+          <span className="truncate text-sm font-semibold text-[var(--work-text)]">{trainName}</span>
           {currentScene && (
             <>
-              <span className="text-[#A88990]">›</span>
+              <span className="text-[var(--work-muted)]">›</span>
               <span
                 className="truncate text-sm font-medium"
                 style={{ color: getLevelConfig(currentScene.level, levels).color }}
@@ -1216,11 +1289,11 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           )}
         </div>
         <div className="flex-1" />
-        <div className="flex items-center gap-1 rounded-lg bg-[#3A161C] p-1">
+        <div className="flex items-center gap-1 rounded-lg bg-[var(--work-surface)] p-1">
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              addMode === "none" ? "bg-[#E31E2D] text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
+              addMode === "none" ? "bg-[#E31E2D] text-white" : "text-[var(--work-muted)] hover:text-[var(--work-text)]"
             }`}
             onClick={() => setAddMode("none")}
             title="Mode Seleksi"
@@ -1230,7 +1303,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              addMode === "scene" ? "bg-emerald-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
+              addMode === "scene" ? "bg-emerald-600 text-white" : "text-[var(--work-muted)] hover:text-[var(--work-text)]"
             }`}
             onClick={() => setAddMode((m) => (m === "scene" ? "none" : "scene"))}
             title="Tambah hotspot scene"
@@ -1240,7 +1313,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              addMode === "space" ? "bg-amber-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
+              addMode === "space" ? "bg-amber-600 text-white" : "text-[var(--work-muted)] hover:text-[var(--work-text)]"
             }`}
             onClick={() => setAddMode((m) => (m === "space" ? "none" : "space"))}
             title="Tambah hotspot unit"
@@ -1250,7 +1323,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              addMode === "info" ? "bg-blue-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
+              addMode === "info" ? "bg-blue-600 text-white" : "text-[var(--work-muted)] hover:text-[var(--work-text)]"
             }`}
             onClick={() => setAddMode((m) => (m === "info" ? "none" : "info"))}
             title="Tambah hotspot info"
@@ -1260,7 +1333,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              addMode === "ad" ? "bg-purple-600 text-white" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
+              addMode === "ad" ? "bg-purple-600 text-white" : "text-[var(--work-muted)] hover:text-[var(--work-text)]"
             }`}
             onClick={() => setAddMode((m) => (m === "ad" ? "none" : "ad"))}
             title="Tambah hotspot iklan"
@@ -1270,7 +1343,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              addMode === "blur" ? "bg-[#E31E2D] text-white ring-1 ring-purple-500/50" : "text-[#C4A8AD] hover:text-[#F8ECEE]"
+              addMode === "blur" ? "bg-[#E31E2D] text-white ring-1 ring-purple-500/50" : "text-[var(--work-muted)] hover:text-[var(--work-text)]"
             }`}
             onClick={() => setAddMode((m) => (m === "blur" ? "none" : "blur"))}
             title="Tambah blur privasi"
@@ -1278,11 +1351,11 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
             <EyeOff className="h-3.5 w-3.5" /> + Blur
           </button>
         </div>
-        <div className="h-5 w-px bg-[#4A1F28]" />
-        <div className="flex items-center gap-1 rounded-lg bg-[#3A161C] p-1">
+        <div className="h-5 w-px bg-[var(--work-subtle)]" />
+        <div className="flex items-center gap-1 rounded-lg bg-[var(--work-surface)] p-1">
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:pointer-events-none disabled:opacity-30"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--work-muted)] hover:text-[var(--work-text)] disabled:pointer-events-none disabled:opacity-30"
             onClick={undo}
             disabled={!canUndo}
             title="Undo (Ctrl+Z)"
@@ -1291,7 +1364,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           </button>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:pointer-events-none disabled:opacity-30"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--work-muted)] hover:text-[var(--work-text)] disabled:pointer-events-none disabled:opacity-30"
             onClick={redo}
             disabled={!canRedo}
             title="Redo (Ctrl+Y)"
@@ -1300,7 +1373,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           </button>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:pointer-events-none disabled:opacity-30"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--work-muted)] hover:text-[var(--work-text)] disabled:pointer-events-none disabled:opacity-30"
             onClick={duplicateSelected}
             disabled={!selectedHotspot && !selectedBlur}
             title="Duplikat hotspot/blur terpilih"
@@ -1309,7 +1382,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           </button>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE] disabled:pointer-events-none disabled:opacity-30"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--work-muted)] hover:text-[var(--work-text)] disabled:pointer-events-none disabled:opacity-30"
             onClick={handleSetInitialView}
             disabled={!currentScene || isPreview}
             title="Set view awal dari posisi kamera"
@@ -1318,15 +1391,15 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           </button>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[#C4A8AD] hover:text-[#F8ECEE]"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--work-muted)] hover:text-[var(--work-text)]"
             onClick={() => setShowConnectionMap(true)}
             title="Peta koneksi antar scene"
           >
             <Network className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="h-5 w-px bg-[#4A1F28]" />
-        <Button asChild variant="outline" size="sm" className="shrink-0 border-[rgba(255,214,218,0.14)]">
+        <div className="h-5 w-px bg-[var(--work-subtle)]" />
+        <Button asChild variant="outline" size="sm" className="shrink-0 border-[var(--work-line)]">
           <Link href={`/train/${trainSlug}`} target="_blank">
             Preview Publik
           </Link>
@@ -1336,7 +1409,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
             isPreview
               ? "border-purple-500 bg-purple-600 text-white"
-              : "border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F0DDE1] hover:border-purple-500 hover:text-purple-300"
+              : "border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-muted)] hover:border-purple-500 hover:text-purple-300"
           }`}
           onClick={() => {
             setIsPreview((p) => !p);
@@ -1354,9 +1427,9 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
         <Button
           size="sm"
           variant="outline"
-          onClick={resetChanges}
+          onClick={() => void resetChanges()}
           disabled={!hasUnsaved || saving || !currentScene}
-          className="shrink-0 border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE] hover:bg-[#3A161C] hover:text-white disabled:opacity-40"
+          className="shrink-0 border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-text)] hover:bg-[var(--work-surface)] hover:text-[var(--work-text)] disabled:opacity-40"
         >
           <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reset
         </Button>
@@ -1380,7 +1453,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
 
       {toast && (
         <div
-          className={`shrink-0 px-4 py-2 text-sm ${toast.type === "ok" ? "bg-emerald-900/50 text-emerald-200" : "bg-red-900/50 text-red-200"}`}
+          className={`shrink-0 px-4 py-2 text-sm ${toast.type === "ok" ? "bg-emerald-900/50 text-[var(--work-success)]" : "bg-red-900/50 text-red-200"}`}
         >
           {toast.msg}
         </div>
@@ -1431,8 +1504,13 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
               <PannellumEditor
                 spaceMarker="info-pin"
                 ref={editorRef}
-                key={`editor-${currentScene.sceneId}`}
+                key={`editor-${currentScene.sceneId}-${currentScene.panoramaUrl || "none"}`}
                 panoramaUrl={currentScene.panoramaUrl}
+                originalPanoramaUrl={currentScene.originalPanoramaUrl ?? null}
+                hematMultiRes={editorHematMultiRes}
+                hdMultiRes={editorHdMultiRes}
+                previewMode={editorPreviewMode}
+                onPreviewModeChange={setEditorPreviewMode}
                 hotspots={hotspots}
                 privacyBlurs={privacyBlurs}
                 selectedId={selectedHotspotId}
@@ -1453,7 +1531,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
               />
             )
           ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-[#C4A8AD]">
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-[var(--work-muted)]">
               <p>Pilih atau tambah scene dari panel kiri</p>
               <Button size="sm" variant="outline" onClick={() => setShowBulkImport(true)}>
                 <Package className="mr-1 h-4 w-4" /> Bulk Import Panorama
@@ -1479,7 +1557,13 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
             uploading={uploading}
             uploadingCreative={uploadingCreative}
             bakingPrivacyBlur={bakingPrivacyBlur}
+            bakePrivacyProgress={bakePrivacyProgress}
             privacyBlurGuideOnly={privacyBlurGuideOnly}
+            editorPreviewMode={editorPreviewMode}
+            onEditorPreviewModeChange={setEditorPreviewMode}
+            hasHematTiles={Boolean(editorHematMultiRes)}
+            hasHdTiles={Boolean(editorHdMultiRes)}
+            hasHdOriginal={Boolean(currentScene.originalPanoramaUrl)}
             getLevelConfig={getLevelConfig}
             onSceneTitleChange={(title) => updateSelectedScene("title", title)}
             onSceneAreaChange={handleSceneAreaChange}
@@ -1498,11 +1582,19 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
             updateBlur={updateBlur}
             updateBlurSize={updateBlurSize}
             setBlurSizeLinked={setBlurSizeLinked}
-            bakePrivacyBlurs={() => void bakePrivacyBlursToPanorama()}
+            bakePrivacyBlurs={requestBakePrivacyBlurs}
             jumpToHotspot={jumpToHotspot}
           />
         ) : null}
       </div>
+
+      <BakePrivacyBlurDialog
+        open={bakeBlurConfirmOpen}
+        onOpenChange={setBakeBlurConfirmOpen}
+        rebake={privacyBlurGuideOnly}
+        confirming={bakingPrivacyBlur}
+        onConfirm={(target) => void bakePrivacyBlursToPanorama(target)}
+      />
 
       {showConnectionMap && (
         <ConnectionMapDialog
@@ -1518,7 +1610,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           activeSceneId={currentScene?.sceneId ?? null}
           onSelectScene={(sceneId) => {
             const idx = scenes.findIndex((s) => s.sceneId === sceneId);
-            if (idx >= 0) selectScene(idx);
+            if (idx >= 0) void selectScene(idx);
           }}
         />
       )}
@@ -1527,9 +1619,9 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <form
             onSubmit={addScene}
-            className="w-full max-w-md rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] p-5 shadow-2xl"
+            className="w-full max-w-md rounded-xl border border-[var(--work-line)] bg-[var(--work-subtle)] p-5 shadow-2xl"
           >
-            <h2 className="mb-4 font-bold text-[#F8ECEE]">Tambah Scene</h2>
+            <h2 className="mb-4 font-bold text-[var(--work-text)]">Tambah Scene</h2>
             <div className="space-y-3">
               <div>
                 <Label>Judul</Label>
@@ -1543,7 +1635,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                       );
                     }
                   }}
-                  className="mt-1 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="mt-1 border-[var(--work-line)] bg-[var(--work-subtle)]"
                   required
                 />
               </div>
@@ -1552,7 +1644,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                 <Input
                   value={newSceneId}
                   onChange={(e) => setNewSceneId(e.target.value)}
-                  className="mt-1 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-sm"
+                  className="mt-1 border-[var(--work-line)] bg-[var(--work-subtle)] font-mono text-sm"
                   required
                 />
               </div>
@@ -1569,7 +1661,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                       setNewSceneId(suggestSceneId(areaId, found.level.slug, levels, scenes));
                     }
                   }}
-                  className="mt-1 h-9 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] px-2 text-sm"
                   required
                 >
                   {levels.map((level) => (
@@ -1598,21 +1690,21 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
 
       {showBulkImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="mx-4 flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[rgba(255,214,218,0.14)] p-5">
-              <h2 className="flex items-center gap-2 font-bold text-[#F8ECEE]">
+          <div className="mx-4 flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-[var(--work-line)] bg-[var(--work-subtle)] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--work-line)] p-5">
+              <h2 className="flex items-center gap-2 font-bold text-[var(--work-text)]">
                 <Package className="h-5 w-5 text-sky-400" /> Bulk Import Panorama
               </h2>
-              <button type="button" onClick={() => setShowBulkImport(false)} className="text-[#A88990] hover:text-[#F0DDE1]">
+              <button type="button" onClick={() => setShowBulkImport(false)} className="text-[var(--work-muted)] hover:text-[var(--work-muted)]">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto p-5">
-              <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-[rgba(255,214,218,0.14)] p-5 text-[#C4A8AD] transition-colors hover:border-sky-600 hover:text-sky-400">
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-[var(--work-line)] p-5 text-[var(--work-muted)] transition-colors hover:border-sky-600 hover:text-sky-400">
                 <Upload className="h-6 w-6 shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Pilih beberapa file panorama sekaligus</p>
-                  <p className="mt-0.5 text-xs text-[#A88990]">JPEG/PNG equirectangular (rasio 2:1)</p>
+                  <p className="mt-0.5 text-xs text-[var(--work-muted)]">JPEG/PNG equirectangular (rasio 2:1)</p>
                 </div>
                 <input
                   ref={bulkFileInputRef}
@@ -1633,14 +1725,14 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                           ? "border-emerald-800/50 bg-emerald-900/10"
                           : row.status === "error"
                             ? "border-red-800/50 bg-red-900/10"
-                            : "border-[rgba(255,214,218,0.14)] bg-[#261015]/50"
+                            : "border-[var(--work-line)] bg-[var(--work-subtle)]/50"
                       }`}
                     >
                       <Input
                         value={row.title}
                         onChange={(e) => updateBulkRow(row.key, "title", e.target.value)}
                         disabled={row.status !== "pending"}
-                        className="h-7 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-xs"
+                        className="h-7 border-[var(--work-line)] bg-[var(--work-subtle)] text-xs"
                       />
                       <Input
                         value={row.sceneId}
@@ -1648,13 +1740,13 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                           updateBulkRow(row.key, "sceneId", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
                         }
                         disabled={row.status !== "pending"}
-                        className="h-7 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-xs"
+                        className="h-7 border-[var(--work-line)] bg-[var(--work-subtle)] font-mono text-xs"
                       />
                       <select
                         value={row.areaId}
                         onChange={(e) => updateBulkRow(row.key, "areaId", e.target.value)}
                         disabled={row.status !== "pending"}
-                        className="h-7 min-w-[110px] rounded border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-1.5 text-xs"
+                        className="h-7 min-w-[110px] rounded border border-[var(--work-line)] bg-[var(--work-subtle)] px-1.5 text-xs"
                       >
                         {levels.map((level) => (
                           <optgroup key={level.id} label={level.label}>
@@ -1670,11 +1762,11 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                         {row.status === "done" ? (
                           <Check className="h-4 w-4 text-emerald-400" />
                         ) : row.status === "error" ? (
-                          <AlertCircle className="h-4 w-4 text-red-400" />
+                          <AlertCircle className="h-4 w-4 text-[var(--work-danger)]" />
                         ) : row.status === "creating" || row.status === "uploading" ? (
                           <Loader2 className="h-4 w-4 animate-spin text-sky-400" />
                         ) : (
-                          <span className="h-2 w-2 rounded-full bg-[#4A1F28]" />
+                          <span className="h-2 w-2 rounded-full bg-[var(--work-subtle)]" />
                         )}
                       </span>
                     </div>
@@ -1682,8 +1774,8 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-between gap-3 border-t border-[rgba(255,214,218,0.14)] p-5">
-              <p className="text-xs text-[#A88990]">
+            <div className="flex items-center justify-between gap-3 border-t border-[var(--work-line)] p-5">
+              <p className="text-xs text-[var(--work-muted)]">
                 {bulkRows.filter((r) => r.status === "done").length}/{bulkRows.length} selesai
               </p>
               <div className="flex gap-2">
@@ -1708,6 +1800,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           </div>
         </div>
       )}
+      {confirmElement}
     </div>
   );
 }

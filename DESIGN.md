@@ -92,10 +92,14 @@ Homepage publik memakai bahasa **void immersif** dengan canvas **maroon gelap LR
 
 ### Station tour (`/station/[slug]`)
 1. Panorama 360° full-bleed (Experience lead)
-2. Chip stasiun + badge ketersediaan di atas (di bawah navbar)
-3. Rail tool kanan: Info / Rute / Unit (hover label, active signal)
-4. Panel terbang / drawer kanan maroon glass
-5. Nav level → area → scene di bawah (pills)
+2. Chip stasiun + breadcrumb Void chrome
+3. Rail tool kiri — **Unit** hero konversi, lalu Info / Rute / Fasilitas (active = signal)
+4. Hybrid shells: Experience (Info / Rute / Fasilitas) = Void maroon glass; Operate (daftar Unit + inquiry sewa) = putih / `#F3F8F5`
+5. Nav level → area → scene (pills)
+
+## Tour tokens (CSS)
+
+Chrome Experience memakai primitive `:root` (`--void`, `--panel`, `--ink`, `--fog`, `--hairline`, `--signal`, `--signal-deep`) dan alias `--tour-chrome-bg` / `--tour-chrome-hover`. Kelas: `.tour-glass`, `.tour-glass-panel`, `.tour-tool-btn`, `.tour-chrome-pill`, `.tour-sheet-void`.
 
 ## Elevation & Depth
 
@@ -103,5 +107,5 @@ Panel maroon elevated di atas void. Kartu signal glow merah saat hover. Wash rad
 
 ## Do's and Don'ts
 
-**Do:** biarkan maroon terbaca sebagai brand LRT dari viewport pertama; chrome tour mengikuti dunia yang sama.  
-**Don't:** hitam murni sebagai canvas; klaim palsu; Inter/Playfair/#FF4500; HUD navy generik (`#0d1f3c`) di tour publik.
+**Do:** biarkan maroon terbaca sebagai brand LRT dari viewport pertama; chrome Experience mengikuti Void; jalur sewa tetap Operate putih.  
+**Don't:** hitam murni / abu `#1c1c1e` sebagai canvas chrome; klaim palsu; Inter/Playfair/#FF4500; HUD navy generik (`#0d1f3c`) di tour publik.

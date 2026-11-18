@@ -48,6 +48,10 @@ import {
   Unlink,
   Upload,
 } from "lucide-react";
+import {
+  EditorPanoramaPreviewToggle,
+  type EditorPanoramaPreviewMode,
+} from "@/components/cms/EditorPanoramaPreviewToggle";
 import { SceneTargetPicker } from "../virtual-tour/[stationId]/SceneTargetPicker";
 import { TrainRentalPicker, type TrainRentalPickerItem } from "./TrainRentalPicker";
 import { CoveragePanel } from "../virtual-tour/[stationId]/CoveragePanel";
@@ -83,7 +87,13 @@ type Props = {
   uploading: boolean;
   uploadingCreative: boolean;
   bakingPrivacyBlur: boolean;
+  bakePrivacyProgress: { percent: number; label: string } | null;
   privacyBlurGuideOnly: boolean;
+  editorPreviewMode: EditorPanoramaPreviewMode;
+  onEditorPreviewModeChange: (mode: EditorPanoramaPreviewMode) => void;
+  hasHematTiles: boolean;
+  hasHdTiles: boolean;
+  hasHdOriginal: boolean;
   getLevelConfig: (slug: string | undefined, levels: TourLevel[]) => { label: string; color: string };
   onSceneTitleChange: (title: string) => void;
   onSceneAreaChange: (areaId: string) => void;
@@ -122,7 +132,13 @@ export function TrainTourEditorSidebar({
   uploading,
   uploadingCreative,
   bakingPrivacyBlur,
+  bakePrivacyProgress,
   privacyBlurGuideOnly,
+  editorPreviewMode,
+  onEditorPreviewModeChange,
+  hasHematTiles,
+  hasHdTiles,
+  hasHdOriginal,
   getLevelConfig,
   onSceneTitleChange,
   onSceneAreaChange,
@@ -145,44 +161,44 @@ export function TrainTourEditorSidebar({
   jumpToHotspot,
 }: Props) {
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-hidden border-l border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE]">
+    <aside className="flex w-72 shrink-0 flex-col overflow-hidden border-l border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-text)]">
       <div className="flex-1 space-y-5 overflow-y-auto px-3 py-3">
         <section>
-          <h3 className="mb-3 border-b border-[rgba(255,214,218,0.14)] pb-2 text-xs font-semibold uppercase tracking-wider text-[#C4A8AD]">
+          <h3 className="mb-3 border-b border-[var(--work-line)] pb-2 text-xs font-semibold uppercase tracking-wider text-[var(--work-muted)]">
             Scene
           </h3>
           <div className="space-y-3">
             <div>
-              <Label className="mb-1.5 block text-xs text-[#A88990]">Judul</Label>
+              <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Judul</Label>
               <Input
                 value={currentScene.title}
                 onChange={(e) => onSceneTitleChange(e.target.value)}
-                className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-sm text-[#F8ECEE]"
+                className="h-8 border-[var(--work-line)] bg-[var(--work-subtle)] text-sm text-[var(--work-text)]"
               />
             </div>
             <div>
-              <Label className="mb-1.5 block text-xs text-[#A88990]">Scene ID</Label>
+              <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Scene ID</Label>
               <Input
                 value={currentScene.sceneId}
                 readOnly
-                className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-xs text-[#C4A8AD]"
+                className="h-8 border-[var(--work-line)] bg-[var(--work-subtle)] font-mono text-xs text-[var(--work-muted)]"
               />
             </div>
             <div>
-              <Label className="mb-1.5 block text-xs text-[#A88990]">Gerbong</Label>
+              <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Gerbong</Label>
               <p
-                className="rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-2 py-1.5 text-sm font-medium"
+                className="rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] px-2 py-1.5 text-sm font-medium"
                 style={{ color: getLevelConfig(currentScene.level, levels).color }}
               >
                 {getLevelConfig(currentScene.level, levels).label}
               </p>
             </div>
             <div>
-              <Label className="mb-1.5 block text-xs text-[#A88990]">Zona</Label>
+              <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Zona</Label>
               <select
                 value={currentScene.areaId ?? ""}
                 onChange={(e) => onSceneAreaChange(e.target.value)}
-                className="h-8 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-2 text-sm text-[#F8ECEE]"
+                className="h-8 w-full rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] px-2 text-sm text-[var(--work-text)]"
               >
                 <option value="">— pilih zona —</option>
                 {levels.map((level) => (
@@ -197,17 +213,17 @@ export function TrainTourEditorSidebar({
               </select>
             </div>
             <div className="flex items-center justify-between">
-              <Label className="text-xs text-[#A88990]">Urutan</Label>
+              <Label className="text-xs text-[var(--work-muted)]">Urutan</Label>
               <Input
                 type="number"
                 min={0}
                 value={currentScene.order}
                 onChange={(e) => onSceneOrderChange(Number(e.target.value))}
-                className="h-8 w-20 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-xs"
+                className="h-8 w-20 border-[var(--work-line)] bg-[var(--work-subtle)] text-xs"
               />
             </div>
             <div>
-              <Label className="mb-1.5 block text-xs text-[#A88990]">Panorama 360°</Label>
+              <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Panorama 360°</Label>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -219,7 +235,7 @@ export function TrainTourEditorSidebar({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="w-full border-[rgba(255,214,218,0.18)]"
+                className="w-full border-[var(--work-line)]"
                 disabled={uploading}
                 onClick={() => fileInputRef.current?.click()}
               >
@@ -235,7 +251,7 @@ export function TrainTourEditorSidebar({
               type="button"
               size="sm"
               variant="ghost"
-              className="w-full text-red-400 hover:text-red-300"
+              className="w-full text-[var(--work-danger)] hover:text-[var(--work-danger)]"
               onClick={onDeleteScene}
             >
               <Trash2 className="mr-1 h-4 w-4" /> Hapus Scene
@@ -245,12 +261,12 @@ export function TrainTourEditorSidebar({
 
         {selectedBlur && (
           <section>
-            <div className="mb-3 flex items-center justify-between border-b border-[rgba(255,214,218,0.14)] pb-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#C4A8AD]">Blur Privasi</h3>
+            <div className="mb-3 flex items-center justify-between border-b border-[var(--work-line)] pb-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--work-muted)]">Blur Privasi</h3>
               <button
                 type="button"
                 onClick={() => onBlurDelete(selectedBlur._id)}
-                className="text-red-400 hover:text-red-300"
+                className="text-[var(--work-danger)] hover:text-[var(--work-danger)]"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -258,11 +274,11 @@ export function TrainTourEditorSidebar({
             <div className="space-y-3">
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <Label className="text-xs text-[#A88990]">Ukuran</Label>
+                  <Label className="text-xs text-[var(--work-muted)]">Ukuran</Label>
                   <button
                     type="button"
                     onClick={() => setBlurSizeLinked(!blurSizeLinked)}
-                    className="text-[#A88990] hover:text-[#F0DDE1]"
+                    className="text-[var(--work-muted)] hover:text-[var(--work-muted)]"
                     title={blurSizeLinked ? "Proporsi terkunci" : "Proporsi bebas"}
                   >
                     {blurSizeLinked ? <Link2 className="h-3.5 w-3.5" /> : <Unlink className="h-3.5 w-3.5" />}
@@ -275,7 +291,7 @@ export function TrainTourEditorSidebar({
                     max={320}
                     value={selectedBlur.width ?? BLUR_WIDTH_DEFAULT}
                     onChange={(e) => updateBlurSize("width", Number(e.target.value))}
-                    className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-xs text-[#F8ECEE]"
+                    className="h-8 border-[var(--work-line)] bg-[var(--work-subtle)] font-mono text-xs text-[var(--work-text)]"
                   />
                   <Input
                     type="number"
@@ -283,12 +299,12 @@ export function TrainTourEditorSidebar({
                     max={320}
                     value={selectedBlur.height ?? BLUR_HEIGHT_DEFAULT}
                     onChange={(e) => updateBlurSize("height", Number(e.target.value))}
-                    className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-xs text-[#F8ECEE]"
+                    className="h-8 border-[var(--work-line)] bg-[var(--work-subtle)] font-mono text-xs text-[var(--work-text)]"
                   />
                 </div>
               </div>
               <div>
-                <Label className="mb-1.5 block text-xs text-[#A88990]">Intensitas Blur</Label>
+                <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Intensitas Blur</Label>
                 <input
                   type="range"
                   min={BLUR_INTENSITY_MIN}
@@ -299,7 +315,7 @@ export function TrainTourEditorSidebar({
                 />
               </div>
               <div>
-                <Label className="mb-1.5 block text-xs text-[#A88990]">Radius Sudut</Label>
+                <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Radius Sudut</Label>
                 <input
                   type="range"
                   min={BLUR_RADIUS_MIN}
@@ -310,7 +326,7 @@ export function TrainTourEditorSidebar({
                 />
               </div>
               <div>
-                <Label className="mb-1.5 block text-xs text-[#A88990]">Skala</Label>
+                <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Skala</Label>
                 <input
                   type="range"
                   min={BLUR_SCALE_MIN}
@@ -327,19 +343,19 @@ export function TrainTourEditorSidebar({
 
         {selectedHotspot && (
           <section>
-            <div className="mb-3 flex items-center justify-between border-b border-[rgba(255,214,218,0.14)] pb-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#C4A8AD]">Hotspot</h3>
+            <div className="mb-3 flex items-center justify-between border-b border-[var(--work-line)] pb-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--work-muted)]">Hotspot</h3>
               <button
                 type="button"
                 onClick={() => onHotspotDelete(selectedHotspot._id)}
-                className="text-red-400 hover:text-red-300"
+                className="text-[var(--work-danger)] hover:text-[var(--work-danger)]"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
             <div className="space-y-3">
               <div>
-                <Label className="mb-1.5 block text-xs text-[#A88990]">Tipe</Label>
+                <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Tipe</Label>
                 <div className="grid grid-cols-2 gap-1.5">
                   {(["scene", "space", "info", "ad"] as const).map((t) => (
                     <button
@@ -355,7 +371,7 @@ export function TrainTourEditorSidebar({
                               : t === "ad"
                                 ? "border-purple-500 bg-purple-600 text-white"
                                 : "border-blue-500 bg-blue-600 text-white"
-                          : "border-[rgba(255,214,218,0.14)] text-[#C4A8AD] hover:bg-[#261015]"
+                          : "border-[var(--work-line)] text-[var(--work-muted)] hover:bg-[var(--work-subtle)]"
                       }`}
                     >
                       {t === "scene" ? "Scene" : t === "space" ? "Unit" : t === "ad" ? "Iklan" : "Info"}
@@ -364,11 +380,11 @@ export function TrainTourEditorSidebar({
                 </div>
               </div>
               <div>
-                <Label className="mb-1.5 block text-xs text-[#A88990]">Label</Label>
+                <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Label</Label>
                 <Input
                   value={selectedHotspot.text}
                   onChange={(e) => updateHotspot("text", e.target.value)}
-                  className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-sm text-[#F8ECEE]"
+                  className="h-8 border-[var(--work-line)] bg-[var(--work-subtle)] text-sm text-[var(--work-text)]"
                   placeholder="Contoh: Handgrip Gerbong 2"
                 />
               </div>
@@ -385,14 +401,14 @@ export function TrainTourEditorSidebar({
                     onChange={(sceneId) => updateHotspot("sceneId", sceneId)}
                   />
                   <div>
-                    <Label className="mb-1.5 block text-xs text-[#A88990]">Arah Panah</Label>
-                    <div className="inline-grid grid-cols-3 gap-1 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/60 p-1.5">
+                    <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Arah Panah</Label>
+                    <div className="inline-grid grid-cols-3 gap-1 rounded-xl border border-[var(--work-line)] bg-[var(--work-subtle)]/60 p-1.5">
                       {DIRECTION_COMPASS.map((d, i) => {
                         if (!d) {
                           return (
                             <div
                               key={`center-${i}`}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#261015]/80"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--work-subtle)]/80"
                               aria-hidden
                             >
                               <span
@@ -414,7 +430,7 @@ export function TrainTourEditorSidebar({
                             className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
                               active
                                 ? "border-red-700 bg-red-950 text-white"
-                                : "border-transparent text-[#A88990] hover:border-[rgba(255,214,218,0.28)] hover:bg-[#261015]"
+                                : "border-transparent text-[var(--work-muted)] hover:border-[var(--work-line)] hover:bg-[var(--work-subtle)]"
                             }`}
                           >
                             <span
@@ -429,7 +445,7 @@ export function TrainTourEditorSidebar({
                 </>
               ) : selectedHotspot.type === "space" ? (
                 <div>
-                  <Label className="mb-1.5 block text-xs text-[#A88990]">Ruang sewa kereta</Label>
+                  <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Ruang sewa kereta</Label>
                   <TrainRentalPicker
                     spaces={rentalSpaces}
                     value={selectedHotspot.spaceCode}
@@ -440,7 +456,7 @@ export function TrainTourEditorSidebar({
               ) : selectedHotspot.type === "ad" ? (
                 <>
                   <div>
-                    <Label className="mb-1.5 block text-xs text-[#A88990]">Ruang sewa kereta</Label>
+                    <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Ruang sewa kereta</Label>
                     <TrainRentalPicker
                       spaces={rentalSpaces}
                       value={selectedHotspot.spaceCode}
@@ -449,17 +465,17 @@ export function TrainTourEditorSidebar({
                     />
                   </div>
                   <div>
-                    <Label className="mb-1.5 block text-xs text-[#A88990]">Judul Kreatif</Label>
+                    <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Judul Kreatif</Label>
                     <Input
                       value={selectedHotspot.creativeTitle ?? ""}
                       onChange={(e) => updateHotspot("creativeTitle", e.target.value)}
-                      className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-sm text-[#F8ECEE]"
+                      className="h-8 border-[var(--work-line)] bg-[var(--work-subtle)] text-sm text-[var(--work-text)]"
                     />
                   </div>
                   <div>
-                    <Label className="mb-1.5 block text-xs text-[#A88990]">Aset Kreatif</Label>
+                    <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Aset Kreatif</Label>
                     {selectedHotspot.creativeUrl && (
-                      <div className="relative mb-2 h-24 overflow-hidden rounded-lg bg-[#261015]">
+                      <div className="relative mb-2 h-24 overflow-hidden rounded-lg bg-[var(--work-subtle)]">
                         <Image
                           src={getS3ProxyUrl(selectedHotspot.creativeUrl)}
                           alt="Kreatif iklan"
@@ -469,7 +485,7 @@ export function TrainTourEditorSidebar({
                         />
                       </div>
                     )}
-                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[rgba(255,214,218,0.18)] p-2 text-xs text-[#C4A8AD] hover:border-purple-500">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[var(--work-line)] p-2 text-xs text-[var(--work-muted)] hover:border-purple-500">
                       {uploadingCreative ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
@@ -490,7 +506,7 @@ export function TrainTourEditorSidebar({
               ) : (
                 <>
                   <div>
-                    <Label className="mb-1.5 block text-xs text-[#A88990]">Ikon Hotspot</Label>
+                    <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Ikon Hotspot</Label>
                     <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
                       <button
                         type="button"
@@ -499,7 +515,7 @@ export function TrainTourEditorSidebar({
                         className={`flex flex-col items-center gap-1 rounded-lg border p-1.5 transition ${
                           !selectedHotspot.facilityIcon
                             ? "border-blue-500 bg-blue-500/15"
-                            : "border-[rgba(255,214,218,0.14)] hover:bg-[#261015]"
+                            : "border-[var(--work-line)] hover:bg-[var(--work-subtle)]"
                         }`}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -520,7 +536,7 @@ export function TrainTourEditorSidebar({
                             title={icon.label}
                             onClick={() => updateHotspot("facilityIcon", icon.id as FacilityIconId)}
                             className={`flex flex-col items-center gap-1 rounded-lg border p-1.5 transition ${
-                              active ? "border-blue-500 bg-blue-500/15" : "border-[rgba(255,214,218,0.14)] hover:bg-[#261015]"
+                              active ? "border-blue-500 bg-blue-500/15" : "border-[var(--work-line)] hover:bg-[var(--work-subtle)]"
                             }`}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -531,12 +547,12 @@ export function TrainTourEditorSidebar({
                     </div>
                   </div>
                   <div>
-                    <Label className="mb-1.5 block text-xs text-[#A88990]">Deskripsi Info</Label>
+                    <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Deskripsi Info</Label>
                     <textarea
                       value={selectedHotspot.description ?? ""}
                       onChange={(e) => updateHotspot("description", e.target.value)}
                       rows={4}
-                      className="w-full resize-none rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 py-2 text-sm text-[#F8ECEE]"
+                      className="w-full resize-none rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] px-3 py-2 text-sm text-[var(--work-text)]"
                       placeholder="Contoh: Handgrip disewa Le Minerale"
                     />
                   </div>
@@ -544,8 +560,8 @@ export function TrainTourEditorSidebar({
               )}
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <Label className="text-xs text-[#A88990]">Ukuran Hotspot</Label>
-                  <span className="font-mono text-xs text-[#C4A8AD]">
+                  <Label className="text-xs text-[var(--work-muted)]">Ukuran Hotspot</Label>
+                  <span className="font-mono text-xs text-[var(--work-muted)]">
                     {Math.round((selectedHotspot.scale ?? HOTSPOT_SCALE_DEFAULT) * 100)}%
                   </span>
                 </div>
@@ -561,23 +577,23 @@ export function TrainTourEditorSidebar({
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="mb-1.5 block text-xs text-[#A88990]">Yaw (°)</Label>
+                  <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Yaw (°)</Label>
                   <Input
                     type="number"
                     step="0.1"
                     value={selectedHotspot.yaw}
                     onChange={(e) => updateHotspot("yaw", Number(e.target.value))}
-                    className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-xs text-[#F8ECEE]"
+                    className="h-8 border-[var(--work-line)] bg-[var(--work-subtle)] font-mono text-xs text-[var(--work-text)]"
                   />
                 </div>
                 <div>
-                  <Label className="mb-1.5 block text-xs text-[#A88990]">Pitch (°)</Label>
+                  <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Pitch (°)</Label>
                   <Input
                     type="number"
                     step="0.1"
                     value={selectedHotspot.pitch}
                     onChange={(e) => updateHotspot("pitch", Number(e.target.value))}
-                    className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-xs text-[#F8ECEE]"
+                    className="h-8 border-[var(--work-line)] bg-[var(--work-subtle)] font-mono text-xs text-[var(--work-text)]"
                   />
                 </div>
               </div>
@@ -587,8 +603,8 @@ export function TrainTourEditorSidebar({
 
         {privacyBlurs.length > 0 && (
           <section>
-            <div className="mb-2 flex items-center justify-between gap-2 border-b border-[rgba(255,214,218,0.14)] pb-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#C4A8AD]">
+            <div className="mb-2 flex items-center justify-between gap-2 border-b border-[var(--work-line)] pb-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--work-muted)]">
                 Blur Privasi ({privacyBlurs.length})
               </h3>
               <Button
@@ -600,13 +616,41 @@ export function TrainTourEditorSidebar({
                 onClick={bakePrivacyBlurs}
               >
                 {bakingPrivacyBlur ? (
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  <>
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    {bakePrivacyProgress
+                      ? `${bakePrivacyProgress.percent}%`
+                      : "Baking…"}
+                  </>
                 ) : (
-                  <ImageIcon className="mr-1 h-3 w-3" />
+                  <>
+                    <ImageIcon className="mr-1 h-3 w-3" />
+                    {privacyBlurGuideOnly ? "Bake ulang…" : "Bake…"}
+                  </>
                 )}
-                {privacyBlurGuideOnly ? "Re-bake" : "Bake ke panorama"}
               </Button>
             </div>
+            {bakingPrivacyBlur && bakePrivacyProgress ? (
+              <div className="mb-2 space-y-1">
+                <div className="h-1.5 overflow-hidden rounded-full bg-[var(--work-surface)]">
+                  <div
+                    className="h-full rounded-full bg-purple-500 transition-[width] duration-300"
+                    style={{ width: `${bakePrivacyProgress.percent}%` }}
+                  />
+                </div>
+                <p className="truncate text-[10px] text-[var(--work-muted)]">
+                  {bakePrivacyProgress.percent}% · {bakePrivacyProgress.label}
+                </p>
+              </div>
+            ) : null}
+            <EditorPanoramaPreviewToggle
+              className="mb-3"
+              value={editorPreviewMode}
+              onChange={onEditorPreviewModeChange}
+              hasHematTiles={hasHematTiles}
+              hasHdTiles={hasHdTiles}
+              hasHdOriginal={hasHdOriginal}
+            />
             <div className="space-y-1">
               {privacyBlurs.map((b, index) => (
                 <div
@@ -614,13 +658,13 @@ export function TrainTourEditorSidebar({
                   className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2 transition-colors ${
                     b._id === selectedBlurId
                       ? "border-purple-700 bg-purple-950/50"
-                      : "border-transparent hover:bg-[#261015]"
+                      : "border-transparent hover:bg-[var(--work-subtle)]"
                   }`}
                   onClick={() => onBlurSelect(b._id)}
                 >
                   <span className="h-4 w-4 flex-none rounded-md border border-purple-500/60 bg-purple-600/40" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs text-[#F8ECEE]">Blur #{index + 1}</p>
+                    <p className="truncate text-xs text-[var(--work-text)]">Blur #{index + 1}</p>
                   </div>
                   <button
                     type="button"
@@ -628,7 +672,7 @@ export function TrainTourEditorSidebar({
                       e.stopPropagation();
                       onBlurDelete(b._id);
                     }}
-                    className="text-[#A88990] hover:text-red-400"
+                    className="text-[var(--work-muted)] hover:text-[var(--work-danger)]"
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
@@ -653,7 +697,7 @@ export function TrainTourEditorSidebar({
 
         {hotspots.length > 0 && (
           <section className="space-y-4">
-            <h3 className="border-b border-[rgba(255,214,218,0.14)] pb-2 text-xs font-semibold uppercase tracking-wider text-[#C4A8AD]">
+            <h3 className="border-b border-[var(--work-line)] pb-2 text-xs font-semibold uppercase tracking-wider text-[var(--work-muted)]">
               Hotspot ({hotspots.length})
             </h3>
             {(["scene", "space", "ad", "info"] as const).map((type) => {
@@ -661,7 +705,7 @@ export function TrainTourEditorSidebar({
               if (items.length === 0) return null;
               return (
                 <div key={type}>
-                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#A88990]">
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--work-muted)]">
                     {hotspotLabel(type)} ({items.length})
                   </p>
                   <div className="space-y-1">
@@ -670,13 +714,13 @@ export function TrainTourEditorSidebar({
                         key={h._id}
                         className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2 transition-colors ${
                           h._id === selectedHotspotId
-                            ? "border-[rgba(255,214,218,0.18)] bg-[#3A161C]"
-                            : "border-transparent hover:bg-[#261015]"
+                            ? "border-[var(--work-line)] bg-[var(--work-surface)]"
+                            : "border-transparent hover:bg-[var(--work-subtle)]"
                         }`}
                         onClick={() => onHotspotSelect(h._id)}
                       >
                         <span
-                          className="flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] text-white"
+                          className="flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] text-[var(--work-text)]"
                           style={{
                             background:
                               h.type === "space" && h.spaceCode
@@ -687,22 +731,22 @@ export function TrainTourEditorSidebar({
                           {h.type === "scene" ? "›" : h.type === "space" ? "●" : h.type === "ad" ? "📢" : "i"}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs text-[#F8ECEE]">{h.text}</p>
+                          <p className="truncate text-xs text-[var(--work-text)]">{h.text}</p>
                           {h.type === "scene" && h.sceneId && (
-                            <p className="truncate text-[10px] text-[#A88990]">
+                            <p className="truncate text-[10px] text-[var(--work-muted)]">
                               → {scenes.find((s) => s.sceneId === h.sceneId)?.title ?? h.sceneId}
                             </p>
                           )}
                           {h.type === "space" && h.spaceCode && (
-                            <p className="truncate font-mono text-[10px] text-[#A88990]">{h.spaceCode}</p>
+                            <p className="truncate font-mono text-[10px] text-[var(--work-muted)]">{h.spaceCode}</p>
                           )}
                           {h.type === "ad" && h.spaceCode && (
-                            <p className="truncate text-[10px] font-mono text-[#A88990]">
+                            <p className="truncate text-[10px] font-mono text-[var(--work-muted)]">
                               {h.spaceCode}
                               {h.creativeTitle ? ` · ${h.creativeTitle}` : ""}
                             </p>
                           )}
-                          <p className="font-mono text-[10px] text-[#A88990]">
+                          <p className="font-mono text-[10px] text-[var(--work-muted)]">
                             {h.yaw.toFixed(1)}°, {h.pitch.toFixed(1)}°
                           </p>
                         </div>
@@ -712,7 +756,7 @@ export function TrainTourEditorSidebar({
                             e.stopPropagation();
                             onHotspotDelete(h._id);
                           }}
-                          className="text-[#A88990] transition-colors hover:text-red-400"
+                          className="text-[var(--work-muted)] transition-colors hover:text-[var(--work-danger)]"
                           title="Hapus hotspot"
                         >
                           <Trash2 className="h-3 w-3" />

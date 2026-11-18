@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   LayoutDashboard,
   LogOut,
@@ -18,6 +18,7 @@ import {
   PhoneCall,
   Sliders,
   LayoutGrid,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import CmsNotifications from "@/components/cms/CmsNotifications";
@@ -36,23 +37,54 @@ type NavItem = {
   adminOnly?: boolean;
 };
 
-const navItems: NavItem[] = [
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+/** Dashboard selalu terlihat; kelompok lain dibuka sebagai dropdown agar rail tetap rapi. */
+const standaloneItems: NavItem[] = [
   { href: "/cms/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/cms/stations", label: "Stasiun", icon: Train },
-  { href: "/cms/virtual-tour", label: "Station Virtual Tour", icon: Map },
-  { href: "/cms/virtual-train", label: "Train Virtual Tour", icon: TrainFront },
-  { href: "/cms/train-spaces", label: "Train Rental Space", icon: LayoutGrid },
-  { href: "/cms/spaces", label: "Ruang Komersial", icon: Store },
-  { href: "/cms/tenants", label: "Penyewa Aktif", icon: Building2 },
-  { href: "/cms/leads", label: "Pengajuan & Site Visit", icon: UserCircle },
+];
+
+/** Sidebar dikelompokkan per fungsi; setiap kelompok adalah dropdown yang bisa dibuka-tutup. */
+const navGroups: NavGroup[] = [
   {
-    href: "/cms/commercial-profile",
-    label: "Profil Tim Komersial",
-    icon: PhoneCall,
-    adminOnly: true,
+    label: "Tur Virtual",
+    items: [
+      { href: "/cms/virtual-tour", label: "Station Virtual Tour", icon: Map },
+      { href: "/cms/virtual-train", label: "Train Virtual Tour", icon: TrainFront },
+    ],
   },
-  { href: "/cms/users", label: "Users", icon: Users, adminOnly: true },
-  { href: "/cms/settings", label: "Pengaturan Sistem", icon: Sliders, adminOnly: true },
+  {
+    label: "Komersial",
+    items: [
+      { href: "/cms/stations", label: "Stasiun", icon: Train },
+      { href: "/cms/spaces", label: "Ruang Komersial", icon: Store },
+      { href: "/cms/train-spaces", label: "Train Rental Space", icon: LayoutGrid },
+      { href: "/cms/tenants", label: "Penyewa Aktif", icon: Building2 },
+    ],
+  },
+  {
+    label: "Pengajuan",
+    items: [
+      { href: "/cms/leads", label: "Pengajuan & Site Visit", icon: UserCircle },
+      { href: "/cms/advertising-form", label: "Form Advertising", icon: Sliders },
+    ],
+  },
+  {
+    label: "Pengaturan",
+    items: [
+      {
+        href: "/cms/commercial-profile",
+        label: "Profil Tim Komersial",
+        icon: PhoneCall,
+        adminOnly: true,
+      },
+      { href: "/cms/users", label: "Users", icon: Users, adminOnly: true },
+      { href: "/cms/settings", label: "Pengaturan Sistem", icon: Sliders, adminOnly: true },
+    ],
+  },
 ];
 
 const SIDEBAR_STORAGE_KEY = "cms-sidebar-collapsed";
@@ -84,14 +116,17 @@ function isFullWidthPage(pathname: string) {
 }
 
 function getPageMeta(pathname: string) {
+  if (pathname.startsWith("/cms/advertising-form")) {
+    return { title: "Form Advertising", subtitle: "Opsi status pengaju dan kategori bisnis" };
+  }
   if (pathname.startsWith("/cms/settings")) {
     return {
       title: "Pengaturan Sistem",
-      subtitle: "Kelola status mode maintenance dan konfigurasi sistem",
+      subtitle: "Mode maintenance dan konfigurasi sistem",
     };
   }
   if (pathname.startsWith("/cms/inquiry-workflow")) {
-    return { title: "Alur Pengajuan", subtitle: "Versi tahapan dan keterangan untuk mitra" };
+    return { title: "Alur Pengajuan", subtitle: "Versi tahapan untuk mitra" };
   }
   if (pathname.startsWith("/cms/dashboard")) {
     return { title: "Dashboard", subtitle: "Ringkasan performa komersial dan aktivitas tenant" };
@@ -129,10 +164,13 @@ function getPageMeta(pathname: string) {
       subtitle: "Brand atau mitra yang sedang mengisi unit komersial",
     };
   }
+  if (pathname.startsWith("/cms/leads/")) {
+    return { title: "Detail Pengajuan", subtitle: "Tahapan, dokumen, dan tindak lanjut" };
+  }
   if (pathname.startsWith("/cms/leads")) {
     return {
       title: "Pengajuan & Site Visit",
-      subtitle: "Alur calon mitra: penawaran, verifikasi lokasi, BA Negosiasi, lalu PKS",
+      subtitle: "Daftar pengajuan stasiun dan kereta",
     };
   }
   if (pathname.startsWith("/cms/commercial-profile")) {
@@ -175,9 +213,54 @@ export default function CmsShell({
 
   const fullWidth = isFullWidthPage(pathname);
   const pageMeta = getPageMeta(pathname);
-  const visibleNav = navItems.filter(
-    (item) => !item.adminOnly || initialUser?.role === "ADMIN"
-  );
+  const visibleGroups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.adminOnly || initialUser?.role === "ADMIN"),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  const activeGroupLabel = visibleGroups.find((group) =>
+    group.items.some((item) => pathname === item.href || pathname.startsWith(item.href + "/"))
+  )?.label;
+
+  // Kelompok aktif terbuka otomatis saat pindah halaman; buka-tutup manual mengikuti halaman saat itu.
+  const [navState, setNavState] = useState<{ path: string; open: ReadonlySet<string> }>(() => ({
+    path: pathname,
+    open: activeGroupLabel ? new Set([activeGroupLabel]) : new Set<string>(),
+  }));
+  const openGroups =
+    navState.path === pathname
+      ? navState.open
+      : activeGroupLabel
+        ? new Set([activeGroupLabel])
+        : new Set<string>();
+  function toggleGroup(label: string) {
+    setNavState({ path: pathname, open: openGroups.has(label) ? new Set<string>() : new Set([label]) });
+  }
+
+  function renderNavLink(item: NavItem) {
+    const active = pathname === item.href || pathname.startsWith(item.href + "/");
+    const Icon = item.icon;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        title={collapsed ? item.label : undefined}
+        aria-current={active ? "page" : undefined}
+        className={`flex items-center rounded-lg text-sm transition-colors group ${
+          collapsed ? "justify-center w-10 h-10 mx-auto" : "gap-3 px-3 py-2"
+        } ${
+          active
+            ? "bg-[#E31E2D] text-white"
+            : "text-[#C4A8AD] hover:bg-white/8 hover:text-[#F8ECEE]"
+        }`}
+      >
+        <Icon className="h-4 w-4 flex-none" />
+        {!collapsed && <span className="truncate">{item.label}</span>}
+      </Link>
+    );
+  }
 
   // Editor panoramik: auto-collapse app rail agar canvas lebih lebar (toggle tetap tersedia).
   const prevFullWidth = useRef(false);
@@ -190,9 +273,9 @@ export default function CmsShell({
   }, [fullWidth]);
 
   return (
-    <div className="cms-shell flex h-screen overflow-hidden bg-[#1C0A0E] text-[#F8ECEE]">
+    <div className="cms-shell flex h-screen overflow-hidden bg-[#F6F7F9] text-slate-900">
       <aside
-        className={`relative z-20 flex h-full min-h-0 flex-none flex-col border-r border-[rgba(255,214,218,0.14)] bg-[#261015] transition-all duration-200 ${
+        className={`relative z-20 flex h-full min-h-0 flex-none flex-col border-r border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE] transition-all duration-200 ${
           collapsed ? "w-14" : "w-56"
         }`}
       >
@@ -212,28 +295,43 @@ export default function CmsShell({
           )}
         </div>
 
-        <nav className="min-h-0 flex-1 p-2 space-y-0.5 overflow-y-auto">
-          {visibleNav.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={collapsed ? item.label : undefined}
-                className={`flex items-center rounded-lg text-sm transition-colors group ${
-                  collapsed ? "justify-center w-10 h-10 mx-auto" : "gap-3 px-3 py-2"
-                } ${
-                  active
-                    ? "bg-[#E31E2D] text-white"
-                    : "text-[#C4A8AD] hover:bg-white/8 hover:text-[#F8ECEE]"
-                }`}
-              >
-                <Icon className="h-4 w-4 flex-none" />
-                {!collapsed && <span className="truncate">{item.label}</span>}
-              </Link>
-            );
-          })}
+        <nav className="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Menu CMS">
+          <div className="space-y-0.5">{standaloneItems.map(renderNavLink)}</div>
+          {collapsed ? (
+            visibleGroups.map((group) => (
+              <div key={group.label}>
+                <div aria-hidden="true" className="mx-auto my-2 h-px w-6 bg-white/10" />
+                <div className="space-y-0.5">{group.items.map(renderNavLink)}</div>
+              </div>
+            ))
+          ) : (
+            visibleGroups.map((group) => {
+              const isOpen = openGroups.has(group.label);
+              const listId = `navgroup-${group.label.replace(/\s+/g, "-").toLowerCase()}`;
+              return (
+                <div key={group.label} className="mt-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.label)}
+                    aria-expanded={isOpen}
+                    aria-controls={listId}
+                    className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-[10px] font-semibold uppercase tracking-wider text-[#A88990] transition-colors hover:bg-white/5 hover:text-[#F8ECEE] focus-visible:outline-2 focus-visible:outline-[#FF858D]"
+                  >
+                    {group.label}
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={`ml-auto h-3.5 w-3.5 transition-transform ${isOpen ? "" : "-rotate-90"}`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div id={listId} className="mt-0.5 space-y-0.5">
+                      {group.items.map(renderNavLink)}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </nav>
 
         <div className={`border-t border-[rgba(255,214,218,0.14)] p-2 ${collapsed ? "flex flex-col items-center gap-2" : "space-y-2"}`}>
@@ -266,21 +364,21 @@ export default function CmsShell({
         </div>
       </aside>
 
-      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="relative z-20 border-b border-[rgba(255,214,218,0.14)] bg-[#261015]">
+      <main className="cms-light relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="relative z-20 border-b border-slate-200 bg-white">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
             <button
               type="button"
               onClick={toggleSidebar}
               title={collapsed ? "Perluas sidebar" : "Sembunyikan sidebar"}
               aria-label={collapsed ? "Perluas sidebar" : "Sembunyikan sidebar"}
-              className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE] transition hover:bg-[#E31E2D]"
+              className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D81435]"
             >
               {collapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
             </button>
 
             <div className="min-w-0">
-              <h1 className="truncate text-base font-black text-white sm:text-lg">{pageMeta.title}</h1>
+              <h1 className="truncate text-base font-black text-slate-900 sm:text-lg">{pageMeta.title}</h1>
             </div>
 
             <CmsNotifications />
@@ -288,8 +386,6 @@ export default function CmsShell({
         </header>
 
         <div className={`relative min-h-0 flex-1 ${fullWidth ? "overflow-hidden" : "overflow-auto"}`}>
-          <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(227,30,45,.16),transparent_32%),radial-gradient(circle_at_85%_8%,rgba(27,58,107,.2),transparent_28%)]" />
-
           {fullWidth ? (
             <div className="relative z-10 flex h-full min-h-0 w-full flex-col overflow-hidden">{children}</div>
           ) : (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Building2, Plus, Trash2, Link2, Unlink, Pencil, Save, X } from "lucide-react";
 import { cmsFetch } from "@/lib/cms-fetch";
 import { cmsUi } from "@/lib/cms-ui";
@@ -9,6 +9,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import CmsMediaSearch from "@/components/cms/CmsMediaSearch";
 
 export type StationOption = { id: string; name: string; slug: string };
 export type SpaceOption = {
@@ -50,6 +66,16 @@ type Props = {
   initialSpaces: SpaceOption[];
 };
 
+const emptyForm = {
+  stationId: "",
+  brandName: "",
+  contactName: "",
+  phone: "",
+  email: "",
+  notes: "",
+  spaceId: "",
+};
+
 export default function TenantsClient({
   initialTenants,
   initialStations,
@@ -59,20 +85,12 @@ export default function TenantsClient({
   const [stations, setStations] = useState(initialStations);
   const [spaces, setSpaces] = useState(initialSpaces);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    stationId: "",
-    brandName: "",
-    contactName: "",
-    phone: "",
-    email: "",
-    notes: "",
-    spaceId: "",
-  });
+  const [form, setForm] = useState(emptyForm);
   const [linkSpaceId, setLinkSpaceId] = useState<Record<string, string>>({});
-  const [editingName, setEditingName] = useState<{ id: string; value: string } | null>(
-    null
-  );
+  const [editingName, setEditingName] = useState<{ id: string; value: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const { confirmDialog, confirmElement } = useConfirmDialog();
 
   async function load() {
     const [tRes, sRes] = await Promise.all([
@@ -121,19 +139,12 @@ export default function TenantsClient({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error ?? "Gagal menambah tenant");
+        setActionError(data.error ?? "Gagal menambah tenant");
         return;
       }
+      setActionError("");
       setShowForm(false);
-      setForm({
-        stationId: "",
-        brandName: "",
-        contactName: "",
-        phone: "",
-        email: "",
-        notes: "",
-        spaceId: "",
-      });
+      setForm(emptyForm);
       await load();
     } finally {
       setBusy(false);
@@ -141,7 +152,13 @@ export default function TenantsClient({
   }
 
   async function deleteTenant(tenant: TenantItem) {
-    if (!confirm(`Hapus tenant "${tenant.brandName}"? Unit terkait akan jadi TERSEDIA.`)) return;
+    const confirmed = await confirmDialog({
+      title: `Hapus tenant "${tenant.brandName}"?`,
+      description: "Unit terkait akan jadi TERSEDIA.",
+      confirmLabel: "Ya, Hapus",
+      destructive: true,
+    });
+    if (!confirmed) return;
     await cmsFetch(`/api/cms/tenants/${tenant.id}`, { method: "DELETE" });
     await load();
   }
@@ -159,7 +176,13 @@ export default function TenantsClient({
   }
 
   async function unlinkSpace(tenantId: string, spaceId: string) {
-    if (!confirm("Lepas unit dari tenant ini?")) return;
+    const confirmed = await confirmDialog({
+      title: "Lepas unit dari tenant ini?",
+      description: "Unit akan kembali berstatus TERSEDIA dan bisa diisi tenant lain.",
+      confirmLabel: "Ya, Lepas",
+      destructive: true,
+    });
+    if (!confirmed) return;
     await cmsFetch(`/api/cms/tenants/${tenantId}/occupancy?spaceId=${spaceId}`, {
       method: "DELETE",
     });
@@ -177,9 +200,10 @@ export default function TenantsClient({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error ?? "Gagal mengubah nama mitra.");
+        setActionError(data.error ?? "Gagal mengubah nama mitra.");
         return;
       }
+      setActionError("");
       setEditingName(null);
       await load();
     } finally {
@@ -187,245 +211,295 @@ export default function TenantsClient({
     }
   }
 
+  const getTenantSearchText = useCallback(
+    (tenant: TenantItem) =>
+      [
+        tenant.brandName,
+        tenant.station.name,
+        tenant.contactName ?? "",
+        tenant.phone ?? "",
+        tenant.email ?? "",
+        tenant.isActive ? "" : "nonaktif",
+        ...tenant.occupancies.flatMap((o) => [o.space.code, o.space.name]),
+      ].join(" "),
+    []
+  );
+
   return (
     <div>
-      <div className="mb-6 flex items-center justify-end gap-3">
-        <Button onClick={() => setShowForm((v) => !v)} className="bg-[#E31E2D] hover:bg-[#c41926]">
-          <Plus className="mr-1.5 h-4 w-4" />
-          Tambah Penyewa
-        </Button>
-      </div>
+      {actionError ? (
+        <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          {actionError}
+        </p>
+      ) : null}
 
-      {showForm && (
-        <Card className="mb-6 border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
-          <CardContent className="space-y-3 p-4">
-            <form onSubmit={createTenant} className="grid gap-3 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Stasiun</Label>
-                <select
-                  required
-                  value={form.stationId}
-                  onChange={(e) => setForm((f) => ({ ...f, stationId: e.target.value, spaceId: "" }))}
-                  className="h-10 w-full rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm"
-                >
-                  <option value="">Pilih stasiun</option>
+      <Dialog
+        open={showForm}
+        onOpenChange={(open) => {
+          setShowForm(open);
+          if (!open) setForm(emptyForm);
+        }}
+      >
+        <DialogContent className={`max-w-lg ${cmsUi.modal}`}>
+          <DialogHeader>
+            <DialogTitle>Tambah penyewa aktif</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={createTenant} className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Label className={`mb-1.5 block text-xs ${cmsUi.muted}`}>Stasiun</Label>
+              <Select
+                value={form.stationId || undefined}
+                onValueChange={(value) =>
+                  setForm((f) => ({ ...f, stationId: value, spaceId: "" }))
+                }
+              >
+                <SelectTrigger className={cmsUi.select}>
+                  <SelectValue placeholder="Pilih stasiun" />
+                </SelectTrigger>
+                <SelectContent>
                   {stations.map((s) => (
-                    <option key={s.id} value={s.id}>
+                    <SelectItem key={s.id} value={s.id}>
                       {s.name}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
-              </div>
-              <div>
-                <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Brand / Nama Tenant</Label>
-                <Input
-                  required
-                  value={form.brandName}
-                  onChange={(e) => setForm((f) => ({ ...f, brandName: e.target.value }))}
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
-                />
-              </div>
-              <div>
-                <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Kontak</Label>
-                <Input
-                  value={form.contactName}
-                  onChange={(e) => setForm((f) => ({ ...f, contactName: e.target.value }))}
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
-                />
-              </div>
-              <div>
-                <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Telepon</Label>
-                <Input
-                  value={form.phone}
-                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
-                />
-              </div>
-              <div>
-                <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Email</Label>
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Unit (opsional)</Label>
-                <select
-                  value={form.spaceId}
-                  onChange={(e) => setForm((f) => ({ ...f, spaceId: e.target.value }))}
-                  className="h-10 w-full rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-3 text-sm"
-                  disabled={!form.stationId}
-                >
-                  <option value="">Belum assign unit</option>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className={`mb-1.5 block text-xs ${cmsUi.muted}`}>Brand / Nama Tenant</Label>
+              <Input
+                required
+                value={form.brandName}
+                onChange={(e) => setForm((f) => ({ ...f, brandName: e.target.value }))}
+                className={cmsUi.input}
+              />
+            </div>
+            <div>
+              <Label className={`mb-1.5 block text-xs ${cmsUi.muted}`}>Kontak</Label>
+              <Input
+                value={form.contactName}
+                onChange={(e) => setForm((f) => ({ ...f, contactName: e.target.value }))}
+                className={cmsUi.input}
+              />
+            </div>
+            <div>
+              <Label className={`mb-1.5 block text-xs ${cmsUi.muted}`}>Telepon</Label>
+              <Input
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                className={cmsUi.input}
+              />
+            </div>
+            <div>
+              <Label className={`mb-1.5 block text-xs ${cmsUi.muted}`}>Email</Label>
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                className={cmsUi.input}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label className={`mb-1.5 block text-xs ${cmsUi.muted}`}>Unit (opsional)</Label>
+              <Select
+                value={form.spaceId || "__none"}
+                onValueChange={(value) =>
+                  setForm((f) => ({ ...f, spaceId: value === "__none" ? "" : value }))
+                }
+                disabled={!form.stationId}
+              >
+                <SelectTrigger className={cmsUi.select}>
+                  <SelectValue placeholder="Belum assign unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">Belum assign unit</SelectItem>
                   {formSpaces.map((s) => (
-                    <option key={s.id} value={s.id}>
+                    <SelectItem key={s.id} value={s.id}>
                       {s.code} — {s.name} ({s.status})
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
-              </div>
-              <div className="sm:col-span-2 flex gap-2">
-                <Button type="submit" disabled={busy} className="bg-[#E31E2D] hover:bg-[#c41926]">
-                  Simpan
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                  Batal
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="sm:col-span-2">
+              <Button type="button" variant="outline" className={cmsUi.outlineBtn} onClick={() => setShowForm(false)}>
+                Batal
+              </Button>
+              <Button type="submit" disabled={busy || !form.stationId} className={cmsUi.primaryBtn}>
+                Simpan
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      <div className="space-y-3">
-        {tenants.length === 0 ? (
-          <p className="text-sm text-[#A88990]">Belum ada tenant aktif.</p>
-        ) : (
-          tenants.map((tenant) => {
-            const stationSpaces = spaces.filter((s) => s.stationId === tenant.station.id);
-            const occupiedIds = new Set(tenant.occupancies.map((o) => o.spaceId));
-            const availableToLink = stationSpaces.filter((s) => !occupiedIds.has(s.id));
+      <CmsMediaSearch
+        items={tenants}
+        placeholder="Cari brand, stasiun, kontak, atau unit…"
+        emptyLabel="Belum ada tenant aktif."
+        getSearchText={getTenantSearchText}
+        toolbar={
+          <Button onClick={() => setShowForm(true)} className={cmsUi.primaryBtn}>
+            <Plus className="mr-1.5 size-4" />
+            Tambah Penyewa
+          </Button>
+        }
+      >
+        {(filtered) => (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {filtered.map((tenant) => {
+              const stationSpaces = spaces.filter((s) => s.stationId === tenant.station.id);
+              const occupiedIds = new Set(tenant.occupancies.map((o) => o.spaceId));
+              const availableToLink = stationSpaces.filter((s) => !occupiedIds.has(s.id));
 
-            return (
-              <Card key={tenant.id} className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
-                <CardContent className="p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-emerald-400" />
-                        {editingName?.id === tenant.id ? (
-                          <Input
-                            autoFocus
-                            value={editingName.value}
-                            onChange={(event) =>
-                              setEditingName({ id: tenant.id, value: event.target.value })
-                            }
-                            className="h-8 w-56 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
-                          />
-                        ) : (
-                          <p className="font-semibold text-white">{tenant.brandName}</p>
-                        )}
-                        <Badge
-                          variant="outline"
-                          className={tenant.isActive ? cmsUi.successBadge : cmsUi.inactiveBadge}
-                        >
-                          {tenant.isActive ? "Aktif" : "Nonaktif"}
-                        </Badge>
+              return (
+                <Card key={tenant.id} className={cmsUi.card}>
+                  <CardContent className="space-y-4 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${cmsUi.nested}`}
+                          >
+                            <Building2 className="size-4 text-emerald-700" />
+                          </span>
+                          {editingName?.id === tenant.id ? (
+                            <Input
+                              autoFocus
+                              value={editingName.value}
+                              onChange={(event) =>
+                                setEditingName({ id: tenant.id, value: event.target.value })
+                              }
+                              className={`h-8 w-56 ${cmsUi.input}`}
+                            />
+                          ) : (
+                            <p className="font-semibold tracking-tight text-[var(--work-text)]">
+                              {tenant.brandName}
+                            </p>
+                          )}
+                          {!tenant.isActive ? (
+                            <Badge variant="outline" className={cmsUi.inactiveBadge}>
+                              Nonaktif
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className={`mt-1.5 text-sm ${cmsUi.muted}`}>{tenant.station.name}</p>
+                        <p className={`text-xs ${cmsUi.muted}`}>
+                          {[tenant.contactName, tenant.phone, tenant.email].filter(Boolean).join(" · ") ||
+                            "Tanpa kontak"}
+                        </p>
                       </div>
-                      <p className="mt-1 text-sm text-[#C4A8AD]">{tenant.station.name}</p>
-                      <p className="text-xs text-[#A88990]">
-                        {[tenant.contactName, tenant.phone, tenant.email].filter(Boolean).join(" · ") ||
-                          "Tanpa kontak"}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      {editingName?.id === tenant.id ? (
-                        <>
+                      <div className="flex gap-2">
+                        {editingName?.id === tenant.id ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className={cmsUi.outlineBtn}
+                              onClick={saveTenantName}
+                              disabled={busy || !editingName.value.trim()}
+                              aria-label="Simpan nama mitra"
+                            >
+                              <Save className="size-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEditingName(null)}
+                              aria-label="Batal edit"
+                            >
+                              <X className="size-3.5" />
+                            </Button>
+                          </>
+                        ) : (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={saveTenantName}
-                            disabled={busy || !editingName.value.trim()}
-                            aria-label="Simpan nama mitra"
+                            className={cmsUi.outlineBtn}
+                            onClick={() => setEditingName({ id: tenant.id, value: tenant.brandName })}
+                            aria-label="Edit nama mitra"
                           >
-                            <Save className="h-3.5 w-3.5" />
+                            <Pencil className="size-3.5" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setEditingName(null)}
-                            aria-label="Batal edit"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        </>
-                      ) : (
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() =>
-                            setEditingName({ id: tenant.id, value: tenant.brandName })
-                          }
-                          aria-label="Edit nama mitra"
+                          className="border-red-300 text-red-700 hover:bg-red-50"
+                          onClick={() => deleteTenant(tenant)}
+                          aria-label="Hapus penyewa"
                         >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-red-800 text-red-300 hover:bg-red-950"
-                        onClick={() => deleteTenant(tenant)}
-                        aria-label="Hapus penyewa"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#A88990]">
-                      Unit ditempati
-                    </p>
-                    {tenant.occupancies.length === 0 ? (
-                      <p className="text-xs text-[#A88990]">Belum ada unit</p>
-                    ) : (
-                      tenant.occupancies.map((o) => (
-                        <div
-                          key={o.id}
-                          className="flex items-center justify-between rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/50 px-3 py-2"
-                        >
-                          <div>
-                            <p className="font-mono text-xs text-[#F8ECEE]">{o.space.code}</p>
-                            <p className="text-[11px] text-[#A88990]">{o.space.name}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => unlinkSpace(tenant.id, o.spaceId)}
-                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-[#C4A8AD] hover:bg-[#261015] hover:text-white"
-                          >
-                            <Unlink className="h-3 w-3" /> Lepas
-                          </button>
-                        </div>
-                      ))
-                    )}
-
-                    {availableToLink.length > 0 && (
-                      <div className="flex gap-2 pt-1">
-                        <select
-                          value={linkSpaceId[tenant.id] ?? ""}
-                          onChange={(e) =>
-                            setLinkSpaceId((prev) => ({ ...prev, [tenant.id]: e.target.value }))
-                          }
-                          className="h-8 flex-1 rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] px-2 text-xs"
-                        >
-                          <option value="">Tambah unit…</option>
-                          {availableToLink.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.code} — {s.name}
-                            </option>
-                          ))}
-                        </select>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 border-[rgba(255,214,218,0.18)]"
-                          onClick={() => linkSpace(tenant.id)}
-                          disabled={!linkSpaceId[tenant.id]}
-                        >
-                          <Link2 className="mr-1 h-3 w-3" /> Tautkan
+                          <Trash2 className="size-3.5" />
                         </Button>
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className={`text-xs font-medium ${cmsUi.muted}`}>Unit ditempati</p>
+                      {tenant.occupancies.length === 0 ? (
+                        <p className={`text-xs ${cmsUi.muted}`}>Belum ada unit</p>
+                      ) : (
+                        tenant.occupancies.map((o) => (
+                          <div
+                            key={o.id}
+                            className={`flex items-center justify-between rounded-lg border px-3 py-2 ${cmsUi.nested}`}
+                          >
+                            <div>
+                              <p className="font-mono text-xs text-[var(--work-text)]">{o.space.code}</p>
+                              <p className={`text-[11px] ${cmsUi.muted}`}>{o.space.name}</p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className={`h-7 px-2 text-xs ${cmsUi.muted}`}
+                              onClick={() => unlinkSpace(tenant.id, o.spaceId)}
+                            >
+                              <Unlink className="mr-1 size-3" /> Lepas
+                            </Button>
+                          </div>
+                        ))
+                      )}
+
+                      {availableToLink.length > 0 ? (
+                        <div className="flex gap-2 pt-1">
+                          <Select
+                            value={linkSpaceId[tenant.id] || undefined}
+                            onValueChange={(value) =>
+                              setLinkSpaceId((prev) => ({ ...prev, [tenant.id]: value }))
+                            }
+                          >
+                            <SelectTrigger className={`h-8 flex-1 text-xs ${cmsUi.select}`}>
+                              <SelectValue placeholder="Tambah unit…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableToLink.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  {s.code} — {s.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={`h-8 ${cmsUi.outlineBtn}`}
+                            onClick={() => linkSpace(tenant.id)}
+                            disabled={!linkSpaceId[tenant.id]}
+                          >
+                            <Link2 className="mr-1 size-3" /> Tautkan
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         )}
-      </div>
+      </CmsMediaSearch>
+      {confirmElement}
     </div>
   );
 }
