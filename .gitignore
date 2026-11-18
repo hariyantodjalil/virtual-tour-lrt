@@ -56,4 +56,15 @@ pnpm-debug.log*
 Thumbs.db
 *.pem
 
-.cursor/*
+# Local agent / IDE scratch (jangan masuk remote)
+.cursor/
+.impeccable/
+.tmp-figma/
+.tmp-*/
+.tmp/
+tasks/
+
+# Script ad-hoc lokal; script produk di scripts/ tetap di-track
+scripts/tmp-*
+scripts/tmp-diff-out/
+scripts/**/tmp-*
