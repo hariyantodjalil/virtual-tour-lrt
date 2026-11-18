@@ -1,5 +1,8 @@
 # Editor V2 + Spatial Hotspot — Phase Report
 
+> Pembaruan 15 November 2026: Spatial sekarang fitur bawaan yang selalu aktif di CMS, API, dan public viewer. Konfigurasi feature flag di bawah merupakan catatan historis dan tidak lagi diperlukan.
+
+
 > **Spec:** `TECHNICAL_SPEC_VIRTUAL_TOUR_EDITOR_V2_SPATIAL_HOTSPOT.md`  
 > **Date:** 2026-10-27  
 > **Phase 5 (Perspective Surface):** ditunda sampai gate eksplisit.

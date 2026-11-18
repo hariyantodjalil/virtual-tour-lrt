@@ -1,6 +1,7 @@
 import type { PrivacyBlur } from "./privacy-blur-types";
 import type { FacilityIconId } from "./facility-icons";
 import type { PannellumMultiRes } from "./panorama-multires";
+import type { PanoramaMultiResProfiles } from "./panorama-profile";
 
 export type Hotspot = {
   pitch: number;
@@ -39,6 +40,8 @@ export type PanoramaScene = {
   title: string;
   panoramaUrl: string;
   multiRes?: PannellumMultiRes;
+  multiResProfiles?: PanoramaMultiResProfiles;
+  multiResProfilesHd?: PanoramaMultiResProfiles;
   hotspots: Hotspot[];
   privacyBlurs?: PrivacyBlur[];
   /** Spatial Area polygons (read-only publik) */

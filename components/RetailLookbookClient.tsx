@@ -239,7 +239,7 @@ export default function RetailLookbookClient({ stations = [], tourDataMap = {} }
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Estimasi Sewa</span>
                                 {isAvail ? (
                                   <span className="text-xl font-black text-slate-900">
-                                    Rp {space.monthlyRent.toLocaleString('id-ID')}
+                                    {space.monthlyRent == null ? "—" : `Rp ${space.monthlyRent.toLocaleString('id-ID')}`}
                                   </span>
                                 ) : (
                                   <span className="text-xl font-black text-gray-300">Hubungi Kami</span>

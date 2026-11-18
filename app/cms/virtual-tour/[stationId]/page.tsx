@@ -4,8 +4,10 @@ import { useEffect, useRef, useState, useCallback, useSyncExternalStore } from "
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import { cmsFetch } from "@/lib/cms-fetch";
@@ -24,6 +26,9 @@ import {
   Loader2,
   X,
   Check,
+  Copy,
+  Sparkles,
+  RotateCcw,
 } from "lucide-react";
 import { hotspotColor, hotspotLabel, HOTSPOT_SCALE_MIN, HOTSPOT_SCALE_MAX, HOTSPOT_SCALE_DEFAULT, DIRECTION_COMPASS, DIRECTION_LABELS, DIRECTION_ROTATE_DEG, type HotspotDirection } from "@/lib/hotspot-types";
 import {
@@ -56,6 +61,10 @@ import {
   isPrivacyBlurBakedInPanorama,
 } from "@/lib/privacy-blur-normalize";
 import {
+  getAiPatchHistory,
+  isAiPatchApplied,
+} from "@/lib/ai-patch-normalize";
+import {
   extractInitialViewFromCanvasData,
   mergeInitialViewIntoCanvasData,
 } from "@/lib/scene-initial-view";
@@ -70,7 +79,15 @@ import {
   type FacilityIconId,
 } from "@/lib/facility-icons";
 import { PannellumPreview } from "./PannellumPreview";
-import { PannellumEditor, type PannellumEditorHandle } from "./PannellumEditor";
+import {
+  PannellumEditor,
+  type EditorPanoramaPreviewMode,
+  type PannellumEditorHandle,
+} from "./PannellumEditor";
+import {
+  extractMultiResProfilesFromCanvasData,
+} from "@/lib/panorama-profile";
+import { extractHdMultiResProfilesFromCanvasData } from "@/lib/panorama-hd-profile";
 import { UnitPicker } from "./UnitPicker";
 import { CoveragePanel } from "./CoveragePanel";
 import { ConnectionMapDialog } from "./ConnectionMapDialog";
@@ -81,6 +98,9 @@ import { SceneTargetPicker } from "./SceneTargetPicker";
 import { SceneEntryViewDialog, type SceneEntryViewSelection } from "./SceneEntryViewDialog";
 import { EditorToolbar } from "./EditorToolbar";
 import { SpatialAreaInspector } from "./SpatialAreaInspector";
+import { BakePrivacyBlurDialog } from "@/components/cms/BakePrivacyBlurDialog";
+import type { PrivacyBlurBakeTarget } from "@/components/cms/BakePrivacyBlurDialog";
+import { EditorPanoramaPreviewToggle } from "@/components/cms/EditorPanoramaPreviewToggle";
 import { isSpatialHotspotEnabled } from "@/lib/spatial-feature";
 import { normalizeSpatialEntities, spatialEntitiesToSave } from "@/lib/spatial/normalize";
 import { validateSphericalPolygonAuthoring } from "@/lib/spatial/geometry/polygon-validation";
@@ -124,13 +144,14 @@ type CommercialSpace = {
   type: string;
   status: SpaceAvailabilityStatus;
   area: number;
-  monthlyRent: number;
+  monthlyRent: number | null;
   deposit: number;
   floor: string;
   location: string;
   nearestExit: string | null;
   exposure: number;
   powerSupply: string | null;
+  preferredUses?: string[];
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;
@@ -260,6 +281,7 @@ export default function VirtualTourEditorPage() {
   const [station, setStation] = useState<Station | null>(null);
   const [levels, setLevels] = useState<TourLevel[]>([]);
   const [scenes, setScenes] = useState<Scene[]>([]);
+  const { confirmDialog, confirmElement } = useConfirmDialog();
   const [stationSpaces, setStationSpaces] = useState<CommercialSpace[]>([]);
   const [selectedSceneIndex, setSelectedSceneIndex] = useState(0);
   const [hotspots, setHotspots] = useState<HotspotItem[]>([]);
@@ -295,6 +317,18 @@ export default function VirtualTourEditorPage() {
   const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [bakingPrivacyBlur, setBakingPrivacyBlur] = useState(false);
+  const [bakePrivacyProgress, setBakePrivacyProgress] = useState<{
+    percent: number;
+    label: string;
+  } | null>(null);
+  const [bakeBlurConfirmOpen, setBakeBlurConfirmOpen] = useState(false);
+  const [editorPreviewMode, setEditorPreviewMode] =
+    useState<EditorPanoramaPreviewMode>("display");
+  const [aiPatchPrompt, setAiPatchPrompt] = useState("");
+  const [bakingAiPatch, setBakingAiPatch] = useState(false);
+  const [restoringAiPatch, setRestoringAiPatch] = useState(false);
+  /** null = masih cek; false = under development (belum FAL_KEY) */
+  const [falConfigured, setFalConfigured] = useState<boolean | null>(null);
   /** Proporsi lebar:tinggi blur — seperti link di Figma */
   const [blurSizeLinked, setBlurSizeLinked] = useState(true);
 
@@ -499,6 +533,16 @@ export default function VirtualTourEditorPage() {
     clearHistory();
   }
 
+  const editorHematMultiRes = currentScene
+    ? extractMultiResProfilesFromCanvasData(currentScene.canvasData)?.desktop ?? null
+    : null;
+  const editorHdMultiRes = currentScene
+    ? extractHdMultiResProfilesFromCanvasData(
+        currentScene.canvasData,
+        currentScene.panoramaUrl
+      )?.desktop ?? null
+    : null;
+
   const privacyBlurGuideOnly = currentScene
     ? isPrivacyBlurBakedInPanorama(currentScene.canvasData)
     : false;
@@ -583,6 +627,22 @@ export default function VirtualTourEditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stationId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await cmsFetch("/api/cms/fal-status");
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) setFalConfigured(Boolean(res.ok && data.configured));
+      } catch {
+        if (!cancelled) setFalConfigured(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // ─── Scene selection ─────────────────────────────────────────────────────
   function selectScene(index: number) {
     if (index === selectedSceneIndex) return;
@@ -597,14 +657,20 @@ export default function VirtualTourEditorPage() {
     const next = scenes[index];
     if (!next) return;
     setSelectedSceneIndex(index);
+    setEditorPreviewMode("display");
     rememberSavedScene(next);
     restoreSceneState(next);
   }
 
   /** Buang perubahan lokal scene aktif → kembalikan ke versi terakhir tersimpan. */
-  function resetChanges() {
+  async function resetChanges() {
     if (!hasUnsaved || !currentScene) return;
-    if (!confirm("Buang semua perubahan yang belum disimpan pada scene ini?")) return;
+    const confirmed = await confirmDialog({
+      title: "Buang semua perubahan yang belum disimpan?",
+      description: "Scene akan dikembalikan ke versi terakhir yang tersimpan.",
+      confirmLabel: "Ya, Buang Perubahan",
+    });
+    if (!confirmed) return;
 
     const saved = savedSceneRef.current;
     if (saved && saved.sceneId === currentScene.sceneId) {
@@ -978,7 +1044,6 @@ export default function VirtualTourEditorPage() {
         } else if (addMode === "spatial" && e.key === "Backspace") {
           e.preventDefault(); setDraftSpatialVertices((current) => current.slice(0, -1));
         } else if (e.key.toLowerCase() === "g" && spatialEnabled) setAddMode("spatial");
-        else if (e.key.toLowerCase() === "h") setAddMode("pan");
         else if (e.key.toLowerCase() === "v") setAddMode("none");
       }
     }
@@ -1050,54 +1115,186 @@ export default function VirtualTourEditorPage() {
     return false;
   }
 
-  // ─── Bake blur ke piksel panorama lalu upload ─────────────────────────────
-  async function bakePrivacyBlursToPanorama() {
-    if (!currentScene?.panoramaUrl || privacyBlurs.length === 0) return;
+  // ─── AI patch (Fal FLUX Kontext) dari sudut kamera editor ─────────────────
+  async function bakeAiPatchToPanorama() {
+    if (!currentScene?.panoramaUrl || isPreview) return;
+    if (falConfigured !== true) {
+      showToast("err", "AI Patch masih under development — Fal belum terhubung");
+      return;
+    }
+    const prompt = aiPatchPrompt.trim();
+    if (prompt.length < 3) {
+      showToast("err", "Isi deskripsi patch AI (minimal 3 karakter)");
+      return;
+    }
+    const view = editorRef.current?.getView();
+    if (!view || !Number.isFinite(view.yaw) || !Number.isFinite(view.pitch)) {
+      showToast("err", "Viewer editor belum siap — arahkan kamera dulu");
+      return;
+    }
     if (
-      !window.confirm(
-        privacyBlurGuideOnly
-          ? "Perubahan blur akan dibake ulang ke panorama dari file master (tanpa blur). Metadata blur tetap bisa diedit setelahnya. Lanjutkan?"
-          : "Blur akan dibake permanen ke file panorama lalu diupload. Anda tetap bisa mengedit posisi/ukuran blur setelah ini; klik bake lagi setelah mengubah. Lanjutkan?"
-      )
+      !(await confirmDialog({
+        title: "Bake patch AI ke panorama?",
+        description: "Patch AI akan mengubah piksel panorama di sudut kamera saat ini (placeholder sementara). Master pra-AI disimpan untuk restore.",
+        confirmLabel: "Ya, Generate Patch",
+      }))
     ) {
       return;
     }
 
+    setBakingAiPatch(true);
+    try {
+      const res = await cmsFetch(
+        `/api/cms/virtual-tour/${stationId}/${currentScene.sceneId}/bake-ai-patch`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            yaw: view.yaw,
+            pitch: view.pitch,
+            hfov: view.hfov || 100,
+          }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const opt = data.optimization as { panorama?: string; patch?: string } | undefined;
+        showToast(
+          "ok",
+          opt?.panorama
+            ? `Patch AI dibake (${opt.panorama}${opt.patch ? `, crop ${opt.patch}` : ""})`
+            : "Patch AI dibake ke panorama"
+        );
+        setHasUnsaved(false);
+        load(selectedSceneIndex);
+      } else if (data.code === "FAL_KEY_MISSING") {
+        showToast("err", "FAL_KEY belum di .env server — hubungkan Fal dulu");
+      } else if (data.code === "FAL_BILLING") {
+        showToast("err", data.error ?? "Kredit Fal habis / akun terkunci");
+      } else {
+        showToast("err", data.error ?? "Gagal generate patch AI");
+      }
+    } catch {
+      showToast("err", "Error jaringan saat generate AI");
+    } finally {
+      setBakingAiPatch(false);
+    }
+  }
+
+  async function restoreAiPatchMaster() {
+    if (!currentScene?.panoramaUrl || isPreview) return;
+    if (!isAiPatchApplied(currentScene.canvasData)) {
+      showToast("err", "Belum ada patch AI untuk di-restore");
+      return;
+    }
+    if (
+      !(await confirmDialog({
+        title: "Kembalikan panorama ke master sebelum patch AI?",
+        description: "Perubahan AI akan hilang.",
+        confirmLabel: "Ya, Restore Master",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
+
+    setRestoringAiPatch(true);
+    try {
+      const res = await cmsFetch(
+        `/api/cms/virtual-tour/${stationId}/${currentScene.sceneId}/bake-ai-patch`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "restore" }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        showToast("ok", "Panorama dikembalikan ke master pra-AI");
+        setHasUnsaved(false);
+        load(selectedSceneIndex);
+      } else {
+        showToast("err", data.error ?? "Gagal restore master pra-AI");
+      }
+    } catch {
+      showToast("err", "Error jaringan saat restore");
+    } finally {
+      setRestoringAiPatch(false);
+    }
+  }
+
+  // ─── Bake blur ke piksel panorama lalu upload ─────────────────────────────
+  function requestBakePrivacyBlurs() {
+    if (!currentScene?.panoramaUrl || privacyBlurs.length === 0 || bakingPrivacyBlur) return;
+    setBakeBlurConfirmOpen(true);
+  }
+
+  async function bakePrivacyBlursToPanorama(target: PrivacyBlurBakeTarget = "both") {
+    if (!currentScene?.panoramaUrl || privacyBlurs.length === 0) return;
+    setBakeBlurConfirmOpen(false);
+
     const viewerCtx = editorRef.current?.getViewerBakeContext();
     setBakingPrivacyBlur(true);
+    setBakePrivacyProgress({ percent: 0, label: "Menyiapkan…" });
     try {
       const res = await cmsFetch(
         `/api/cms/virtual-tour/${stationId}/${currentScene.sceneId}/bake-privacy-blur`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/x-ndjson",
+          },
           body: JSON.stringify({
             privacyBlurs: blursToSave(privacyBlurs),
             viewerWidth: viewerCtx?.viewerWidth,
             viewerHeight: viewerCtx?.viewerHeight,
             hfov: viewerCtx?.hfov,
+            target,
           }),
         }
       );
-      if (res.ok) {
+      if (res.status === 401) return;
+      if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        const opt = data.optimization as { panorama?: string; dimensions?: string } | undefined;
+        showToast("err", (data as { error?: string }).error ?? "Gagal bake blur ke panorama");
+        return;
+      }
+      const { consumeBakePrivacyBlurStream } = await import("@/lib/cms-bake-progress-client");
+      const data = await consumeBakePrivacyBlurStream(res, {
+        onProgress: (percent, label) => setBakePrivacyProgress({ percent, label }),
+      });
+      const opt = data.optimization as { panorama?: string; dimensions?: string } | undefined;
+      const hd = data.hd as { status?: string; reason?: string } | undefined;
+      if (target === "hd") {
         showToast(
           "ok",
-          opt?.panorama
-            ? `Blur dibake ke panorama (${opt.panorama}, ${opt.dimensions ?? ""})`
-            : "Blur dibake ke panorama"
+          hd?.status === "done"
+            ? "Tile HD dibake"
+            : data.message || "Bake HD selesai"
         );
-        setHasUnsaved(false);
-        load(selectedSceneIndex);
+        setEditorPreviewMode("hd");
       } else {
-        const data = await res.json().catch(() => ({}));
-        showToast("err", data.error ?? "Gagal bake blur ke panorama");
+        const base = opt?.panorama
+          ? `Blur dibake Hemat (${opt.panorama}, ${opt.dimensions ?? ""})`
+          : "Blur dibake ke panorama Hemat";
+        const hdMsg =
+          hd?.status === "queued"
+            ? " · HD diantrikan"
+            : hd?.status === "skipped"
+              ? ` · HD dilewati (${hd.reason ?? "tidak tersedia"})`
+              : "";
+        showToast("ok", `${base}${hdMsg}`);
+        setEditorPreviewMode("display");
       }
-    } catch {
-      showToast("err", "Error jaringan saat bake blur");
+      setHasUnsaved(false);
+      load(selectedSceneIndex);
+    } catch (err) {
+      showToast("err", err instanceof Error ? err.message : "Error jaringan saat bake blur");
     } finally {
       setBakingPrivacyBlur(false);
+      setBakePrivacyProgress(null);
     }
   }
 
@@ -1281,7 +1478,11 @@ export default function VirtualTourEditorPage() {
     if (areaScenes.length < 2) return;
 
     const found = findArea(levels, areaId);
-    if (!confirm(`Tautkan ${areaScenes.length} scene di "${found?.area.label ?? "area"}" dengan hotspot →/← otomatis? Hotspot jalan lama di area ini akan diganti.`)) {
+    if (!(await confirmDialog({
+      title: `Tautkan ${areaScenes.length} scene di "${found?.area.label ?? "area"}"?`,
+      description: "Hotspot →/← otomatis akan dibuat mengikuti urutan scene. Hotspot jalan lama di area ini akan diganti.",
+      confirmLabel: "Ya, Tautkan",
+    }))) {
       return;
     }
 
@@ -1394,7 +1595,13 @@ export default function VirtualTourEditorPage() {
 
   // ─── Delete scene ─────────────────────────────────────────────────────────
   async function deleteScene(scene: Scene) {
-    if (!confirm(`Hapus scene "${scene.title}"? Semua hotspot yang menautkan ke scene ini juga perlu diperbarui.`)) return;
+    const confirmed = await confirmDialog({
+      title: `Hapus scene "${scene.title}"?`,
+      description: "Semua hotspot yang menautkan ke scene ini juga perlu diperbarui.",
+      confirmLabel: "Ya, Hapus",
+      destructive: true,
+    });
+    if (!confirmed) return;
     const res = await cmsFetch(`/api/cms/virtual-tour/${stationId}/${scene.sceneId}`, {
       method: "DELETE",
     });
@@ -1532,7 +1739,7 @@ export default function VirtualTourEditorPage() {
     }
   }
 
-  function jumpToHotspot(sceneId: string, hotspotIndex: number, spatialId?: string) {
+  async function jumpToHotspot(sceneId: string, hotspotIndex: number, spatialId?: string) {
     const idx = scenes.findIndex((s) => s.sceneId === sceneId);
     if (idx < 0) return;
     const scene = scenes[idx];
@@ -1542,7 +1749,12 @@ export default function VirtualTourEditorPage() {
 
     if (idx !== selectedSceneIndex) {
       if (hasUnsaved) {
-        if (!confirm("Ada perubahan yang belum disimpan. Pindah scene?")) return;
+        const confirmed = await confirmDialog({
+          title: "Pindah scene?",
+          description: "Ada perubahan yang belum disimpan pada scene ini. Perubahan tersebut akan dibuang.",
+          confirmLabel: "Pindah Scene",
+        });
+        if (!confirmed) return;
         const saved = savedSceneRef.current;
         if (saved) {
           setScenes((prev) =>
@@ -1798,33 +2010,37 @@ export default function VirtualTourEditorPage() {
         spatialEnabled={spatialEnabled}
         canUndo={canUndo}
         canRedo={canRedo}
-        canDuplicate={Boolean(selectedHotspot || selectedBlur)}
         hasUnsaved={hasUnsaved}
         saving={saving}
         isPreview={isPreview}
         hasScene={Boolean(currentScene)}
         onUndo={undo}
         onRedo={redo}
-        onDuplicate={duplicateSelected}
-        onSetInitialView={handleSetInitialView}
         onOpenConnectionMap={() => setShowConnectionMap(true)}
         onTogglePreview={() => {
           setPreviewEntryView(null);
           setIsPreview((p) => !p);
           setAddMode("none");
         }}
-        onReset={resetChanges}
+        onReset={() => void resetChanges()}
         onSave={() => { void saveScene(); }}
         onPublishSpatial={() => {
-          if (confirm("Publikasikan area pada scene ini? Pengunjung akan melihat versi area ini setelah publikasi.")) void saveScene("publish");
+          void (async () => {
+            const confirmed = await confirmDialog({
+              title: "Publikasikan area pada scene ini?",
+              description: "Pengunjung akan melihat versi area ini setelah publikasi.",
+              confirmLabel: "Ya, Publikasikan",
+            });
+            if (confirmed) void saveScene("publish");
+          })();
         }}
       />
 
       {/* ── Main Editor Area ─────────────────────────────────────────────── */}
       <Dialog open={pendingSceneIndex !== null} onOpenChange={(open) => { if (!open) setPendingSceneIndex(null); }}>
-        <DialogContent className="border-white/15 bg-[#261015] text-[#F8ECEE]">
+        <DialogContent className="border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-text)]">
           <DialogTitle>Perubahan belum disimpan</DialogTitle>
-          <DialogDescription className="text-[#C4A8AD]">
+          <DialogDescription className="text-[var(--work-muted)]">
             Simpan perubahan sebelum pindah scene, buang perubahan, atau lanjutkan mengedit scene ini.
           </DialogDescription>
           <div className="flex flex-wrap justify-end gap-2">
@@ -1846,6 +2062,13 @@ export default function VirtualTourEditorPage() {
           </div>
         </DialogContent>
       </Dialog>
+      <BakePrivacyBlurDialog
+        open={bakeBlurConfirmOpen}
+        onOpenChange={setBakeBlurConfirmOpen}
+        rebake={privacyBlurGuideOnly}
+        confirming={bakingPrivacyBlur}
+        onConfirm={(target) => void bakePrivacyBlursToPanorama(target)}
+      />
       <div className="relative flex flex-1 min-h-0 overflow-hidden" inert={saving}>
 
         <TourStructureSidebar
@@ -1896,6 +2119,11 @@ export default function VirtualTourEditorPage() {
                 ref={editorRef}
                 key={`editor-${currentScene.sceneId}-${currentScene.panoramaUrl || "none"}`}
                 panoramaUrl={currentScene.panoramaUrl}
+                originalPanoramaUrl={currentScene.originalPanoramaUrl ?? null}
+                hematMultiRes={editorHematMultiRes}
+                hdMultiRes={editorHdMultiRes}
+                previewMode={editorPreviewMode}
+                onPreviewModeChange={setEditorPreviewMode}
                 hotspots={hotspots}
                 privacyBlurs={privacyBlurs}
                 selectedId={selectedHotspotId}
@@ -1924,20 +2152,20 @@ export default function VirtualTourEditorPage() {
               />
             )
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center bg-[#1C0A0E] text-[#C4A8AD]">
-              <div className="text-5xl mb-3">📷</div>
-              <p>Pilih atau tambah scene</p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-[var(--work-subtle)] text-[var(--work-muted)]">
+              <ImageIcon className="size-10 opacity-40" aria-hidden />
+              <p className="text-sm">Pilih atau tambah scene</p>
             </div>
           )}
         </div>
 
         {/* ── Right: Properties / Coverage ──────────────────────────────── */}
         {inspectorCollapsed ? (
-          <aside className="flex w-10 flex-none flex-col items-center border-l border-[rgba(255,214,218,0.14)] bg-[#261015] py-2">
+          <aside className="flex w-10 flex-none flex-col items-center border-l border-[var(--work-line)] bg-[var(--work-subtle)] py-2">
             <button
               type="button"
               onClick={() => setInspectorCollapsed(false)}
-              className="rounded-md p-1.5 text-[#C4A8AD] hover:bg-[#3A161C] hover:text-[#F8ECEE]"
+              className="rounded-md p-1.5 text-[var(--work-muted)] hover:bg-[var(--work-surface)] hover:text-[var(--work-text)]"
               title="Tampilkan Inspector"
               aria-label="Tampilkan Inspector"
             >
@@ -1945,8 +2173,8 @@ export default function VirtualTourEditorPage() {
             </button>
           </aside>
         ) : (
-        <aside className="flex w-[300px] flex-none flex-col overflow-hidden border-l border-[rgba(255,214,218,0.14)] bg-[#261015] max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-30 lg:w-80">
-          <div className="flex shrink-0 flex-col gap-1 border-b border-[rgba(255,214,218,0.14)] p-1.5">
+        <aside className="flex w-[300px] flex-none flex-col overflow-hidden border-l border-[var(--work-line)] bg-[var(--work-subtle)] max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-30 lg:w-80">
+          <div className="flex shrink-0 flex-col gap-1 border-b border-[var(--work-line)] p-1.5">
             <div className="flex items-center gap-0.5">
               {(
                 [
@@ -1963,7 +2191,7 @@ export default function VirtualTourEditorPage() {
                   className={`min-w-0 flex-1 truncate rounded-full px-1.5 py-1.5 text-[10px] font-semibold transition-colors ${
                     inspectorTab === tab.id
                       ? "bg-[#E31E2D] text-white"
-                      : "text-[#C4A8AD] hover:bg-[#3A161C] hover:text-[#F8ECEE]"
+                      : "text-[var(--work-muted)] hover:bg-[var(--work-surface)] hover:text-[var(--work-text)]"
                   }`}
                   onClick={() => setInspectorTab(tab.id)}
                 >
@@ -1973,7 +2201,7 @@ export default function VirtualTourEditorPage() {
               <button
                 type="button"
                 onClick={() => setInspectorCollapsed(true)}
-                className="shrink-0 rounded p-1.5 text-[#C4A8AD] hover:text-[#F8ECEE]"
+                className="shrink-0 rounded p-1.5 text-[var(--work-muted)] hover:text-[var(--work-text)]"
                 title="Sembunyikan Inspector"
                 aria-label="Sembunyikan Inspector"
               >
@@ -2001,7 +2229,7 @@ export default function VirtualTourEditorPage() {
                 onJumpTo={jumpToHotspot}
               />
               ) : (
-                <p className="text-xs text-[#C4A8AD]">Pilih scene untuk melihat coverage.</p>
+                <p className="text-xs text-[var(--work-muted)]">Pilih scene untuk melihat coverage.</p>
               )
             ) : inspectorTab === "spatial" ? (
               spatialEnabled ? (
@@ -2020,22 +2248,22 @@ export default function VirtualTourEditorPage() {
                       <button
                         type="button"
                         key={entity.id}
-                        className={`block w-full rounded border px-2 py-1.5 text-left text-xs hover:bg-white/10 ${
+                        className={`block w-full rounded border px-2 py-1.5 text-left text-xs hover:bg-[var(--work-subtle)] ${
                           selectedSpatialId === entity.id
-                            ? "border-emerald-500/50 bg-emerald-950/40 text-[#F8ECEE]"
-                            : "border-white/15 text-[#F8ECEE]"
+                            ? "border-emerald-500/50 bg-[var(--work-success-soft)]/40 text-[var(--work-text)]"
+                            : "border-[var(--work-line)] text-[var(--work-text)]"
                         }`}
                         aria-pressed={selectedSpatialId === entity.id}
                         onClick={() => handleSpatialSelect(entity.id)}
                       >
                         {faceNo > 0 ? (
-                          <span className="font-mono text-emerald-300">
+                          <span className="font-mono text-[var(--work-success)]">
                             {code} · sisi {faceNo}/{siblings.length}
                           </span>
                         ) : (
                           entity.label || entity.spaceCode || "Area"
                         )}
-                        <span className="text-[#A88990]">
+                        <span className="text-[var(--work-muted)]">
                           {" "}
                           · {entity.enabled ? "aktif" : "nonaktif"}
                         </span>
@@ -2072,48 +2300,48 @@ export default function VirtualTourEditorPage() {
                 />
                 </>
               ) : (
-                <p className="text-xs text-[#C4A8AD]">Spatial Area belum diaktifkan.</p>
+                <p className="text-xs text-[var(--work-muted)]">Spatial Area belum diaktifkan.</p>
               )
             ) : (
             <>
             {/* Scene Properties */}
             {inspectorTab === "scene" && currentScene && (
               <section>
-                <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider mb-3 pb-2 border-b border-[rgba(255,214,218,0.14)]">
+                <h3 className="text-xs font-semibold text-[var(--work-muted)] uppercase tracking-wider mb-3 pb-2 border-b border-[var(--work-line)]">
                   Scene Properties
                 </h3>
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Judul</Label>
+                    <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Judul</Label>
                     <Input
                       value={currentScene.title}
                       onChange={(e) => updateSelectedScene("title", e.target.value)}
-                      className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-sm h-8"
+                      className="bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-text)] text-sm h-8"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Scene ID</Label>
+                    <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Scene ID</Label>
                     <Input
                       value={currentScene.sceneId}
                       readOnly
-                      className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#C4A8AD] text-xs h-8 font-mono"
+                      className="bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-muted)] text-xs h-8 font-mono"
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Level</Label>
+                    <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Level</Label>
                     <p
-                      className="rounded-md border border-[rgba(255,214,218,0.18)] bg-[#3A161C] px-2 py-1.5 text-sm font-medium"
+                      className="rounded-md border border-[var(--work-line)] bg-[var(--work-surface)] px-2 py-1.5 text-sm font-medium"
                       style={{ color: getLevelConfig(currentScene.level, levels).color }}
                     >
                       {getLevelConfig(currentScene.level, levels).label}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Area</Label>
+                    <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Area</Label>
                     <select
                       value={currentScene.areaId ?? ""}
                       onChange={(e) => handleSceneAreaChange(e.target.value)}
-                      className="w-full bg-[#3A161C] border border-[rgba(255,214,218,0.18)] rounded-md h-8 px-2 text-sm text-[#F8ECEE]"
+                      className="w-full bg-[var(--work-surface)] border border-[var(--work-line)] rounded-md h-8 px-2 text-sm text-[var(--work-text)]"
                     >
                       <option value="">— pilih area —</option>
                       {levels.map((level) => (
@@ -2128,20 +2356,20 @@ export default function VirtualTourEditorPage() {
                     </select>
                   </div>
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-[#C4A8AD]">Urutan</Label>
+                    <Label className="text-xs text-[var(--work-muted)]">Urutan</Label>
                     <Input
                       type="number"
                       value={currentScene.order}
                       onChange={(e) => updateSelectedScene("order", Number(e.target.value))}
-                      className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-sm h-8 w-20 text-right"
+                      className="bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-text)] text-sm h-8 w-20 text-right"
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-[#C4A8AD]">Aktif</Label>
+                    <Label className="text-xs text-[var(--work-muted)]">Aktif</Label>
                     <button
                       onClick={() => updateSelectedScene("isActive", !currentScene.isActive)}
                       className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${
-                        currentScene.isActive ? "bg-emerald-600" : "bg-[#4A1F28]"
+                        currentScene.isActive ? "bg-emerald-600" : "bg-[var(--work-subtle)]"
                       }`}
                     >
                       <span
@@ -2153,19 +2381,19 @@ export default function VirtualTourEditorPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs text-[#F8ECEE]">Arah kamera awal scene</Label>
+                    <Label className="text-xs text-[var(--work-text)]">Arah kamera awal scene</Label>
                     <Button type="button" variant="outline" size="sm" disabled={isPreview} onClick={handleSetInitialView} className="w-full text-xs">
                       Gunakan arah kamera saat ini
                     </Button>
                   </div>
 
                   {/* Connection info */}
-                  <div className="bg-[#3A161C]/60 rounded-lg px-3 py-2 text-xs text-[#C4A8AD] space-y-1">
+                  <div className="bg-[var(--work-surface)]/60 rounded-lg px-3 py-2 text-xs text-[var(--work-muted)] space-y-1">
                     {(() => {
                       const iv = extractInitialViewFromCanvasData(currentScene.canvasData);
                       if (!iv) return null;
                       return (
-                        <div className="mb-1 border-b border-[rgba(255,214,218,0.18)]/60 pb-1 text-[11px] text-[#C4A8AD]">
+                        <div className="mb-1 border-b border-[var(--work-line)]/60 pb-1 text-[11px] text-[var(--work-muted)]">
                           View awal: yaw {iv.yaw.toFixed(1)}°, pitch {iv.pitch.toFixed(1)}°, hfov{" "}
                           {(iv.hfov ?? 0).toFixed(0)}°
                         </div>
@@ -2175,7 +2403,7 @@ export default function VirtualTourEditorPage() {
                       <span className="flex items-center gap-1.5">
                         <ArrowRightLeft className="h-3 w-3" /> Mengarah ke
                       </span>
-                      <span className="text-[#F0DDE1]">
+                      <span className="text-[var(--work-muted)]">
                         {hotspots.filter((h) => h.type === "scene").length} scene
                       </span>
                     </div>
@@ -2183,7 +2411,7 @@ export default function VirtualTourEditorPage() {
                       <span className="flex items-center gap-1.5">
                         <Link2 className="h-3 w-3" /> Ditautkan dari
                       </span>
-                      <span className="text-[#F0DDE1]">
+                      <span className="text-[var(--work-muted)]">
                         {incomingMap.get(currentScene.sceneId) ?? 0} scene
                       </span>
                     </div>
@@ -2191,9 +2419,9 @@ export default function VirtualTourEditorPage() {
 
                   {/* Panorama upload */}
                   <div>
-                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Panorama</Label>
+                    <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Panorama</Label>
                     {currentScene.panoramaUrl && (
-                      <div className="relative h-20 rounded-lg overflow-hidden mb-2 bg-[#3A161C]">
+                      <div className="relative h-20 rounded-lg overflow-hidden mb-2 bg-[var(--work-surface)]">
                         <Image
                           src={getS3ProxyUrl(currentScene.panoramaUrl)}
                           alt="panorama"
@@ -2204,9 +2432,9 @@ export default function VirtualTourEditorPage() {
                       </div>
                     )}
                     {currentScene.panoramaUrl && (
-                      <details className="mb-2 text-xs text-[#C4A8AD]">
-                        <summary className="cursor-pointer py-1 focus-visible:outline-2 focus-visible:outline-white">Detail aset</summary>
-                        <p className="text-[10px] text-[#A88990] font-mono break-all leading-relaxed">
+                      <details className="mb-2 text-xs text-[var(--work-muted)]">
+                        <summary className="cursor-pointer py-1 focus-visible:outline-2 focus-visible:outline-[var(--work-accent)]">Detail aset</summary>
+                        <p className="text-[10px] text-[var(--work-muted)] font-mono break-all leading-relaxed">
                           {currentScene.panoramaUrl}
                         </p>
                         {currentScene.thumbnailUrl && (
@@ -2219,8 +2447,8 @@ export default function VirtualTourEditorPage() {
                     <label
                       className={`flex items-center gap-2 cursor-pointer border border-dashed rounded-lg p-2.5 text-xs transition-colors ${
                         uploading
-                          ? "border-[rgba(255,214,218,0.18)] text-[#A88990]"
-                          : "border-[rgba(255,214,218,0.22)] text-[#C4A8AD] hover:border-emerald-500 hover:text-emerald-400"
+                          ? "border-[var(--work-line)] text-[var(--work-muted)]"
+                          : "border-[var(--work-line)] text-[var(--work-muted)] hover:border-emerald-500 hover:text-emerald-400"
                       }`}
                     >
                       {uploading ? (
@@ -2239,50 +2467,207 @@ export default function VirtualTourEditorPage() {
                       />
                     </label>
                   </div>
+
+                  {/* AI patch / virtual tenant placeholder */}
+                  <div
+                    className={`rounded-lg border p-3 space-y-2.5 ${
+                      falConfigured === false
+                        ? "border-amber-900/40 bg-[var(--work-warning-soft)]/15"
+                        : "border-emerald-900/50 bg-[var(--work-success-soft)]/20"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Sparkles
+                        className={`h-3.5 w-3.5 shrink-0 ${
+                          falConfigured === false ? "text-amber-400" : "text-emerald-400"
+                        }`}
+                      />
+                      <h4
+                        className={`text-[11px] font-semibold uppercase tracking-wider ${
+                          falConfigured === false ? "text-amber-300/90" : "text-[var(--work-success)]/90"
+                        }`}
+                      >
+                        AI Patch (Fal)
+                      </h4>
+                      {falConfigured === false && (
+                        <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide bg-amber-900/50 text-amber-200 border border-amber-700/40">
+                          Under development
+                        </span>
+                      )}
+                      {falConfigured === true && (
+                        <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide bg-emerald-900/50 text-[var(--work-success)] border border-emerald-700/40">
+                          Ready
+                        </span>
+                      )}
+                    </div>
+
+                    {falConfigured === false ? (
+                      <div className="rounded-md border border-amber-200 bg-[var(--work-subtle)]/40 px-2.5 py-2 space-y-1">
+                        <p className="text-[11px] text-amber-200/95 font-medium">
+                          Fitur masih under development
+                        </p>
+                        <p className="text-[10px] leading-relaxed text-[var(--work-muted)]">
+                          Pipeline CMS sudah siap, tetapi Fal API belum terhubung (`FAL_KEY`).
+                          Generate akan aktif setelah key diisi di server dan app di-restart.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] leading-relaxed text-[var(--work-muted)]">
+                        Arahkan kamera ke area kosong / belum reshoot, tulis instruksi, lalu generate.
+                        Hasil = placeholder sementara; restore mengembalikan master pra-AI.
+                      </p>
+                    )}
+
+                    {(() => {
+                      const history = getAiPatchHistory(currentScene.canvasData);
+                      const applied = isAiPatchApplied(currentScene.canvasData);
+                      if (!applied && history.length === 0) return null;
+                      const last = history[history.length - 1];
+                      return (
+                        <div className="rounded-md border border-emerald-900/40 bg-[var(--work-subtle)]/50 px-2 py-1.5 text-[10px] text-[var(--work-muted)] space-y-0.5">
+                          {applied && last ? (
+                            <>
+                              <p className="text-emerald-400/90 font-medium">Patch AI aktif</p>
+                              <p className="line-clamp-2">{last.prompt}</p>
+                              <p className="font-mono text-[var(--work-muted)]">
+                                yaw {last.yaw.toFixed(1)}° · pitch {last.pitch.toFixed(1)}° · hfov{" "}
+                                {last.hfov.toFixed(0)}°
+                              </p>
+                            </>
+                          ) : (
+                            <p>Riwayat patch: {history.length} entri</p>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    <div>
+                      <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Instruksi edit</Label>
+                      <Textarea
+                        value={aiPatchPrompt}
+                        onChange={(e) => setAiPatchPrompt(e.target.value)}
+                        placeholder={
+                          falConfigured === false
+                            ? "Menunggu koneksi Fal API…"
+                            : 'Contoh: "Isi dinding kosong ini dengan booth kopi modern minimalis 3x3 m, neon box, pencahayaan warm white"'
+                        }
+                        className="min-h-[72px] bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-text)] text-xs resize-y"
+                        disabled={
+                          falConfigured !== true ||
+                          bakingAiPatch ||
+                          restoringAiPatch ||
+                          isPreview ||
+                          !currentScene.panoramaUrl
+                        }
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 w-full text-xs bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-50"
+                        disabled={
+                          falConfigured !== true ||
+                          bakingAiPatch ||
+                          restoringAiPatch ||
+                          isPreview ||
+                          !currentScene.panoramaUrl ||
+                          aiPatchPrompt.trim().length < 3
+                        }
+                        onClick={() => void bakeAiPatchToPanorama()}
+                      >
+                        {bakingAiPatch ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                            Generating…
+                          </>
+                        ) : falConfigured === false ? (
+                          <>
+                            <Sparkles className="h-3 w-3 mr-1.5" />
+                            Belum tersedia
+                          </>
+                        ) : falConfigured === null ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                            Cek status Fal…
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-3 w-3 mr-1.5" />
+                            Generate dari sudut kamera
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 w-full text-[10px] border-[var(--work-line)] text-[var(--work-muted)]"
+                        disabled={
+                          bakingAiPatch ||
+                          restoringAiPatch ||
+                          isPreview ||
+                          !isAiPatchApplied(currentScene.canvasData)
+                        }
+                        onClick={() => void restoreAiPatchMaster()}
+                      >
+                        {restoringAiPatch ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            Restore…
+                          </>
+                        ) : (
+                          <>
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                            Restore master pra-AI
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </section>
             )}
 
             {inspectorTab === "scene" && currentScene && (
-              <section className="rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/40 px-3 py-2.5">
-                <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[#A88990]">
+              <section className="rounded-lg border border-[var(--work-line)] bg-[var(--work-subtle)]/40 px-3 py-2.5">
+                <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--work-muted)]">
                   Elemen di scene
                 </h3>
-                <ul className="space-y-1 text-xs text-[#C4A8AD]">
+                <ul className="space-y-1 text-xs text-[var(--work-muted)]">
                   <li className="flex justify-between gap-2">
                     <span>Point (scene/unit/info)</span>
-                    <span className="font-mono text-[#F8ECEE]">
+                    <span className="font-mono text-[var(--work-text)]">
                       {hotspots.filter((h) => h.type !== "ad").length}
                     </span>
                   </li>
                   <li className="flex justify-between gap-2">
                     <span>Media / iklan</span>
-                    <span className="font-mono text-[#F8ECEE]">
+                    <span className="font-mono text-[var(--work-text)]">
                       {hotspots.filter((h) => h.type === "ad").length}
                     </span>
                   </li>
                   {spatialEnabled && (
                     <li className="flex justify-between gap-2">
                       <span>Spatial Area</span>
-                      <span className="font-mono text-[#F8ECEE]">{spatialEntities.length}</span>
+                      <span className="font-mono text-[var(--work-text)]">{spatialEntities.length}</span>
                     </li>
                   )}
                   <li className="flex justify-between gap-2">
                     <span>Blur privasi</span>
-                    <span className="font-mono text-[#F8ECEE]">{privacyBlurs.length}</span>
+                    <span className="font-mono text-[var(--work-text)]">{privacyBlurs.length}</span>
                   </li>
                 </ul>
               </section>
             )}
 
             {inspectorTab === "point" && !selectedHotspot && !selectedBlur && (
-              <p className="rounded-lg border border-dashed border-[rgba(255,214,218,0.2)] px-3 py-4 text-center text-xs text-[#C4A8AD]">
+              <p className="rounded-lg border border-dashed border-[var(--work-line)] px-3 py-4 text-center text-xs text-[var(--work-muted)]">
                 Pilih pin di kanvas untuk mengedit.
               </p>
             )}
 
             {inspectorTab === "media" && !(selectedHotspot && selectedHotspot.type === "ad") && (
-              <p className="rounded-lg border border-dashed border-[rgba(255,214,218,0.2)] px-3 py-4 text-center text-xs text-[#C4A8AD]">
+              <p className="rounded-lg border border-dashed border-[var(--work-line)] px-3 py-4 text-center text-xs text-[var(--work-muted)]">
                 Pilih hotspot iklan untuk mengedit.
               </p>
             )}
@@ -2290,35 +2675,53 @@ export default function VirtualTourEditorPage() {
             {/* Blur privasi */}
             {inspectorTab === "point" && selectedBlur && (
               <section>
-                <div className="flex items-center justify-between mb-3 pb-2 border-b border-[rgba(255,214,218,0.14)]">
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-[var(--work-line)]">
                   <h3 className="text-xs font-semibold text-purple-400 uppercase tracking-wider">
                     Blur Privasi
                   </h3>
-                  <button
-                    onClick={() => handleBlurDelete(selectedBlur._id)}
-                    className="text-red-400 hover:text-red-300 transition-colors"
-                    title="Hapus blur"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={duplicateSelected}
+                      className="text-[var(--work-muted)] hover:text-[var(--work-text)] transition-colors"
+                      title="Duplikat blur"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBlurDelete(selectedBlur._id)}
+                      className="text-[var(--work-danger)] hover:text-[var(--work-danger)] transition-colors"
+                      title="Hapus blur"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-3">
-                  <p className="text-xs text-[#C4A8AD] leading-relaxed">
+                  <p className="text-xs text-[var(--work-muted)] leading-relaxed">
                     {privacyBlurGuideOnly
-                      ? "Posisi blur berubah? Simpan, lalu Bake ke panorama lagi."
-                      : "Klik Bake ke panorama untuk menerapkan blur pada foto."}
+                      ? "Setelah bake, pakai Preview Hemat/HD untuk cek blur di piksel."
+                      : "Set blur di Display, Bake, lalu cek hasil lewat Preview Hemat/HD."}
                   </p>
+                  <EditorPanoramaPreviewToggle
+                    value={editorPreviewMode}
+                    onChange={setEditorPreviewMode}
+                    hasHematTiles={Boolean(editorHematMultiRes)}
+                    hasHdTiles={Boolean(editorHdMultiRes)}
+                    hasHdOriginal={Boolean(currentScene?.originalPanoramaUrl)}
+                  />
 
                   <div>
                     <div className="mb-1.5 flex items-center justify-between">
-                      <Label className="text-xs text-[#C4A8AD]">Ukuran (px)</Label>
+                      <Label className="text-xs text-[var(--work-muted)]">Ukuran (px)</Label>
                       <button
                         type="button"
                         onClick={() => setBlurSizeLinked((v) => !v)}
                         className={`p-1 rounded transition-colors ${
                           blurSizeLinked
                             ? "text-purple-400 hover:text-purple-300"
-                            : "text-[#C4A8AD] hover:text-[#C4A8AD]"
+                            : "text-[var(--work-muted)] hover:text-[var(--work-muted)]"
                         }`}
                         title={
                           blurSizeLinked
@@ -2335,25 +2738,25 @@ export default function VirtualTourEditorPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Lebar</Label>
+                        <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Lebar</Label>
                         <Input
                           type="number"
                           min={24}
                           max={320}
                           value={selectedBlur.width ?? BLUR_WIDTH_DEFAULT}
                           onChange={(e) => updateBlurSize("width", Number(e.target.value))}
-                          className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-8 font-mono"
+                          className="bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-text)] text-xs h-8 font-mono"
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Tinggi</Label>
+                        <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Tinggi</Label>
                         <Input
                           type="number"
                           min={24}
                           max={320}
                           value={selectedBlur.height ?? BLUR_HEIGHT_DEFAULT}
                           onChange={(e) => updateBlurSize("height", Number(e.target.value))}
-                          className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-8 font-mono"
+                          className="bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-text)] text-xs h-8 font-mono"
                         />
                       </div>
                     </div>
@@ -2361,7 +2764,7 @@ export default function VirtualTourEditorPage() {
 
                   <div>
                     <div className="mb-1.5 flex items-center justify-between gap-2">
-                      <Label className="text-xs text-[#C4A8AD] shrink-0">Intensitas Blur</Label>
+                      <Label className="text-xs text-[var(--work-muted)] shrink-0">Intensitas Blur</Label>
                       <div className="flex items-center gap-1">
                         <Input
                           type="number"
@@ -2370,9 +2773,9 @@ export default function VirtualTourEditorPage() {
                           step={1}
                           value={selectedBlur.intensity ?? BLUR_INTENSITY_DEFAULT}
                           onChange={(e) => updateBlur("intensity", Number(e.target.value))}
-                          className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-7 w-14 font-mono px-2"
+                          className="bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-text)] text-xs h-7 w-14 font-mono px-2"
                         />
-                        <span className="text-xs text-[#C4A8AD]">px</span>
+                        <span className="text-xs text-[var(--work-muted)]">px</span>
                       </div>
                     </div>
                     <input
@@ -2388,7 +2791,7 @@ export default function VirtualTourEditorPage() {
 
                   <div>
                     <div className="mb-1.5 flex items-center justify-between gap-2">
-                      <Label className="text-xs text-[#C4A8AD] shrink-0">Radius Sudut</Label>
+                      <Label className="text-xs text-[var(--work-muted)] shrink-0">Radius Sudut</Label>
                       <div className="flex items-center gap-1">
                         <Input
                           type="number"
@@ -2397,9 +2800,9 @@ export default function VirtualTourEditorPage() {
                           step={1}
                           value={selectedBlur.radius ?? BLUR_RADIUS_DEFAULT}
                           onChange={(e) => updateBlur("radius", Number(e.target.value))}
-                          className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-7 w-14 font-mono px-2"
+                          className="bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-text)] text-xs h-7 w-14 font-mono px-2"
                         />
-                        <span className="text-xs text-[#C4A8AD]">px</span>
+                        <span className="text-xs text-[var(--work-muted)]">px</span>
                       </div>
                     </div>
                     <input
@@ -2418,7 +2821,7 @@ export default function VirtualTourEditorPage() {
 
                   <div>
                     <div className="mb-1.5 flex items-center justify-between gap-2">
-                      <Label className="text-xs text-[#C4A8AD] shrink-0">Skala</Label>
+                      <Label className="text-xs text-[var(--work-muted)] shrink-0">Skala</Label>
                       <div className="flex items-center gap-1">
                         <Input
                           type="number"
@@ -2429,9 +2832,9 @@ export default function VirtualTourEditorPage() {
                           onChange={(e) =>
                             updateBlur("scale", Number(e.target.value) / 100)
                           }
-                          className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-7 w-14 font-mono px-2"
+                          className="bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-text)] text-xs h-7 w-14 font-mono px-2"
                         />
-                        <span className="text-xs text-[#C4A8AD]">%</span>
+                        <span className="text-xs text-[var(--work-muted)]">%</span>
                       </div>
                     </div>
                     <input
@@ -2447,7 +2850,7 @@ export default function VirtualTourEditorPage() {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Yaw (°)</Label>
+                      <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Yaw (°)</Label>
                       <Input
                         type="number"
                         step="0.1"
@@ -2455,11 +2858,11 @@ export default function VirtualTourEditorPage() {
                         max="180"
                         value={selectedBlur.yaw}
                         onChange={(e) => updateBlur("yaw", Number(e.target.value))}
-                        className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-8 font-mono"
+                        className="bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-text)] text-xs h-8 font-mono"
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Pitch (°)</Label>
+                      <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Pitch (°)</Label>
                       <Input
                         type="number"
                         step="0.1"
@@ -2467,7 +2870,7 @@ export default function VirtualTourEditorPage() {
                         max="90"
                         value={selectedBlur.pitch}
                         onChange={(e) => updateBlur("pitch", Number(e.target.value))}
-                        className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-8 font-mono"
+                        className="bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-text)] text-xs h-8 font-mono"
                       />
                     </div>
                   </div>
@@ -2480,21 +2883,32 @@ export default function VirtualTourEditorPage() {
               ((inspectorTab === "point" && selectedHotspot.type !== "ad") ||
                 (inspectorTab === "media" && selectedHotspot.type === "ad")) && (
               <section>
-                <div className="flex items-center justify-between mb-3 pb-2 border-b border-[rgba(255,214,218,0.14)]">
-                  <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider">
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-[var(--work-line)]">
+                  <h3 className="text-xs font-semibold text-[var(--work-muted)] uppercase tracking-wider">
                     {selectedHotspot.type === "ad" ? "Media / Iklan" : "Point Hotspot"}
                   </h3>
-                  <button
-                    onClick={() => handleHotspotDelete(selectedHotspot._id)}
-                    className="text-red-400 hover:text-red-300 transition-colors"
-                    title="Hapus hotspot"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={duplicateSelected}
+                      className="text-[var(--work-muted)] hover:text-[var(--work-text)] transition-colors"
+                      title="Duplikat hotspot"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleHotspotDelete(selectedHotspot._id)}
+                      className="text-[var(--work-danger)] hover:text-[var(--work-danger)] transition-colors"
+                      title="Hapus hotspot"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Tipe</Label>
+                    <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Tipe</Label>
                     <div className="grid grid-cols-2 gap-1.5">
                       {(["scene", "space", "info", "ad"] as const).map((t) => (
                         <button
@@ -2509,7 +2923,7 @@ export default function VirtualTourEditorPage() {
                                   : t === "ad"
                                     ? "bg-purple-600 border-purple-500 text-white"
                                     : "bg-blue-600 border-blue-500 text-white"
-                              : "border-[rgba(255,214,218,0.18)] text-[#C4A8AD] hover:bg-[#3A161C]"
+                              : "border-[var(--work-line)] text-[var(--work-muted)] hover:bg-[var(--work-surface)]"
                           }`}
                         >
                           {t === "scene"
@@ -2525,11 +2939,11 @@ export default function VirtualTourEditorPage() {
                   </div>
 
                   <div>
-                    <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Label</Label>
+                    <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Label</Label>
                     <Input
                       value={selectedHotspot.text}
                       onChange={(e) => updateHotspot("text", e.target.value)}
-                      className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-sm h-8"
+                      className="bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-text)] text-sm h-8"
                       placeholder="Nama hotspot"
                     />
                   </div>
@@ -2537,7 +2951,7 @@ export default function VirtualTourEditorPage() {
                   {selectedHotspot.type === "scene" ? (
                     <>
                       <div>
-                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Target Scene</Label>
+                        <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Target Scene</Label>
                         {currentScene && (
                           <SceneTargetPicker
                             levels={levels}
@@ -2552,8 +2966,8 @@ export default function VirtualTourEditorPage() {
                         )}
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-xs text-[#F8ECEE]">Arah kamera saat tiba</Label>
-                        <p className="text-xs text-[#C4A8AD]" data-scene-entry-status>
+                        <Label className="text-xs text-[var(--work-text)]">Arah kamera saat tiba</Label>
+                        <p className="text-xs text-[var(--work-muted)]" data-scene-entry-status>
                           {selectedHotspot.targetView
                             ? `Yaw ${selectedHotspot.targetView.yaw.toFixed(1)}° · Pitch ${selectedHotspot.targetView.pitch.toFixed(1)}° · Zoom ${(selectedHotspot.targetView.hfov ?? 120).toFixed(0)}°`
                             : "Bawaan scene tujuan"}
@@ -2568,23 +2982,23 @@ export default function VirtualTourEditorPage() {
                           });
                         }}>Atur arah di scene tujuan</Button>
                         {selectedHotspot.targetView && selectedHotspot.sceneId && (
-                          <button type="button" className="text-xs text-[#C4A8AD] underline hover:text-white" onClick={() => { if (selectedHotspot.sceneId) setHotspotEntryView(selectedHotspot._id, selectedHotspot.sceneId); }}>Ikuti arah bawaan scene</button>
+                          <button type="button" className="text-xs text-[var(--work-muted)] underline hover:text-[var(--work-text)]" onClick={() => { if (selectedHotspot.sceneId) setHotspotEntryView(selectedHotspot._id, selectedHotspot.sceneId); }}>Ikuti arah bawaan scene</button>
                         )}
                       </div>
                       <div>
                         <div className="mb-1.5 flex items-center justify-between gap-2">
-                          <Label className="text-xs text-[#C4A8AD]">Arah Panah</Label>
-                          <span className="text-[10px] text-[#C4A8AD]">
+                          <Label className="text-xs text-[var(--work-muted)]">Arah Panah</Label>
+                          <span className="text-[10px] text-[var(--work-muted)]">
                             {DIRECTION_LABELS[(selectedHotspot.direction ?? "right") as HotspotDirection]}
                           </span>
                         </div>
-                        <div className="inline-grid grid-cols-3 gap-1 rounded-xl border border-[rgba(255,214,218,0.18)] bg-[#261015]/60 p-1.5">
+                        <div className="inline-grid grid-cols-3 gap-1 rounded-xl border border-[var(--work-line)] bg-[var(--work-subtle)]/60 p-1.5">
                           {DIRECTION_COMPASS.map((d, i) => {
                             if (!d) {
                               return (
                                 <div
                                   key={`center-${i}`}
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3A161C]/80"
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--work-surface)]/80"
                                   aria-hidden
                                 >
                                   <span
@@ -2606,7 +3020,7 @@ export default function VirtualTourEditorPage() {
                                 className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
                                   active
                                     ? "border-red-700 bg-red-950 text-white"
-                                    : "border-transparent text-[#C4A8AD] hover:border-[rgba(255,214,218,0.22)] hover:bg-[#3A161C] hover:text-[#F8ECEE]"
+                                    : "border-transparent text-[var(--work-muted)] hover:border-[var(--work-line)] hover:bg-[var(--work-surface)] hover:text-[var(--work-text)]"
                                 }`}
                               >
                                 <span
@@ -2621,7 +3035,7 @@ export default function VirtualTourEditorPage() {
                     </>
                   ) : selectedHotspot.type === "space" ? (
                     <div>
-                      <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Kode Unit</Label>
+                      <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Kode Unit</Label>
                       <UnitPicker
                         spaces={stationSpaces}
                         value={selectedHotspot.spaceCode}
@@ -2640,7 +3054,7 @@ export default function VirtualTourEditorPage() {
                   ) : selectedHotspot.type === "ad" ? (
                     <>
                       <div>
-                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Unit Media</Label>
+                        <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Unit Media</Label>
                         <UnitPicker
                           spaces={stationSpaces}
                           value={selectedHotspot.spaceCode}
@@ -2657,18 +3071,18 @@ export default function VirtualTourEditorPage() {
                           )}
                       </div>
                       <div>
-                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Judul Kreatif</Label>
+                        <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Judul Kreatif</Label>
                         <Input
                           value={selectedHotspot.creativeTitle ?? ""}
                           onChange={(e) => updateHotspot("creativeTitle", e.target.value)}
-                          className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-sm h-8"
+                          className="bg-[var(--work-surface)] border-[var(--work-line)] text-[var(--work-text)] text-sm h-8"
                           placeholder="Judul iklan / kampanye"
                         />
                       </div>
                       <div>
-                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Aset Kreatif</Label>
+                        <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Aset Kreatif</Label>
                         {selectedHotspot.creativeUrl && (
-                          <div className="relative mb-2 h-24 overflow-hidden rounded-lg bg-[#3A161C]">
+                          <div className="relative mb-2 h-24 overflow-hidden rounded-lg bg-[var(--work-surface)]">
                             <Image
                               src={getS3ProxyUrl(selectedHotspot.creativeUrl)}
                               alt="Kreatif iklan"
@@ -2682,8 +3096,8 @@ export default function VirtualTourEditorPage() {
                           <label
                             className={`flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed p-2 text-xs transition-colors ${
                               uploadingCreative
-                                ? "border-[rgba(255,214,218,0.18)] text-[#A88990]"
-                                : "border-[rgba(255,214,218,0.22)] text-[#C4A8AD] hover:border-purple-500 hover:text-purple-400"
+                                ? "border-[var(--work-line)] text-[var(--work-muted)]"
+                                : "border-[var(--work-line)] text-[var(--work-muted)] hover:border-purple-500 hover:text-purple-400"
                             }`}
                           >
                             {uploadingCreative ? (
@@ -2706,7 +3120,7 @@ export default function VirtualTourEditorPage() {
                               type="button"
                               size="sm"
                               variant="outline"
-                              className="h-auto border-[rgba(255,214,218,0.22)] px-2 text-xs text-[#C4A8AD]"
+                              className="h-auto border-[var(--work-line)] px-2 text-xs text-[var(--work-muted)]"
                               onClick={() => {
                                 pushHistory();
                                 updateHotspot("creativeUrl", undefined);
@@ -2721,7 +3135,7 @@ export default function VirtualTourEditorPage() {
                   ) : (
                     <>
                       <div>
-                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">
+                        <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">
                           Ikon Hotspot
                         </Label>
                         <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
@@ -2732,7 +3146,7 @@ export default function VirtualTourEditorPage() {
                             className={`flex flex-col items-center gap-1 rounded-lg border p-1.5 transition ${
                               !selectedHotspot.facilityIcon
                                 ? "border-blue-500 bg-blue-500/15"
-                                : "border-[rgba(255,214,218,0.18)] hover:bg-[#3A161C]"
+                                : "border-[var(--work-line)] hover:bg-[var(--work-surface)]"
                             }`}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2743,7 +3157,7 @@ export default function VirtualTourEditorPage() {
                               height={39}
                               className="h-[39px] w-9 object-contain"
                             />
-                            <span className="text-[9px] font-medium text-[#C4A8AD]">
+                            <span className="text-[9px] font-medium text-[var(--work-muted)]">
                               Info
                             </span>
                           </button>
@@ -2761,7 +3175,7 @@ export default function VirtualTourEditorPage() {
                                 className={`flex flex-col items-center gap-1 rounded-lg border p-1.5 transition ${
                                   active
                                     ? "border-blue-500 bg-blue-500/15"
-                                    : "border-[rgba(255,214,218,0.18)] hover:bg-[#3A161C]"
+                                    : "border-[var(--work-line)] hover:bg-[var(--work-surface)]"
                                 }`}
                               >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2772,7 +3186,7 @@ export default function VirtualTourEditorPage() {
                                   height={39}
                                   className="h-[39px] w-9 object-contain"
                                 />
-                                <span className="text-[9px] font-medium text-[#C4A8AD]">
+                                <span className="text-[9px] font-medium text-[var(--work-muted)]">
                                   {icon.label}
                                 </span>
                               </button>
@@ -2781,14 +3195,14 @@ export default function VirtualTourEditorPage() {
                         </div>
                       </div>
                       <div>
-                        <Label className="text-xs text-[#C4A8AD] mb-1.5 block">
+                        <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">
                           Deskripsi Info
                         </Label>
                         <textarea
                           value={selectedHotspot.description ?? ""}
                           onChange={(e) => updateHotspot("description", e.target.value)}
                           rows={4}
-                          className="w-full resize-none rounded-md border border-[rgba(255,214,218,0.18)] bg-[#3A161C] px-3 py-2 text-sm text-[#F8ECEE]"
+                          className="w-full resize-none rounded-md border border-[var(--work-line)] bg-[var(--work-surface)] px-3 py-2 text-sm text-[var(--work-text)]"
                           placeholder="Isi informasi"
                         />
                       </div>
@@ -2797,8 +3211,8 @@ export default function VirtualTourEditorPage() {
 
                   <div>
                     <div className="mb-1.5 flex items-center justify-between">
-                      <Label className="text-xs text-[#C4A8AD]">Ukuran Hotspot</Label>
-                      <span className="text-xs font-mono text-[#F8ECEE]">
+                      <Label className="text-xs text-[var(--work-muted)]">Ukuran Hotspot</Label>
+                      <span className="text-xs font-mono text-[var(--work-text)]">
                         {Math.round((selectedHotspot.scale ?? HOTSPOT_SCALE_DEFAULT) * 100)}%
                       </span>
                     </div>
@@ -2811,7 +3225,7 @@ export default function VirtualTourEditorPage() {
                       onChange={(e) => updateHotspot("scale", Number(e.target.value))}
                       className="w-full accent-[#E31E2D]"
                     />
-                    <div className="mt-1 flex justify-between text-[10px] text-[#C4A8AD]/80">
+                    <div className="mt-1 flex justify-between text-[10px] text-[var(--work-muted)]/80">
                       <span>Kecil (50%)</span>
                       <span>Normal</span>
                       <span>Besar (200%)</span>
@@ -2821,11 +3235,11 @@ export default function VirtualTourEditorPage() {
                   {/* Coordinates */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Yaw (°)</Label>
+                      <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Yaw (°)</Label>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          className="flex h-8 w-7 items-center justify-center rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] hover:bg-[#E31E2D]"
+                          className="flex h-8 w-7 items-center justify-center rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-text)] hover:bg-[#E31E2D]"
                           onClick={() => updateHotspot("yaw", wrapYaw(selectedHotspot.yaw - 1))}
                           title="Yaw −1°"
                         >
@@ -2841,11 +3255,11 @@ export default function VirtualTourEditorPage() {
                             const n = Number(e.target.value);
                             if (Number.isFinite(n)) updateHotspot("yaw", wrapYaw(n));
                           }}
-                          className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-xs text-[#F8ECEE]"
+                          className="h-8 border-[var(--work-line)] bg-[var(--work-subtle)] font-mono text-xs text-[var(--work-text)]"
                         />
                         <button
                           type="button"
-                          className="flex h-8 w-7 items-center justify-center rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] hover:bg-[#E31E2D]"
+                          className="flex h-8 w-7 items-center justify-center rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-text)] hover:bg-[#E31E2D]"
                           onClick={() => updateHotspot("yaw", wrapYaw(selectedHotspot.yaw + 1))}
                           title="Yaw +1°"
                         >
@@ -2854,11 +3268,11 @@ export default function VirtualTourEditorPage() {
                       </div>
                     </div>
                     <div>
-                      <Label className="mb-1.5 block text-xs text-[#C4A8AD]">Pitch (°)</Label>
+                      <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Pitch (°)</Label>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          className="flex h-8 w-7 items-center justify-center rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] hover:bg-[#E31E2D]"
+                          className="flex h-8 w-7 items-center justify-center rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-text)] hover:bg-[#E31E2D]"
                           onClick={() =>
                             updateHotspot(
                               "pitch",
@@ -2881,11 +3295,11 @@ export default function VirtualTourEditorPage() {
                               updateHotspot("pitch", Math.max(-90, Math.min(90, n)));
                             }
                           }}
-                          className="h-8 border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] font-mono text-xs text-[#F8ECEE]"
+                          className="h-8 border-[var(--work-line)] bg-[var(--work-subtle)] font-mono text-xs text-[var(--work-text)]"
                         />
                         <button
                           type="button"
-                          className="flex h-8 w-7 items-center justify-center rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] hover:bg-[#E31E2D]"
+                          className="flex h-8 w-7 items-center justify-center rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-text)] hover:bg-[#E31E2D]"
                           onClick={() =>
                             updateHotspot(
                               "pitch",
@@ -2905,8 +3319,8 @@ export default function VirtualTourEditorPage() {
 
             {inspectorTab === "point" && currentScene && privacyBlurs.length > 0 && (
               <section>
-                <div className="flex items-center justify-between mb-2 pb-2 border-b border-[rgba(255,214,218,0.14)] gap-2">
-                  <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider">
+                <div className="flex items-center justify-between mb-2 pb-2 border-b border-[var(--work-line)] gap-2">
+                  <h3 className="text-xs font-semibold text-[var(--work-muted)] uppercase tracking-wider">
                     Blur Privasi ({privacyBlurs.length})
                   </h3>
                   <Button
@@ -2915,21 +3329,44 @@ export default function VirtualTourEditorPage() {
                     variant="outline"
                     className="h-7 text-[10px] px-2 border-purple-600/60 text-purple-300 hover:bg-purple-950/50"
                     disabled={bakingPrivacyBlur || !currentScene.panoramaUrl}
-                    onClick={() => void bakePrivacyBlursToPanorama()}
+                    onClick={requestBakePrivacyBlurs}
                   >
                     {bakingPrivacyBlur ? (
                       <>
                         <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                        Baking…
+                        {bakePrivacyProgress
+                          ? `${bakePrivacyProgress.percent}%`
+                          : "Baking…"}
                       </>
                     ) : (
                       <>
                         <ImageIcon className="h-3 w-3 mr-1" />
-                        {privacyBlurGuideOnly ? "Re-bake panorama" : "Bake ke panorama"}
+                        {privacyBlurGuideOnly ? "Bake ulang…" : "Bake…"}
                       </>
                     )}
                   </Button>
                 </div>
+                {bakingPrivacyBlur && bakePrivacyProgress ? (
+                  <div className="mb-2 space-y-1">
+                    <div className="h-1.5 rounded-full bg-[var(--work-surface)] overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-purple-500 transition-[width] duration-300"
+                        style={{ width: `${bakePrivacyProgress.percent}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-[var(--work-muted)] truncate">
+                      {bakePrivacyProgress.percent}% · {bakePrivacyProgress.label}
+                    </p>
+                  </div>
+                ) : null}
+                <EditorPanoramaPreviewToggle
+                  className="mb-3"
+                  value={editorPreviewMode}
+                  onChange={setEditorPreviewMode}
+                  hasHematTiles={Boolean(editorHematMultiRes)}
+                  hasHdTiles={Boolean(editorHdMultiRes)}
+                  hasHdOriginal={Boolean(currentScene.originalPanoramaUrl)}
+                />
                 <div className="space-y-1">
                   {privacyBlurs.map((b, index) => (
                     <div
@@ -2937,14 +3374,14 @@ export default function VirtualTourEditorPage() {
                       className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-colors ${
                         b._id === selectedBlurId
                           ? "bg-purple-950/50 border-purple-700"
-                          : "border-transparent hover:bg-[#3A161C]"
+                          : "border-transparent hover:bg-[var(--work-surface)]"
                       }`}
                       onClick={() => handleBlurSelect(b._id)}
                     >
                       <span className="w-4 h-4 rounded-md flex-none bg-purple-600/40 border border-purple-500/60 backdrop-blur-sm" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-[#F8ECEE] truncate">Blur #{index + 1}</p>
-                        <p className="text-xs text-[#C4A8AD] font-mono">
+                        <p className="text-xs text-[var(--work-text)] truncate">Blur #{index + 1}</p>
+                        <p className="text-xs text-[var(--work-muted)] font-mono">
                           {b.yaw.toFixed(1)}°, {b.pitch.toFixed(1)}°
                         </p>
                       </div>
@@ -2953,7 +3390,7 @@ export default function VirtualTourEditorPage() {
                           e.stopPropagation();
                           handleBlurDelete(b._id);
                         }}
-                        className="text-[#A88990] hover:text-red-400 transition-colors"
+                        className="text-[var(--work-muted)] hover:text-[var(--work-danger)] transition-colors"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -2968,14 +3405,14 @@ export default function VirtualTourEditorPage() {
               hotspots.length > 0 &&
               (inspectorTab === "point" || inspectorTab === "media") && (
               <section className="space-y-4">
-                <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider pb-2 border-b border-[rgba(255,214,218,0.14)]">
+                <h3 className="text-xs font-semibold text-[var(--work-muted)] uppercase tracking-wider pb-2 border-b border-[var(--work-line)]">
                   {inspectorTab === "media" ? "Daftar Media" : "Daftar Point"}
                 </h3>
 
                 {(
                   [
-                    { type: "scene" as const, color: "#E31E2D", accent: "text-red-400", badge: "bg-red-950 text-red-300" },
-                    { type: "space" as const, color: "#f59e0b", accent: "text-amber-400", badge: "bg-amber-950 text-amber-300" },
+                    { type: "scene" as const, color: "#E31E2D", accent: "text-[var(--work-danger)]", badge: "bg-red-950 text-[var(--work-danger)]" },
+                    { type: "space" as const, color: "#f59e0b", accent: "text-amber-400", badge: "bg-[var(--work-warning-soft)] text-amber-300" },
                     { type: "ad" as const, color: "#a855f7", accent: "text-purple-400", badge: "bg-purple-950 text-purple-300" },
                     { type: "info" as const, color: "#3b82f6", accent: "text-blue-400", badge: "bg-blue-950 text-blue-300" },
                   ] as const
@@ -3005,8 +3442,8 @@ export default function VirtualTourEditorPage() {
                             key={h._id}
                             className={`flex items-center gap-2 rounded-lg border p-2 cursor-pointer transition-colors ${
                               h._id === selectedHotspotId
-                                ? "border-[rgba(255,214,218,0.22)] bg-[#4A1F28]"
-                                : "border-transparent hover:bg-[#3A161C]"
+                                ? "border-[var(--work-line)] bg-[var(--work-subtle)]"
+                                : "border-transparent hover:bg-[var(--work-surface)]"
                             }`}
                             onClick={() => {
                               setSelectedHotspotId(h._id);
@@ -3014,7 +3451,7 @@ export default function VirtualTourEditorPage() {
                             }}
                           >
                             <span
-                              className="flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] text-white"
+                              className="flex h-4 w-4 flex-none items-center justify-center rounded-full text-[10px] text-[var(--work-text)]"
                               style={{
                                 background:
                                   h.type === "space" && h.spaceCode
@@ -3025,15 +3462,15 @@ export default function VirtualTourEditorPage() {
                               {h.type === "scene" ? "›" : h.type === "space" ? "●" : h.type === "ad" ? "📢" : "i"}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs text-[#F8ECEE]">{h.text}</p>
+                              <p className="truncate text-xs text-[var(--work-text)]">{h.text}</p>
                               {h.type === "scene" && h.sceneId && (() => {
                                 const tgt = scenes.find((s) => s.sceneId === h.sceneId);
                                 const loc = tgt?.areaId ? findArea(levels, tgt.areaId) : null;
                                 return (
-                                  <p className="truncate text-[10px] text-[#C4A8AD]">
+                                  <p className="truncate text-[10px] text-[var(--work-muted)]">
                                     → {tgt?.title ?? h.sceneId}
                                     {loc && (
-                                      <span className="text-[#A88990]">
+                                      <span className="text-[var(--work-muted)]">
                                         {" "}
                                         · {loc.level.label} › {loc.area.label}
                                       </span>
@@ -3054,7 +3491,7 @@ export default function VirtualTourEditorPage() {
                                             {linkedSpace.tenantBrand}
                                           </p>
                                         )}
-                                      <p className="truncate font-mono text-[10px] text-[#C4A8AD]">
+                                      <p className="truncate font-mono text-[10px] text-[var(--work-muted)]">
                                         {h.spaceCode}
                                       </p>
                                     </>
@@ -3062,12 +3499,12 @@ export default function VirtualTourEditorPage() {
                                 })()
                               )}
                               {h.type === "ad" && h.spaceCode && (
-                                <p className="truncate text-[10px] text-[#C4A8AD] font-mono">
+                                <p className="truncate text-[10px] text-[var(--work-muted)] font-mono">
                                   {h.spaceCode}
                                   {h.creativeTitle ? ` · ${h.creativeTitle}` : ""}
                                 </p>
                               )}
-                              <p className="font-mono text-[10px] text-[#C4A8AD]">
+                              <p className="font-mono text-[10px] text-[var(--work-muted)]">
                                 {h.yaw.toFixed(1)}°, {h.pitch.toFixed(1)}°
                               </p>
                             </div>
@@ -3076,7 +3513,7 @@ export default function VirtualTourEditorPage() {
                                 e.stopPropagation();
                                 handleHotspotDelete(h._id);
                               }}
-                              className="text-[#A88990] transition-colors hover:text-red-400"
+                              className="text-[var(--work-muted)] transition-colors hover:text-[var(--work-danger)]"
                             >
                               <Trash2 className="h-3 w-3" />
                             </button>
@@ -3091,11 +3528,11 @@ export default function VirtualTourEditorPage() {
 
             {/* Legend (tersembunyi; cadangan panduan) */}
             {inspectorTab === "scene" && (
-            <section className="hidden border-t border-[rgba(255,214,218,0.14)] pt-4">
-              <h3 className="text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider mb-2">
+            <section className="hidden border-t border-[var(--work-line)] pt-4">
+              <h3 className="text-xs font-semibold text-[var(--work-muted)] uppercase tracking-wider mb-2">
                 Panduan
               </h3>
-              <ul className="space-y-1.5 text-xs text-[#C4A8AD]">
+              <ul className="space-y-1.5 text-xs text-[var(--work-muted)]">
                 <li className="flex items-center gap-2">
                   <span className="w-4 h-4 rounded-full bg-emerald-600 flex-none" />
                   Hotspot scene — pindah ke scene lain
@@ -3140,17 +3577,17 @@ export default function VirtualTourEditorPage() {
       {/* ── Add Scene Dialog ─────────────────────────────────────────────── */}
       {showAddScene && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#261015] border border-[rgba(255,214,218,0.18)] rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
-            <h2 className="font-bold text-[#F8ECEE] mb-5 flex items-center gap-2">
+          <div className="bg-[var(--work-subtle)] border border-[var(--work-line)] rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <h2 className="font-bold text-[var(--work-text)] mb-5 flex items-center gap-2">
               <Plus className="h-5 w-5 text-emerald-400" /> Tambah Scene
             </h2>
             <form onSubmit={addScene} className="space-y-4">
               <div>
-                <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Area</Label>
+                <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Area</Label>
                 <select
                   value={newSceneAreaId}
                   onChange={(e) => handleNewSceneAreaChange(e.target.value)}
-                  className="w-full bg-[#3A161C] border border-[rgba(255,214,218,0.18)] rounded-md h-10 px-3 text-sm text-[#F8ECEE]"
+                  className="w-full bg-[var(--work-surface)] border border-[var(--work-line)] rounded-md h-10 px-3 text-sm text-[var(--work-text)]"
                   required
                 >
                   <option value="">— pilih area —</option>
@@ -3166,26 +3603,26 @@ export default function VirtualTourEditorPage() {
                 </select>
               </div>
               <div>
-                <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Judul Scene</Label>
+                <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Judul Scene</Label>
                 <Input
                   value={newSceneTitle}
                   onChange={(e) => handleNewSceneTitleChange(e.target.value)}
                   placeholder="contoh: Concourse Utama"
-                  className="bg-[#3A161C] border-[rgba(255,214,218,0.18)]"
+                  className="bg-[var(--work-surface)] border-[var(--work-line)]"
                   required
                 />
               </div>
               <div>
-                <Label className="text-xs text-[#C4A8AD] mb-1.5 block">Scene ID</Label>
+                <Label className="text-xs text-[var(--work-muted)] mb-1.5 block">Scene ID</Label>
                 <Input
                   value={newSceneId}
                   onChange={(e) => setNewSceneId(e.target.value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""))}
                   placeholder="concourse-01"
-                  className="bg-[#3A161C] border-[rgba(255,214,218,0.18)] font-mono"
+                  className="bg-[var(--work-surface)] border-[var(--work-line)] font-mono"
                   required
                 />
                 {scenes.some((s) => s.sceneId === newSceneId) && (
-                  <p className="text-xs text-red-400 mt-1">Scene ID ini sudah digunakan</p>
+                  <p className="text-xs text-[var(--work-danger)] mt-1">Scene ID ini sudah digunakan</p>
                 )}
               </div>
               <div className="flex gap-2 pt-1">
@@ -3213,15 +3650,15 @@ export default function VirtualTourEditorPage() {
       {/* ── Bulk Import Dialog ───────────────────────────────────────────── */}
       {showBulkImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#261015] border border-[rgba(255,214,218,0.18)] rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[85vh]">
+          <div className="bg-[var(--work-subtle)] border border-[var(--work-line)] rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[85vh]">
             {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-[rgba(255,214,218,0.14)]">
-              <h2 className="font-bold text-[#F8ECEE] flex items-center gap-2">
+            <div className="flex items-center justify-between p-5 border-b border-[var(--work-line)]">
+              <h2 className="font-bold text-[var(--work-text)] flex items-center gap-2">
                 <Package className="h-5 w-5 text-sky-400" /> Bulk Import Panorama
               </h2>
               <button
                 onClick={() => setShowBulkImport(false)}
-                className="text-[#C4A8AD] hover:text-[#F0DDE1] transition-colors"
+                className="text-[var(--work-muted)] hover:text-[var(--work-muted)] transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -3230,11 +3667,11 @@ export default function VirtualTourEditorPage() {
             {/* Body */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {/* File picker */}
-              <label className="flex items-center gap-3 cursor-pointer border-2 border-dashed border-[rgba(255,214,218,0.18)] rounded-xl p-5 text-[#C4A8AD] hover:border-sky-600 hover:text-sky-400 transition-colors">
+              <label className="flex items-center gap-3 cursor-pointer border-2 border-dashed border-[var(--work-line)] rounded-xl p-5 text-[var(--work-muted)] hover:border-sky-600 hover:text-sky-400 transition-colors">
                 <Upload className="h-6 w-6 shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Pilih beberapa file panorama sekaligus</p>
-                  <p className="text-xs text-[#C4A8AD] mt-0.5">JPEG/PNG equirectangular (2:1 ratio)</p>
+                  <p className="text-xs text-[var(--work-muted)] mt-0.5">JPEG/PNG equirectangular (2:1 ratio)</p>
                 </div>
                 <input
                   ref={bulkFileInputRef}
@@ -3249,7 +3686,7 @@ export default function VirtualTourEditorPage() {
               {/* Rows */}
               {bulkRows.length > 0 && (
                 <div className="space-y-2">
-                  <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 text-[10px] text-[#C4A8AD] uppercase tracking-wider px-1">
+                  <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-2 text-[10px] text-[var(--work-muted)] uppercase tracking-wider px-1">
                     <span>Judul Scene</span>
                     <span>Scene ID</span>
                     <span>Area</span>
@@ -3263,14 +3700,14 @@ export default function VirtualTourEditorPage() {
                           ? "border-emerald-800/50 bg-emerald-900/10"
                           : row.status === "error"
                           ? "border-red-800/50 bg-red-900/10"
-                          : "border-[rgba(255,214,218,0.14)] bg-[#3A161C]/50"
+                          : "border-[var(--work-line)] bg-[var(--work-surface)]/50"
                       }`}
                     >
                       <Input
                         value={row.title}
                         onChange={(e) => updateBulkRow(row.key, "title", e.target.value)}
                         disabled={row.status !== "pending"}
-                        className="bg-[#261015] border-[rgba(255,214,218,0.18)] text-[#F8ECEE] text-xs h-7 px-2"
+                        className="bg-[var(--work-subtle)] border-[var(--work-line)] text-[var(--work-text)] text-xs h-7 px-2"
                         placeholder="Judul scene"
                       />
                       <Input
@@ -3283,14 +3720,14 @@ export default function VirtualTourEditorPage() {
                           )
                         }
                         disabled={row.status !== "pending"}
-                        className="bg-[#261015] border-[rgba(255,214,218,0.18)] text-[#C4A8AD] text-xs h-7 px-2 font-mono"
+                        className="bg-[var(--work-subtle)] border-[var(--work-line)] text-[var(--work-muted)] text-xs h-7 px-2 font-mono"
                         placeholder="scene-id"
                       />
                       <select
                         value={row.areaId}
                         onChange={(e) => updateBulkRow(row.key, "areaId", e.target.value)}
                         disabled={row.status !== "pending"}
-                        className="bg-[#261015] border border-[rgba(255,214,218,0.18)] rounded h-7 px-1.5 text-xs text-[#F8ECEE] min-w-[110px]"
+                        className="bg-[var(--work-subtle)] border border-[var(--work-line)] rounded h-7 px-1.5 text-xs text-[var(--work-text)] min-w-[110px]"
                       >
                         {levels.map((level) => (
                           <optgroup key={level.id} label={level.label}>
@@ -3306,7 +3743,7 @@ export default function VirtualTourEditorPage() {
                         {row.status === "done" ? (
                           <Check className="h-4 w-4 text-emerald-400" />
                         ) : row.status === "error" ? (
-                          <AlertCircle className="h-4 w-4 text-red-400" />
+                          <AlertCircle className="h-4 w-4 text-[var(--work-danger)]" />
                         ) : row.status === "creating" || row.status === "uploading" ? (
                           <Loader2 className="h-4 w-4 text-sky-400 animate-spin" />
                         ) : (
@@ -3319,15 +3756,15 @@ export default function VirtualTourEditorPage() {
               )}
 
               {bulkRows.length === 0 && (
-                <p className="text-center text-[#A88990] text-sm py-4">
+                <p className="text-center text-[var(--work-muted)] text-sm py-4">
                   Pilih file di atas untuk mulai konfigurasi bulk import
                 </p>
               )}
             </div>
 
             {/* Footer */}
-            <div className="p-5 border-t border-[rgba(255,214,218,0.14)] flex items-center justify-between gap-3">
-              <p className="text-xs text-[#C4A8AD]">
+            <div className="p-5 border-t border-[var(--work-line)] flex items-center justify-between gap-3">
+              <p className="text-xs text-[var(--work-muted)]">
                 {bulkRows.filter((r) => r.status === "done").length}/{bulkRows.length} selesai
               </p>
               <div className="flex gap-2">
@@ -3395,7 +3832,7 @@ export default function VirtualTourEditorPage() {
         activeSceneId={currentScene?.sceneId ?? null}
         onSelectScene={(sceneId) => {
           const idx = scenes.findIndex((s) => s.sceneId === sceneId);
-          if (idx >= 0) selectScene(idx);
+          if (idx >= 0) void selectScene(idx);
         }}
       />
 
@@ -3404,7 +3841,7 @@ export default function VirtualTourEditorPage() {
         <div
           className={`fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 rounded-xl shadow-2xl border text-sm font-medium z-[100] transition-all ${
             toast.type === "ok"
-              ? "bg-emerald-900 border-emerald-700 text-emerald-200"
+              ? "bg-emerald-900 border-emerald-700 text-[var(--work-success)]"
               : "bg-red-900 border-red-700 text-red-200"
           }`}
         >
@@ -3416,6 +3853,7 @@ export default function VirtualTourEditorPage() {
           {toast.msg}
         </div>
       )}
+      {confirmElement}
     </div>
   );
 }

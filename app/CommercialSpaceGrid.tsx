@@ -17,7 +17,7 @@ export type SpaceListing = {
   type: string;
   status: string;
   area: number;
-  monthlyRent: number;
+  monthlyRent: number | null;
   stationName: string;
   stationSlug: string;
   stationOrder: number;

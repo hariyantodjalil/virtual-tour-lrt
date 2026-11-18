@@ -1,5 +1,8 @@
 # Virtual Tour Editor — Phase 0 Audit
 
+> Pembaruan 15 November 2026: Spatial sekarang fitur bawaan yang selalu aktif di CMS, API, dan public viewer. Konfigurasi feature flag di bawah merupakan catatan historis dan tidak lagi diperlukan.
+
+
 > **Status:** Complete (gate Phase 0)  
 > **Date:** 2026-10-27  
 > **Branch / HEAD:** `dev` @ `2ab8871`  

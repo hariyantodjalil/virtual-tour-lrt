@@ -46,14 +46,14 @@ function Section({
   collapsible?: boolean;
 }) {
   if (collapsible) return (
-    <details className="border-t border-[rgba(255,214,218,0.12)] pt-3">
-      <summary className="cursor-pointer text-xs font-medium text-[#C4A8AD] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">{title}</summary>
+    <details className="border-t border-[var(--work-line)] pt-3">
+      <summary className="cursor-pointer text-xs font-medium text-[var(--work-muted)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--work-accent)]">{title}</summary>
       <div className="space-y-3 pt-3">{children}</div>
     </details>
   );
   return (
-    <section className="space-y-2 border-t border-[rgba(255,214,218,0.12)] pt-3 first:border-t-0 first:pt-0">
-      <h4 className="text-xs font-medium text-[#C4A8AD]">
+    <section className="space-y-2 border-t border-[var(--work-line)] pt-3 first:border-t-0 first:pt-0">
+      <h4 className="text-xs font-medium text-[var(--work-muted)]">
         {title}
       </h4>
       {children}
@@ -78,14 +78,14 @@ export function SpatialAreaInspector({
 }: Props) {
   if (!entity && draftVertexCount === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-[rgba(255,214,218,0.2)] bg-[#261015]/40 px-3 py-4 text-center">
+      <div className="rounded-lg border border-dashed border-[var(--work-line)] bg-[var(--work-subtle)]/40 px-3 py-4 text-center">
         <Hexagon className="mx-auto mb-2 h-5 w-5 text-emerald-400/80" />
         {pendingSiblingUnitCode ? (
-          <p className="text-xs text-[#C4A8AD]">
-            Sisi baru · <strong className="font-mono text-[#F8ECEE]">{pendingSiblingUnitCode}</strong><br />Klik minimal 3 sudut.
+          <p className="text-xs text-[var(--work-muted)]">
+            Sisi baru · <strong className="font-mono text-[var(--work-text)]">{pendingSiblingUnitCode}</strong><br />Klik minimal 3 sudut.
           </p>
         ) : (
-          <p className="text-xs text-[#C4A8AD]">
+          <p className="text-xs text-[var(--work-muted)]">
             Pilih area di kanvas, atau gunakan Unit → Spatial untuk menggambar.
           </p>
         )}
@@ -96,15 +96,15 @@ export function SpatialAreaInspector({
   if (!entity && draftVertexCount > 0) {
     const ready = draftVertexCount >= 3 && !draftWarning;
     return (
-      <div className="space-y-3 rounded-lg border border-emerald-500/30 bg-[#261015]/60 p-3">
+      <div className="space-y-3 rounded-lg border border-emerald-500/30 bg-[var(--work-subtle)]/60 p-3">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-200">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--work-success)]">
               {pendingSiblingUnitCode
                 ? `Draft sisi · ${pendingSiblingUnitCode}`
                 : "Area baru"}
             </h3>
-            <p className="mt-1 text-xs text-[#C4A8AD]">
+            <p className="mt-1 text-xs text-[var(--work-muted)]">
               {draftVertexCount} titik
               {!ready && draftVertexCount < 3
                 ? " · minimal 3"
@@ -112,7 +112,7 @@ export function SpatialAreaInspector({
             </p>
           </div>
           {ready ? (
-            <span className="shrink-0 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+            <span className="shrink-0 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-[var(--work-success)]">
               Siap
             </span>
           ) : draftWarning ? (
@@ -122,7 +122,7 @@ export function SpatialAreaInspector({
           ) : null}
         </div>
         {draftWarning && (
-          <p className="rounded-md bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug text-amber-200">
+          <p className="rounded-md bg-[var(--work-warning-soft)] px-2 py-1.5 text-[10px] leading-snug text-amber-200">
             {draftWarning}
           </p>
         )}
@@ -174,14 +174,14 @@ export function SpatialAreaInspector({
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="flex items-center gap-1.5 text-xs font-semibold text-[#F8ECEE]">
+          <h3 className="flex items-center gap-1.5 text-xs font-semibold text-[var(--work-text)]">
             <Hexagon className="h-3.5 w-3.5 text-emerald-400" />
             Area Spatial
           </h3>
           <p
             className={`mt-1 text-xs ${
               polygonOk
-                ? "text-[#C4A8AD]"
+                ? "text-[var(--work-muted)]"
                 : "text-amber-300"
             }`}
           >
@@ -192,7 +192,7 @@ export function SpatialAreaInspector({
           type="button"
           size="sm"
           variant="ghost"
-          className="h-7 shrink-0 px-2 text-red-300 hover:text-red-200"
+          className="h-7 shrink-0 px-2 text-[var(--work-danger)] hover:text-red-200"
           onClick={onDelete}
           title="Hapus Spatial Area"
         >
@@ -227,7 +227,7 @@ export function SpatialAreaInspector({
             }}
           />
           {spaceCode && siblingFaceCount > 0 && (
-            <p className="text-[10px] text-emerald-300/90">
+            <p className="text-[10px] text-[var(--work-success)]/90">
               {siblingFaceCount} sisi
             </p>
           )}
@@ -236,7 +236,7 @@ export function SpatialAreaInspector({
               type="button"
               size="sm"
               variant="outline"
-              className="mt-1 h-8 w-full border-emerald-500/40 bg-emerald-950/30 text-xs text-emerald-200 hover:bg-emerald-900/40"
+              className="mt-1 h-8 w-full border-emerald-500/40 bg-[var(--work-success-soft)]/30 text-xs text-[var(--work-success)] hover:bg-emerald-900/40"
               onClick={onAddSiblingFace}
             >
               <Plus className="mr-1.5 h-3.5 w-3.5" />
@@ -245,9 +245,9 @@ export function SpatialAreaInspector({
           )}
         </div>
         <label className="block space-y-1">
-          <span className="text-xs text-[#C4A8AD]">Label area</span>
+          <span className="text-xs text-[var(--work-muted)]">Label area</span>
           <input
-            className="w-full rounded-md border border-[rgba(255,214,218,0.18)] bg-[#1C0A0E] px-2 py-1.5 text-xs text-[#F8ECEE]"
+            className="w-full rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] px-2 py-1.5 text-xs text-[var(--work-text)]"
             value={entity.label ?? ""}
             placeholder={
               linked
@@ -262,10 +262,10 @@ export function SpatialAreaInspector({
       <Section title="Tampilan area" collapsible>
         <div className="grid grid-cols-2 gap-2">
           <label className="block space-y-1">
-            <span className="text-xs text-[#C4A8AD]">Warna isi</span>
+            <span className="text-xs text-[var(--work-muted)]">Warna isi</span>
             <input
               type="color"
-              className="h-8 w-full cursor-pointer rounded border border-[rgba(255,214,218,0.18)] bg-transparent"
+              className="h-8 w-full cursor-pointer rounded border border-[var(--work-line)] bg-transparent"
               value={fill}
               onChange={(e) =>
                 onUpdate({
@@ -279,10 +279,10 @@ export function SpatialAreaInspector({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs text-[#C4A8AD]">Garis tepi</span>
+            <span className="text-xs text-[var(--work-muted)]">Garis tepi</span>
             <input
               type="color"
-              className="h-8 w-full cursor-pointer rounded border border-[rgba(255,214,218,0.18)] bg-transparent"
+              className="h-8 w-full cursor-pointer rounded border border-[var(--work-line)] bg-transparent"
               value={stroke}
               onChange={(e) =>
                 onUpdate({ style: { ...entity.style, strokeColor: e.target.value } })
@@ -291,7 +291,7 @@ export function SpatialAreaInspector({
           </label>
         </div>
         <label className="block space-y-1">
-          <span className="text-xs text-[#C4A8AD]">
+          <span className="text-xs text-[var(--work-muted)]">
             Opasitas isi ({fillOpacity}%)
           </span>
           <input
@@ -313,7 +313,7 @@ export function SpatialAreaInspector({
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs text-[#C4A8AD]">
+          <span className="text-xs text-[var(--work-muted)]">
             Ketebalan garis ({strokeW}px)
           </span>
           <input
@@ -330,21 +330,21 @@ export function SpatialAreaInspector({
             }
           />
         </label>
-        <label className="flex items-center gap-2 text-xs text-[#C4A8AD]">
+        <label className="flex items-center gap-2 text-xs text-[var(--work-muted)]">
           <input type="checkbox" checked={outlineOnly} onChange={(e) => onUpdate({ style: { ...entity.style, outlineOnly: e.target.checked } })} />
           Garis tepi dominan
         </label>
-        <label className="flex items-center gap-2 text-xs text-[#C4A8AD]" title="Tampilkan caption Boundary Indicative*">
+        <label className="flex items-center gap-2 text-xs text-[var(--work-muted)]" title="Tampilkan caption Boundary Indicative*">
           <input type="checkbox" checked={showHint} onChange={(e) => onUpdate({ style: { ...entity.style, showBoundaryHint: e.target.checked } })} />
           Catatan batas area
         </label>
       </Section>
 
       <Section title="Interaksi">
-        <label className="block space-y-1 text-xs text-[#C4A8AD]">
+        <label className="block space-y-1 text-xs text-[var(--work-muted)]">
           Aksi klik
           <select
-            className="w-full rounded border border-white/20 bg-[#1C0A0E] p-2"
+            className="w-full rounded border border-[var(--work-control)] bg-[var(--work-subtle)] p-2"
             value={entity.action.type}
             onChange={(event) => {
               const type = event.target.value;
@@ -360,9 +360,9 @@ export function SpatialAreaInspector({
           </select>
         </label>
         {entity.action.type === "open_scene" && (
-          <label className="block text-xs text-[#C4A8AD]">
+          <label className="block text-xs text-[var(--work-muted)]">
             Target scene
-            <select className="mt-1 w-full rounded border border-white/20 bg-[#1C0A0E] p-2"
+            <select className="mt-1 w-full rounded border border-[var(--work-control)] bg-[var(--work-subtle)] p-2"
               value={entity.action.targetId ?? ""}
               onChange={(e) => onUpdate({ action: { ...entity.action, targetId: e.target.value } })}>
               <option value="">Pilih scene</option>
@@ -372,19 +372,19 @@ export function SpatialAreaInspector({
         )}
         {entity.action.type === "info_detail" && (
           <>
-            <label className="block text-xs text-[#C4A8AD]">Judul informasi
-              <input className="mt-1 w-full rounded border border-white/20 bg-[#1C0A0E] p-2"
+            <label className="block text-xs text-[var(--work-muted)]">Judul informasi
+              <input className="mt-1 w-full rounded border border-[var(--work-control)] bg-[var(--work-subtle)] p-2"
                 maxLength={160} value={entity.action.title ?? ""}
                 onChange={(e) => onUpdate({ action: { ...entity.action, title: e.target.value } })} />
             </label>
-            <label className="block text-xs text-[#C4A8AD]">Isi informasi
-              <textarea className="mt-1 w-full rounded border border-white/20 bg-[#1C0A0E] p-2"
+            <label className="block text-xs text-[var(--work-muted)]">Isi informasi
+              <textarea className="mt-1 w-full rounded border border-[var(--work-control)] bg-[var(--work-subtle)] p-2"
                 maxLength={2000} value={entity.action.description ?? ""}
                 onChange={(e) => onUpdate({ action: { ...entity.action, description: e.target.value } })} />
             </label>
           </>
         )}
-        <label className="flex items-center gap-2 text-xs text-[#C4A8AD]">
+        <label className="flex items-center gap-2 text-xs text-[var(--work-muted)]">
           <input
             type="checkbox"
             checked={showLabel}
@@ -394,7 +394,7 @@ export function SpatialAreaInspector({
           />
           Tampilkan label
         </label>
-        <label className="flex items-center gap-2 text-xs text-[#C4A8AD]">
+        <label className="flex items-center gap-2 text-xs text-[var(--work-muted)]">
           <input
             type="checkbox"
             checked={entity.enabled}

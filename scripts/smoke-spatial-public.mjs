@@ -3,8 +3,6 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 
-process.env.CMS_SPATIAL_HOTSPOT = "1";
-process.env.NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT = "1";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });

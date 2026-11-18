@@ -10,8 +10,6 @@ if (target.hostname !== "127.0.0.1" || target.port !== "6147" || target.pathname
 }
 process.env.DATABASE_URL = databaseUrl;
 process.env.NEXTAUTH_SECRET = "local-spatial-verification-only-secret-32-characters";
-process.env.CMS_SPATIAL_HOTSPOT = "1";
-process.env.NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT = "1";
 
 const { prisma } = await import("../lib/prisma");
 const { signToken } = await import("../lib/auth");
@@ -106,11 +104,10 @@ try {
   const list = await listed.json();
   assert.equal(list.find((s: { sceneId: string }) => s.sceneId === scene.sceneId).spatialRevision, 4);
   pass("existing scene list exposes current CAS revision");
-  process.env.CMS_SPATIAL_HOTSPOT = "0";
-  assert.equal((await put({ ...body, spatialRevision: 4 })).status, 403);
-  const hidden = await getStationBySlug(station.slug);
-  assert.equal(hidden?.scenes[0]?.spatialEntities?.length, 0); pass("server kill switch overrides enabled public build flag");
-  assert.equal((await put({ title: "Legacy pin save" })).status, 200); pass("legacy scene save still works with spatial disabled");
+  assert.equal((await put({ ...body, spatialRevision: 4 })).status, 200); pass("spatial saves available without feature flags");
+  const visible = await getStationBySlug(station.slug);
+  assert.equal(visible?.scenes[0]?.spatialEntities?.length, 1); pass("published spatial areas available without feature flags");
+  assert.equal((await put({ title: "Legacy pin save" })).status, 200); pass("legacy scene save still works");
   console.log(`${checks} integration checks passed against disposable PostgreSQL.`);
 } finally {
   await prisma.$disconnect();

@@ -18,7 +18,7 @@ type Space = {
   type: string;
   status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
   area: number;
-  monthlyRent: number;
+  monthlyRent: number | null;
   deposit: number;
   floor: string;
   location: string;

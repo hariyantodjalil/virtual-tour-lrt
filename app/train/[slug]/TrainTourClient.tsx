@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Info, List } from "lucide-react";
+import Image from "next/image";
+import { ChevronRight, Eye, EyeOff, Info, List } from "lucide-react";
 import VirtualTourViewer from "@/components/tour/VirtualTourViewer";
 import TourLeftPanel from "@/components/tour/TourLeftPanel";
 import TrainFormationMap from "@/components/tour/TrainFormationMap";
@@ -17,9 +18,10 @@ import { trainRentalStatusToSpaceStatus, TRAIN_RENTAL_STATUS_LABELS } from "@/li
 import { getTourLocationBreadcrumb } from "@/lib/tour-location-breadcrumb";
 import { VIRTUAL_TOUR_LANDING, TRAIN_TOUR_LANDING } from "@/lib/tour-nav";
 import { findScenePlacement, firstSceneIdInLevel, defaultAreaForLevel } from "@/lib/public-train-tour-structure";
+import { resolvePublicAssetUrl, shouldUnoptimizeImage } from "@/lib/s3-utils";
 
 type Props = { trainInfo: TrainInfo; rentalSpaces: TrainRentalSpacePublic[] };
-const toolClass = "flex size-11 items-center justify-center rounded-full border border-white/12 bg-[#1c1c1e]/78 text-white backdrop-blur-md transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white";
+const toolClass = "tour-chrome-pill flex size-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-white";
 
 export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
   const router = useRouter();
@@ -79,7 +81,7 @@ export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
         </>} />
       <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-[60] px-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">
         <div className="relative flex items-end gap-2 md:min-h-[76px] md:justify-center">
-          {trainInfo.levels.length > 0 && <div className="pointer-events-auto min-w-0 flex-1 rounded-2xl border border-white/12 bg-[#1c1c1e]/78 px-2 py-1.5 text-white backdrop-blur-md md:w-[min(52vw,390px)] md:flex-none">
+          {trainInfo.levels.length > 0 && <div className="tour-chrome-pill pointer-events-auto min-w-0 flex-1 rounded-2xl px-2 py-1.5 md:w-[min(52vw,390px)] md:flex-none">
             <p className="px-1 text-left text-xs font-semibold md:text-center">{currentCarLabel}</p>
             <TrainFormationMap touchTargets cars={trainInfo.levels.map(level => ({ id: level.id, label: level.label }))}
               activeCarId={activeLevelId} onSelectCar={handleSelectCar} className="w-full" />
@@ -92,19 +94,44 @@ export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
       </footer>
     </>}
     {uiCleared && <button type="button" onClick={() => setUiCleared(false)} className={toolClass + " absolute bottom-5 left-3 z-[70] sm:left-5"} aria-label="Tampilkan UI" title="Tampilkan UI"><Eye className="size-5" /></button>}
-    {panel === "info" && <TrainTourPanel title="Informasi kereta" compact onClose={() => setPanel(null)}>
-      <div className="min-h-0 overflow-y-auto p-5"><h2 className="text-lg font-semibold">{trainInfo.name}</h2>
-        {trainInfo.formation && <p className="mt-2 text-sm text-slate-600">{trainInfo.formation}</p>}
-        {trainInfo.description && <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{trainInfo.description}</p>}
+    {panel === "info" && <TrainTourPanel title="Informasi kereta" centered compact onClose={() => setPanel(null)}>
+      <div className="min-h-0 overflow-y-auto overscroll-contain">
+        {trainInfo.imageUrl && <div className="relative aspect-[2/1] max-h-64 bg-slate-100">
+          <Image src={resolvePublicAssetUrl(trainInfo.imageUrl)} alt={trainInfo.name} fill
+            sizes="(max-width: 767px) 100vw, 640px" className="object-cover"
+            unoptimized={shouldUnoptimizeImage(resolvePublicAssetUrl(trainInfo.imageUrl))} />
+        </div>}
+        <div className="px-5 py-6 sm:px-7 sm:py-7">
+          <h2 className="text-xl font-semibold leading-tight text-slate-900 sm:text-2xl">{trainInfo.name}</h2>
+          {trainInfo.formation && <dl className="mt-5 border-y border-slate-200 py-4">
+            <dt className="text-sm text-slate-600">Formasi kereta</dt>
+            <dd className="mt-1 break-words text-base font-semibold text-slate-900">{trainInfo.formation}</dd>
+          </dl>}
+          {trainInfo.description && <p className="mt-5 max-w-prose whitespace-pre-wrap break-words text-base leading-relaxed text-slate-700">{trainInfo.description}</p>}
+        </div>
       </div>
     </TrainTourPanel>}
-    {panel === "media" && <TrainTourPanel title="Media iklan" onClose={() => setPanel(null)}>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {rentalSpaces.map(space => <TourSheetAction key={space.id} afterClose={() => openMedia(space.id)} className="flex min-h-16 w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#E31E2D]">
-          <span className="text-sm font-semibold text-slate-500">{space.displayNumber}</span>
-          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{space.title}</span><span className="mt-1 block text-xs text-slate-600">{TRAIN_RENTAL_STATUS_LABELS[space.status]}</span></span>
-        </TourSheetAction>)}
-        {!rentalSpaces.length && <p className="p-3 text-sm text-slate-600">Belum ada media iklan.</p>}
+    {panel === "media" && <TrainTourPanel title="Media iklan" centered wide fitContent onClose={() => setPanel(null)}>
+      <div className="min-h-0 overflow-y-auto overscroll-contain px-4 py-2 sm:px-6 sm:py-3">
+        <ul className="grid grid-cols-1 gap-x-6 md:grid-cols-2">
+          {rentalSpaces.map(space => <li key={space.id} className="min-w-0 border-b border-slate-200 last:border-0 md:[&:nth-last-child(2):nth-child(odd)]:border-0">
+            <TourSheetAction afterClose={() => openMedia(space.id)} className="group flex min-h-24 w-full items-center gap-3 rounded-lg py-4 text-left transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D] sm:gap-4">
+              {space.image && <span className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-slate-100 sm:size-20">
+                <Image src={resolvePublicAssetUrl(space.image)} alt="" fill sizes="80px" className="object-cover" style={{ objectPosition: space.objectPosition }}
+                  unoptimized={shouldUnoptimizeImage(resolvePublicAssetUrl(space.image))} />
+              </span>}
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs text-slate-500">Media {space.displayNumber}</span>
+                <span className="mt-1 block break-words text-base font-semibold leading-snug text-slate-900">{space.title}</span>
+                <span className={`mt-2 inline-flex items-center gap-1.5 text-xs font-medium ${space.status === "TERSEDIA" ? "text-emerald-700" : space.status === "TERBATAS" ? "text-amber-800" : "text-slate-600"}`}>
+                  <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />{TRAIN_RENTAL_STATUS_LABELS[space.status]}
+                </span>
+              </span>
+              <ChevronRight aria-hidden="true" className="size-5 shrink-0 text-slate-400 group-hover:text-[#E31E2D]" />
+            </TourSheetAction>
+          </li>)}
+        </ul>
+        {!rentalSpaces.length && <p className="py-10 text-center text-base text-slate-600">Belum ada media iklan.</p>}
       </div>
     </TrainTourPanel>}
     {infoPopup && <InTourInfoPopup title={infoPopup.title} description={infoPopup.description} onClose={() => setInfoPopup(null)} />}
