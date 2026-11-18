@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+import { inquiryPhoneSchema } from "@/lib/inquiry-validation";
 import { trainInquiryInputSchema } from "@/lib/train-advertising-shared";
 import { resolveTrainInquiry, TrainInquiryError } from "@/lib/train-advertising";
 import { createInquiryOnce } from "@/lib/active-inquiry";
@@ -14,13 +16,13 @@ import { trainLeadRequirement } from "@/lib/train-rental-spaces";
 const leadSchema = z.object({
   spaceId: z.string().trim().min(1).max(128).optional(),
   trainRentalSpaceId: z.string().trim().min(1).max(128).optional(),
-    trainInquiry: trainInquiryInputSchema.optional(),
+  trainInquiry: trainInquiryInputSchema.optional(),
   companyName: z.string().trim().min(2).max(160),
   contactName: z.string().trim().min(2).max(160),
-  phone: z.string().trim().min(10).max(32).regex(/^[+0-9()\s.-]+$/),
+  phone: inquiryPhoneSchema,
   email: z.string().trim().email().max(254),
   password: z.string().min(8, "Password minimal 8 karakter").max(128),
-  businessType: z.string().trim().min(3).max(120),
+  businessType: z.string().trim().min(1).max(120),
   spaceRequirement: z.string().trim().max(500).optional(),
   surveyPreference: z.string().trim().max(500).optional(),
   message: z.string().trim().max(2_000).optional(),
@@ -96,29 +98,22 @@ export async function POST(req: NextRequest) {
       commercialSpaceId = space.id;
     }
 
-    let user = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      if (!existingUser.isActive) return NextResponse.json({ error: "Akun mitra tidak aktif" }, { status: 403 });
+      return NextResponse.json({ error: "Email sudah terdaftar. Silakan masuk untuk melanjutkan pengajuan.", code: "ACCOUNT_EXISTS" }, { status: 409 });
+    }
 
-    if (user) {
-      if (!user.isActive) {
-        return NextResponse.json({ error: "Akun mitra tidak aktif" }, { status: 403 });
+    let user;
+    try {
+      user = await prisma.user.create({ data: {
+        email, name: data.contactName, password: await bcrypt.hash(data.password, 12), role: "MITRA",
+      } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return NextResponse.json({ error: "Email sudah terdaftar. Silakan masuk untuk melanjutkan pengajuan.", code: "ACCOUNT_EXISTS" }, { status: 409 });
       }
-
-      const passwordValid = await bcrypt.compare(data.password, user.password);
-      if (!passwordValid) {
-        return NextResponse.json(
-          { error: "Email sudah terdaftar. Masukkan password akun yang benar untuk menautkan pengajuan." },
-          { status: 409 }
-        );
-      }
-    } else {
-      user = await prisma.user.create({
-        data: {
-          email,
-          name: data.contactName,
-          password: await bcrypt.hash(data.password, 12),
-          role: "MITRA",
-        },
-      });
+      throw error;
     }
 
     const result = await createInquiryOnce({
@@ -129,37 +124,22 @@ export async function POST(req: NextRequest) {
         ...await inquiryCreationData(user.id),
         ...(trainRequest ? { trainInquiry: { create: trainRequest.create } } : {}),
         ...(commercialSpaceId ? { spaceId: commercialSpaceId } : {}),
-        companyName: data.companyName,
-        contactName: data.contactName,
-        phone: data.phone,
-        email,
-        businessType: data.businessType,
+        companyName: data.companyName, contactName: data.contactName, phone: data.phone, email,
+        businessType: trainRequest?.businessType ?? data.businessType,
         spaceRequirement: trainRequirement ?? data.spaceRequirement,
-        surveyPreference: data.surveyPreference,
-        message: data.message,
-        userId: user.id,
+        surveyPreference: data.surveyPreference, message: data.message, userId: user.id,
         siteVisitStatus: data.surveyPreference ? "REQUESTED" : "NONE",
       },
     });
     if (!result.created) {
-      return NextResponse.json({
-        error: "Anda sudah punya pengajuan aktif untuk unit ini.",
-        existingInquiryId: result.existingInquiryId,
-      }, { status: 409 });
+      return NextResponse.json({ error: "Anda sudah punya pengajuan aktif untuk unit ini.", existingInquiryId: result.existingInquiryId }, { status: 409 });
     }
     const lead = result.lead;
-
-    // Track analytics
     if (commercialSpaceId) {
-      await prisma.visitEvent.create({
-        data: {
-          spaceId: commercialSpaceId,
-          eventType: "FORM_SUBMIT",
-          sessionId: getClientIdentifier(req),
-        },
-      });
+      await prisma.visitEvent.create({ data: {
+        spaceId: commercialSpaceId, eventType: "FORM_SUBMIT", sessionId: getClientIdentifier(req),
+      } });
     }
-
     return NextResponse.json(lead, { status: 201, headers: rateLimitHeaders(rateLimit) });
   } catch (error) {
     console.error("[api/leads POST]", error);

@@ -11,7 +11,6 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronRight,
-  Circle,
   Clock3,
   FileText,
   Glasses,
@@ -20,16 +19,15 @@ import {
   Plus,
   XCircle,
 } from "lucide-react";
+import InquiryTimeline, { inquiryStatusLabel } from "@/components/partner/InquiryTimeline";
 import { formatRupiah, getWhatsAppUrl } from "@/lib/utils";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 import {
   ACTIVE_LEAD_STATUSES,
   isCommercialOperation,
-  LEAD_PIPELINE_STATUSES,
-  LEAD_STATUS_LABELS,
+  PUBLIC_LEAD_PROCESS_STEPS,
   SITE_VISIT_STATUS_LABELS,
-  type CommercialLeadStatus,
 } from "@/lib/commercial-pipeline";
 
 export type PartnerLead = {
@@ -45,7 +43,9 @@ export type PartnerLead = {
   surveyPreference: string | null;
   siteVisitStatus: string;
   siteVisitScheduledAt: string | null;
-  notes: string | null;
+  leaseStartAt?: string | null;
+  leaseEndAt?: string | null;
+  paymentVerifiedAt?: string | null;
   createdAt: string;
   space: {
     id: string;
@@ -55,7 +55,7 @@ export type PartnerLead = {
     area: number;
     floor: string;
     location: string;
-    monthlyRent: number;
+    monthlyRent: number | null;
     panoramaUrl: string | null;
     station: { name: string; slug: string };
   } | null;
@@ -69,7 +69,7 @@ type RecommendedSpace = {
   area: number;
   floor: string;
   location: string;
-  monthlyRent: number;
+  monthlyRent: number | null;
   panoramaUrl: string | null;
   station: { name: string; slug: string };
 };
@@ -85,24 +85,13 @@ const TYPE_LABELS: Record<string, string> = {
   AREA_PROMOSI: "Area Promosi",
 };
 
-const STEPS = LEAD_PIPELINE_STATUSES.filter((status) => status !== "CLOSED_LOST").map(
-  (status) => LEAD_STATUS_LABELS[status]
-);
-
 function statusBadge(status: string) {
-  const label = LEAD_STATUS_LABELS[status as CommercialLeadStatus] ?? "Baru Diajukan";
+  const label = inquiryStatusLabel(status);
   if (status === "CLOSED_LOST") return { label, className: "bg-red-600 text-white" };
   if (isCommercialOperation(status)) {
-    return { label: "Operasional Komersial", className: "bg-emerald-600 text-white" };
+    return { label: "Sewa Aktif", className: "bg-emerald-600 text-white" };
   }
   return { label, className: "bg-[#1C0A0E] text-white" };
-}
-
-function currentStepIndex(status: string): number {
-  if (status === "CLOSED_LOST") return -1;
-  if (status === "CLOSED_WON") return STEPS.length - 1;
-  const index = LEAD_PIPELINE_STATUSES.findIndex((step) => step === status);
-  return index >= 0 ? index : 0;
 }
 
 function matchesFilter(status: string, filter: FilterTab) {
@@ -149,7 +138,6 @@ export default function ApplicationsSection({
   const resolvedContactPhone =
     contactPhone || commercialProfile.whatsappNumber;
   const [filter, setFilter] = useState<FilterTab>("semua");
-  const [detailLead, setDetailLead] = useState<PartnerLead | null>(null);
   const [recommendations, setRecommendations] = useState<RecommendedSpace[]>([]);
   const [showAll, setShowAll] = useState(false);
 
@@ -197,7 +185,7 @@ export default function ApplicationsSection({
   const tabs: { id: FilterTab; label: string }[] = [
     { id: "semua", label: "Semua" },
     { id: "diproses", label: "Diproses" },
-    { id: "disetujui", label: "Operasional" },
+    { id: "disetujui", label: "Sewa Aktif" },
     { id: "ditolak", label: "Ditolak" },
   ];
 
@@ -223,7 +211,7 @@ export default function ApplicationsSection({
       </div>
 
       {/* Summary */}
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           title="Total Pengajuan"
           value={summary.total}
@@ -243,7 +231,7 @@ export default function ApplicationsSection({
           tone="violet"
         />
         <StatCard
-          title="Operasional"
+          title="Sewa Aktif"
           value={summary.disetujui}
           icon={<CheckCircle2 className="size-4" />}
           tone="green"
@@ -306,7 +294,7 @@ export default function ApplicationsSection({
               <ApplicationCard
                 key={lead.id}
                 lead={lead}
-                onDetail={() => lead.trainInquiry ? router.push(`/partner/inquiries/${encodeURIComponent(lead.id)}`) : setDetailLead(lead)}
+                onDetail={() => router.push(`/partner/inquiries/${encodeURIComponent(lead.id)}`)}
               />
             ))
           )}
@@ -425,14 +413,8 @@ export default function ApplicationsSection({
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="text-base font-bold text-[#101828]">Panduan Penyewaan</h3>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            {[
-              { n: "1", t: "Jelajahi", d: "Tur 360° stasiun" },
-              { n: "2", t: "Ajukan", d: "Kirim minat sewa" },
-              { n: "3", t: "Penawaran", d: "KAI mengirim penawaran resmi" },
-              { n: "4", t: "Verifikasi", d: "Cek lokasi setelah kesepakatan" },
-              { n: "5", t: "Perjanjian", d: "BA, desain, PKS, serah terima" },
-            ].map((step) => (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {PUBLIC_LEAD_PROCESS_STEPS.map((item, index) => ({ n: String(index + 1), t: item.title, d: item.detail })).map((step) => (
               <div
                 key={step.n}
                 className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 text-center"
@@ -441,7 +423,7 @@ export default function ApplicationsSection({
                   {step.n}
                 </span>
                 <p className="mt-2 text-sm font-bold text-[#101828]">{step.t}</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">{step.d}</p>
+                <p className="mt-0.5 text-xs text-slate-500">{step.d}</p>
               </div>
             ))}
           </div>
@@ -466,9 +448,6 @@ export default function ApplicationsSection({
         </section>
       </div>
 
-      {detailLead && (
-        <DetailModal lead={detailLead} onClose={() => setDetailLead(null)} />
-      )}
     </>
   );
 }
@@ -481,7 +460,6 @@ function ApplicationCard({
   onDetail: () => void;
 }) {
   const badge = statusBadge(lead.status);
-  const stepIdx = currentStepIndex(lead.status);
   const space = lead.space;
   const cover = coverUrl(lead.trainInquiry?.media?.imageUrl ?? space?.panoramaUrl);
 
@@ -498,7 +476,7 @@ function ApplicationCard({
             unoptimized={cover.startsWith("/api/")}
           />}
           <span
-            className={`absolute bottom-3 left-3 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${badge.className}`}
+            className={`absolute bottom-3 left-3 rounded-md px-2 py-1 text-xs font-bold uppercase tracking-wide ${badge.className}`}
           >
             {badge.label}
           </span>
@@ -525,7 +503,7 @@ function ApplicationCard({
             <button
               type="button"
               onClick={onDetail}
-              className="hidden shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 sm:inline-flex"
+              className="hidden min-h-11 shrink-0 items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 sm:inline-flex"
             >
               Lihat Detail
             </button>
@@ -534,10 +512,13 @@ function ApplicationCard({
           {lead.trainInquiry ? <div className="mt-4 rounded-xl bg-slate-50 px-3 py-3 text-sm">
             <p className="font-semibold">{lead.trainInquiry.train.name}</p>
             {lead.trainInquiry.requestedTrainsetCount !== null && <p className="mt-1">Permintaan {lead.trainInquiry.requestedTrainsetCount} trainset</p>}
+            {lead.trainInquiry.carPreferences.length > 0 && <p className="mt-1 text-sm">{lead.trainInquiry.carPreferences.map(car => car.carLabel).join(", ")}</p>}
+            {lead.trainInquiry.applicantStatusLabel && <p className="mt-1 text-sm">{lead.trainInquiry.applicantStatusLabel}{lead.trainInquiry.representedBrand && (" · " + lead.trainInquiry.representedBrand)}</p>}
+            {lead.trainInquiry.businessCategoryLabel && <p className="mt-1 text-sm">{lead.trainInquiry.businessCategoryOther ?? lead.trainInquiry.businessCategoryLabel}</p>}
             <p className="mt-1 text-slate-600">{trainCampaignPeriod(lead.trainInquiry)}</p>
           </div> : <div className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-slate-50 px-3 py-3">
             <div>
-              <p className="text-[10px] font-medium tracking-wide text-slate-400 uppercase">
+              <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">
                 Luas
               </p>
               <p className="mt-0.5 text-sm font-bold text-[#101828]">
@@ -545,7 +526,7 @@ function ApplicationCard({
               </p>
             </div>
             <div>
-              <p className="text-[10px] font-medium tracking-wide text-slate-400 uppercase">
+              <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">
                 Harga / Bulan
               </p>
               <p className="mt-0.5 text-sm font-bold text-[#101828]">
@@ -553,7 +534,7 @@ function ApplicationCard({
               </p>
             </div>
             <div>
-              <p className="text-[10px] font-medium tracking-wide text-slate-400 uppercase">
+              <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">
                 Tanggal Pengajuan
               </p>
               <p className="mt-0.5 text-sm font-bold text-[#101828]">
@@ -569,14 +550,14 @@ function ApplicationCard({
           <button
             type="button"
             onClick={onDetail}
-            className="mt-3 inline-flex rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 sm:hidden"
+            className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 sm:hidden"
           >
             Lihat Detail
           </button>
         </div>
 
         <div className="border-t border-slate-100 p-4 lg:border-t-0 lg:border-l">
-          <p className="mb-3 text-[10px] font-bold tracking-wide text-slate-400 uppercase">
+          <p className="mb-3 text-xs font-bold tracking-wide text-slate-400 uppercase">
             Status Pengajuan
           </p>
           {lead.status === "CLOSED_LOST" ? (
@@ -585,154 +566,11 @@ function ApplicationCard({
               Pengajuan ditolak. Silakan ajukan unit lain.
             </div>
           ) : (
-            <ol className="space-y-2.5">
-              {STEPS.map((label, index) => {
-                const finalIndex = STEPS.length - 1;
-                const done =
-                  stepIdx > index || (stepIdx === finalIndex && index === finalIndex);
-                const current = stepIdx === index && stepIdx < finalIndex;
-                const completeFinal =
-                  stepIdx === finalIndex && index === finalIndex;
-                return (
-                  <li key={label} className="flex items-start gap-2.5">
-                    <span className="mt-0.5 shrink-0">
-                      {done || completeFinal ? (
-                        <CheckCircle2 className="size-4 text-emerald-500" />
-                      ) : current ? (
-                        <span className="flex size-4 items-center justify-center rounded-full border-2 border-amber-500">
-                          <span className="size-1.5 rounded-full bg-amber-500" />
-                        </span>
-                      ) : (
-                        <Circle className="size-4 text-slate-300" />
-                      )}
-                    </span>
-                    <span
-                      className={`text-xs leading-snug ${
-                        done || completeFinal || current
-                          ? "font-semibold text-[#101828]"
-                          : "text-slate-400"
-                      }`}
-                    >
-                      {label}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
+            <InquiryTimeline status={lead.status} compact />
           )}
         </div>
       </div>
     </article>
-  );
-}
-
-function DetailModal({ lead, onClose }: { lead: PartnerLead; onClose: () => void }) {
-  const space = lead.space;
-  const badge = statusBadge(lead.status);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <span
-              className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ${badge.className}`}
-            >
-              {badge.label}
-            </span>
-            <h3 className="mt-2 text-xl font-bold text-[#101828]">
-              {space?.code ?? lead.trainInquiry?.mediaCode ?? "-"} — {space?.name ?? "Unit"}
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">
-              {space?.station?.name ?? "-"} · {space?.floor || space?.location || "-"}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            aria-label="Tutup"
-          >
-            <XCircle className="size-5" />
-          </button>
-        </div>
-
-        <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-xl bg-slate-50 p-3">
-            <dt className="text-xs text-slate-400">Luas</dt>
-            <dd className="font-bold text-[#101828]">{space ? `${space.area} m²` : "-"}</dd>
-          </div>
-          <div className="rounded-xl bg-slate-50 p-3">
-            <dt className="text-xs text-slate-400">Harga / Bulan</dt>
-            <dd className="font-bold text-[#101828]">{priceLabel(space?.monthlyRent)}</dd>
-          </div>
-          <div className="rounded-xl bg-slate-50 p-3">
-            <dt className="text-xs text-slate-400">Jenis Usaha</dt>
-            <dd className="font-bold text-[#101828]">{lead.businessType}</dd>
-          </div>
-          <div className="rounded-xl bg-slate-50 p-3">
-            <dt className="text-xs text-slate-400">Tanggal</dt>
-            <dd className="font-bold text-[#101828]">
-              {new Date(lead.createdAt).toLocaleDateString("id-ID")}
-            </dd>
-          </div>
-        </dl>
-
-        {lead.siteVisitStatus !== "NONE" && (
-          <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50 p-3">
-            <p className="text-xs font-semibold uppercase text-sky-600">Site Visit</p>
-            <p className="mt-1 text-sm font-semibold text-sky-900">
-              {SITE_VISIT_STATUS_LABELS[
-                lead.siteVisitStatus as keyof typeof SITE_VISIT_STATUS_LABELS
-              ] ?? lead.siteVisitStatus}
-            </p>
-            {lead.siteVisitScheduledAt && (
-              <p className="mt-1 text-sm text-sky-800">
-                {new Date(lead.siteVisitScheduledAt).toLocaleString("id-ID", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            )}
-          </div>
-        )}
-
-        {lead.surveyPreference && (
-          <div className="mt-4 rounded-xl border border-slate-100 p-3">
-            <p className="text-xs font-semibold text-slate-400 uppercase">Preferensi Survei</p>
-            <p className="mt-1 text-sm text-slate-700">{lead.surveyPreference}</p>
-          </div>
-        )}
-
-        {lead.message && (
-          <div className="mt-4 rounded-xl border border-slate-100 p-3">
-            <p className="text-xs font-semibold text-slate-400 uppercase">Pesan</p>
-            <p className="mt-1 text-sm text-slate-700">{lead.message}</p>
-          </div>
-        )}
-
-        <div className="mt-5 flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Tutup
-          </button>
-          {space?.station?.slug && (
-            <Link
-              href={`/station/${space.station.slug}?unit=${space.id}`}
-              className="flex-1 rounded-xl bg-[#c41230] px-4 py-2.5 text-center text-sm font-semibold text-white hover:brightness-110"
-            >
-              Lihat di Tour
-            </Link>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 

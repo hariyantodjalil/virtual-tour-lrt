@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Bell,
   Building2,
   CheckCircle2,
   ChevronDown,
@@ -43,9 +42,9 @@ import {
 import {
   ACTIVE_LEAD_STATUSES,
   isCommercialOperation,
-  LEAD_STATUS_LABELS,
-  type CommercialLeadStatus,
 } from "@/lib/commercial-pipeline";
+
+import InquiryTimeline, { inquiryStatusLabel } from "@/components/partner/InquiryTimeline";
 
 type User = {
   id: string;
@@ -218,19 +217,6 @@ export default function PartnerPage() {
         </Link>
 
         <div className="flex items-center gap-3 md:gap-4">
-          <button
-            type="button"
-            className="relative rounded-full p-2 transition hover:bg-white/15"
-            aria-label="Notifikasi"
-          >
-            <Bell className="size-5" />
-            {summary.active > 0 && (
-              <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-[#c41230]">
-                {summary.active}
-              </span>
-            )}
-          </button>
-
           <div className="relative">
             <button
               type="button"
@@ -488,9 +474,9 @@ function DashboardOverview({
           tone="rose"
         />
         <MetricCard
-          title="Disetujui"
+          title="Sewa Aktif"
           value={summary.won}
-          caption="Siap lanjut"
+          caption="Pembayaran terverifikasi & sewa efektif"
           icon={<CheckCircle2 className="size-5" />}
           tone="green"
         />
@@ -591,129 +577,21 @@ function DashboardOverview({
   );
 }
 
-const PROGRESS_CARD_TONES = [
-  { card: "bg-[#e8f1ff]", btn: "bg-[#c4b5fd] hover:bg-[#a78bfa]" },
-  { card: "bg-[#f3e8ff]", btn: "bg-[#f9a8d4] hover:bg-[#f472b6]" },
-  { card: "bg-[#ffe8e4]", btn: "bg-[#fda4af] hover:bg-[#fb7185]" },
-] as const;
-
-function applicationBadge(status: string, createdAt: string) {
-  const dateLabel = new Date(createdAt).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-
-  switch (status) {
-    case "COMMERCIAL_OPERATION":
-    case "CLOSED_WON":
-      return { label: "Operasional", className: "bg-emerald-500 text-white" };
-    case "CLOSED_LOST":
-      return { label: "Ditolak", className: "bg-red-500 text-white" };
-    case "NEGOTIATING":
-      return { label: `Negosiasi · ${dateLabel}`, className: "bg-[#1e293b] text-white" };
-    case "PKS":
-      return { label: `PKS · ${dateLabel}`, className: "bg-indigo-600 text-white" };
-    case "FIT_OUT_HANDOVER":
-      return { label: `Fit-Out · ${dateLabel}`, className: "bg-violet-600 text-white" };
-    case "CONTACTED":
-      return { label: `Direview · ${dateLabel}`, className: "bg-[#1e293b] text-white" };
-    default:
-      return {
-        label: `${LEAD_STATUS_LABELS[status as CommercialLeadStatus] ?? "Diajukan"} · ${dateLabel}`,
-        className: "bg-[#1C0A0E] text-white",
-      };
-  }
-}
-
-function isApplicationDone(status: string) {
-  return isCommercialOperation(status) || status === "CLOSED_LOST";
-}
-
 function ApplicationProgressList({ leads }: { leads: Lead[] }) {
-  return (
-    <div className="relative">
-      {/* vertical timeline line */}
-      {leads.length > 1 && (
-        <div
-          className="absolute top-6 bottom-6 left-[11px] w-0.5 bg-[#1e293b]/25 md:left-[13px]"
-          aria-hidden
-        />
-      )}
-
-      <ul className="space-y-3">
-        {leads.map((lead, index) => {
-          const tone = PROGRESS_CARD_TONES[index % PROGRESS_CARD_TONES.length];
-          const badge = applicationBadge(lead.status, lead.createdAt);
-          const done = isApplicationDone(lead.status);
-          const href = lead.space?.station?.slug
-            ? `/station/${lead.space.station.slug}?unit=${lead.space.id}`
-            : undefined;
-
-          return (
-            <li key={lead.id} className="relative flex gap-3 md:gap-4">
-              <div className="relative z-[1] mt-5 flex w-6 shrink-0 justify-center md:w-7">
-                <span
-                  className={`size-3.5 rounded-full border-2 border-[#1e293b] md:size-4 ${
-                    done ? "bg-[#1e293b]" : "bg-white"
-                  }`}
-                />
-              </div>
-
-              <div
-                className={`min-w-0 flex-1 rounded-2xl ${tone.card} px-4 py-3.5 sm:px-5 sm:py-4`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="truncate text-sm font-bold text-[#101828] sm:text-base">
-                      {lead.space?.code ?? lead.trainInquiry?.mediaCode ?? "-"} — {lead.space?.name ?? lead.trainInquiry?.mediaTitle ?? "Unit Komersial"}
-                    </h3>
-                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-600 sm:text-[13px]">
-                      {lead.space?.station?.name ?? lead.trainInquiry?.train.name ?? "Stasiun"}
-                      {lead.space?.floor ? ` · ${lead.space.floor}` : ""}
-                      {lead.businessType ? ` · ${lead.businessType}` : ""}
-                      {lead.space ? ` · ${lead.space.area} m²` : ""}
-                    </p>
-                    {lead.message && (
-                      <p className="mt-1.5 line-clamp-1 text-xs text-slate-500">{lead.message}</p>
-                    )}
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold tracking-wide uppercase ${badge.className}`}
-                  >
-                    {badge.label}
-                  </span>
-                </div>
-
-                <div className="mt-3 flex items-end justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">
-                    {lead.space?.monthlyRent && lead.space.monthlyRent > 0
-                      ? formatRupiah(lead.space.monthlyRent) + " / bulan"
-                      : "Harga: hubungi tim"}
-                  </p>
-                  {href ? (
-                    <Link
-                      href={href}
-                      className={`inline-flex size-9 items-center justify-center rounded-full text-white shadow-sm transition ${tone.btn}`}
-                      aria-label="Lihat unit"
-                    >
-                      <ArrowUpRight className="size-4" strokeWidth={2.5} />
-                    </Link>
-                  ) : (
-                    <span
-                      className={`inline-flex size-9 items-center justify-center rounded-full text-white/70 ${tone.btn}`}
-                    >
-                      <ArrowUpRight className="size-4" strokeWidth={2.5} />
-                    </span>
-                  )}
-                </div>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
+  return <ul className="divide-y divide-slate-200">
+    {leads.map(lead => {
+      const title = inquiryStatusLabel(lead.status);
+      return <li key={lead.id} className="grid gap-5 py-5 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="min-w-0">
+          <h3 className="break-words text-base font-semibold">{lead.space?.code ?? lead.trainInquiry?.mediaCode ?? "—"} — {lead.space?.name ?? lead.trainInquiry?.mediaTitle ?? "Unit Komersial"}</h3>
+          <p className="mt-2 text-sm text-slate-600">{lead.space?.station?.name ?? lead.trainInquiry?.train.name}</p>
+          <p className="mt-2 text-sm font-medium text-[#a81724]">{title}</p>
+          <Link href={"/partner/inquiries/" + encodeURIComponent(lead.id)} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-semibold text-[#c41230] hover:underline focus-visible:outline-2 focus-visible:outline-[#c41230]">Pantau pengajuan<ArrowUpRight className="size-4" /></Link>
+        </div>
+        <InquiryTimeline status={lead.status} compact />
+      </li>;
+    })}
+  </ul>;
 }
 
 function QuickAction({

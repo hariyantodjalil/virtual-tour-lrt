@@ -26,7 +26,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { allocatedTrainsets, allocationNotes } = parsed.data;
     const activeCount = await tx.trainset.count({ where: { trainId: inquiry.trainId, code: { in: allocatedTrainsets }, isActive: true } });
     if (activeCount !== allocatedTrainsets.length) return { error: "Pilih trainset aktif dari armada yang sesuai.", status: 400 };
-    if (isCommercialOperation(lead.status) && (!allocatedTrainsets.length || (inquiry.mode === "FULL_BRANDING" && inquiry.requestedTrainsetCount !== null && allocatedTrainsets.length !== inquiry.requestedTrainsetCount))) {
+    if (isCommercialOperation(lead.status) && (!allocatedTrainsets.length || (inquiry.requestedTrainsetCount !== null && allocatedTrainsets.length !== inquiry.requestedTrainsetCount))) {
       return { error: "Alokasi pengajuan operasional harus sesuai permintaan.", status: 409 };
     }
     await tx.trainInquiry.update({ where: { leadId: id }, data: { allocatedTrainsets, allocationNotes: allocationNotes || null } });

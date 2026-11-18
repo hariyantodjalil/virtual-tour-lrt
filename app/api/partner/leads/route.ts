@@ -1,3 +1,4 @@
+import { inquiryPhoneSchema } from "@/lib/inquiry-validation";
 import { trainInquiryInputSchema } from "@/lib/train-advertising-shared";
 import { resolveTrainInquiry, TrainInquiryError } from "@/lib/train-advertising";
 import { createInquiryOnce } from "@/lib/active-inquiry";
@@ -15,18 +16,12 @@ const partnerLeadSchema = z
     spaceId: z.string().trim().min(1).max(128).optional(),
     trainRentalSpaceId: z.string().trim().min(1).max(128).optional(),
     trainInquiry: trainInquiryInputSchema.optional(),
-    businessType: z.string().trim().min(3).max(120),
+    businessType: z.string().trim().min(1).max(120),
     message: z.string().trim().max(2_000).optional(),
     companyName: z.string().trim().min(2).max(160).optional(),
     contactName: z.string().trim().min(2).max(160).optional(),
     surveyPreference: z.string().trim().max(500).optional(),
-    phone: z
-      .string()
-      .trim()
-      .min(10)
-      .max(32)
-      .regex(/^[+0-9()\s.-]+$/)
-      .optional(),
+    phone: inquiryPhoneSchema.optional(),
   })
   .strict()
   .refine((value) => Boolean(value.spaceId) || Boolean(value.trainRentalSpaceId), {
@@ -137,7 +132,7 @@ export async function POST(request: NextRequest) {
       contactName,
       phone,
       email: user.email,
-      businessType: parsed.data.businessType,
+      businessType: trainRequest?.businessType ?? parsed.data.businessType,
       spaceRequirement: trainRequirement ?? null,
       message: parsed.data.message || null,
       surveyPreference: parsed.data.surveyPreference || null,
