@@ -1,6 +1,7 @@
 /** Cache decode panorama equirectangular sebelum transisi scene. */
+import { recordPanoramaTileFailure } from "./panorama-quality";
 
-const readyCache = new Map<string, Promise<void>>();
+const readyCache = new Map<string, Promise<boolean>>();
 const MAX_CACHE_ENTRIES = 24;
 
 function evictOldestEntry() {
@@ -9,28 +10,41 @@ function evictOldestEntry() {
   if (oldestKey) readyCache.delete(oldestKey);
 }
 
-export function preloadPanoramaUrl(url: string): Promise<void> {
-  if (!url) return Promise.resolve();
+export function preloadPanoramaUrl(url: string): Promise<boolean> {
+  if (!url) return Promise.resolve(true);
 
   const cached = readyCache.get(url);
   if (cached) return cached;
 
   evictOldestEntry();
-  const task = new Promise<void>((resolve) => {
+  const task = new Promise<boolean>((resolve) => {
     const img = new Image();
     img.decoding = "async";
 
-    const finish = () => resolve();
+    let done = false;
+    const finish = (success = true) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      img.onload = null;
+      img.onerror = null;
+      if (!success) {
+        img.src = "";
+        readyCache.delete(url);
+        recordPanoramaTileFailure(url);
+      }
+      resolve(success);
+    };
+    const timer = setTimeout(() => finish(false), 10000);
     const fail = () => {
       // Soft-fail: S3/proxy sering down di lokal — jangan unhandledRejection
-      readyCache.delete(url);
       console.warn(`Gagal preload panorama: ${url}`);
-      resolve();
+      finish(false);
     };
 
     img.onload = () => {
       if (typeof img.decode === "function") {
-        img.decode().then(finish).catch(finish);
+        img.decode().then(() => finish()).catch(() => finish());
       } else {
         finish();
       }

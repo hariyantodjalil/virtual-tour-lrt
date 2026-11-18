@@ -136,7 +136,7 @@ export async function softCrossfadeScene(
   const start = { blur: 8, fade: 0.28, vignette: 0.3 };
   overlay.update(start);
 
-  viewer.loadScene(targetSceneId);
+  viewer.loadScene(targetSceneId, options.entryView?.pitch, options.entryView?.yaw, options.entryView?.hfov);
   await waitPanoramaLoaded(viewer, SCENE_FADE_MS + 600);
 
   await new Promise<void>((resolve) => {

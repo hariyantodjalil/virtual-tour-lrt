@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateS3Key, uploadToS3 } from "@/lib/s3";
-import { uploadPanoramaTiles } from "@/lib/panorama-tile-upload";
+import { uploadAdaptivePanoramaTiles } from "@/lib/panorama-tile-upload";import { withoutHdPanoramaProfiles } from "@/lib/panorama-profile";
+
 import { processPanorama, generatePanoramaThumbnail, formatBytes } from "@/lib/image-processor";
 import { resetPrivacyBlurForNewPanorama } from "@/lib/privacy-blur-normalize";
+import { resetAiPatchForNewPanorama } from "@/lib/ai-patch-normalize";
 import { Prisma } from "@prisma/client";
 import { MAX_PANORAMA_UPLOAD_BYTES, readValidatedImageUpload } from "@/lib/upload-validation";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { sceneUpdateSchema } from "@/lib/api-schemas";
 import { spatialEntitiesSchema } from "@/lib/spatial/spatial-entity-schema";
-import { isSpatialHotspotEnabled } from "@/lib/spatial-feature";
 import { validateSpatialLinks } from "@/lib/spatial/links";
 
 type Params = { params: Promise<{ stationId: string; sceneId: string }> };
@@ -69,12 +70,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (body.order !== undefined) updateData.order = body.order;
   if (body.hotspots !== undefined) updateData.hotspots = body.hotspots as Prisma.InputJsonValue;
   if (body.spatialEntities !== undefined) {
-    if (!isSpatialHotspotEnabled()) {
-      return NextResponse.json(
-        { error: "Fitur Spatial Hotspot belum diaktifkan (CMS_SPATIAL_HOTSPOT)" },
-        { status: 403 }
-      );
-    }
     const parsedSpatial = spatialEntitiesSchema.safeParse(body.spatialEntities);
     if (!parsedSpatial.success) {
       return NextResponse.json(
@@ -250,10 +245,17 @@ export async function POST(request: NextRequest, { params }: Params) {
       where: { stationId_sceneId: { stationId, sceneId } },
       select: { canvasData: true },
     });
-    const canvasData = {
-      ...resetPrivacyBlurForNewPanorama(existing?.canvasData, panoramaUrl),
-      multiRes: await uploadPanoramaTiles(panoramaResult.buffer, stationSlug, sceneId),
-    } as Prisma.InputJsonValue;
+    // Profil adaptif dibuat dari panorama display; sumber asli yang belum diblur
+    // tidak boleh langsung menjadi panorama publik. Bake blur meregenerasi dari master.
+    const multiResProfiles = await uploadAdaptivePanoramaTiles(panoramaResult.buffer, stationSlug, sceneId);
+    const canvasData = withoutHdPanoramaProfiles({
+      ...resetAiPatchForNewPanorama(
+        resetPrivacyBlurForNewPanorama(existing?.canvasData, panoramaUrl)
+      ),
+      // Legacy reader (image rollback) memakai mobile: profil detail terendah yang aman.
+      multiRes: multiResProfiles.mobile,
+      multiResProfiles,
+    }) as Prisma.InputJsonValue;
 
     const scene = await prisma.virtualTourScene.update({
       where: { stationId_sceneId: { stationId, sceneId } },

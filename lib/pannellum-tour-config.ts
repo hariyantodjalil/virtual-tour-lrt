@@ -7,6 +7,9 @@ import { SCENE_FADE_MS } from "@/lib/pannellum-tour-dive";
 import { PANNELLUM_HFOV, PANNELLUM_INTERACTION, PANNELLUM_PITCH_LIMITS } from "@/lib/pannellum-viewer-defaults";
 import { preloadPanoramaUrl, preloadPanoramaUrls } from "@/lib/panorama-preload";
 import type { PannellumMultiRes } from "@/lib/panorama-multires";
+import { selectQualityMultiRes } from "./panorama-quality-profile";
+import type { PanoramaQuality } from "./panorama-quality";
+import { panoramaIntentUrls, panoramaViewport, type PanoramaViewport } from "./panorama-intent";
 
 export type AdHotspotPayload = {
   spaceCode?: string;
@@ -18,7 +21,7 @@ export type AdHotspotPayload = {
 type SceneHandlers = {
   spaceMarker?: SpaceHotspotMarker;
   onSceneHotspot: (targetSceneId: string, pitch: number, yaw: number, entryView: SceneInitialView) => void;
-  onScenePreload?: (targetSceneId: string) => void;
+  onScenePreload?: (targetSceneId: string, view: SceneInitialView) => void;
   onSpaceClick: (spaceCode: string) => void;
   onAdClick?: (payload: AdHotspotPayload) => void;
   onInfoClick: (title: string, description: string) => void;
@@ -87,9 +90,11 @@ function buildHotSpots(scene: PanoramaScene, allScenes: PanoramaScene[], handler
 
         if (h.type === "scene" && h.sceneId && handlers.onScenePreload) {
           const targetId = h.sceneId;
-          div.addEventListener("pointerenter", () => handlers.onScenePreload?.(targetId), {
+          const entry = resolveSceneEntryView(h, allScenes.find((s) => s.id === targetId)?.initialView);
+          div.addEventListener("pointerenter", () => handlers.onScenePreload?.(targetId, entry), {
             passive: true,
           });
+          div.addEventListener("focus", () => handlers.onScenePreload?.(targetId, entry));
         }
       },
     };
@@ -113,11 +118,12 @@ function proxyMultiRes(multiRes: PannellumMultiRes) {
 }
 
 /** Tile tingkat rendah saja. Scene tanpa tile tetap memakai WebP utuh. */
-export function scenePreviewUrls(scene: PanoramaScene | undefined) {
+export function scenePreviewUrls(scene: PanoramaScene | undefined, viewportWidth = panoramaViewport().width, quality?: PanoramaQuality) {
   if (!scene) return [];
-  if (scene.multiRes) {
-    const base = proxyMultiRes(scene.multiRes).basePath;
-    return PREVIEW_FACES.map((face) => `${base}/1/${face}0_0.${scene.multiRes?.extension ?? "jpg"}`);
+  const multiRes = selectQualityMultiRes(scene, viewportWidth, quality);
+  if (multiRes) {
+    const base = proxyMultiRes(multiRes).basePath;
+    return PREVIEW_FACES.map((face) => `${base}/1/${face}0_0.${multiRes.extension}`);
   }
   const url = getS3ProxyUrl(scene.panoramaUrl);
   return url ? [url] : [];
@@ -129,42 +135,62 @@ export function linkedSceneIds(scene: PanoramaScene) {
     .map((h) => h.sceneId as string);
 }
 
-export function preloadInitialPanorama(scenes: PanoramaScene[], sceneId?: string) {
+export function preloadInitialPanorama(scenes: PanoramaScene[], sceneId?: string, viewportWidth?: number) {
   const initial = scenes.find((scene) => scene.id === sceneId) ?? scenes[0];
-  void preloadPanoramaUrls(scenePreviewUrls(initial));
+  void preloadPanoramaUrls(scenePreviewUrls(initial, viewportWidth, "economy"));
 }
 
-export function preloadLinkedScenes(scenes: PanoramaScene[], fromSceneId: string) {
+let intentTimer: ReturnType<typeof setTimeout> | undefined;
+function allowsSpeculativePreload() {
+  const connection = typeof navigator === "undefined" ? undefined :
+    (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  return !connection?.saveData && !connection?.effectiveType?.includes("2g");
+}
+
+/** Debounce rapid hover changes; one destination, no more than two URLs. */
+export function schedulePanoramaIntent(scene: PanoramaScene | undefined, view: SceneInitialView, viewport?: PanoramaViewport) {
+  if (intentTimer) clearTimeout(intentTimer);
+  if (!scene || !allowsSpeculativePreload()) return;
+  intentTimer = setTimeout(() => { void preloadPanoramaUrls(panoramaIntentUrls(scene, view, viewport)); }, 120);
+}
+
+export function preloadLinkedScenes(scenes: PanoramaScene[], fromSceneId: string, viewport?: PanoramaViewport) {
+  if (!allowsSpeculativePreload()) return;
   const scene = scenes.find((s) => s.id === fromSceneId);
   if (!scene) return;
-  const urls = linkedSceneIds(scene)
-    .slice(0, 2)
-    .flatMap((id) => scenePreviewUrls(scenes.find((item) => item.id === id)));
+  const urls = scene.hotspots.filter(h => h.type === "scene" && h.sceneId).slice(0, 2).flatMap(h => {
+    const destination = scenes.find(s => s.id === h.sceneId);
+    return destination ? panoramaIntentUrls(destination, resolveSceneEntryView(h, destination.initialView), viewport).slice(0, 1) : [];
+  });
   void preloadPanoramaUrls(urls);
+}
+
+/** Build an inactive destination without reloading the currently visible scene. */
+export function buildPannellumSceneConfig(
+  scene: PanoramaScene, scenes: PanoramaScene[], handlers: SceneHandlers,
+  viewportWidth: number, quality: PanoramaQuality,
+) {
+  const view = scene.initialView;
+  const multiRes = selectQualityMultiRes(scene, viewportWidth, quality);
+  return {
+    ...(multiRes
+      ? { type: "multires", multiRes: proxyMultiRes(multiRes) }
+      : { type: "equirectangular", panorama: getS3ProxyUrl(scene.panoramaUrl) }),
+    hotSpots: buildHotSpots(scene, scenes, handlers),
+    ...(view ? { yaw: view.yaw, pitch: view.pitch, hfov: view.hfov ?? PANNELLUM_HFOV.hfov } : {}),
+  };
 }
 
 export function buildPannellumTourConfig(
   scenes: PanoramaScene[],
   firstSceneId: string,
   handlers: SceneHandlers
+  , viewportWidth = panoramaViewport().width
 ) {
   const sceneMap: Record<string, object> = {};
 
   for (const scene of scenes) {
-    const view = scene.initialView;
-    sceneMap[scene.id] = {
-      ...(scene.multiRes
-        ? { type: "multires", multiRes: proxyMultiRes(scene.multiRes) }
-        : { type: "equirectangular", panorama: getS3ProxyUrl(scene.panoramaUrl) }),
-      hotSpots: buildHotSpots(scene, scenes, handlers),
-      ...(view
-        ? {
-            yaw: view.yaw,
-            pitch: view.pitch,
-            hfov: view.hfov ?? PANNELLUM_HFOV.hfov,
-          }
-        : {}),
-    };
+    sceneMap[scene.id] = buildPannellumSceneConfig(scene, scenes, handlers, viewportWidth, "economy");
   }
 
   return {

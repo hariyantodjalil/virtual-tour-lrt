@@ -29,7 +29,7 @@ export const INFO_PIN_H = 56;
 const SCENE_CHEVRON_SVG =
   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
-export type SpaceHotspotMarker = "footprint" | "info-pin";
+export type SpaceHotspotMarker = "footprint" | "pin" | "info-pin";
 const TENANT_INFO_SVG = '<svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true"><image href="/brand/tour-pins/tenant-i.png" x="1" y="1" width="24" height="24" preserveAspectRatio="xMidYMid meet"/></svg>';
 
 export type HotspotVisualOptions = {
@@ -97,7 +97,7 @@ function applyPinHotspotOuterShell(div: HTMLDivElement, opts: HotspotVisualOptio
   const scale = clampHotspotScale(opts.scale);
   const isFacility = opts.type === "info" && !!opts.facilityIcon;
   const isInfoPin = opts.type === "info" && !opts.facilityIcon;
-  const isSpace = opts.type === "space" && opts.spaceMarker !== "info-pin";
+  const isSpace = opts.type === "space" && opts.spaceMarker === "footprint";
   const w = isSpace ? "auto" : isFacility ? "75px" : isInfoPin ? `${INFO_PIN_W}px` : "88px";
   const h = isSpace ? "auto" : isFacility ? "81px" : isInfoPin ? `${INFO_PIN_H}px` : "88px";
   Object.assign(div.style, {
@@ -213,7 +213,7 @@ function applySceneHotspotStyle(div: HTMLDivElement, opts: HotspotVisualOptions)
 
 function applyPinHotspotStyle(div: HTMLDivElement, opts: HotspotVisualOptions) {
   applyPinHotspotOuterShell(div, opts);
-  if (opts.type === "space" && opts.spaceMarker !== "info-pin") {
+  if (opts.type === "space" && opts.spaceMarker === "footprint") {
     div.innerHTML = buildSpaceFootprintHtml(opts.spaceStatus, opts.spaceCode, opts.selected ?? false);
     applyHotspotScale(div, opts.scale);
     return;
