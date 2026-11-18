@@ -9,12 +9,16 @@
     "start": "node scripts/bin.mjs next start",
     "lint": "node scripts/bin.mjs eslint",
     "test:spatial": "node --import tsx --test lib/spatial/geometry/*.test.ts",
+    "test:ai-patch": "node --import tsx --test lib/panorama-perspective.test.ts lib/ai-patch-normalize.test.ts",
+    "test:panorama-backfill": "node --import tsx --test lib/panorama-backfill.test.ts",
     "db:generate": "node scripts/bin.mjs prisma generate",
     "db:deploy": "node scripts/bin.mjs prisma migrate deploy",
     "db:deploy:recover": "sh scripts/prisma-migrate-deploy.sh",
     "db:migrate": "node scripts/bin.mjs prisma migrate dev",
     "db:seed": "node scripts/bin.mjs tsx prisma/seed.ts",
-    "db:studio": "node scripts/bin.mjs prisma studio"
+    "db:studio": "node scripts/bin.mjs prisma studio",
+    "panorama:backfill-adaptive": "node scripts/bin.mjs tsx scripts/backfill-adaptive-panorama-tiles.ts",
+    "panorama:backfill-hd": "node scripts/bin.mjs tsx scripts/backfill-hd-panorama-tiles.ts"
   },
   "overrides": {
     "sharp": "$sharp",
@@ -23,6 +27,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1092.0",
     "@aws-sdk/s3-request-presigner": "^3.1092.0",
+    "@fal-ai/client": "^1.11.0",
     "@hookform/resolvers": "^5.4.0",
     "@prisma/adapter-pg": "^7.9.0",
     "@prisma/client": "^7.9.0",
@@ -36,7 +41,7 @@
     "clsx": "^2.1.1",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.25.0",
-    "next": "^16.4.3",
+    "next": "16.4.6",
     "pg": "^8.22.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -55,7 +60,7 @@
     "@types/react-dom": "^19",
     "dotenv": "^17.4.2",
     "eslint": "^9",
-    "eslint-config-next": "^16.4.3",
+    "eslint-config-next": "16.4.6",
     "prisma": "^7.9.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.1",
