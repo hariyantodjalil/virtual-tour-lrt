@@ -5,7 +5,7 @@ export type FavoriteSpace = {
   type: string;
   status: string;
   area: number;
-  monthlyRent?: number;
+  monthlyRent?: number | null;
   location?: string;
   floor?: string;
   panoramaUrl?: string | null;

@@ -21,10 +21,9 @@ type Props = {
   map?: ReactNode;
 };
 
-/** Dark glass — layout mockup, ukuran lebih compact */
-const SURFACE_PILL =
-  "rounded-full border border-white/12 bg-[#1c1c1e]/78 text-white backdrop-blur-md";
-const ICON_DISK = "inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-white/12";
+/** Void Portal glass — Experience chrome (token CSS) */
+const SURFACE_PILL = "tour-chrome-pill rounded-full";
+const ICON_DISK = "inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-panel";
 
 /**
  * Panel kiri virtual tour — struktur mengikuti mockup Figma, warna dark glass.
@@ -67,20 +66,20 @@ export default function TourLeftPanel({
         </div>
 
         {locationBreadcrumb ? (
-          <nav aria-label="Lokasi tur" className="w-max max-w-[calc(100vw-1rem)] self-start rounded-lg bg-[#1c1c1e]/85 px-2.5 py-1.5 text-white backdrop-blur-md md:absolute md:top-2 md:right-2 md:flex md:min-h-11 md:max-w-[calc(100%-19rem)] md:items-center md:rounded-2xl md:border md:border-white/12 md:px-4 md:py-2">
+          <nav aria-label="Lokasi tur" className="tour-chrome-pill w-max max-w-[calc(100vw-1rem)] self-start rounded-lg px-2.5 py-1.5 md:absolute md:top-2 md:right-2 md:flex md:min-h-11 md:max-w-[calc(100%-19rem)] md:items-center md:rounded-2xl md:px-4 md:py-2">
             <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-relaxed md:gap-x-3 md:text-sm">
-              <li className="sr-only md:not-sr-only md:flex md:min-w-0 md:max-w-full md:items-center md:gap-2"><span className="shrink-0 text-white/75">{locationKind}</span><strong className="min-w-0 break-words font-semibold">{locationBreadcrumb.stationName}</strong></li>
-              {locationBreadcrumb.locationLabel && <li className="flex min-w-0 max-w-full items-center gap-2 md:gap-3"><ChevronRight aria-hidden="true" className="hidden size-3 shrink-0 text-white/45 md:block" /><span className="min-w-0 break-words text-white/85">{locationBreadcrumb.locationLabel}</span></li>}
-              {locationBreadcrumb.sceneLabel && <li aria-current="location" className="flex min-w-0 max-w-full items-center gap-2 md:gap-3"><ChevronRight aria-hidden="true" className="size-3 shrink-0 text-white/45" /><span className="min-w-0 break-words font-semibold capitalize">{locationBreadcrumb.sceneLabel}</span></li>}
+              <li className="sr-only md:not-sr-only md:flex md:min-w-0 md:max-w-full md:items-center md:gap-2"><span className="shrink-0 text-fog">{locationKind}</span><strong className="min-w-0 break-words font-semibold">{locationBreadcrumb.stationName}</strong></li>
+              {locationBreadcrumb.locationLabel && <li className="flex min-w-0 max-w-full items-center gap-2 md:gap-3"><ChevronRight aria-hidden="true" className="hidden size-3 shrink-0 text-fog md:block" /><span className="min-w-0 break-words text-ink/85">{locationBreadcrumb.locationLabel}</span></li>}
+              {locationBreadcrumb.sceneLabel && <li aria-current="location" className="flex min-w-0 max-w-full items-center gap-2 md:gap-3"><ChevronRight aria-hidden="true" className="size-3 shrink-0 text-fog" /><span className="min-w-0 break-words font-semibold capitalize">{locationBreadcrumb.sceneLabel}</span></li>}
             </ol>
           </nav>
         ) : <section className={`flex items-center gap-2 px-2 py-1.5 ${SURFACE_PILL}`}>
           <span className={ICON_DISK}>
-            <MapPin className="size-3.5 text-white" strokeWidth={2.4} />
+            <MapPin className="size-3.5 text-ink" strokeWidth={2.4} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[9px] font-medium text-white/65">Lokasi Saat Ini</p>
-            <p className="truncate font-display text-sm leading-tight font-bold text-white">
+            <p className="text-[9px] font-medium text-fog">Lokasi Saat Ini</p>
+            <p className="truncate font-display text-sm leading-tight font-bold text-ink">
               {stationName}
             </p>
           </div>

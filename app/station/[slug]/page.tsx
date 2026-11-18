@@ -81,6 +81,12 @@ export default async function StationPage({ params }: Props) {
             id: s.id,
             code: s.code,
             name: s.name,
+            displayName: s.status === "TERISI"
+              ? stationInfo.scenes.flatMap(scene => scene.hotspots).find(hotspot =>
+                  hotspot.type === "space" && hotspot.spaceCode === s.code &&
+                  hotspot.text?.trim() && !/^(unit|retail|space|scene|hotspot)\b/i.test(hotspot.text.trim())
+                )?.text?.trim() || s.name
+              : s.name,
             type: s.type,
             status: s.status as SpaceAvailabilityStatus,
             area: s.area,
@@ -92,6 +98,7 @@ export default async function StationPage({ params }: Props) {
             nearbyFacilities: Array.isArray(s.nearbyFacilities) ? s.nearbyFacilities : [],
             exposure: s.exposure,
             powerSupply: s.powerSupply,
+            preferredUses: Array.isArray(s.preferredUses) ? s.preferredUses : [],
             waterAccess: s.waterAccess,
             airConditioning: s.airConditioning,
             description: s.description,

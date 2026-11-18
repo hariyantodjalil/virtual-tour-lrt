@@ -18,13 +18,14 @@ type Space = {
   type: string;
   status: "TERSEDIA" | "TERISI" | "MAINTENANCE";
   area: number;
-  monthlyRent: number;
+  monthlyRent: number | null;
   deposit: number;
   floor: string;
   location: string;
   nearestExit: string | null;
   exposure: number;
   powerSupply: string | null;
+  preferredUses?: string[];
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;

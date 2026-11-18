@@ -13,6 +13,8 @@ export function TourSheetAction({ afterClose, children, ...props }: Omit<ButtonH
   return <button {...props} type="button" onClick={() => { if (close) close(afterClose); else afterClose(); }}>{children}</button>;
 }
 
+type SheetTone = "void" | "operate";
+
 type Props = {
   title: string;
   size: "content" | "list";
@@ -21,9 +23,12 @@ type Props = {
   onExpandedChange?: (expanded: boolean) => void;
   children: ReactNode;
   footer?: ReactNode;
+  /** void = Experience maroon; operate = white sewa path (default) */
+  tone?: SheetTone;
 };
 
-export default function MobileTourSheet({ title, size, onClose, children, footer, initialExpanded = false, onExpandedChange }: Props) {
+export default function MobileTourSheet({ title, size, onClose, children, footer, initialExpanded = false, onExpandedChange, tone = "operate" }: Props) {
+  const voidChrome = tone === "void";
   const [expanded, setExpanded] = useState(initialExpanded);
   const [closing, setClosing] = useState(false);
   const sheet = useRef<HTMLDivElement>(null);
@@ -126,19 +131,19 @@ export default function MobileTourSheet({ title, size, onClose, children, footer
         onOpenAutoFocus={event => { event.preventDefault(); closeButton.current?.focus(); }}
         onCloseAutoFocus={event => { event.preventDefault(); if (previousFocus.current instanceof HTMLElement && previousFocus.current.isConnected) previousFocus.current.focus(); }}
         onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === "tour-unit-exit") finishClose(); }}
-        className={`tour-mobile-sheet fixed inset-x-0 bottom-0 z-[91] flex max-h-[90dvh] w-full translate-y-[var(--sheet-drag-y,0px)] flex-col overflow-clip rounded-t-3xl bg-white text-slate-900 shadow-[0_24px_64px_rgba(15,23,42,0.25)] outline-none transition-[translate,height] duration-200 ease-out data-[dragging=true]:transition-none motion-reduce:transition-none ${expanded ? "h-[90dvh]" : size === "list" ? "h-[60dvh] min-h-[min(24rem,80dvh)]" : ""}`}>
+        className={`tour-mobile-sheet fixed inset-x-0 bottom-0 z-[91] flex max-h-[90dvh] w-full translate-y-[var(--sheet-drag-y,0px)] flex-col overflow-clip rounded-t-3xl outline-none transition-[translate,height] duration-200 ease-out data-[dragging=true]:transition-none motion-reduce:transition-none ${voidChrome ? "tour-sheet-void" : "bg-white text-slate-900 shadow-[0_24px_64px_rgba(15,23,42,0.25)]"} ${expanded ? "h-[90dvh]" : size === "list" ? "h-[60dvh] min-h-[min(24rem,80dvh)]" : ""}`}>
         <header onPointerDown={start} onPointerMove={move} onPointerUp={event => end(event)} onPointerCancel={event => end(event, true)} onLostPointerCapture={event => { if (event.target === event.currentTarget) end(event, true); }}
           onClickCapture={event => { if (event.detail > 0 && event.target instanceof Element && event.target.closest("[data-sheet-handle]") && performance.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }}
-          className="shrink-0 touch-none border-b border-slate-200 bg-[#F3F8F5] px-4 select-none">
-          <button type="button" data-sheet-handle aria-label={expanded ? "Ringkas panel" : "Perbesar panel"} aria-expanded={expanded} onClick={() => resize(!expanded)} className="mx-auto flex h-7 w-16 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-[#E31E2D]"><span aria-hidden="true" className="h-1 w-10 rounded-full bg-[#BFCFC5]" /></button>
+          className={`shrink-0 touch-none border-b px-4 select-none ${voidChrome ? "tour-sheet-void__header" : "border-slate-200 bg-[#F3F8F5]"}`}>
+          <button type="button" data-sheet-handle aria-label={expanded ? "Ringkas panel" : "Perbesar panel"} aria-expanded={expanded} onClick={() => resize(!expanded)} className="mx-auto flex h-7 w-16 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-signal"><span aria-hidden="true" className={`h-1 w-10 rounded-full ${voidChrome ? "tour-sheet-void__handle" : "bg-[#BFCFC5]"}`} /></button>
           <div className="flex min-h-14 items-center gap-3 pb-2">
             <Dialog.Title className="min-w-0 flex-1 text-base font-semibold">{title}</Dialog.Title>
-            <Dialog.Close ref={closeButton} aria-label={`Tutup ${title.toLocaleLowerCase("id-ID")}`} className="flex size-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-200/60 focus-visible:outline-2 focus-visible:outline-[#E31E2D]"><X className="size-5" /></Dialog.Close>
+            <Dialog.Close ref={closeButton} aria-label={`Tutup ${title.toLocaleLowerCase("id-ID")}`} className={`flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-signal ${voidChrome ? "tour-sheet-void__close" : "text-slate-600 hover:bg-slate-200/60"}`}><X className="size-5" /></Dialog.Close>
           </div>
         </header>
         <CloseSheetContext.Provider value={close}>
           {children}
-          {footer && <footer className="shrink-0 border-t border-slate-200 bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{footer}</footer>}
+          {footer && <footer className={`shrink-0 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${voidChrome ? "tour-sheet-void__footer" : "border-slate-200 bg-white"}`}>{footer}</footer>}
         </CloseSheetContext.Provider>
       </Dialog.Content>
     </Dialog.Portal>

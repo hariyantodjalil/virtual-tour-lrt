@@ -57,11 +57,11 @@ export default function FacilityLegend({
       role={mobile ? "dialog" : undefined}
       aria-label={mobile ? "Fasilitas stasiun" : undefined}
       onKeyDown={event => { if (mobile) event.stopPropagation(); }}
-      className={`${mobile ? "tour-panel-in flex w-[min(15rem,calc(100vw-4.5rem))] max-h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-2xl bg-white text-slate-900 shadow-[0_12px_32px_rgba(15,23,42,0.22)]" : "min-w-[140px] rounded-2xl border border-white/12 bg-[#1c1c1e]/90 px-2.5 py-2.5 shadow-lg backdrop-blur-md"} ${className}`}
+      className={`${mobile ? "tour-panel-in tour-glass-panel flex w-[min(15rem,calc(100vw-4.5rem))] max-h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-2xl text-[#F8ECEE]" : "min-w-[140px] rounded-2xl border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/90 px-2.5 py-2.5 shadow-lg backdrop-blur-md text-[#F8ECEE]"} ${className}`}
     >
-      {mobile && <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 py-1 pr-1 pl-3">
+      {mobile && <div className="flex shrink-0 items-center gap-2 border-b border-[color:rgb(255_214_218_/_0.12)] py-1 pr-1 pl-3">
         <h2 className="min-w-0 flex-1 text-sm font-semibold">Fasilitas</h2>
-        <button ref={closeButton} type="button" aria-label="Tutup fasilitas" onClick={onClose} className="flex size-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-[#E31E2D]"><X className="size-4" /></button>
+        <button ref={closeButton} type="button" aria-label="Tutup fasilitas" onClick={onClose} className="flex size-11 shrink-0 items-center justify-center rounded-full text-[#C4A8AD] hover:bg-[#3A161C] focus-visible:outline-2 focus-visible:outline-[#E31E2D]"><X className="size-4" /></button>
       </div>}
       <ul className={mobile ? "min-h-0 space-y-1 overflow-y-auto overscroll-contain p-2" : "space-y-1.5"}>
         {items.map((item) => {
@@ -71,11 +71,11 @@ export default function FacilityLegend({
               <button
                 type="button"
                 onClick={() => onSelectFacility?.(item.id)}
-                className={mobile ? `flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left focus-visible:outline-2 focus-visible:outline-[#E31E2D] ${active ? "bg-red-50" : "hover:bg-slate-100"}` : `grid w-full grid-cols-[1fr_28px] items-center gap-2 rounded-lg px-1 py-0.5 transition ${active ? "bg-white/15" : "hover:bg-white/10"}`}
+                className={mobile ? `flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left focus-visible:outline-2 focus-visible:outline-[#E31E2D] ${active ? "bg-[#E31E2D]/20" : "hover:bg-[#3A161C]"}` : `grid w-full grid-cols-[1fr_28px] items-center gap-2 rounded-lg px-1 py-0.5 transition ${active ? "bg-white/15" : "hover:bg-white/10"}`}
                 aria-pressed={active}
                 aria-label={`Tampilkan ${item.label}`}
               >
-                <span className={mobile ? "order-2 min-w-0 flex-1 text-sm font-medium" : "truncate text-right text-[10px] leading-none font-medium text-white"}>
+                <span className={mobile ? "order-2 min-w-0 flex-1 text-sm font-medium" : "truncate text-right text-[10px] leading-none font-medium text-[#F8ECEE]"}>
                   {item.label}
                 </span>
                 <Image
@@ -91,7 +91,7 @@ export default function FacilityLegend({
           );
         })}
       </ul>
-      {!items.length && <p className="px-3 pb-4 text-sm leading-relaxed text-slate-600">Belum ada titik fasilitas.</p>}
+      {!items.length && <p className="px-3 pb-4 text-sm leading-relaxed text-fog">Belum ada titik fasilitas di scene ini.</p>}
     </div>
   );
 }

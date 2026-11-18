@@ -64,10 +64,11 @@ type CommercialSpace = {
   id: string;
   code: string;
   name: string;
+  displayName?: string;
   type: string;
   status: SpaceAvailabilityStatus;
   area: number;
-  monthlyRent?: number;
+  monthlyRent?: number | null;
   deposit: number;
   floor: string;
   location: string;
@@ -75,6 +76,7 @@ type CommercialSpace = {
   nearbyFacilities?: string[];
   exposure: number;
   powerSupply: string | null;
+  preferredUses?: string[];
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;

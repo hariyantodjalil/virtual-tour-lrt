@@ -10,15 +10,16 @@ import GoogleSignInButton, { type AuthUser } from "@/components/auth/GoogleSignI
 import InquiryConfirmation from "./InquiryConfirmation";
 import { LEAD_STATUS_VALUES } from "@/lib/commercial-pipeline";
 import { cn } from "@/lib/utils";
+import { inquiryPhoneSchema } from "@/lib/inquiry-validation";
+import { advertisingOptionsSchema, validateAdvertisingApplicant, type AdvertisingFormOption } from "@/lib/advertising-form-shared";
 import { trainInquiryInputSchema, trainCampaignPeriod, type TrainInquiryInput } from "@/lib/train-advertising-shared";
 
 const identitySchema = z.object({
   contactName: z.string().trim().min(2, "Nama kontak minimal 2 karakter.").max(160),
   companyName: z.string().trim().min(2, "Nama perusahaan minimal 2 karakter.").max(160),
-  phone: z.string().trim().min(10, "Nomor WhatsApp minimal 10 karakter.").max(32)
-    .regex(/^[+0-9()\s.-]+$/, "Format nomor WhatsApp tidak valid."),
+  phone: inquiryPhoneSchema,
   email: z.string().trim().email("Format email tidak valid.").max(254),
-  businessType: z.string().trim().min(3, "Jenis usaha minimal 3 karakter.").max(120),
+  businessType: z.string().trim().min(1, "Pilih kategori bisnis Anda.").max(120),
   message: z.string().trim().max(2000, "Catatan maksimal 2.000 karakter."),
 });
 const passwordSchema = z.string().min(8, "Password minimal 8 karakter.").max(128);
@@ -31,7 +32,7 @@ const receiptSchema = z.object({
   id: z.string().min(1), status: z.enum(LEAD_STATUS_VALUES), inquiryCode: z.string().optional(),
   workflowVersion: z.object({ steps: z.array(z.object({ stepOrder: z.number().int(), leadStatus: z.enum(LEAD_STATUS_VALUES), title: z.string(), publicMessage: z.string() })) }).nullable().optional(),
 });
-const errorSchema = z.object({ error: z.string(), existingInquiryId: z.string().optional() });
+const errorSchema = z.object({ error: z.string(), existingInquiryId: z.string().optional(), code: z.string().optional() });
 const loginErrorSchema = z.union([errorSchema, z.object({ message: z.string() }).transform(({ message }) => ({ error: message }))]);
 type Session = z.infer<typeof sessionSchema>;
 type Identity = z.infer<typeof identitySchema>;
@@ -43,7 +44,7 @@ export type SpaceInquiryStage = Submission["kind"];
 const BUSINESS_OPTIONS = ["Vending Machine", "Grab-and-Go F&B", "Retail Kiosk", "Automated Services", "Lainnya"];
 const controlClass = "min-h-11 w-full min-w-0 rounded-md border-0 bg-transparent px-1 py-2 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-500 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#E31E2D]/50 aria-invalid:text-red-700";
 const primaryClass = "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#E31E2D] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#C41926] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D] disabled:cursor-wait disabled:opacity-60";
-const FIELD_ICONS = { contactName: UserRound, companyName: Building2, phone: Phone, email: Mail, password: KeyRound, businessUse: Briefcase, customBusinessUse: Briefcase, message: MessageSquareText };
+const FIELD_ICONS = { contactName: UserRound, companyName: Building2, phone: Phone, email: Mail, password: KeyRound, businessUse: Briefcase, customBusinessUse: Briefcase, applicantStatusId: UserRound, representedBrand: Building2, businessCategoryId: Briefcase, businessCategoryOther: Briefcase, message: MessageSquareText };
 const STAGE_LABELS = { details: "Spesifikasi", form: "Data pengajuan", review: "Review", success: "Selesai" };
 const STAGE_NUMBERS = { details: 1, form: 2, review: 3, success: 4 };
 
@@ -73,12 +74,13 @@ type InquiryFormProps = {
   initialStage?: "details" | "form";
   onBackToDetails?: () => void;
   additionalFields?: ReactNode;
+  trainCarOptions?: { slug: string; label: string }[];
 } & (
   | { spaceId: string; area: number; trainRentalSpaceId?: never; trainInquiry?: never }
   | { trainRentalSpaceId: string; trainInquiry: TrainInquiryInput; spaceId?: never; area?: never }
 );
 
-export default function SpaceInquiryForm({ spaceId, trainRentalSpaceId, trainInquiry, spaceCode, stationName, area, details, canApply, onStageChange, onExplore, initialStage = "details", onBackToDetails, additionalFields }: InquiryFormProps) {
+export default function SpaceInquiryForm({ spaceId, trainRentalSpaceId, trainInquiry, spaceCode, stationName, area, details, canApply, onStageChange, onExplore, initialStage = "details", onBackToDetails, additionalFields, trainCarOptions = [] }: InquiryFormProps) {
   const router = useRouter();
   const [auth, setAuth] = useState<AuthState>({ kind: "loading" });
   const [authAttempt, setAuthAttempt] = useState(0);
@@ -86,7 +88,12 @@ export default function SpaceInquiryForm({ spaceId, trainRentalSpaceId, trainInq
   const [accountMode, setAccountMode] = useState<"register" | "login">("register");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
-  const [form, setForm] = useState({ contactName: "", companyName: "", phone: "", email: "", password: "", businessUse: trainRentalSpaceId ? "Lainnya" : "Vending Machine", customBusinessUse: "", message: "" });
+  const [form, setForm] = useState({ contactName: "", companyName: "", phone: "", email: "", password: "", businessUse: trainRentalSpaceId ? "Lainnya" : "Vending Machine", customBusinessUse: "", applicantStatusId: "", representedBrand: "", businessCategoryId: "", businessCategoryOther: "", message: "" });
+  const [advertisingOptions, setAdvertisingOptions] = useState<AdvertisingFormOption[]>([]);
+  const [optionsState, setOptionsState] = useState<"loading" | "ready" | "error">("loading");
+  const [optionsAttempt, setOptionsAttempt] = useState(0);
+  const applicantStatus = advertisingOptions.find(option => option.id === form.applicantStatusId);
+  const businessCategory = advertisingOptions.find(option => option.id === form.businessCategoryId);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState("");
   const [pending, setPending] = useState(false);
@@ -100,6 +107,23 @@ export default function SpaceInquiryForm({ spaceId, trainRentalSpaceId, trainInq
   const activeInquiry = useActiveInquiry(partner?.id, spaceId, trainRentalSpaceId);
   const [duplicateInquiryId, setDuplicateInquiryId] = useState<string | null>(null);
   const existingInquiryId = duplicateInquiryId ?? activeInquiry.id;
+
+  useEffect(() => {
+    if (!trainRentalSpaceId) return;
+    const controller = new AbortController();
+    async function loadOptions() {
+      try {
+        const response = await fetch("/api/advertising-form-options", { signal: controller.signal, cache: "no-store" });
+        if (!response.ok) throw new Error("Pilihan formulir gagal dimuat.");
+        const options = advertisingOptionsSchema.parse(await response.json());
+        if (controller.signal.aborted) return;
+        setAdvertisingOptions(options);
+        setOptionsState("ready");
+      } catch { if (!controller.signal.aborted) setOptionsState("error"); }
+    }
+    void loadOptions();
+    return () => controller.abort();
+  }, [trainRentalSpaceId, optionsAttempt]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -190,14 +214,23 @@ export default function SpaceInquiryForm({ spaceId, trainRentalSpaceId, trainInq
     if (auth.kind !== "ready") return;
     const parsed = identitySchema.safeParse({
       ...form, email: partner?.email ?? form.email,
-      businessType: form.businessUse === "Lainnya" ? form.customBusinessUse : form.businessUse,
+      businessType: trainRentalSpaceId ? (businessCategory?.requiresDetail ? form.businessCategoryOther : businessCategory?.label ?? "") : form.businessUse === "Lainnya" ? form.customBusinessUse : form.businessUse,
     });
     const nextErrors: Record<string, string> = {};
-    const campaign = trainRentalSpaceId ? trainInquiryInputSchema.safeParse(trainInquiry) : null;
+    const advertisingInput = {
+      ...trainInquiry, applicantStatusId: form.applicantStatusId, businessCategoryId: form.businessCategoryId,
+      ...(applicantStatus?.allowsRepresentedBrand && form.representedBrand.trim() ? { representedBrand: form.representedBrand.trim() } : {}),
+      ...(businessCategory?.requiresDetail ? { businessCategoryOther: form.businessCategoryOther.trim() } : {}),
+    };
+    if (trainRentalSpaceId) {
+      Object.assign(nextErrors, validateAdvertisingApplicant(advertisingInput, advertisingOptions).errors);
+      if (optionsState !== "ready") nextErrors.applicantStatusId = "Pilihan formulir belum dimuat. Silakan coba lagi.";
+    }
+    const campaign = trainRentalSpaceId ? trainInquiryInputSchema.safeParse(advertisingInput) : null;
     if (campaign && !campaign.success) nextErrors.trainInquiry = campaign.error.issues[0].message;
     if (!parsed.success) for (const issue of parsed.error.issues) {
       const name = issue.path[0];
-      if (typeof name === "string") nextErrors[name === "businessType" ? "customBusinessUse" : name] = issue.message;
+      if (typeof name === "string") nextErrors[name === "businessType" ? (trainRentalSpaceId ? (businessCategory?.requiresDetail ? "businessCategoryOther" : "businessCategoryId") : "customBusinessUse") : name] = issue.message;
     }
     if (!partner) {
       const password = passwordSchema.safeParse(form.password);
@@ -233,6 +266,13 @@ export default function SpaceInquiryForm({ spaceId, trainRentalSpaceId, trainInq
       const body: unknown = await response.json().catch(() => null);
       if (!response.ok) {
         const error = errorSchema.safeParse(body);
+        if (response.status === 409 && error.success && error.data.code === "ACCOUNT_EXISTS") {
+          setSubmission({ kind: "form" });
+          setAccountMode("login");
+          setForm(current => ({ ...current, password: "" }));
+          setLoginError(error.data.error);
+          return;
+        }
         if (response.status === 409 && error.success && error.data.existingInquiryId) {
           setDuplicateInquiryId(error.data.existingInquiryId);
           return;
@@ -253,10 +293,10 @@ export default function SpaceInquiryForm({ spaceId, trainRentalSpaceId, trainInq
 
   function input(name: keyof typeof form, type = "text", autoComplete?: string, maxLength?: number) {
     const placeholders: Partial<Record<keyof typeof form, string>> = {
-      contactName: "Budi Santoso", companyName: "PT Contoh / Brand", phone: "081234567890", email: "nama@perusahaan.com", customBusinessUse: "Jenis usaha Anda",
+      contactName: "Masukkan nama lengkap Anda", companyName: "Contoh: PT Contoh Indonesia", phone: "Contoh: 081234567890", email: "nama@perusahaan.com", customBusinessUse: "Jenis usaha Anda", representedBrand: "Nama brand yang diwakili", businessCategoryOther: "Masukkan kategori bisnis Anda",
     };
     return <input id={`inquiry-${name}`} name={name} type={type} autoComplete={autoComplete}
-      required value={form[name]} maxLength={maxLength} placeholder={placeholders[name]}
+      required={name !== "representedBrand"} value={form[name]} maxLength={maxLength} placeholder={placeholders[name]}
       onChange={event => update(name, event.target.value)} className={controlClass}
       aria-invalid={Boolean(errors[name])} aria-describedby={errors[name] ? `inquiry-${name}-error` : undefined} />;
   }
@@ -295,8 +335,11 @@ export default function SpaceInquiryForm({ spaceId, trainRentalSpaceId, trainInq
         <dl className="divide-y divide-slate-200 text-sm">
           {[
             ["Nama penanggung jawab", submission.identity.contactName], ["Perusahaan / brand", submission.identity.companyName],
-            ["WhatsApp", submission.identity.phone], ["Email", submission.identity.email], ["Peruntukan usaha", submission.identity.businessType],
+            ["WhatsApp", submission.identity.phone], ["Email", submission.identity.email], [trainRentalSpaceId ? "Kategori bisnis" : "Peruntukan usaha", submission.identity.businessType],
+            ["Status pengaju", advertisingOptions.find(option => option.id === submission.trainInquiry?.applicantStatusId)?.label],
+            ["Brand yang diwakili", submission.trainInquiry?.representedBrand],
             ["Catatan kebutuhan", submission.identity.message],
+            ["Gerbong", trainRentalSpaceId ? trainCarOptions.filter(car => !submission.trainInquiry?.carSlugs || submission.trainInquiry.carSlugs.includes(car.slug)).map(car => car.label).join(", ") : null],
             ["Jumlah trainset", submission.trainInquiry?.requestedTrainsetCount?.toString()],
             ["Periode kampanye", submission.trainInquiry?.campaignStart ? trainCampaignPeriod({ campaignStart: submission.trainInquiry.campaignStart, campaignEnd: submission.trainInquiry.campaignEnd ?? null }) : null],
             ["Kebutuhan kampanye", submission.trainInquiry?.campaignNeeds],
@@ -309,6 +352,7 @@ export default function SpaceInquiryForm({ spaceId, trainRentalSpaceId, trainInq
     </> : <form onSubmit={!partner && accountMode === "login" ? login : review} noValidate className="flex min-h-0 flex-1 flex-col">
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3 sm:px-7">
         <button type="button" onClick={() => { if (onBackToDetails) onBackToDetails(); else setSubmission({ kind: "details" }); }} className="mb-3 inline-flex min-h-11 items-center gap-2 text-sm font-medium hover:text-[#C41926]"><ArrowLeft className="size-4" />Kembali ke spesifikasi</button>
+        {trainRentalSpaceId && <section aria-label="Media advertising terpilih" className="mb-4 border-b border-slate-200 pb-4">{details}</section>}
         {!partner && <div className="mb-3 space-y-3">
           <div role="group" aria-label="Akun mitra" className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
             {(["register", "login"] satisfies ("register" | "login")[]).map(mode => <button key={mode} type="button" aria-pressed={accountMode === mode} disabled={loggingIn} onClick={() => { setAccountMode(mode); setLoginError(""); setErrors({}); }} className={cn("min-h-11 rounded-md px-3 text-sm font-medium transition", accountMode === mode ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900")}>{mode === "register" ? "Daftar akun" : "Sudah punya akun? Masuk"}</button>)}
@@ -319,8 +363,8 @@ export default function SpaceInquiryForm({ spaceId, trainRentalSpaceId, trainInq
         {loginError && <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{loginError}</p>}
         {(partner || accountMode === "register") && <>
         <Field name="contactName" label="Nama kontak" error={errors.contactName}>{input("contactName", "text", "name", 160)}</Field>
-        <Field name="companyName" label="Perusahaan / brand" error={errors.companyName}>{input("companyName", "text", "organization", 160)}</Field>
-        <Field name="phone" label="No. WhatsApp aktif" error={errors.phone}>{input("phone", "tel", "tel", 32)}</Field>
+        <Field name="companyName" label="Nama perusahaan / brand" error={errors.companyName}>{input("companyName", "text", "organization", 160)}</Field>
+        <Field name="phone" label="Nomor WhatsApp aktif" error={errors.phone}>{input("phone", "tel", "tel", 32)}</Field>
         </>}
         <div>
           <Field name="email" label="Email bisnis" error={errors.email}>
@@ -342,15 +386,33 @@ export default function SpaceInquiryForm({ spaceId, trainRentalSpaceId, trainInq
             {BUSINESS_OPTIONS.map(option => <option key={option}>{option}</option>)}
           </select>
         </Field>}
-        {(trainRentalSpaceId || form.businessUse === "Lainnya") && <Field name="customBusinessUse" label={trainRentalSpaceId ? "Jenis usaha" : "Jenis usaha Anda"} error={errors.customBusinessUse}>{input("customBusinessUse", "text", undefined, 120)}</Field>}
+        {!trainRentalSpaceId && form.businessUse === "Lainnya" && <Field name="customBusinessUse" label={trainRentalSpaceId ? "Jenis usaha" : "Jenis usaha Anda"} error={errors.customBusinessUse}>{input("customBusinessUse", "text", undefined, 120)}</Field>}
+        {trainRentalSpaceId && <>
+          {optionsState === "error" && <div role="alert" className="my-3 text-sm text-red-700">Pilihan formulir gagal dimuat.<button type="button" className="ml-2 min-h-11 underline" onClick={() => { setOptionsState("loading"); setOptionsAttempt(value => value + 1); }}>Coba lagi</button></div>}
+          <Field name="applicantStatusId" label="Status pengaju" error={errors.applicantStatusId}>
+            <select id="inquiry-applicantStatusId" required disabled={optionsState !== "ready"} value={form.applicantStatusId} onChange={event => update("applicantStatusId", event.target.value)} className={controlClass} aria-invalid={Boolean(errors.applicantStatusId)} aria-describedby={errors.applicantStatusId ? "inquiry-applicantStatusId-error" : undefined}>
+              <option value="">{optionsState === "loading" ? "Memuat pilihan…" : "Pilih status pengaju"}</option>
+              {advertisingOptions.filter(option => option.kind === "APPLICANT_STATUS").map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+            </select>
+          </Field>
+          {applicantStatus?.allowsRepresentedBrand && <Field name="representedBrand" label="Nama brand yang diwakili" optional error={errors.representedBrand}>{input("representedBrand", "text", undefined, 160)}</Field>}
+          <Field name="businessCategoryId" label="Kategori bisnis" error={errors.businessCategoryId}>
+            <select id="inquiry-businessCategoryId" required disabled={optionsState !== "ready"} value={form.businessCategoryId} onChange={event => update("businessCategoryId", event.target.value)} className={controlClass} aria-invalid={Boolean(errors.businessCategoryId)} aria-describedby="inquiry-category-hint inquiry-businessCategoryId-error">
+              <option value="">{optionsState === "loading" ? "Memuat pilihan…" : "Pilih kategori bisnis Anda"}</option>
+              {advertisingOptions.filter(option => option.kind === "BUSINESS_CATEGORY").map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+            </select>
+            {applicantStatus?.allowsRepresentedBrand && <p id="inquiry-category-hint" className="text-xs leading-relaxed text-slate-600">Pilih industri brand yang akan beriklan.</p>}
+          </Field>
+          {businessCategory?.requiresDetail && <Field name="businessCategoryOther" label="Kategori bisnis Anda" error={errors.businessCategoryOther}>{input("businessCategoryOther", "text", undefined, 120)}</Field>}
+        </>}
         {additionalFields}
         {errors.trainInquiry && <p role="alert" className="mt-3 text-sm text-red-700">{errors.trainInquiry}</p>}
         <Field name="message" label="Catatan kebutuhan" optional error={errors.message}>
-          <textarea id="inquiry-message" rows={3} maxLength={2000} value={form.message} onChange={event => update("message", event.target.value)} className={cn(controlClass, "resize-y")} aria-invalid={Boolean(errors.message)} aria-describedby={errors.message ? "inquiry-message-error" : undefined} />
+          <textarea id="inquiry-message" placeholder={trainRentalSpaceId ? "Jelaskan kebutuhan atau rencana kampanye" : undefined} rows={3} maxLength={2000} value={form.message} onChange={event => update("message", event.target.value)} className={cn(controlClass, "resize-y")} aria-invalid={Boolean(errors.message)} aria-describedby={errors.message ? "inquiry-message-error" : undefined} />
         </Field>
         </>}
       </div>
-      <div className="shrink-0 border-t border-slate-200 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-7 lg:pb-4"><button type="submit" disabled={loggingIn} className={primaryClass}>{loggingIn ? <><Loader2 className="size-4 animate-spin" />Memproses...</> : <>{!partner && accountMode === "login" ? "Masuk dan lanjutkan" : "Review pengajuan"}<ArrowRight className="size-4" /></>}</button></div>
+      <div className="shrink-0 border-t border-slate-200 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-7 lg:pb-4"><button type="submit" disabled={loggingIn || Boolean(trainRentalSpaceId && accountMode === "register" && optionsState !== "ready")} className={primaryClass}>{loggingIn ? <><Loader2 className="size-4 animate-spin" />Memproses...</> : <>{!partner && accountMode === "login" ? "Masuk dan lanjutkan" : "Review pengajuan"}<ArrowRight className="size-4" /></>}</button></div>
     </form>}
   </div>;
 }

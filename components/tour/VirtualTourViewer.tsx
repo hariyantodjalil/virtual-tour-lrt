@@ -9,10 +9,12 @@ import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { findSpaceStatus } from "@/lib/space-availability";
 import {
   buildPannellumTourConfig,
+  buildPannellumSceneConfig,
   preloadLinkedScenes,
   preloadPanoramaUrls,
   scenePreviewUrls,
   preloadInitialPanorama,
+  schedulePanoramaIntent,
 } from "@/lib/pannellum-tour-config";
 import {
   diveIntoScene,
@@ -26,6 +28,9 @@ import type { SpatialEntity } from "@/lib/spatial/types";
 import { runSpatialAction } from "@/lib/spatial/actions";
 import { resolveSceneEntryView } from "@/lib/scene-entry-view";
 import type { SpaceHotspotMarker } from "@/lib/pannellum-hotspot";
+import { getAutomaticPanoramaQuality, observePanoramaNetwork, recordPanoramaTileFailure } from "@/lib/panorama-quality";
+import type { PanoramaQuality } from "@/lib/panorama-quality";
+import { selectQualityMultiRes } from "@/lib/panorama-quality-profile";
 
 declare global {
   interface Window {
@@ -125,7 +130,7 @@ export default function VirtualTourViewer({
   focusCamera,
   focusToken = 0,
   hideSceneBar = false,
-  spaceMarker = "footprint",
+  spaceMarker = "info-pin",
   autoRotateControlContainer,
   chromeTone = "default",
 }: Props) {
@@ -142,6 +147,7 @@ export default function VirtualTourViewer({
   const overlayRef = useRef<DiveOverlayState>(ZERO_OVERLAY);
   /** Epoch init — cegah race double-mount (Strict Mode / remount) yang meninggalkan hotspot orphan. */
   const initEpochRef = useRef(0);
+  const prepareSceneRef = useRef<((sceneId: string, width: number, quality: PanoramaQuality) => void) | null>(null);
 
   const [panoramaVisible, setPanoramaVisible] = useState(false);
   const [overlay, setOverlay] = useState<DiveOverlayState>(ZERO_OVERLAY);
@@ -211,21 +217,27 @@ export default function VirtualTourViewer({
     try {
       stopViewerAutoRotate(viewer);
       setAutoRotate(false);
-      viewer.lookAt(target.pitch, target.yaw, target.hfov ?? 82, 320);
+      viewer.lookAt(target.pitch, target.yaw, target.hfov ?? viewer.getHfov(), 320);
     } catch {
       /* ignore */
     }
   }, []);
 
   const ensureSceneReady = useCallback(
-    (sceneId: string) =>
-      preloadPanoramaUrls(scenePreviewUrls(scenesRef.current.find((scene) => scene.id === sceneId))),
+    async (sceneId: string) => {
+      const scene = scenesRef.current.find((item) => item.id === sceneId);
+      const width = containerRef.current?.clientWidth || window.innerWidth;
+      const quality = getAutomaticPanoramaQuality(width);
+      prepareSceneRef.current?.(sceneId, width, quality);
+      const result = await preloadPanoramaUrls(scenePreviewUrls(scene, width, quality));
+      // A missing / unreachable HD profile must not leave a working economy scene blank.
+      if (quality === "hd" && result.some(r => r.status === "rejected" || !r.value)) {
+        prepareSceneRef.current?.(sceneId, width, "economy");
+        await preloadPanoramaUrls(scenePreviewUrls(scene, width, "economy"));
+      }
+    },
     []
   );
-
-  const preloadSceneById = useCallback((sceneId: string) => {
-    void ensureSceneReady(sceneId);
-  }, [ensureSceneReady]);
 
   const handleSceneHotspotClick = useCallback(
     async (targetSceneId: string, pitch: number, yaw: number, entryView: SceneInitialView) => {
@@ -289,6 +301,7 @@ export default function VirtualTourViewer({
       }
       viewerRef.current = null;
     }
+    prepareSceneRef.current = null;
     if (containerRef.current) {
       containerRef.current.innerHTML = "";
     }
@@ -316,15 +329,18 @@ export default function VirtualTourViewer({
       if (!containerRef.current || epoch !== initEpochRef.current) return;
 
       const firstId = activeSceneIdRef.current ?? currentScenes[0]?.id;
-      const config = buildPannellumTourConfig(currentScenes, firstId, {
+      const handlers = {
         spaceMarker,
-        onSceneHotspot: (id, pitch, yaw, entryView) => handleSceneHotspotRef.current(id, pitch, yaw, entryView),
-        onScenePreload: (id) => preloadSceneById(id),
-        onSpaceClick: (code) => onSpaceClickRef.current?.(code),
-        onAdClick: (payload) => onAdClickRef.current?.(payload),
-        onInfoClick: (title, desc) => onInfoClickRef.current?.(title, desc),
-        getSpaceStatus: (code) => findSpaceStatus(spacesRef.current, code),
-      });
+        onSceneHotspot: (id: string, pitch: number, yaw: number, entryView: SceneInitialView) => handleSceneHotspotRef.current(id, pitch, yaw, entryView),
+        onScenePreload: (id: string, view: SceneInitialView) => {
+          schedulePanoramaIntent(scenesRef.current.find((scene) => scene.id === id), view);
+        },
+        onSpaceClick: (code: string) => onSpaceClickRef.current?.(code),
+        onAdClick: (payload: import("@/lib/pannellum-tour-config").AdHotspotPayload) => onAdClickRef.current?.(payload),
+        onInfoClick: (title: string, desc: string) => onInfoClickRef.current?.(title, desc),
+        getSpaceStatus: (code: string) => findSpaceStatus(spacesRef.current, code),
+      };
+      const config = buildPannellumTourConfig(currentScenes, firstId, handlers);
 
       const viewer = window.pannellum.viewer(containerRef.current, config);
       if (epoch !== initEpochRef.current) {
@@ -337,6 +353,19 @@ export default function VirtualTourViewer({
       }
 
       viewerRef.current = viewer;
+      const hdSceneIds = new Set<string>();
+      prepareSceneRef.current = (sceneId, width, quality) => {
+        if (viewerRef.current !== viewer || viewer.getScene?.() === sceneId) return;
+        const target = scenesRef.current.find(scene => scene.id === sceneId);
+        if (!target) return;
+        const selected = selectQualityMultiRes(target, width, quality);
+        if (selected && (selected === target.multiResProfilesHd?.desktop || selected === target.multiResProfilesHd?.mobile)) {
+          hdSceneIds.add(sceneId);
+        } else {
+          hdSceneIds.delete(sceneId);
+        }
+        viewer.addScene(sceneId, buildPannellumSceneConfig(target, scenesRef.current, handlers, width, quality));
+      };
 
       const revealLoadedScene = () => {
         if (!isMounted.current || epoch !== initEpochRef.current || viewerRef.current !== viewer) return;
@@ -378,6 +407,18 @@ export default function VirtualTourViewer({
       viewer.on("error", (err: string) => {
         console.error("Pannellum error:", err);
         if (isMounted.current && epoch === initEpochRef.current) {
+          const sceneId = viewer.getScene?.();
+          const target = scenesRef.current.find(scene => scene.id === sceneId);
+          if (target && hdSceneIds.delete(sceneId)) {
+            recordPanoramaTileFailure();
+            const width = containerRef.current?.clientWidth || window.innerWidth;
+            const view = { pitch: viewer.getPitch(), yaw: viewer.getYaw(), hfov: viewer.getHfov() };
+            try {
+              viewer.addScene(sceneId, buildPannellumSceneConfig(target, scenesRef.current, handlers, width, "economy"));
+              viewer.loadScene(sceneId, view.pitch, view.yaw, view.hfov);
+              return;
+            } catch { /* Fall through to the existing retry UI. */ }
+          }
           setError("Gagal memuat panorama. Periksa koneksi internet.");
         }
       });
@@ -387,7 +428,11 @@ export default function VirtualTourViewer({
         setError(e instanceof Error ? e.message : "Gagal menginisialisasi viewer 360°");
       }
     }
-  }, [applyCameraFocus, destroyViewer, overlayController, preloadSceneById, spaceMarker]);
+  }, [applyCameraFocus, destroyViewer, overlayController, spaceMarker]);
+
+  useEffect(() => {
+    return observePanoramaNetwork();
+  }, []);
 
   useEffect(() => {
     isMounted.current = true;
@@ -412,13 +457,18 @@ export default function VirtualTourViewer({
         externalNavRef.current = true;
         divingRef.current = true;
 
+        const focus = focusCameraRef.current;
+        const entryView = focus && focus.hfov == null
+          ? { yaw: focus.yaw, pitch: focus.pitch, hfov: viewer.getHfov() }
+          : undefined;
         softCrossfadeScene(viewer, activeSceneId, overlayController, {
+          entryView,
           ensureReady: async () => {
             await ensureSceneReady(activeSceneId);
           },
         })
           .catch(() => {
-            try { viewer.loadScene(activeSceneId); } catch { /* ignore */ }
+            try { viewer.loadScene(activeSceneId, entryView?.pitch, entryView?.yaw, entryView?.hfov); } catch { /* ignore */ }
           })
           .finally(() => {
             divingRef.current = false;
@@ -465,7 +515,7 @@ export default function VirtualTourViewer({
 
   const autoRotateControl = panoramaVisible && !error ? (
     <button type="button" onClick={toggleAutoRotate} aria-label="Auto Putar" aria-pressed={autoRotate}
-      className={`flex shrink-0 items-center justify-center rounded-full backdrop-blur-md transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${autoRotateControlContainer === undefined ? "size-10" : "size-11"} ${autoRotate ? `bg-[#E31E2D] text-white ${autoRotateControlContainer === undefined ? "shadow-[0_10px_24px_rgba(227,30,45,0.35)]" : ""}` : "border border-white/12 bg-[#1c1c1e]/78 text-white hover:bg-white/10"}`}
+      className={`flex shrink-0 items-center justify-center rounded-full backdrop-blur-md transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${autoRotateControlContainer === undefined ? "size-10" : "size-11"} ${autoRotate ? `bg-[#E31E2D] text-white ${autoRotateControlContainer === undefined ? "shadow-[0_10px_24px_rgba(227,30,45,0.35)]" : ""}` : "tour-chrome-pill"}`}
       title="Auto Putar">{autoRotateControlContainer === undefined ? <Navigation className="size-4" /> : <RotateCw className="size-5" />}</button>
   ) : null;
 
