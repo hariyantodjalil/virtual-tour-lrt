@@ -23,6 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { PUBLIC_LEASING_STEPS } from "@/lib/commercial-pipeline";
+import { notifyCmsLeadsUpdated, notifyPartnerLeadsUpdated } from "@/lib/inquiry-sync-events";
+import { subscribeAuthSessionChanged } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
 const guestSchema = z.object({
@@ -207,7 +209,7 @@ export default function TenantInterestForm({
     let cancelled = false;
     async function checkAuth() {
       try {
-        const res = await fetch("/api/auth/verify");
+        const res = await fetch("/api/auth/verify", { cache: "no-store" });
         if (!res.ok) return;
         const data = await res.json();
         if (!cancelled && data.authenticated && data.user?.role === "MITRA") {
@@ -218,8 +220,13 @@ export default function TenantInterestForm({
       }
     }
     void checkAuth();
+    const unsubscribe = subscribeAuthSessionChanged((nextUser) => {
+      setAuthUser(nextUser?.role === "MITRA" ? nextUser : null);
+      setAuthChecked(true);
+    });
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 
@@ -259,6 +266,8 @@ export default function TenantInterestForm({
       });
 
       if (res.ok) {
+        notifyPartnerLeadsUpdated();
+        notifyCmsLeadsUpdated();
         setSubmitted(true);
         onSuccess?.();
       } else {
@@ -293,6 +302,8 @@ export default function TenantInterestForm({
       });
 
       if (res.ok) {
+        notifyPartnerLeadsUpdated();
+        notifyCmsLeadsUpdated();
         setSubmitted(true);
         onSuccess?.();
         return;
@@ -493,7 +504,7 @@ export default function TenantInterestForm({
         </ol>
         <div className="mt-5 flex justify-center">
           <Button asChild className="bg-[#E31E2D] hover:bg-[#c41926]">
-            <Link href="/partner">Buka Panel Mitra</Link>
+            <Link href="/partner/inquiries">Buka Panel Mitra</Link>
           </Button>
         </div>
       </div>

@@ -36,6 +36,8 @@ export function normalizeHotspots(raw: unknown): Hotspot[] {
     const creativeTitle = h.creativeTitle ? String(h.creativeTitle) : undefined;
     const direction = normalizeDirection(h.direction);
     const facilityIcon = isFacilityIconId(h.facilityIcon) ? h.facilityIcon : undefined;
+    const volumeRotation = Number(h.volumeRotation);
+    const volumeDistance = Number(h.volumeDistance);
 
     let type = normalizeType(h.type);
     if (!type) {
@@ -59,6 +61,12 @@ export function normalizeHotspots(raw: unknown): Hotspot[] {
       spaceCode,
       description,
       ...(type === "info" && facilityIcon ? { facilityIcon } : {}),
+      ...(type === "space" && h.volumeRotation != null && Number.isFinite(volumeRotation)
+        ? { volumeRotation: Math.max(-180, Math.min(180, volumeRotation)) }
+        : {}),
+      ...(type === "space" && h.volumeDistance != null && Number.isFinite(volumeDistance) && volumeDistance > 0
+        ? { volumeDistance }
+        : {}),
       ...(type === "ad"
         ? {
             ...(creativeUrl ? { creativeUrl } : {}),

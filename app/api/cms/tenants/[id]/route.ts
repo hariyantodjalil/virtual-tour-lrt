@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { tenantUpdateSchema } from "@/lib/api-schemas";
+import { publishInquiryEvent } from "@/lib/realtime-events";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -78,6 +79,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     });
   });
 
+  if (tenant.userId) {
+    await publishInquiryEvent({
+      kind: "tenancy-updated",
+      userId: tenant.userId,
+    });
+  }
+
   return NextResponse.json(tenant);
 }
 
@@ -103,6 +111,13 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
     await tx.tenant.delete({ where: { id } });
   });
+
+  if (tenant.userId) {
+    await publishInquiryEvent({
+      kind: "tenancy-updated",
+      userId: tenant.userId,
+    });
+  }
 
   return NextResponse.json({ message: "Tenant dihapus" });
 }

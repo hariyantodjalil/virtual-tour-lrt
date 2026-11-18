@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ComponentProps, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { CalendarDays, Check, ChevronLeft, Copy, Download, Heart, MapPin, Maximize2, Phone, Store, Wrench, X, Zap } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, Copy, Download, Heart, MapPin, Maximize2, Phone, ShieldCheck, Store, Users, Wrench, X, Zap } from "lucide-react";
 import type InTourSpacePopupLegacy from "./InTourSpacePopupLegacy";
 import SpaceInquiryForm, { type SpaceInquiryStage } from "./SpaceInquiryForm";
 import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
@@ -10,22 +10,40 @@ import { PUBLIC_LEASING_STEPS, SPACE_STATUS_LABELS } from "@/lib/commercial-pipe
 import { printSpaceSummary } from "@/lib/space-summary";
 import { cn, getWhatsAppUrl } from "@/lib/utils";
 import { resolveSheetSwipe } from "@/lib/sheet-gesture";
-import { FAVORITES_UPDATED_EVENT, isFavoriteSpace, toggleFavoriteSpace } from "@/lib/favorite-spaces";
+import FavoriteAuthDialog from "@/components/commercial/FavoriteAuthDialog";
+import { usePartnerFavorites } from "@/components/commercial/usePartnerFavorites";
+import { formatDimensions, SPACE_AREA_KIND_LABELS, type SpaceAreaKind } from "@/lib/unit-dimensions";
+import { getFacilityIcon, isFacilityIconId } from "@/lib/facility-icons";
+import ScaledUnitPlan from "@/components/commercial/ScaledUnitPlan";
 
 export type SpaceInquiryModalProps = ComponentProps<typeof InTourSpacePopupLegacy> & { onExplore?: () => void };
 const TYPE_LABELS: Record<string, string> = {
   KIOS: "Kios", RUKO: "Ruko", ATM: "ATM", VENDING: "Vending Machine", MEDIA_IKLAN: "Media Iklan", AREA_PROMOSI: "Area Promosi",
 };
 type SpecRow = { label: string; value: string; hint?: string | null; icon: ReactNode };
-const secondaryClass = "inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]";
+const secondaryClass = "inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]";
+
+function formatFloorLabel(floor?: string | null) {
+  const trimmed = floor?.trim();
+  if (!trimmed) return "";
+  return /^\d+$/.test(trimmed) ? `Lt. ${trimmed}` : trimmed;
+}
 
 export default function SpaceInquiryModal({ space, stationName, stationSlug, contactPhone, onClose, onExplore = onClose, returnToList = false }: SpaceInquiryModalProps) {
   const profile = useCommercialProfile();
   const phone = contactPhone || profile.whatsappNumber;
   const [copied, setCopied] = useState(false);
   const [pdfError, setPdfError] = useState("");
-  const [favorite, setFavorite] = useState(false);
-  const [favoriteError, setFavoriteError] = useState("");
+  const {
+    favoriteIds,
+    busySpaceId,
+    error: favoriteError,
+    notice: favoriteNotice,
+    authPrompt,
+    closeAuthPrompt,
+    toggleFavorite: handleToggleFavorite,
+  } = usePartnerFavorites({ pendingTargetSpaceId: space.id });
+  const favorite = favoriteIds.has(space.id);
   const [stage, setStage] = useState<SpaceInquiryStage>("details");
   const [expanded, setExpanded] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -38,35 +56,116 @@ export default function SpaceInquiryModal({ space, stationName, stationSlug, con
   const copyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const previousFocus = useRef(typeof document !== "undefined" ? document.activeElement : null);
-  const location = space.location?.trim() || space.floor?.trim() || "-";
-  const locationHint = space.location?.trim() && space.floor?.trim() && space.location.trim() !== space.floor.trim()
-    ? space.floor.trim() : space.nearestExit?.trim() ? `Exit terdekat: ${space.nearestExit.trim()}` : null;
+  const floorLabel = formatFloorLabel(space.floor);
+  const location = space.location?.trim() || floorLabel || "-";
+  const floorHint = space.location?.trim() && floorLabel && space.location.trim() !== space.floor?.trim()
+    ? floorLabel
+    : null;
   const tenant = space.status === "TERISI" ? space.tenantBrand?.trim() : null;
-  const breadcrumb = [stationName, space.floor, space.location].map(part => part?.trim()).filter(Boolean).join(" | ");
+  const unitTitle = space.name?.trim() || space.code;
+  const statusPillLabel = space.status === "TERSEDIA" ? "Tersedia untuk disewa" : SPACE_STATUS_LABELS[space.status];
+  const breadcrumb = [stationName, floorLabel, space.location].map(part => part?.trim()).filter(Boolean).join(" · ");
+  const mobileLocation = [floorLabel, space.location].map(part => part?.trim()).filter(Boolean).join(" · ");
+  const dimensions = formatDimensions(space);
+  const areaKindLabel =
+    space.areaKind && space.areaKind in SPACE_AREA_KIND_LABELS
+      ? SPACE_AREA_KIND_LABELS[space.areaKind as SpaceAreaKind]
+      : null;
+  const nearbyFacilityLabels = (space.nearbyFacilities ?? [])
+    .map((item) => (isFacilityIconId(item) ? getFacilityIcon(item)?.label ?? item : item))
+    .filter(Boolean);
+  const enrichedLocationHint = [
+    floorHint,
+    space.nearestExit?.trim() ? `Exit terdekat: ${space.nearestExit.trim()}` : null,
+    nearbyFacilityLabels.length > 0 ? `Dekat: ${nearbyFacilityLabels.slice(0, 4).join(", ")}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ") || null;
+  const sizeVisual = dimensions ? <div>
+    <h3 className="text-sm font-semibold text-slate-900">Visual Ukuran</h3>
+    <p className="mt-0.5 text-xs leading-snug text-slate-600">Gambaran ukuran unit dari data dimensi, dengan orang sebagai pembanding.</p>
+    <div className="mt-2.5"><ScaledUnitPlan key={space.id} compact zoomable tone="light" lengthM={space.lengthM} widthM={space.widthM} heightM={space.heightM} /></div>
+  </div> : null;
   const rows: SpecRow[] = [
-    { label: "Luas Lantai", value: `${space.area} m²`, icon: <Maximize2 className="size-4" /> },
-    { label: "Lokasi Toko", value: location, hint: locationHint, icon: <MapPin className="size-4" /> },
-    { label: "Jenis Ruang", value: TYPE_LABELS[space.type] ?? space.type, hint: space.description?.trim() || null, icon: <Store className="size-4" /> },
-    { label: "Pasokan Listrik", value: space.powerSupply?.trim() || "-", icon: <Zap className="size-4" /> },
-    { label: "Utilitas", value: [space.waterAccess ? "Air" : null, space.airConditioning ? "AC / ventilasi" : null].filter(Boolean).join(" · ") || "-", icon: <Wrench className="size-4" /> },
-    { label: "Ketersediaan", value: SPACE_STATUS_LABELS[space.status], hint: tenant ? `Penyewa: ${tenant}` : null, icon: <CalendarDays className="size-4" /> },
+    {
+      label: "Ketersediaan",
+      value: SPACE_STATUS_LABELS[space.status],
+      hint: tenant ? `Penyewa: ${tenant}` : null,
+      icon: <CalendarDays className="size-4" />,
+    },
+    {
+      label: "Luas & Dimensi",
+      value: `${space.area} m²`,
+      hint: [dimensions, areaKindLabel].filter(Boolean).join(" · ") || null,
+      icon: <Maximize2 className="size-4" />,
+    },
+    {
+      label: "Estimasi Eksposur",
+      value:
+        space.exposure > 0
+          ? `±${space.exposure.toLocaleString("id-ID")} penumpang/hari`
+          : "Mengikuti trafik harian stasiun",
+      hint: "Potensi paparan trafik komuter di area stasiun",
+      icon: <Users className="size-4" />,
+    },
+    {
+      label: "Lokasi & Akses",
+      value: location,
+      hint: enrichedLocationHint,
+      icon: <MapPin className="size-4" />,
+    },
+    {
+      label: "Jenis & Skema Ruang",
+      value: `${TYPE_LABELS[space.type] ?? space.type}${areaKindLabel ? ` · ${areaKindLabel}` : ""}`,
+      hint: space.description?.trim() || "Model Sewa: Space-Only Leasing (Sewa Ruang Kosong)",
+      icon: <Store className="size-4" />,
+    },
+    {
+      label: "Pasokan Listrik",
+      value: space.powerSupply?.trim() || "Sesuai verifikasi teknis",
+      icon: <Zap className="size-4" />,
+    },
+    {
+      label: "Utilitas Ruang",
+      value: `Air bersih: ${space.waterAccess ? "Tersedia" : "Tidak tersedia"} · AC/Ventilasi: ${space.airConditioning ? "Tersedia" : "Tidak tersedia"}`,
+      icon: <Wrench className="size-4" />,
+    },
+    {
+      label: "Ketentuan Fit-Out & K3",
+      value: "Fit-Out oleh Mitra (Wajib Persetujuan Teknis KAI)",
+      hint: "Stasiun layang: Dilarang menggunakan tabung Gas LPG (wajib peralatan elektrik)",
+      icon: <ShieldCheck className="size-4" />,
+    },
   ];
   const waUrl = getWhatsAppUrl(phone, `Halo, saya tertarik dengan unit komersial ${space.code} (${space.name}) di Stasiun ${stationName}. Mohon informasi lebih lanjut.`);
-  const afterSteps = <ol className="mt-5 space-y-5">
-    {PUBLIC_LEASING_STEPS.slice(2).map(step => <li key={step.n} className="flex gap-4">
-      <span className="w-6 shrink-0 pt-0.5 font-display text-xs font-semibold text-[#C41926]">{step.n}</span>
-      <div><p className="text-sm font-semibold">{step.title}</p><p className="mt-1 text-sm leading-relaxed text-slate-600">{step.detail}</p></div>
+  const afterSteps = <ol className="mt-3 space-y-2.5">
+    {PUBLIC_LEASING_STEPS.slice(2).map(step => <li key={step.n} className="flex gap-3">
+      <span className="w-5 shrink-0 pt-0.5 font-display text-xs font-semibold text-[#C41926]">{step.n}</span>
+      <div className="min-w-0">
+        <p className="text-[13px] leading-snug font-semibold text-slate-900">{step.title}</p>
+        <p className="mt-0.5 text-xs leading-snug text-slate-600">{step.detail}</p>
+      </div>
     </li>)}
   </ol>;
-  const specRows = rows.map(row => <div key={row.label} className="flex items-start gap-3 py-4">
-    <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600" aria-hidden="true">{row.icon}</span>
-    <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)] gap-3">
-      <dt className="pt-1 text-sm text-slate-600">{row.label}</dt>
-      <dd className="min-w-0 break-words text-sm font-semibold">{row.value}{row.hint && <p className="mt-1 text-xs leading-relaxed font-normal text-slate-600">{row.hint}</p>}</dd>
-    </div>
-  </div>);
   const statusColor = space.status === "TERSEDIA" ? "border-emerald-200 bg-emerald-50 text-emerald-800"
     : space.status === "TERISI" ? "border-red-200 bg-red-50 text-red-800" : "border-slate-200 bg-slate-50 text-slate-700";
+  const specRows = rows.map(row => <div key={row.label} className="flex items-start gap-3 py-2">
+    <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600" aria-hidden="true">{row.icon}</span>
+    <div className="grid min-w-0 flex-1 grid-cols-1 gap-0.5 pt-1 sm:grid-cols-[152px_minmax(0,1fr)] sm:gap-3 sm:pt-1.5">
+      <dt className="text-xs font-medium text-slate-600 sm:text-[13px]">{row.label}</dt>
+      <dd className="min-w-0 break-words text-sm font-semibold text-slate-900">
+        {row.label === "Ketersediaan" ? (
+          <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold", statusColor)}>
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
+            {row.value}
+          </span>
+        ) : (
+          row.value
+        )}
+        {row.hint && <p className="mt-0.5 text-xs leading-snug font-normal text-slate-600">{row.hint}</p>}
+      </dd>
+    </div>
+  </div>);
 
   useEffect(() => {
     void fetch("/api/analytics", {
@@ -76,28 +175,10 @@ export default function SpaceInquiryModal({ space, stationName, stationSlug, con
   }, [space.id]);
   useEffect(() => () => { if (copyTimeout.current) clearTimeout(copyTimeout.current); }, []);
   useEffect(() => () => { if (dismissTimeout.current) clearTimeout(dismissTimeout.current); }, []);
-  useEffect(() => {
-    const refresh = () => setFavorite(isFavoriteSpace(space.id));
-    refresh();
-    window.addEventListener(FAVORITES_UPDATED_EVENT, refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener(FAVORITES_UPDATED_EVENT, refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, [space.id]);
 
   function toggleFavorite() {
     if (!stationSlug) return;
-    try {
-      setFavorite(toggleFavoriteSpace({
-        spaceId: space.id, code: space.code, name: space.name, type: space.type,
-        status: space.status, area: space.area, monthlyRent: space.monthlyRent,
-        location: space.location, floor: space.floor, panoramaUrl: space.panoramaUrl,
-        stationSlug, stationName,
-      }));
-      setFavoriteError("");
-    } catch { setFavoriteError("Favorit gagal disimpan. Periksa penyimpanan browser."); }
+    void handleToggleFavorite(space.id, { ensureUnitParam: true });
   }
 
   function finishClose() {
@@ -213,50 +294,74 @@ export default function SpaceInquiryModal({ space, stationName, stationSlug, con
   return <Dialog.Root open onOpenChange={open => { if (!open) requestClose(onClose); }}>
     <Dialog.Portal container={fullscreen}>
       <Dialog.Overlay ref={backdropRef} data-motion={closing ? "exit" : "enter"} className="tour-unit-backdrop fixed inset-0 z-[90] bg-black/20 lg:bg-black/30 lg:backdrop-blur-[2px]" />
-      <Dialog.Content ref={sheetRef} aria-describedby={undefined} data-motion={closing ? "exit" : "enter"}
+      <Dialog.Content ref={sheetRef} tabIndex={-1} aria-describedby={undefined} data-motion={closing ? "exit" : "enter"}
         onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === "tour-unit-exit") finishClose(); }}
-        onOpenAutoFocus={event => { event.preventDefault(); closeRef.current?.focus(); }}
+        onOpenAutoFocus={event => { event.preventDefault(); sheetRef.current?.focus({ preventScroll: true }); }}
         onCloseAutoFocus={event => { event.preventDefault(); if (previousFocus.current instanceof HTMLElement) previousFocus.current.focus(); }}
         onKeyDown={event => event.stopPropagation()}
-        className={cn("tour-unit-modal fixed inset-x-0 bottom-0 z-[91] flex min-h-[min(32rem,calc(100dvh-3.5rem))] max-h-[calc(100dvh-0.75rem)] w-full max-w-[1200px] translate-y-[var(--sheet-drag-y,0px)] flex-col overflow-clip rounded-t-3xl bg-white text-[#0B1220] shadow-[0_24px_64px_rgba(15,23,42,0.25)] outline-none transition-[translate,height] duration-200 ease-out data-[dragging=true]:transition-none motion-reduce:transition-none lg:inset-x-auto lg:top-1/2 lg:bottom-auto lg:left-1/2 lg:h-[min(820px,calc(100dvh-4rem))] lg:min-h-0 lg:max-h-[calc(100dvh-1.5rem)] lg:w-[calc(100%-1.5rem)] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-2xl", expanded ? "h-[90dvh]" : "h-[70dvh]")}>
+        className={cn("tour-unit-modal fixed inset-x-0 bottom-0 z-[91] flex min-h-[min(32rem,calc(100dvh-3.5rem))] max-h-[calc(100dvh-0.75rem)] w-full max-w-[1160px] translate-y-[var(--sheet-drag-y,0px)] flex-col overflow-clip rounded-t-2xl bg-white text-[#0B1220] shadow-[0_24px_64px_rgba(15,23,42,0.25)] outline-none transition-[translate,height] duration-200 ease-out data-[dragging=true]:transition-none motion-reduce:transition-none lg:inset-x-auto lg:top-1/2 lg:bottom-auto lg:left-1/2 lg:h-[min(840px,calc(100dvh-2rem))] lg:min-h-0 lg:max-h-[calc(100dvh-1.5rem)] lg:w-[calc(100%-2rem)] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-2xl", expanded ? "h-[90dvh]" : "h-[74dvh]")}>
         <header onPointerDown={startSwipe} onPointerMove={moveSwipe} onPointerUp={event => finishSwipe(event)} onPointerCancel={event => finishSwipe(event, true)} onLostPointerCapture={event => { if (event.target === event.currentTarget) finishSwipe(event, true); }}
           onClickCapture={event => { if (event.detail > 0 && event.target instanceof Element && event.target.closest("[data-sheet-handle]") && performance.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }}
-          className="shrink-0 touch-none border-b border-slate-200 bg-[#F3F8F5] px-4 pb-4 select-none sm:px-6 lg:touch-auto lg:bg-white lg:py-2.5 lg:select-auto">
-          <button data-sheet-handle type="button" onClick={() => setExpanded(value => !value)} aria-label={expanded ? "Ringkas detail unit" : "Perbesar detail unit"} aria-expanded={expanded} className="mx-auto flex h-7 w-16 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-[#E31E2D] lg:hidden"><span aria-hidden="true" className="h-1 w-10 rounded-full bg-[#BFCFC5]" /></button>
+          className="shrink-0 touch-none border-b border-slate-200 bg-white px-5 pb-3.5 select-none sm:px-7 lg:touch-auto lg:py-2 lg:select-auto">
+          <button data-sheet-handle type="button" onClick={() => setExpanded(value => !value)} aria-label={expanded ? "Ringkas detail unit" : "Perbesar detail unit"} aria-expanded={expanded} className="mx-auto flex h-6 w-16 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-[#E31E2D] lg:hidden"><span aria-hidden="true" className="h-1 w-10 rounded-full bg-slate-300" /></button>
           <div className="flex items-center justify-between gap-3">
-          <p className="min-w-0 text-[10px] font-semibold tracking-widest text-emerald-800 lg:hidden">{stage === "details" ? "DETAIL RUANG KOMERSIAL" : space.code}</p>
+          {stage === "details" ? (
+            <p className="min-w-0 text-xs font-medium text-slate-500 lg:hidden">Ruang Komersial · {stationName}</p>
+          ) : (
+            <p className="min-w-0 truncate text-sm font-semibold text-slate-900 lg:hidden">{space.code} · {unitTitle}</p>
+          )}
           <div className="hidden lg:block">
-          {returnToList ? <button type="button" onClick={() => requestClose(onClose)} className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-lg text-sm font-medium text-slate-700 hover:text-slate-900"><ChevronLeft className="size-4 shrink-0" />Kembali ke Daftar Unit</button>
+          {returnToList ? <button type="button" onClick={() => requestClose(onClose)} className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-lg px-1 text-sm font-medium text-slate-700 hover:text-slate-900"><ChevronLeft className="size-4 shrink-0" />Kembali ke Daftar Unit</button>
             : <p className="text-sm font-medium text-slate-600">Ruang Komersial</p>}
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            {stationSlug && <button type="button" onClick={toggleFavorite} aria-label={favorite ? "Hapus dari favorit" : "Simpan ke favorit"} aria-pressed={favorite} title={favorite ? "Hapus dari favorit" : "Simpan ke favorit"} className={cn("inline-flex size-11 items-center justify-center rounded-full transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]", favorite ? "text-[#C41926]" : "text-slate-600")}><Heart aria-hidden="true" className={cn("size-5", favorite && "fill-current")} /></button>}
-            <Dialog.Close ref={closeRef} aria-label="Tutup detail unit" className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]"><X className="size-5" /></Dialog.Close>
+          <div className="flex shrink-0 items-center gap-2">
+            {stationSlug && <button type="button" onClick={toggleFavorite} disabled={busySpaceId === space.id} aria-label={favorite ? "Hapus dari favorit" : "Simpan ke favorit"} aria-pressed={favorite} title={favorite ? "Hapus dari favorit" : "Simpan ke favorit"} className={cn("inline-flex size-11 lg:size-10 items-center justify-center rounded-lg border border-slate-200 bg-white transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D] disabled:opacity-60", favorite ? "border-red-200 bg-red-50/40 text-[#C41926]" : "text-slate-600 hover:text-slate-900")}><Heart aria-hidden="true" className={cn("size-[18px]", favorite && "fill-current")} /></button>}
+            <Dialog.Close ref={closeRef} aria-label="Tutup detail unit" className="inline-flex size-11 lg:size-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]"><X className="size-[18px]" /></Dialog.Close>
           </div>
           </div>
           {favoriteError && <p role="alert" className="mt-2 text-xs text-red-700">{favoriteError}</p>}
-          <div className={stage === "details" ? "lg:sr-only" : "sr-only"}>
-            <Dialog.Title className="pr-2 text-lg leading-snug font-semibold [overflow-wrap:anywhere]">{space.name || space.code}</Dialog.Title>
-            <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-slate-600">{space.code} · {space.floor}{space.location ? ` · ${space.location}` : ""}</p>
-            {stage === "details" && <span className={cn("mt-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", statusColor)}><span aria-hidden="true" className="size-1.5 rounded-full bg-current" />{space.status === "TERSEDIA" ? "Tersedia untuk disewa" : SPACE_STATUS_LABELS[space.status]}</span>}
+          {!favoriteError && favoriteNotice && <p role="status" className="mt-2 text-xs font-medium text-emerald-700">{favoriteNotice}</p>}
+          <div className={stage === "details" ? "mt-2 lg:sr-only" : "sr-only"}>
+            <div className="flex items-start justify-between gap-2">
+              <Dialog.Title className="min-w-0 text-lg leading-snug font-semibold text-[#0B1220] [overflow-wrap:anywhere]">{unitTitle}</Dialog.Title>
+              {stage === "details" && <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold", statusColor)}><span aria-hidden="true" className="size-1.5 rounded-full bg-current" />{statusPillLabel}</span>}
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+              <button type="button" onClick={() => void copyCode()} aria-label={copied ? "Kode disalin" : "Salin kode unit"} className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-slate-800 transition hover:bg-slate-100">
+                <span>{space.code}</span>
+                {copied ? <Check className="size-3 text-emerald-700" /> : <Copy className="size-3 text-slate-500" />}
+              </button>
+              {mobileLocation && <span className="truncate">{mobileLocation}</span>}
+            </div>
+            {stage === "details" && tenant && <p className="mt-2 text-xs font-semibold text-[#C41926]">Penyewa saat ini: {tenant}</p>}
           </div>
         </header>
 
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-2">
           <section aria-label="Unit dan langkah pengajuan" className="hidden min-w-0 flex-col border-b border-slate-200 lg:flex lg:min-h-0 lg:border-r lg:border-b-0">
-            <div className="min-h-0 flex-1 px-5 py-6 sm:px-7 lg:overflow-y-auto lg:overscroll-contain lg:px-8 lg:py-7">
-              <div className="flex items-start gap-2">
-                <h2 className="min-w-0 flex-1 font-display text-2xl leading-tight font-semibold [overflow-wrap:anywhere] lg:text-3xl">{space.code}</h2>
-                <button type="button" onClick={() => void copyCode()} aria-label={copied ? "Kode disalin" : "Salin kode unit"} className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100">{copied ? <Check className="size-4" /> : <Copy className="size-4" />}</button>
+            <div className="min-h-0 flex-1 px-6 py-5 lg:overflow-y-auto lg:overscroll-contain lg:px-7">
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="min-w-0 flex-1 font-display text-2xl leading-tight font-semibold text-[#0B1220] [overflow-wrap:anywhere]">{unitTitle}</h2>
+                <span className={cn("mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold", statusColor)}>
+                  <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
+                  {statusPillLabel}
+                </span>
               </div>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">{breadcrumb}</p>
-              {tenant && <p className="mt-3 text-sm font-semibold text-[#C41926]">Penyewa saat ini: {tenant}</p>}
-              <div className="mt-8 hidden border-t border-slate-200 pt-6 lg:block">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => void copyCode()} aria-label={copied ? "Kode disalin" : "Salin kode unit"} className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#E31E2D]">
+                  <span>{space.code}</span>
+                  {copied ? <Check className="size-3.5 text-emerald-700" /> : <Copy className="size-3.5 text-slate-500" />}
+                </button>
+                <p className="text-sm text-slate-600">{breadcrumb}</p>
+              </div>
+              {tenant && <p className="mt-2.5 text-xs font-semibold text-[#C41926]">Penyewa saat ini: {tenant}</p>}
+              {sizeVisual && <div className="mt-4">{sizeVisual}</div>}
+              <div className="mt-4 hidden border-t border-slate-200 pt-4 lg:block">
                 <h2 className="text-sm font-semibold text-slate-900">Setelah pengajuan</h2>
                 {afterSteps}
               </div>
             </div>
-            <footer className="shrink-0 border-t border-slate-200 px-5 py-4 sm:px-7 lg:px-8">
+            <footer className="shrink-0 border-t border-slate-200 bg-white px-6 py-3.5 lg:px-7">
               <div className="grid grid-cols-2 gap-3">
                 <a href={waUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackAction("WHATSAPP_CLICK")} className={secondaryClass}><Phone className="size-4 shrink-0" />WhatsApp Tim</a>
                 <button type="button" onClick={downloadSummary} className={secondaryClass}><Download className="size-4 shrink-0" />Unduh PDF</button>
@@ -265,28 +370,39 @@ export default function SpaceInquiryModal({ space, stationName, stationSlug, con
             </footer>
           </section>
           <section aria-label="Pengajuan minat sewa" className="flex min-h-0 min-w-0 flex-col">
-            <SpaceInquiryForm key={space.id} spaceId={space.id} spaceCode={space.code} stationName={stationName} area={space.area}
+            <SpaceInquiryForm key={space.id} spaceId={space.id} spaceCode={space.code} spaceName={unitTitle} stationName={stationName} area={space.area}
               canApply={space.status === "TERSEDIA"}
               onStageChange={handleStageChange} onExplore={() => requestClose(onExplore)}
               details={<>
                 <div className="py-3 lg:hidden">
-                  <h3 className="text-sm font-semibold">Informasi Unit</h3>
-                  <dl className="mt-3 grid grid-cols-2 gap-2.5">
-                    {[["Stasiun", stationName], ["Area", location], ["Luas", `${space.area} m²`], ["Status", SPACE_STATUS_LABELS[space.status]]].map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-slate-100 bg-slate-50 p-3"><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 break-words text-sm font-semibold">{value}</dd></div>)}
-                  </dl>
-                  {tenant && <p className="mt-3 text-sm text-slate-600">Penyewa: {tenant}</p>}
-                  <details className="mt-3 border-b border-slate-200 pb-3"><summary className="cursor-pointer py-2 text-sm font-medium text-slate-700">Spesifikasi dan utilitas</summary><dl className="divide-y divide-slate-200">{specRows}</dl></details>
-                  <details className="border-b border-slate-200 py-3"><summary className="cursor-pointer py-2 text-sm font-medium text-slate-700">Setelah pengajuan</summary>{afterSteps}</details>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
+                  {sizeVisual && <div>{sizeVisual}</div>}
+                  <div className={cn(sizeVisual ? "mt-5 border-t border-slate-200 pt-4" : "")}>
+                    <h3 className="text-sm font-semibold text-slate-900">Spesifikasi Unit</h3>
+                    <dl className="mt-1 divide-y divide-slate-200/80">{specRows}</dl>
+                  </div>
+                  <div className="mt-5 border-t border-slate-200 pt-4">
+                    <h3 className="text-sm font-semibold text-slate-900">Setelah pengajuan</h3>
+                    {afterSteps}
+                  </div>
+                  <div className="mt-5 grid grid-cols-2 gap-2.5 border-t border-slate-200 pt-4">
                     <a href={waUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackAction("WHATSAPP_CLICK")} className={secondaryClass}><Phone className="size-4 shrink-0" />WhatsApp Tim</a>
                     <button type="button" onClick={downloadSummary} className={secondaryClass}><Download className="size-4 shrink-0" />Unduh PDF</button>
                   </div>
                   {pdfError && <p role="alert" className="mt-2 text-xs text-red-700">{pdfError}</p>}
                 </div>
-                <dl className="hidden divide-y divide-slate-200 lg:block">{specRows}</dl>
+                <dl className="hidden divide-y divide-slate-200/80 lg:block">{specRows}</dl>
               </>} />
           </section>
         </div>
+        {authPrompt && (
+          <FavoriteAuthDialog
+            open
+            mode={authPrompt.mode}
+            redirectPath={authPrompt.redirectPath}
+            roleLabel={authPrompt.roleLabel}
+            onClose={closeAuthPrompt}
+          />
+        )}
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>;

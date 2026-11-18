@@ -7,6 +7,7 @@ import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/r
 import { ACTIVE_LEAD_STATUSES } from "@/lib/commercial-pipeline";
 import { findTrainRentalSpaceForLead, trainLeadRequirement } from "@/lib/train-rental-spaces";
 import { inquiryCreationData, partnerInquiryInclude, publicWorkflowSelect, toPartnerInquiry } from "@/lib/partner-inquiries";
+import { publishInquiryEvent } from "@/lib/realtime-events";
 
 const partnerLeadSchema = z
   .object({
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
 
   let commercialSpaceId: string | undefined;
   let trainRequirement: string | undefined;
+  let spaceArea: number | undefined;
 
   if (parsed.data.trainRentalSpaceId) {
     const trainSpace = await findTrainRentalSpaceForLead(parsed.data.trainRentalSpaceId);
@@ -85,7 +87,7 @@ export async function POST(request: NextRequest) {
         status: "TERSEDIA",
         station: { isActive: true },
       },
-      select: { id: true },
+      select: { id: true, area: true },
     });
     if (!space) {
       return NextResponse.json(
@@ -94,6 +96,7 @@ export async function POST(request: NextRequest) {
       );
     }
     commercialSpaceId = space.id;
+    spaceArea = space.area;
   }
 
   const latestLead = await prisma.tenantLead.findFirst({
@@ -149,7 +152,8 @@ export async function POST(request: NextRequest) {
       phone,
       email: user.email,
       businessType: parsed.data.businessType,
-      spaceRequirement: trainRequirement ?? null,
+      spaceRequirement:
+        trainRequirement ?? (spaceArea !== undefined ? `${spaceArea} m²` : null),
       message: parsed.data.message || null,
       surveyPreference: parsed.data.surveyPreference || null,
       siteVisitStatus: parsed.data.surveyPreference ? "REQUESTED" : "NONE",
@@ -166,6 +170,12 @@ export async function POST(request: NextRequest) {
       },
     });
   }
+
+  await publishInquiryEvent({
+    kind: "lead-created",
+    leadId: lead.id,
+    userId: lead.userId,
+  });
 
   return NextResponse.json(lead, { status: 201, headers: rateLimitHeaders(rateLimit) });
 }

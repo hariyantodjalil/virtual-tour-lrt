@@ -84,7 +84,7 @@ export default function CommercialProfileClient({
   return (
     <div className="mx-auto max-w-5xl">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
+        <Card className="border-slate-200 bg-white text-[#101828]">
           <CardContent className="p-5">
             <form onSubmit={save} className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -96,7 +96,7 @@ export default function CommercialProfileClient({
                     required
                     value={profile.teamName}
                     onChange={(event) => update("teamName", event.target.value)}
-                    className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                    className="border-slate-200 bg-white"
                     placeholder="Tim Komersial LRT Jabodebek"
                   />
                 </Field>
@@ -110,7 +110,7 @@ export default function CommercialProfileClient({
                     onChange={(event) =>
                       update("contactPersonName", event.target.value || null)
                     }
-                    className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                    className="border-slate-200 bg-white"
                     placeholder="Opsional"
                   />
                 </Field>
@@ -127,7 +127,7 @@ export default function CommercialProfileClient({
                     onChange={(event) =>
                       update("whatsappNumber", event.target.value)
                     }
-                    className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                    className="border-slate-200 bg-white"
                     placeholder="628118012012"
                   />
                 </Field>
@@ -143,7 +143,7 @@ export default function CommercialProfileClient({
                     onChange={(event) =>
                       update("phoneNumber", event.target.value || null)
                     }
-                    className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                    className="border-slate-200 bg-white"
                     placeholder="021..."
                   />
                 </Field>
@@ -155,7 +155,7 @@ export default function CommercialProfileClient({
                     onChange={(event) =>
                       update("email", event.target.value || null)
                     }
-                    className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                    className="border-slate-200 bg-white"
                     placeholder="komersial@lrtjabodebek.co.id"
                   />
                 </Field>
@@ -169,7 +169,7 @@ export default function CommercialProfileClient({
                     onChange={(event) =>
                       update("officeAddress", event.target.value || null)
                     }
-                    className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                    className="border-slate-200 bg-white"
                     placeholder="Opsional"
                   />
                 </Field>
@@ -187,19 +187,19 @@ export default function CommercialProfileClient({
                   onChange={(event) =>
                     update("defaultWhatsappMessage", event.target.value)
                   }
-                  className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]"
+                  className="border-slate-200 bg-white"
                 />
               </Field>
 
               {error && (
-                <p role="alert" className="text-sm text-red-300">
+                <p role="alert" className="text-sm text-red-600">
                   {error}
                 </p>
               )}
               {message && (
                 <p
                   role="status"
-                  className="flex items-center gap-2 text-sm text-emerald-300"
+                  className="flex items-center gap-2 text-sm text-emerald-700"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   {message}
@@ -215,12 +215,12 @@ export default function CommercialProfileClient({
         </Card>
 
         <aside className="space-y-4">
-          <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
+          <Card className="border-slate-200 bg-white text-[#101828]">
             <CardContent className="p-5">
-              <p className="text-xs font-semibold text-[#A88990]">Preview kontak</p>
-              <h2 className="mt-2 font-semibold text-white">{profile.teamName}</h2>
+              <p className="text-xs font-semibold text-slate-500">Preview kontak</p>
+              <h2 className="mt-2 font-semibold text-[#101828]">{profile.teamName}</h2>
               {profile.contactPersonName && (
-                <p className="mt-1 text-sm text-[#C4A8AD]">
+                <p className="mt-1 text-sm text-slate-600">
                   {profile.contactPersonName}
                 </p>
               )}
@@ -252,7 +252,7 @@ export default function CommercialProfileClient({
                 href={previewWhatsAppUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1DA851]"
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-[#101828] transition hover:bg-[#1DA851]"
               >
                 <ExternalLink className="h-4 w-4" />
                 Tes WhatsApp
@@ -260,7 +260,7 @@ export default function CommercialProfileClient({
             </CardContent>
           </Card>
 
-          <p className="rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C]/70 p-4 text-xs leading-relaxed text-[#C4A8AD]">
+          <p className="rounded-xl border border-slate-200 bg-white p-4 text-xs leading-relaxed text-slate-600">
             Nomor WhatsApp pada profil stasiun hanya digunakan sebagai override.
             Kosongkan nomor stasiun agar otomatis mengikuti profil global ini.
           </p>
@@ -283,12 +283,12 @@ function Field({
 }) {
   return (
     <div>
-      <Label className="mb-1.5 flex items-center gap-2 text-xs text-[#F0DDE1]">
-        <span className="text-emerald-300">{icon}</span>
+      <Label className="mb-1.5 flex items-center gap-2 text-xs text-slate-700">
+        <span className="text-emerald-700">{icon}</span>
         {label}
       </Label>
       {children}
-      {hint && <p className="mt-1 text-xs text-[#A88990]">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
   );
 }
@@ -301,8 +301,8 @@ function ContactRow({
   value: string;
 }) {
   return (
-    <div className="flex items-start gap-2.5 text-[#F0DDE1]">
-      <span className="mt-0.5 text-emerald-300">{icon}</span>
+    <div className="flex items-start gap-2.5 text-slate-700">
+      <span className="mt-0.5 text-emerald-700">{icon}</span>
       <span className="break-words">{value}</span>
     </div>
   );

@@ -1,14 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import CommercialSpaceCard from "@/components/commercial/CommercialSpaceCard";
 import CommercialSpacesBrowseModal from "@/components/commercial/CommercialSpacesBrowseModal";
-import {
-  FAVORITES_UPDATED_EVENT,
-  isFavoriteSpace,
-  toggleFavoriteSpace,
-} from "@/lib/favorite-spaces";
+import FavoriteAuthDialog from "@/components/commercial/FavoriteAuthDialog";
+import { usePartnerFavorites } from "@/components/commercial/usePartnerFavorites";
 
 export type SpaceListing = {
   id: string;
@@ -81,17 +78,16 @@ export default function CommercialSpaceGrid({
 }) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["value"]>("all");
   const [stationFilter, setStationFilter] = useState("all");
-  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [browseOpen, setBrowseOpen] = useState(false);
-
-  useEffect(() => {
-    function refreshFavorites() {
-      setFavoriteIds(new Set(spaces.filter((s) => isFavoriteSpace(s.id)).map((s) => s.id)));
-    }
-    refreshFavorites();
-    window.addEventListener(FAVORITES_UPDATED_EVENT, refreshFavorites);
-    return () => window.removeEventListener(FAVORITES_UPDATED_EVENT, refreshFavorites);
-  }, [spaces]);
+  const {
+    favoriteIds,
+    error: favoriteError,
+    notice: favoriteNotice,
+    clearMessages,
+    authPrompt,
+    closeAuthPrompt,
+    toggleFavorite,
+  } = usePartnerFavorites();
 
   const filtered = useMemo(() => {
     let list = spaces;
@@ -111,17 +107,7 @@ export default function CommercialSpaceGrid({
   function handleFavorite(e: React.MouseEvent, space: SpaceListing) {
     e.preventDefault();
     e.stopPropagation();
-    toggleFavoriteSpace({
-      spaceId: space.id,
-      code: space.code,
-      name: space.name,
-      type: space.type,
-      status: space.status,
-      area: space.area,
-      monthlyRent: space.monthlyRent,
-      stationSlug: space.stationSlug,
-      stationName: space.stationName,
-    });
+    void toggleFavorite(space.id);
   }
 
   return (
@@ -250,6 +236,26 @@ export default function CommercialSpaceGrid({
         </p>
       )}
 
+      {(favoriteError || favoriteNotice) && (
+        <div
+          role={favoriteError ? "alert" : "status"}
+          className={`mt-5 flex items-center justify-between gap-3 rounded-xl px-4 py-2.5 text-xs font-medium shadow-sm ${
+            favoriteError
+              ? "border border-red-200 bg-red-50 text-red-800"
+              : "border border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
+        >
+          <span>{favoriteError || favoriteNotice}</span>
+          <button
+            type="button"
+            onClick={clearMessages}
+            className="shrink-0 underline underline-offset-2 opacity-80 hover:opacity-100"
+          >
+            Tutup
+          </button>
+        </div>
+      )}
+
       <CommercialSpacesBrowseModal
         open={browseOpen}
         onClose={() => setBrowseOpen(false)}
@@ -261,6 +267,16 @@ export default function CommercialSpaceGrid({
         onFavorite={handleFavorite}
         totalCount={sortedFiltered.length}
       />
+
+      {authPrompt && (
+        <FavoriteAuthDialog
+          open
+          mode={authPrompt.mode}
+          redirectPath={authPrompt.redirectPath}
+          roleLabel={authPrompt.roleLabel}
+          onClose={closeAuthPrompt}
+        />
+      )}
     </div>
   );
 }

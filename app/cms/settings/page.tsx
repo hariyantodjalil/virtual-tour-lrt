@@ -135,14 +135,14 @@ export default function SystemSettingsPage() {
         <div
           className={`fixed top-5 right-5 z-50 flex items-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold shadow-2xl transition-all ${
             toast.type === "ok"
-              ? "border border-emerald-500/40 bg-emerald-950 text-emerald-200"
-              : "border border-red-500/40 bg-red-950 text-red-200"
+              ? "border border-emerald-500/40 bg-emerald-50 text-emerald-800"
+              : "border border-red-500/40 bg-red-50 text-red-800"
           }`}
         >
           {toast.type === "ok" ? (
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            <CheckCircle2 className="h-4 w-4 text-emerald-700" />
           ) : (
-            <AlertTriangle className="h-4 w-4 text-red-400" />
+            <AlertTriangle className="h-4 w-4 text-red-600" />
           )}
           {toast.msg}
         </div>
@@ -151,8 +151,8 @@ export default function SystemSettingsPage() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Pengaturan Sistem</h1>
-          <p className="text-xs text-[#C4A8AD]">
+          <h1 className="text-2xl font-bold tracking-tight text-[#101828]">Pengaturan Sistem</h1>
+          <p className="text-xs text-slate-600">
             Kelola status operasional situs publik dan pembatasan akses sistem
           </p>
         </div>
@@ -162,7 +162,7 @@ export default function SystemSettingsPage() {
             size="sm"
             onClick={() => fetchSettings(true)}
             disabled={loading}
-            className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-xs text-[#F0DDE1] hover:bg-[#261015]"
+            className="border-slate-200 bg-white text-xs text-slate-700 hover:bg-slate-50"
           >
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -171,10 +171,10 @@ export default function SystemSettingsPage() {
             asChild
             variant="outline"
             size="sm"
-            className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-xs text-[#F0DDE1] hover:bg-[#261015]"
+            className="border-slate-200 bg-white text-xs text-slate-700 hover:bg-slate-50"
           >
             <Link href="/maintenance" target="_blank">
-              <Eye className="mr-1.5 h-3.5 w-3.5 text-sky-400" />
+              <Eye className="mr-1.5 h-3.5 w-3.5 text-sky-700" />
               Preview Halaman Maintenance
             </Link>
           </Button>
@@ -185,8 +185,8 @@ export default function SystemSettingsPage() {
       <div
         className={`relative overflow-hidden rounded-2xl border p-6 transition-all ${
           data.isMaintenanceMode
-            ? "border-rose-500/40 bg-gradient-to-r from-rose-950/60 via-[#261015]/90 to-[#261015]"
-            : "border-emerald-500/40 bg-gradient-to-r from-emerald-950/40 via-[#261015]/90 to-[#261015]"
+            ? "border-rose-500/40 bg-gradient-to-r from-rose-950/60 via-slate-50/90 to-slate-50"
+            : "border-emerald-500/40 bg-gradient-to-r from-emerald-950/40 via-slate-50/90 to-slate-50"
         }`}
       >
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
@@ -194,14 +194,14 @@ export default function SystemSettingsPage() {
             <div
               className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border shadow-xl ${
                 data.isMaintenanceMode
-                  ? "border-rose-500/50 bg-rose-500/20 text-rose-300 shadow-rose-900/30"
-                  : "border-emerald-500/50 bg-emerald-500/20 text-emerald-300 shadow-emerald-900/30"
+                  ? "border-rose-500/50 bg-rose-500/20 text-rose-600 shadow-rose-900/30"
+                  : "border-emerald-500/50 bg-emerald-50 text-emerald-700 shadow-emerald-900/30"
               }`}
             >
               {data.isMaintenanceMode ? (
-                <Wrench className="h-7 w-7 animate-pulse text-rose-400" />
+                <Wrench className="h-7 w-7 animate-pulse text-rose-600" />
               ) : (
-                <ShieldCheck className="h-7 w-7 text-emerald-400" />
+                <ShieldCheck className="h-7 w-7 text-emerald-700" />
               )}
             </div>
             <div className="space-y-1">
@@ -209,8 +209,8 @@ export default function SystemSettingsPage() {
                 <span
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-semibold ${
                     data.isMaintenanceMode
-                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                      : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                      ? "bg-rose-500/20 text-rose-600 border border-rose-500/30"
+                      : "bg-emerald-50 text-emerald-700 border border-emerald-500/30"
                   }`}
                 >
                   <span
@@ -223,12 +223,12 @@ export default function SystemSettingsPage() {
                     : "SITUS PUBLIK AKTIF NORMAL"}
                 </span>
               </div>
-              <h2 className="text-lg font-bold text-white">
+              <h2 className="text-lg font-bold text-[#101828]">
                 {data.isMaintenanceMode
                   ? "Akses Pengunjung Publik Ditutup Sementara"
                   : "Seluruh Pengunjung Publik Dapat Mengakses Virtual Tour"}
               </h2>
-              <p className="text-xs text-[#C4A8AD] max-w-xl">
+              <p className="text-xs text-slate-600 max-w-xl">
                 {data.isMaintenanceMode
                   ? "Pengunjung publik dialihkan ke halaman pemeliharaan sistem. Hanya Administrator dan Editor yang dapat mengakses CMS dan meninjau tur."
                   : "Platform virtual tour, katalog unit komersial, dan portal mitra dapat diakses secara leluasa oleh semua pengunjung."}
@@ -245,7 +245,7 @@ export default function SystemSettingsPage() {
               onClick={() => handleToggleClick(!data.isMaintenanceMode)}
               className={`font-semibold shadow-lg transition-all ${
                 data.isMaintenanceMode
-                  ? "bg-[#E31E2D] hover:bg-[#c41926] text-white shadow-emerald-950/40"
+                  ? "bg-[#c41230] hover:bg-[#a30f28] text-white shadow-emerald-950/40"
                   : "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/40"
               }`}
             >
@@ -268,12 +268,12 @@ export default function SystemSettingsPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Settings Form */}
         <div className="space-y-6 lg:col-span-2">
-          <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C]/60 backdrop-blur">
+          <Card className="border-slate-200 bg-white backdrop-blur">
             <CardHeader>
-              <CardTitle className="text-base font-semibold text-white">
+              <CardTitle className="text-base font-semibold text-[#101828]">
                 Pesan Pemeliharaan Publik
               </CardTitle>
-              <CardDescription className="text-xs text-[#C4A8AD]">
+              <CardDescription className="text-xs text-slate-600">
                 Pesan ini akan ditampilkan kepada pengunjung yang membuka situs saat mode
                 maintenance aktif.
               </CardDescription>
@@ -281,11 +281,11 @@ export default function SystemSettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs text-[#F0DDE1]">Isi Pesan</Label>
+                  <Label className="text-xs text-slate-700">Isi Pesan</Label>
                   <button
                     type="button"
                     onClick={() => setData({ ...data, maintenanceMessage: DEFAULT_MESSAGE })}
-                    className="text-[11px] text-sky-400 hover:underline"
+                    className="text-[11px] text-sky-700 hover:underline"
                   >
                     Gunakan Pesan Standar
                   </button>
@@ -295,16 +295,16 @@ export default function SystemSettingsPage() {
                   onChange={(e) => setData({ ...data, maintenanceMessage: e.target.value })}
                   placeholder="Ketik pesan pemeliharaan untuk pengunjung..."
                   rows={4}
-                  className="bg-[#1C0A0E] border-[rgba(255,214,218,0.14)] text-xs text-[#F8ECEE] focus:border-rose-500"
+                  className="bg-white border-slate-200 text-xs text-[#101828] focus:border-rose-500"
                 />
-                <div className="flex justify-between text-[11px] text-[#A88990]">
+                <div className="flex justify-between text-[11px] text-slate-500">
                   <span>Maksimal 300 karakter</span>
                   <span>{data.maintenanceMessage.length} karakter</span>
                 </div>
               </div>
 
               {hasUnsavedMessage && (
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[rgba(255,214,218,0.14)]">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -314,7 +314,7 @@ export default function SystemSettingsPage() {
                         maintenanceMessage: initialData?.maintenanceMessage || DEFAULT_MESSAGE,
                       })
                     }
-                    className="text-xs text-[#C4A8AD] hover:text-white"
+                    className="text-xs text-slate-600 hover:text-[#101828]"
                   >
                     Batal
                   </Button>
@@ -333,29 +333,29 @@ export default function SystemSettingsPage() {
           </Card>
 
           {/* Petunjuk Akses */}
-          <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C]/60 backdrop-blur">
+          <Card className="border-slate-200 bg-white backdrop-blur">
             <CardHeader>
-              <CardTitle className="text-base font-semibold text-white">
+              <CardTitle className="text-base font-semibold text-[#101828]">
                 Aturan & Hak Akses
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-xs text-[#F0DDE1]">
-              <div className="flex items-start gap-2.5 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/40 p-3">
-                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <CardContent className="space-y-3 text-xs text-slate-700">
+              <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white/40 p-3">
+                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
                 <div>
-                  <span className="font-semibold text-[#F8ECEE]">Akses CMS & Editor:</span>
-                  <p className="mt-0.5 text-[#C4A8AD]">
+                  <span className="font-semibold text-[#101828]">Akses CMS & Editor:</span>
+                  <p className="mt-0.5 text-slate-600">
                     Administrator dan Editor tetap dapat login dan menggunakan seluruh menu CMS
                     untuk upload aset dan memperbarui stasiun.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-2.5 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/40 p-3">
-                <Eye className="mt-0.5 h-4 w-4 shrink-0 text-sky-400" />
+              <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white/40 p-3">
+                <Eye className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" />
                 <div>
-                  <span className="font-semibold text-[#F8ECEE]">Live Preview Admin:</span>
-                  <p className="mt-0.5 text-[#C4A8AD]">
+                  <span className="font-semibold text-[#101828]">Live Preview Admin:</span>
+                  <p className="mt-0.5 text-slate-600">
                     Admin yang sudah login tetap dapat membuka halaman depan / tur 3D stasiun untuk
                     memastikan kualitas sebelum publik dibuka.
                   </p>
@@ -367,23 +367,23 @@ export default function SystemSettingsPage() {
 
         {/* Audit & Info Sidebar */}
         <div className="space-y-6">
-          <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C]/60 backdrop-blur">
+          <Card className="border-slate-200 bg-white backdrop-blur">
             <CardHeader>
-              <CardTitle className="text-sm font-semibold text-white">Informasi Log</CardTitle>
+              <CardTitle className="text-sm font-semibold text-[#101828]">Informasi Log</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-xs">
               <div className="space-y-1">
-                <span className="text-[11px] text-[#A88990]">Terakhir Diperbarui Oleh:</span>
-                <div className="flex items-center gap-1.5 font-medium text-[#F8ECEE]">
-                  <User className="h-3.5 w-3.5 text-[#C4A8AD]" />
+                <span className="text-[11px] text-slate-500">Terakhir Diperbarui Oleh:</span>
+                <div className="flex items-center gap-1.5 font-medium text-[#101828]">
+                  <User className="h-3.5 w-3.5 text-slate-600" />
                   <span className="truncate">{data.updatedBy || "Sistem"}</span>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[11px] text-[#A88990]">Waktu Pembaruan:</span>
-                <div className="flex items-center gap-1.5 font-medium text-[#F8ECEE]">
-                  <Clock className="h-3.5 w-3.5 text-[#C4A8AD]" />
+                <span className="text-[11px] text-slate-500">Waktu Pembaruan:</span>
+                <div className="flex items-center gap-1.5 font-medium text-[#101828]">
+                  <Clock className="h-3.5 w-3.5 text-slate-600" />
                   <span>
                     {data.updatedAt
                       ? new Date(data.updatedAt).toLocaleString("id-ID", {
@@ -402,22 +402,22 @@ export default function SystemSettingsPage() {
       {/* Confirmation Modal */}
       {showConfirmModal && pendingMode !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] p-6 shadow-2xl">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white">
               {pendingMode ? (
-                <Wrench className="h-6 w-6 text-rose-400" />
+                <Wrench className="h-6 w-6 text-rose-600" />
               ) : (
-                <ShieldCheck className="h-6 w-6 text-emerald-400" />
+                <ShieldCheck className="h-6 w-6 text-emerald-700" />
               )}
             </div>
 
-            <h3 className="text-lg font-bold text-white">
+            <h3 className="text-lg font-bold text-[#101828]">
               {pendingMode
                 ? "Konfirmasi Aktifkan Mode Maintenance?"
                 : "Buka Kembali Situs untuk Publik?"}
             </h3>
 
-            <p className="mt-2 text-xs leading-relaxed text-[#F0DDE1]">
+            <p className="mt-2 text-xs leading-relaxed text-slate-700">
               {pendingMode
                 ? "Seluruh pengunjung umum akan dialihkan ke halaman pemeliharaan sistem. Anda dan tim admin tetap dapat mengakses CMS."
                 : "Situs publik akan langsung dapat diakses kembali oleh seluruh pengunjung secara normal."}
@@ -432,7 +432,7 @@ export default function SystemSettingsPage() {
                   setShowConfirmModal(false);
                   setPendingMode(null);
                 }}
-                className="text-xs text-[#F0DDE1] hover:text-white"
+                className="text-xs text-slate-700 hover:text-[#101828]"
               >
                 Batal
               </Button>
@@ -443,7 +443,7 @@ export default function SystemSettingsPage() {
                 className={`text-xs font-semibold ${
                   pendingMode
                     ? "bg-rose-600 hover:bg-rose-500 text-white"
-                    : "bg-[#E31E2D] hover:bg-[#c41926] text-white"
+                    : "bg-[#c41230] hover:bg-[#a30f28] text-white"
                 }`}
               >
                 {saving

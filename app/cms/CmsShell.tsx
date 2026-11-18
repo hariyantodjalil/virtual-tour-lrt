@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
+  House,
   LayoutDashboard,
   LogOut,
   Map,
@@ -18,9 +19,14 @@ import {
   PhoneCall,
   Sliders,
   LayoutGrid,
+  GitBranch,
+  Handshake,
+  ChevronDown,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import CmsNotifications from "@/components/cms/CmsNotifications";
+import { announceAuthLogout } from "@/lib/auth-client";
 
 export type CmsUser = {
   id: string;
@@ -29,31 +35,116 @@ export type CmsUser = {
   role: string;
 };
 
-type NavItem = {
+type NavLeaf = {
+  kind: "link";
   href: string;
   label: string;
   icon: LucideIcon;
   adminOnly?: boolean;
 };
 
-const navItems: NavItem[] = [
-  { href: "/cms/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/cms/stations", label: "Stasiun", icon: Train },
-  { href: "/cms/virtual-tour", label: "Station Virtual Tour", icon: Map },
-  { href: "/cms/virtual-train", label: "Train Virtual Tour", icon: TrainFront },
-  { href: "/cms/train-spaces", label: "Train Rental Space", icon: LayoutGrid },
-  { href: "/cms/spaces", label: "Ruang Komersial", icon: Store },
-  { href: "/cms/tenants", label: "Penyewa Aktif", icon: Building2 },
-  { href: "/cms/leads", label: "Pengajuan & Site Visit", icon: UserCircle },
+type NavGroup = {
+  kind: "group";
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  adminOnly?: boolean;
+  children: NavLeaf[];
+};
+
+type NavEntry = NavLeaf | NavGroup;
+
+const navItems: NavEntry[] = [
+  { kind: "link", href: "/cms/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { kind: "link", href: "/cms/stations", label: "Stasiun", icon: Train },
+  { kind: "link", href: "/cms/virtual-tour", label: "Station Virtual Tour", icon: Map },
+  { kind: "link", href: "/cms/virtual-train", label: "Train Virtual Tour", icon: TrainFront },
+  { kind: "link", href: "/cms/train-spaces", label: "Train Rental Space", icon: LayoutGrid },
+  { kind: "link", href: "/cms/spaces", label: "Ruang Komersial", icon: Store },
   {
+    kind: "group",
+    id: "tenant-leasing",
+    label: "Penyewaan Tenant",
+    icon: Handshake,
+    children: [
+      { kind: "link", href: "/cms/leads", label: "Pengajuan & Site Visit", icon: UserCircle },
+      { kind: "link", href: "/cms/tenants", label: "Penyewa Aktif", icon: Building2 },
+      {
+        kind: "link",
+        href: "/cms/workflow",
+        label: "Alur Pengajuan",
+        icon: GitBranch,
+        adminOnly: true,
+      },
+    ],
+  },
+  {
+    kind: "link",
     href: "/cms/commercial-profile",
     label: "Profil Tim Komersial",
     icon: PhoneCall,
     adminOnly: true,
   },
-  { href: "/cms/users", label: "Users", icon: Users, adminOnly: true },
-  { href: "/cms/settings", label: "Pengaturan Sistem", icon: Sliders, adminOnly: true },
+  { kind: "link", href: "/cms/users", label: "Users", icon: Users, adminOnly: true },
+  {
+    kind: "link",
+    href: "/cms/settings",
+    label: "Pengaturan Sistem",
+    icon: Sliders,
+    adminOnly: true,
+  },
 ];
+
+function isRouteActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
+function filterVisibleNav(entries: NavEntry[], isAdmin: boolean): NavEntry[] {
+  const result: NavEntry[] = [];
+  for (const item of entries) {
+    if (item.adminOnly && !isAdmin) continue;
+    if (item.kind === "link") {
+      result.push(item);
+      continue;
+    }
+    const visibleChildren = item.children.filter((child) => !child.adminOnly || isAdmin);
+    if (visibleChildren.length > 0) {
+      result.push({ ...item, children: visibleChildren });
+    }
+  }
+  return result;
+}
+
+/** Shared leaf link used by both the inline accordion tree and the collapsed rail popover. */
+function SubNavLink({
+  child,
+  active,
+  role,
+  onNavigate,
+}: {
+  child: NavLeaf;
+  active: boolean;
+  role?: "menuitem";
+  onNavigate: () => void;
+}) {
+  const ChildIcon = child.icon;
+  return (
+    <Link
+      href={child.href}
+      role={role}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors ${
+        active
+          ? "bg-[#c41230] font-medium text-white shadow-sm"
+          : "text-slate-600 hover:bg-slate-100 hover:text-[#101828]"
+      }`}
+    >
+      <ChildIcon className="h-3.5 w-3.5 flex-none" />
+      <span className="truncate">{child.label}</span>
+    </Link>
+  );
+}
 
 const SIDEBAR_STORAGE_KEY = "cms-sidebar-collapsed";
 const SIDEBAR_EVENT = "cms-sidebar";
@@ -126,10 +217,23 @@ function getPageMeta(pathname: string) {
       subtitle: "Brand atau mitra yang sedang mengisi unit komersial",
     };
   }
+  if (pathname.startsWith("/cms/leads/")) {
+    return {
+      title: "Detail Pengajuan & Kendali Tahapan",
+      subtitle: "Meja kerja admin untuk verifikasi, dokumen resmi, dan kemajuan alur pengajuan",
+    };
+  }
   if (pathname.startsWith("/cms/leads")) {
     return {
       title: "Pengajuan & Site Visit",
       subtitle: "Alur calon mitra: penawaran, verifikasi lokasi, BA Negosiasi, lalu PKS",
+    };
+  }
+  if (pathname.startsWith("/cms/workflow")) {
+    return {
+      title: "Alur Pengajuan (Workflow Builder)",
+      subtitle:
+        "Kelola versi tahapan proses, tipe form tahapan, target SLA, syarat dokumen, dan automasi status ruang",
     };
   }
   if (pathname.startsWith("/cms/commercial-profile")) {
@@ -159,22 +263,108 @@ export default function CmsShell({
     getSidebarServerSnapshot
   );
 
-  const toggleSidebar = () => {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [groupOverrides, setGroupOverrides] = useState<
+    Record<string, { pathname: string; open: boolean }>
+  >({});
+  const [collapsedPopover, setCollapsedPopover] = useState<{
+    groupId: string;
+    pathname: string;
+    top: number;
+    left: number;
+  } | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  const isAdmin = initialUser?.role === "ADMIN";
+  const visibleNav = filterVisibleNav(navItems, isAdmin);
+
+  const isIconRail = collapsed && !mobileNavOpen;
+  const activePopover =
+    isIconRail && collapsedPopover && collapsedPopover.pathname === pathname
+      ? collapsedPopover
+      : null;
+  const activePopoverGroupId = activePopover?.groupId ?? null;
+  const activePopoverEntry = activePopover
+    ? visibleNav.find(
+        (entry): entry is NavGroup =>
+          entry.kind === "group" && entry.id === activePopover.groupId
+      ) ?? null
+    : null;
+
+  useEffect(() => {
+    if (!activePopoverGroupId) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (popoverRef.current?.contains(target)) return;
+      if (target.closest(`[data-collapsed-group-trigger="${activePopoverGroupId}"]`)) {
+        return;
+      }
+      setCollapsedPopover(null);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setCollapsedPopover(null);
+        const trigger = document.querySelector<HTMLButtonElement>(
+          `[data-collapsed-group-trigger="${activePopoverGroupId}"]`
+        );
+        trigger?.focus();
+      }
+    };
+
+    const handleResize = () => setCollapsedPopover(null);
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", handleResize);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [activePopoverGroupId]);
+
+  const handleHeaderSidebarToggle = () => {
+    setCollapsedPopover(null);
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setMobileNavOpen((prev) => !prev);
+      return;
+    }
     const next = !getSidebarSnapshot();
     localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
     window.dispatchEvent(new Event(SIDEBAR_EVENT));
   };
 
+  function handleCollapsedGroupToggle(group: NavGroup, triggerEl: HTMLButtonElement) {
+    if (activePopover?.groupId === group.id) {
+      setCollapsedPopover(null);
+      return;
+    }
+    const rect = triggerEl.getBoundingClientRect();
+    const estimatedHeight = 44 + group.children.length * 36;
+    const top = Math.max(12, Math.min(rect.top, window.innerHeight - estimatedHeight - 12));
+    setCollapsedPopover({
+      groupId: group.id,
+      pathname,
+      top,
+      left: rect.right + 8,
+    });
+  }
+
   async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/");
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      announceAuthLogout();
+      router.push("/");
+      router.refresh();
+    }
   }
 
   const fullWidth = isFullWidthPage(pathname);
   const pageMeta = getPageMeta(pathname);
-  const visibleNav = navItems.filter(
-    (item) => !item.adminOnly || initialUser?.role === "ADMIN"
-  );
 
   // Editor panoramik: auto-collapse app rail agar canvas lebih lebar (toggle tetap tersedia).
   const prevFullWidth = useRef(false);
@@ -187,91 +377,248 @@ export default function CmsShell({
   }, [fullWidth]);
 
   return (
-    <div className="cms-shell flex h-screen overflow-hidden bg-[#1C0A0E] text-[#F8ECEE]">
+    <div className="cms-shell relative flex h-screen overflow-hidden bg-[#f3f4f6] text-[#101828]">
+      {mobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Tutup menu navigasi"
+          onClick={() => setMobileNavOpen(false)}
+          className="fixed inset-0 z-30 bg-slate-950/45 md:hidden"
+        />
+      )}
+
       <aside
-        className={`relative z-20 flex h-full min-h-0 flex-none flex-col border-r border-[rgba(255,214,218,0.14)] bg-[#261015] transition-all duration-200 ${
-          collapsed ? "w-14" : "w-56"
-        }`}
+        className={`fixed inset-y-0 left-0 z-40 flex h-full min-h-0 flex-none flex-col border-r border-slate-200 bg-white transition-all duration-200 md:relative md:z-20 md:translate-x-0 ${
+          mobileNavOpen
+            ? "w-60 translate-x-0 shadow-2xl"
+            : "-translate-x-full pointer-events-none md:pointer-events-auto"
+        } ${collapsed ? "md:w-14" : "md:w-60"}`}
       >
         <div
-          className={`border-b border-[rgba(255,214,218,0.14)] flex items-center ${
-            collapsed ? "justify-center p-3" : "gap-2.5 p-4"
+          className={`flex h-16 flex-none items-center border-b border-slate-200 ${
+            isIconRail ? "justify-center px-2" : "gap-2.5 px-4"
           }`}
         >
-          <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-[#E31E2D] text-xs font-black text-white">
+          <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-[#c41230] text-xs font-black text-white">
             LRT
           </div>
-          {!collapsed && (
+          {!isIconRail && (
             <div className="min-w-0">
-              <p className="text-sm font-black text-white leading-tight">Virtual Tour CMS</p>
-              <p className="text-xs text-[#C4A8AD]">LRT Jabodebek</p>
+              <p className="text-sm font-black text-[#101828] leading-tight">Virtual Tour CMS</p>
+              <p className="text-xs text-slate-500">LRT Jabodebek</p>
             </div>
           )}
         </div>
 
-        <nav className="min-h-0 flex-1 p-2 space-y-0.5 overflow-y-auto">
-          {visibleNav.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
-            const Icon = item.icon;
+        <nav
+          onScroll={() => {
+            if (activePopover) setCollapsedPopover(null);
+          }}
+          className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-2"
+        >
+          {visibleNav.map((entry) => {
+            if (entry.kind === "link") {
+              const active = isRouteActive(pathname, entry.href);
+              const Icon = entry.icon;
+              return (
+                <Link
+                  key={entry.href}
+                  href={entry.href}
+                  onClick={() => setMobileNavOpen(false)}
+                  title={isIconRail ? entry.label : undefined}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex items-center rounded-lg text-sm transition-colors group ${
+                    isIconRail ? "justify-center w-10 h-10 mx-auto" : "gap-3 px-3 py-2"
+                  } ${
+                    active
+                      ? "bg-[#c41230] text-white shadow-sm"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-[#101828]"
+                  }`}
+                >
+                  <Icon className="h-4 w-4 flex-none" />
+                  {!isIconRail && <span className="truncate">{entry.label}</span>}
+                </Link>
+              );
+            }
+
+            const GroupIcon = entry.icon;
+            const isGroupActive = entry.children.some((child) =>
+              isRouteActive(pathname, child.href)
+            );
+
+            if (isIconRail) {
+              const isPopoverOpen = activePopover?.groupId === entry.id;
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  data-collapsed-group-trigger={entry.id}
+                  onClick={(event) => handleCollapsedGroupToggle(entry, event.currentTarget)}
+                  title={entry.label}
+                  aria-label={entry.label}
+                  aria-haspopup="menu"
+                  aria-expanded={isPopoverOpen}
+                  className={`relative mx-auto flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
+                    isGroupActive
+                      ? "bg-[#c41230] text-white shadow-sm"
+                      : isPopoverOpen
+                        ? "bg-slate-100 text-[#101828]"
+                        : "text-slate-600 hover:bg-slate-100 hover:text-[#101828]"
+                  }`}
+                >
+                  <GroupIcon className="h-4 w-4 flex-none" />
+                  <ChevronRight
+                    className="pointer-events-none absolute right-1 bottom-1 size-2.5 opacity-75"
+                    aria-hidden="true"
+                  />
+                </button>
+              );
+            }
+
+            const override = groupOverrides[entry.id];
+            const isOpen =
+              override && override.pathname === pathname ? override.open : isGroupActive;
+            const submenuId = `nav-group-${entry.id}`;
+
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={collapsed ? item.label : undefined}
-                className={`flex items-center rounded-lg text-sm transition-colors group ${
-                  collapsed ? "justify-center w-10 h-10 mx-auto" : "gap-3 px-3 py-2"
-                } ${
-                  active
-                    ? "bg-[#E31E2D] text-white"
-                    : "text-[#C4A8AD] hover:bg-white/8 hover:text-[#F8ECEE]"
-                }`}
-              >
-                <Icon className="h-4 w-4 flex-none" />
-                {!collapsed && <span className="truncate">{item.label}</span>}
-              </Link>
+              <div key={entry.id}>
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  aria-controls={submenuId}
+                  onClick={() =>
+                    setGroupOverrides((prev) => ({
+                      ...prev,
+                      [entry.id]: { pathname, open: !isOpen },
+                    }))
+                  }
+                  className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                    isGroupActive
+                      ? "bg-rose-50/80 font-medium text-[#c41230]"
+                      : isOpen
+                        ? "bg-slate-100/80 font-medium text-[#101828]"
+                        : "text-slate-600 hover:bg-slate-100 hover:text-[#101828]"
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <GroupIcon className="h-4 w-4 flex-none" />
+                    <span className="truncate">{entry.label}</span>
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 flex-none transition-transform duration-200 ${
+                      isOpen ? "rotate-180" : ""
+                    }`}
+                    aria-hidden="true"
+                  />
+                </button>
+
+                {isOpen && (
+                  <ul id={submenuId} className="mt-0.5">
+                    {entry.children.map((child, idx) => {
+                      const isLast = idx === entry.children.length - 1;
+                      return (
+                        <li key={child.href} className="relative py-0.5 pl-[30px]">
+                          <span
+                            aria-hidden="true"
+                            className={`pointer-events-none absolute top-0 left-5 w-px bg-slate-200 ${
+                              isLast ? "h-1/2" : "bottom-0"
+                            }`}
+                          />
+                          <span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute top-1/2 left-5 h-px w-2 bg-slate-200"
+                          />
+                          <SubNavLink
+                            child={child}
+                            active={isRouteActive(pathname, child.href)}
+                            onNavigate={() => setMobileNavOpen(false)}
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
             );
           })}
         </nav>
 
-        <div className={`border-t border-[rgba(255,214,218,0.14)] p-2 ${collapsed ? "flex flex-col items-center gap-2" : "space-y-2"}`}>
+        {activePopover && activePopoverEntry && (
           <div
-            title={collapsed ? initialUser?.name ?? initialUser?.email ?? "User" : undefined}
-            className={`flex items-center rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE] ${
-              collapsed ? "h-10 w-10 justify-center" : "gap-3 p-2"
+            ref={popoverRef}
+            role="menu"
+            aria-label={activePopoverEntry.label}
+            style={{ top: activePopover.top, left: activePopover.left }}
+            className="fixed z-50 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg"
+          >
+            <div className="mb-1 border-b border-slate-100 px-2.5 pt-1 pb-1.5">
+              <p className="text-xs font-semibold text-[#101828]">{activePopoverEntry.label}</p>
+            </div>
+            <div className="space-y-0.5">
+              {activePopoverEntry.children.map((child) => (
+                <SubNavLink
+                  key={child.href}
+                  child={child}
+                  role="menuitem"
+                  active={isRouteActive(pathname, child.href)}
+                  onNavigate={() => setCollapsedPopover(null)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className={`border-t border-slate-200 p-2 ${isIconRail ? "flex flex-col items-center gap-2" : "space-y-2"}`}>
+          <div
+            title={isIconRail ? initialUser?.name ?? initialUser?.email ?? "User" : undefined}
+            className={`flex items-center rounded-xl border border-slate-200 bg-slate-50 text-[#101828] ${
+              isIconRail ? "h-10 w-10 justify-center" : "gap-3 p-2"
             }`}
           >
-            <UserCircle className="h-5 w-5 flex-none text-[#FF6B4A]" />
-            {!collapsed && (
+            <UserCircle className="h-5 w-5 flex-none text-[#c41230]" />
+            {!isIconRail && (
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">
+                <p className="truncate text-sm font-semibold text-[#101828]">
                   {initialUser?.name ?? initialUser?.email ?? "User"}
                 </p>
               </div>
             )}
           </div>
 
+          {/* Ke halaman utama publik tanpa logout; sesi admin tetap aktif sehingga bisa kembali ke CMS. */}
+          <Link
+            href="/"
+            title={isIconRail ? "Halaman Utama" : undefined}
+            className={`flex items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#101828] ${
+              isIconRail ? "w-10 h-10" : "w-full h-9 gap-2 px-3"
+            }`}
+          >
+            <House className="h-4 w-4 flex-none" />
+            {!isIconRail && <span className="text-sm flex-1 text-left">Halaman Utama</span>}
+          </Link>
+
           <button
             onClick={handleLogout}
-            title={collapsed ? "Logout" : undefined}
-            className={`flex items-center justify-center rounded-lg text-[#C4A8AD] hover:bg-red-900/30 hover:text-red-300 transition-colors ${
-              collapsed ? "w-10 h-10" : "w-full h-9 gap-2 px-3"
+            title={isIconRail ? "Logout" : undefined}
+            className={`flex items-center justify-center rounded-lg text-slate-600 hover:bg-red-50 hover:text-red-700 transition-colors ${
+              isIconRail ? "w-10 h-10" : "w-full h-9 gap-2 px-3"
             }`}
           >
             <LogOut className="h-4 w-4 flex-none" />
-            {!collapsed && <span className="text-sm flex-1 text-left">Logout</span>}
+            {!isIconRail && <span className="text-sm flex-1 text-left">Logout</span>}
           </button>
         </div>
       </aside>
 
       <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="relative z-20 border-b border-[rgba(255,214,218,0.14)] bg-[#261015]">
+        <header className="relative z-20 bg-[#c41230] text-white shadow-md">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
             <button
               type="button"
-              onClick={toggleSidebar}
+              onClick={handleHeaderSidebarToggle}
               title={collapsed ? "Perluas sidebar" : "Sembunyikan sidebar"}
               aria-label={collapsed ? "Perluas sidebar" : "Sembunyikan sidebar"}
-              className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE] transition hover:bg-[#E31E2D]"
+              className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white transition hover:bg-white/20"
             >
               {collapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
             </button>
@@ -280,17 +627,24 @@ export default function CmsShell({
               <h1 className="truncate text-base font-black text-white sm:text-lg">{pageMeta.title}</h1>
             </div>
 
-            <CmsNotifications />
+            <div className="ml-auto flex-none">
+              <CmsNotifications />
+            </div>
           </div>
         </header>
 
-        <div className={`relative min-h-0 flex-1 ${fullWidth ? "overflow-hidden" : "overflow-auto"}`}>
-          <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(227,30,45,.16),transparent_32%),radial-gradient(circle_at_85%_8%,rgba(27,58,107,.2),transparent_28%)]" />
+        <div className={`relative min-h-0 min-w-0 flex-1 ${fullWidth ? "overflow-hidden" : "overflow-auto"}`}>
 
           {fullWidth ? (
             <div className="relative z-10 flex h-full min-h-0 w-full flex-col overflow-hidden">{children}</div>
           ) : (
-            <div className="relative z-10 mx-auto max-w-7xl p-6">{children}</div>
+            <div
+              className={`relative z-10 mx-auto w-full min-w-0 p-4 sm:p-6 ${
+                pathname.startsWith("/cms/workflow") ? "max-w-none" : "max-w-7xl"
+              }`}
+            >
+              {children}
+            </div>
           )}
         </div>
       </main>

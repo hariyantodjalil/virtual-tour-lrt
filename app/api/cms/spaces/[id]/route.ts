@@ -7,6 +7,15 @@ import { processSpacePhoto } from "@/lib/image-processor";
 import { MAX_STANDARD_IMAGE_UPLOAD_BYTES, readValidatedImageUpload } from "@/lib/upload-validation";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { spaceMutationSchema } from "@/lib/api-schemas";
+import { resolveSpaceArea } from "@/lib/space-zoning";
+import { diffChangedFields, logTenantChange } from "@/lib/tenant-change-log";
+import {
+  countLinks,
+  describeLinks,
+  findStationSpaceLinks,
+  removeStationSpaceLinks,
+  renameStationSpaceCode,
+} from "@/lib/space-hotspot-links";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -41,7 +50,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
   const existing = await prisma.commercialSpace.findUnique({
     where: { id },
-    select: { id: true, stationId: true },
+    include: { occupancy: { select: { tenantId: true } } },
   });
   if (!existing) {
     return NextResponse.json({ error: "Unit tidak ditemukan." }, { status: 404 });
@@ -74,10 +83,18 @@ export async function PUT(request: NextRequest, { params }: Params) {
   }
 
   try {
-    const space = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
+      const resolved = await resolveSpaceArea(tx, {
+        stationId: existing.stationId,
+        spaceId: id,
+        input: spaceData,
+      });
+      if (!resolved.ok) return resolved;
+
+      const nextData = { ...spaceData, ...resolved.data };
       const updated = await tx.commercialSpace.update({
         where: { id },
-        data: spaceData,
+        data: nextData,
       });
 
       if (tenantId) {
@@ -90,21 +107,96 @@ export async function PUT(request: NextRequest, { params }: Params) {
         await tx.spaceOccupancy.deleteMany({ where: { spaceId: id } });
       }
 
-      return updated;
+      const hotspotsAffected =
+        existing.code !== updated.code
+          ? await renameStationSpaceCode(tx, existing.stationId, {
+              id,
+              oldCode: existing.code,
+              newCode: updated.code,
+            })
+          : 0;
+
+      const changedFields = diffChangedFields(
+        { ...existing, tenantId: existing.occupancy?.tenantId ?? null },
+        { ...nextData, tenantId: tenantId ?? null }
+      );
+      if (changedFields.length > 0) {
+        await logTenantChange(tx, {
+          entityType: "COMMERCIAL_SPACE",
+          entityId: id,
+          entityLabel: `${updated.code} - ${updated.name}`,
+          stationId: existing.stationId,
+          action: "UPDATE",
+          changedFields,
+          hotspotsAffected,
+          performedBy: auth.user.email,
+        });
+      }
+
+      return { ok: true as const, space: updated, hotspotsAffected };
     });
-    return NextResponse.json(space);
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json({ ...result.space, hotspotsAffected: result.hotspotsAffected });
   } catch (error) {
     return spaceWriteError(error);
   }
 }
 
+/**
+ * Hapus unit. Jika unit masih ditandai di panorama, kembalikan 409 berisi daftar scene
+ * agar admin mengonfirmasi; kirim ?cascadeHotspots=1 untuk menghapus unit beserta penandanya.
+ */
 export async function DELETE(request: NextRequest, { params }: Params) {
   const auth = await requireAuth(request);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { id } = await params;
-  await prisma.commercialSpace.delete({ where: { id } });
-  return NextResponse.json({ message: "Unit dihapus" });
+  const cascade = request.nextUrl.searchParams.get("cascadeHotspots") === "1";
+  const space = await prisma.commercialSpace.findUnique({
+    where: { id },
+    select: { id: true, code: true, name: true, stationId: true, _count: { select: { allocations: true } } },
+  });
+  if (!space) return NextResponse.json({ error: "Unit tidak ditemukan." }, { status: 404 });
+
+  if (space._count.allocations > 0) {
+    return NextResponse.json(
+      {
+        error: `Zona ${space.code} masih dibagi ke ${space._count.allocations} unit. Hapus atau pindahkan unit bagian zona terlebih dahulu.`,
+        code: "ZONE_HAS_ALLOCATIONS",
+      },
+      { status: 409 }
+    );
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const links = await findStationSpaceLinks(tx, space.stationId, space);
+    if (links.length > 0 && !cascade) return { ok: false as const, links };
+
+    const hotspotsAffected = links.length > 0 ? await removeStationSpaceLinks(tx, space.stationId, space) : 0;
+    await tx.commercialSpace.delete({ where: { id } });
+    await logTenantChange(tx, {
+      entityType: "COMMERCIAL_SPACE",
+      entityId: id,
+      entityLabel: `${space.code} - ${space.name}`,
+      stationId: space.stationId,
+      action: "DELETE",
+      hotspotsAffected,
+      performedBy: auth.user.email,
+    });
+    return { ok: true as const, hotspotsAffected };
+  });
+
+  if (!result.ok) {
+    return NextResponse.json(
+      {
+        error: `Unit ${space.code} masih ditandai di ${countLinks(result.links)} penanda lokasi (${describeLinks(result.links)}).`,
+        code: "HOTSPOT_LINKED",
+        links: result.links,
+      },
+      { status: 409 }
+    );
+  }
+  return NextResponse.json({ message: "Unit dihapus", hotspotsAffected: result.hotspotsAffected });
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
@@ -125,9 +217,21 @@ export async function POST(request: NextRequest, { params }: Params) {
   await uploadToS3(result.buffer, s3Key, "image/webp");
   const panoramaUrl = `/${s3Key}`;
 
-  const space = await prisma.commercialSpace.update({
-    where: { id },
-    data: { panoramaUrl },
+  const space = await prisma.$transaction(async (tx) => {
+    const updated = await tx.commercialSpace.update({
+      where: { id },
+      data: { panoramaUrl },
+    });
+    await logTenantChange(tx, {
+      entityType: "COMMERCIAL_SPACE",
+      entityId: id,
+      entityLabel: `${updated.code} - ${updated.name}`,
+      stationId: updated.stationId,
+      action: "UPDATE",
+      changedFields: ["panoramaUrl"],
+      performedBy: auth.user.email,
+    });
+    return updated;
   });
 
   return NextResponse.json({ message: "Upload berhasil", space });

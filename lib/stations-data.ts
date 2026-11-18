@@ -7,6 +7,7 @@ import { extractInitialViewFromCanvasData } from "@/lib/scene-initial-view";
 import { extractMultiResFromCanvasData } from "@/lib/panorama-multires";
 import { sortScenesByTourOrder } from "@/lib/virtual-tour-structure";
 import { buildPublicTourLevels } from "@/lib/public-tour-structure";
+import { getLevelMinimaps } from "@/lib/level-minimap-store";
 import { normalizeSpatialEntities } from "@/lib/spatial/normalize";
 import { isSpatialHotspotEnabled } from "@/lib/spatial-feature";
 
@@ -47,6 +48,7 @@ async function mapStationToInfo(station: StationRow): Promise<StationInfo> {
 
   const sortedScenes = sortScenesByTourOrder(freshScenes);
   const publicLevels = buildPublicTourLevels(levels, areas, sortedScenes);
+  const levelMinimaps = await getLevelMinimaps(station.id);
 
   return {
     slug: station.slug,
@@ -57,7 +59,10 @@ async function mapStationToInfo(station: StationRow): Promise<StationInfo> {
     dailyPassengers: station.dailyPassengers,
     address: station.address,
     commercialContactPhone: station.commercialContactPhone ?? undefined,
-    levels: publicLevels,
+    levels: publicLevels.map((level) => ({
+      ...level,
+      minimap: levelMinimaps.get(level.id) ?? null,
+    })),
     scenes: sortedScenes.map((scene) => ({
       id: scene.sceneId,
       title: scene.title,

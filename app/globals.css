@@ -1069,3 +1069,43 @@ body {
     animation: none;
   }
 }
+
+/* Dialog form CMS (CmsSlideOver) — muncul di tengah layar */
+@keyframes cms-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.cms-dialog-in {
+  animation: cms-dialog-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cms-dialog-in {
+    animation: none;
+  }
+}
+
+/* Minimap: denyut penanda posisi scene aktif. */
+@keyframes minimap-pulse {
+  0% { transform: scale(0.7); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.minimap-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: minimap-pulse 1.8s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .minimap-pulse {
+    animation: none;
+  }
+}

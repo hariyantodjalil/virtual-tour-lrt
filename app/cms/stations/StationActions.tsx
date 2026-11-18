@@ -87,8 +87,8 @@ export default function StationActions({ station }: Props) {
           onClick={toggleStatus}
           className={
             station.isActive
-              ? "border-amber-700 text-amber-300 hover:bg-amber-950"
-              : "border-emerald-700 text-emerald-300 hover:bg-emerald-950"
+              ? "border-amber-700 text-amber-700 hover:bg-amber-50"
+              : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
           }
         >
           {station.isActive ? (
@@ -108,14 +108,14 @@ export default function StationActions({ station }: Props) {
           variant="outline"
           disabled={busyAction !== null}
           onClick={deleteStation}
-          className="border-red-800 text-red-300 hover:bg-red-950"
+          className="border-red-200 text-red-600 hover:bg-red-50"
         >
           <Trash2 className="h-3.5 w-3.5" />
           {busyAction === "delete" ? "Menghapus..." : "Hapus"}
         </Button>
       </div>
       {error && (
-        <p role="alert" className="text-xs text-red-400">
+        <p role="alert" className="text-xs text-red-600">
           {error}
         </p>
       )}

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
+
 /**
  * Session probe for public UI (navbar, forms).
  * Unauthenticated visitors get 200 + authenticated:false — not 401 —
@@ -11,7 +13,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET(request: NextRequest) {
   const payload = getUserFromRequest(request);
   if (!payload) {
-    return NextResponse.json({ authenticated: false });
+    return NextResponse.json({ authenticated: false }, { headers: NO_STORE_HEADERS });
   }
 
   const user = await prisma.user.findUnique({
@@ -26,11 +28,14 @@ export async function GET(request: NextRequest) {
   });
 
   if (!user || !user.isActive) {
-    return NextResponse.json({ authenticated: false });
+    return NextResponse.json({ authenticated: false }, { headers: NO_STORE_HEADERS });
   }
 
-  return NextResponse.json({
-    authenticated: true,
-    user: { ...user, avatarUrl: null as string | null },
-  });
+  return NextResponse.json(
+    {
+      authenticated: true,
+      user: { ...user, avatarUrl: null as string | null },
+    },
+    { headers: NO_STORE_HEADERS }
+  );
 }

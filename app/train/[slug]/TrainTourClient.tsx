@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import VirtualTourViewer from "@/components/tour/VirtualTourViewer";
+import VirtualTourViewer, { type VirtualTourViewerHandle } from "@/components/tour/VirtualTourViewer";
+import { TRAIN_MEDIA_DISTANCE_M } from "@/lib/spatial/unit-volume";
 import TourLeftPanel from "@/components/tour/TourLeftPanel";
 import TrainFormationMap from "@/components/tour/TrainFormationMap";
 import ContactPersonFab from "@/components/tour/ContactPersonFab";
@@ -46,6 +47,20 @@ export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
     );
   });
   const [uiCleared, setUiCleared] = useState(false);
+  const [spaceMockups, setSpaceMockups] = useState<Record<string, string>>({});
+  const tourViewerRef = useRef<VirtualTourViewerHandle>(null);
+
+  const handleMockupChange = useCallback((spaceCode: string, url: string | null) => {
+    setSpaceMockups((prev) => {
+      const next = { ...prev };
+      if (url) {
+        next[spaceCode] = url;
+      } else {
+        delete next[spaceCode];
+      }
+      return next;
+    });
+  }, []);
 
   const currentCar =
     trainInfo.levels.find((l) => l.id === activeLevelId) ?? trainInfo.levels[0];
@@ -79,6 +94,7 @@ export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
   return (
     <div className="tour-shell relative h-[100dvh] w-full overflow-hidden">
       <VirtualTourViewer
+        ref={tourViewerRef}
         scenes={trainInfo.scenes}
         stationName={trainInfo.name}
         initialScene={activeSceneId}
@@ -102,7 +118,15 @@ export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
         spaces={rentalSpaces.map((space) => ({
           code: space.displayNumber,
           status: trainRentalStatusToSpaceStatus(space.status),
+          lengthM: space.lengthM,
+          widthM: space.widthM,
+          heightM: space.heightM,
+          mockupImageUrl:
+            spaceMockups[space.displayNumber] ??
+            spaceMockups[space.id] ??
+            null,
         }))}
+        pinVolumeDistanceM={TRAIN_MEDIA_DISTANCE_M}
         hideSceneBar
         chromeTone="maroon"
       />
@@ -186,6 +210,27 @@ export default function TrainTourClient({ trainInfo, rentalSpaces }: Props) {
           onClose={() => setSelectedSpace(null)}
           backLabel="Kembali ke Tour"
           initialCarSlug={currentCar?.slug}
+          mockupImageUrl={
+            spaceMockups[selectedSpace.displayNumber] ??
+            spaceMockups[selectedSpace.id] ??
+            null
+          }
+          onMockupImageChange={(url) => {
+            handleMockupChange(selectedSpace.displayNumber, url);
+            if (selectedSpace.id && selectedSpace.id !== selectedSpace.displayNumber) {
+              handleMockupChange(selectedSpace.id, url);
+            }
+          }}
+          onDownloadMockup={async () => {
+            await tourViewerRef.current?.downloadMockupSnapshot({
+              spaceCode: selectedSpace.displayNumber,
+              spaceTitle: selectedSpace.title,
+              mockupImageUrl:
+                spaceMockups[selectedSpace.displayNumber] ??
+                spaceMockups[selectedSpace.id] ??
+                null,
+            });
+          }}
         />
       ) : null}
     </div>

@@ -8,6 +8,7 @@ import { parseJsonRequest } from "@/lib/api-validation";
 import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/rate-limit";
 import { ACTIVE_LEAD_STATUSES } from "@/lib/commercial-pipeline";
 import { findTrainRentalSpaceForLead, trainLeadRequirement } from "@/lib/train-rental-spaces";
+import { publishInquiryEvent } from "@/lib/realtime-events";
 
 const leadSchema = z.object({
   spaceId: z.string().trim().min(1).max(128).optional(),
@@ -175,6 +176,12 @@ export async function POST(req: NextRequest) {
         },
       });
     }
+
+    await publishInquiryEvent({
+      kind: "lead-created",
+      leadId: lead.id,
+      userId: lead.userId,
+    });
 
     return NextResponse.json(lead, { status: 201, headers: rateLimitHeaders(rateLimit) });
   } catch (error) {

@@ -26,6 +26,10 @@ export type Hotspot = {
   facilityIcon?: FacilityIconId;
   creativeUrl?: string;
   creativeTitle?: string;
+  /** Unit berdimensi: arah hadap volume 3D (derajat, 0 = menghadap kamera). */
+  volumeRotation?: number;
+  /** Unit berdimensi: jarak volume dari kamera (meter); kosong = otomatis. */
+  volumeDistance?: number;
 };
 
 export type SceneInitialView = {
@@ -67,6 +71,8 @@ export type TourLevelPublic = {
   areas: TourAreaPublic[];
   /** Scene tanpa area (fallback) — urutan sceneId */
   sceneIds: string[];
+  /** Denah minimap level (gambar, kalibrasi, pin scene). */
+  minimap?: import("@/lib/minimap").LevelMinimap | null;
 };
 
 export type StationInfo = {

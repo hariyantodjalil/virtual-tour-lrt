@@ -18,6 +18,7 @@ import { validateSphericalPolygonAuthoring } from "@/lib/spatial/geometry/polygo
 import { dirToSpherical, slerpDir, sphericalToDir } from "@/lib/spatial/geometry/spherical";
 import type { CameraState, SpatialEntity, SphericalPoint } from "@/lib/spatial/types";
 import { DEFAULT_SPATIAL_STYLE } from "@/lib/spatial/types";
+import { buildEntityVolume, isPinVolumeEntity, type UnitVolumeDimensions, type UnitVolumeFace } from "@/lib/spatial/unit-volume";
 import {
   spaceStatusColor,
   spaceStatusCssVariant,
@@ -32,6 +33,12 @@ type Props = {
   selectedId?: string | null;
   interactive?: boolean;
   resolveSpaceStatus?: (spaceCode: string) => SpaceAvailabilityStatus | undefined;
+  /** Bila diisi, area yang tertaut unit berdimensi lengkap digambar sebagai volume 3D. */
+  resolveUnitDimensions?: (spaceCode: string) => UnitVolumeDimensions | undefined;
+  /** Gambar pratinjau materi promosi/mockup yang diproyeksikan ke permukaan volume unit. */
+  resolveMockupImage?: (spaceCode: string) => string | null | undefined;
+  /** false = volume dari pin unit hanya tampilan (editor CMS memakai titik pegangan pin untuk memilih). */
+  pinVolumesInteractive?: boolean;
   onSelect?: (id: string | null) => void;
   onEntityClick?: (entity: SpatialEntity) => void;
   onGeometryCommit?: (id: string, vertices: SphericalPoint[]) => void;
@@ -91,6 +98,9 @@ function SpatialOverlayContent({
   selectedId = null,
   interactive = false,
   resolveSpaceStatus,
+  resolveUnitDimensions,
+  resolveMockupImage,
+  pinVolumesInteractive = true,
   onSelect,
   onEntityClick,
   onGeometryCommit,
@@ -138,6 +148,33 @@ function SpatialOverlayContent({
   const width = camera?.widthCssPx ?? 0;
   const height = camera?.heightCssPx ?? 0;
 
+  // Dimensi dibaca per render (murah), tetapi geometri volume hanya dibangun ulang bila datanya berubah
+  // agar cache tessellation per array vertex tetap terpakai saat kamera bergerak.
+  const dimensionsKey = resolveUnitDimensions
+    ? JSON.stringify(
+        entities.map((e) => {
+          const d = e.spaceCode ? resolveUnitDimensions(e.spaceCode) : undefined;
+          return [e.id, d?.lengthM ?? null, d?.widthM ?? null, d?.heightM ?? null];
+        })
+      )
+    : "";
+  const volumes = useMemo(() => {
+    const map = new Map<string, UnitVolumeFace[]>();
+    if (!dimensionsKey) return map;
+    const dims = new Map(
+      (JSON.parse(dimensionsKey) as [string, number | null, number | null, number | null][]).map(
+        ([id, lengthM, widthM, heightM]) => [id, { lengthM, widthM, heightM }]
+      )
+    );
+    for (const entity of entities) {
+      if (entity.geometry.type !== "spherical_polygon") continue;
+      const unit = dims.get(entity.id);
+      const faces = unit ? buildEntityVolume(entity, unit) : null;
+      if (faces) map.set(entity.id, faces);
+    }
+    return map;
+  }, [entities, dimensionsKey]);
+
   const rendered = useMemo(() => {
     if (!camera || width < 1 || height < 1) return [];
     return entities
@@ -149,7 +186,17 @@ function SpatialOverlayContent({
         const verts = drag?.id === entity.id
           ? drag.vertices
           : entity.geometry.type === "spherical_polygon" ? entity.geometry.vertices : [];
-        const fragments = projectPolygonFragments(verts, camera);
+        const faces = drag?.id === entity.id ? undefined : volumes.get(entity.id);
+        const shapes = faces
+          ? faces.map((face) => ({
+              key: face.key,
+              vertices: face.vertices,
+              fragments: projectPolygonFragments(face.vertices, camera),
+              back: !face.facesCamera,
+              top: face.key === "top",
+            }))
+          : [{ key: "area", vertices: verts, fragments: projectPolygonFragments(verts, camera), back: false, top: false }];
+        const fragments = shapes.flatMap((shape) => shape.fragments);
         const handles =
           entity.id === selectedId
             ? verts.flatMap((v, index) => {
@@ -165,10 +212,10 @@ function SpatialOverlayContent({
               return point ? [{ ...point, spherical, index }] : [];
             })
           : [];
-        return { entity, verts, fragments, anchor: badgeAnchor(fragments), handles, midpoints };
+        return { entity, verts, shapes, fragments, anchor: badgeAnchor(fragments), handles, midpoints };
       })
       .filter((r) => r.fragments.length > 0);
-  }, [camera, entities, width, height, selectedId, drag]);
+  }, [camera, entities, width, height, selectedId, drag, volumes]);
 
   const unitBadges = useMemo(() => {
     const groups = new Map<string, { ownerId: string | null; fragments: ProjectedFragment[] }>();
@@ -220,14 +267,16 @@ function SpatialOverlayContent({
         </filter>
       </defs>
 
-      {rendered.map(({ entity, verts, fragments, anchor, handles, midpoints }) => {
+      {rendered.map(({ entity, verts, shapes, anchor, handles, midpoints }) => {
         const style = { ...DEFAULT_SPATIAL_STYLE, ...entity.style };
         const unitKey = unitKeys.get(entity.id) ?? `area:${entity.id}`;
         const badge = unitBadges.get(unitKey);
         const selected = entity.id === selectedId;
         const outlineOnly = style.outlineOnly !== false;
         const baseFill = style.fillOpacity ?? 0.1;
-        const hovered = interactive && unitKey === hoveredUnitKey;
+        // Volume pin di editor hanya tampilan; pin dipilih/digeser lewat titik pegangannya.
+        const entityInteractive = interactive && (pinVolumesInteractive || !isPinVolumeEntity(entity));
+        const hovered = entityInteractive && unitKey === hoveredUnitKey;
         let fillOp = outlineOnly
           ? selected
             ? Math.max(baseFill, 0.14)
@@ -242,10 +291,15 @@ function SpatialOverlayContent({
         const status = entity.spaceCode
           ? resolveSpaceStatus?.(entity.spaceCode)
           : undefined;
-        const stroke =
-          style.strokeColor ??
-          (status ? spaceStatusColor(status) : "#4ADE80");
-        const fill = style.fillColor ?? stroke;
+        const mockupImage = entity.spaceCode
+          ? resolveMockupImage?.(entity.spaceCode)
+          : undefined;
+        // Volume dari pin unit mengikuti warna status seperti kotak pin lama; Spatial Area memakai gaya entitasnya.
+        const pinVolume = isPinVolumeEntity(entity);
+        const stroke = pinVolume
+          ? status ? spaceStatusColor(status) : "#4ADE80"
+          : style.strokeColor ?? (status ? spaceStatusColor(status) : "#4ADE80");
+        const fill = pinVolume ? stroke : style.fillColor ?? stroke;
         const caption = spatialAreaBadgeCaption(entity, status);
         const pill = pillColors(status);
         const approxCharW = 7.2;
@@ -255,7 +309,7 @@ function SpatialOverlayContent({
         const pillW = Math.min(maxPillW, Math.max(120, displayCaption.length * approxCharW + 50));
         const pillH = 32;
 
-        const onHit = interactive
+        const onHit = entityInteractive
           ? (e: { stopPropagation: () => void; preventDefault: () => void }) => {
               e.stopPropagation();
               e.preventDefault();
@@ -265,16 +319,75 @@ function SpatialOverlayContent({
           : undefined;
         /** Stroke visual tipis (~2–4px) — hit area terpisah biar gampang diklik. */
         const hitStroke = Math.max(28, strokeW + 20);
+        const isVolume = shapes.length > 1;
 
         return (
-          <g key={entity.id} data-spatial-entity={entity.id} data-spatial-group={unitKey} style={{ transition: "opacity 160ms ease-out" }}>
-            {fragments.map((frag, i) => {
+          <g key={entity.id} data-spatial-entity={entity.id} data-spatial-group={unitKey} data-spatial-volume={isVolume || undefined} style={{ transition: "opacity 160ms ease-out" }}>
+            {shapes.flatMap((shape) => shape.fragments.map((frag, i) => {
               // Keep every clipped vertex while avoiding per-frame path-data style updates.
               const points = frag.points.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
+              // Volume: arsir per sisi (samping paling gelap, depan paling terang) agar kotak terbaca 3D;
+              // sisi belakang tipis putus-putus seperti garis tersembunyi.
+              const boost = Math.max(0, fillOp - (style.fillOpacity ?? 0.1));
+
+              // Sisi muka yang memuat iklan: untuk volume 3D (sisi front/back yang menghadap kamera), atau area 2D
+              const isAdFace = (!isVolume && shape.key === "area") || (isVolume && !shape.back && (shape.key === "front" || shape.key === "back"));
+              const hasMockup = isAdFace && !!mockupImage;
+
+              let matrixTransform: string | null = null;
+              if (hasMockup) {
+                const faceVerts = shape.vertices && shape.vertices.length >= 4 ? shape.vertices : verts;
+                const corners = (faceVerts || [])
+                  .map((v) => projectPoint(v, camera))
+                  .filter((p): p is { x: number; y: number } => p != null && Number.isFinite(p.x) && Number.isFinite(p.y));
+
+                const srcPoints = corners.length === 4 ? corners : (frag.points.length >= 4 ? frag.points : []);
+                if (srcPoints.length >= 4) {
+                  const sortedByY = [...srcPoints].sort((a, b) => a.y - b.y);
+                  const topPoints = sortedByY.slice(0, 2).sort((a, b) => a.x - b.x);
+                  const botPoints = sortedByY.slice(-2).sort((a, b) => a.x - b.x);
+                  const pTL = topPoints[0];
+                  const pTR = topPoints[1];
+                  const pBL = botPoints[0];
+
+                  const a = (pTR.x - pTL.x) / 100;
+                  const b = (pTR.y - pTL.y) / 100;
+                  const c = (pBL.x - pTL.x) / 100;
+                  const d = (pBL.y - pTL.y) / 100;
+                  const e = pTL.x;
+                  const f = pTL.y;
+                  const det = a * d - b * c;
+                  if (Math.abs(det) > 0.00001) {
+                    matrixTransform = `matrix(${a.toFixed(4)} ${b.toFixed(4)} ${c.toFixed(4)} ${d.toFixed(4)} ${e.toFixed(2)} ${f.toFixed(2)})`;
+                  }
+                }
+              }
+
+              const shapeFill = !isVolume
+                ? (hasMockup ? 0 : fillOp)
+                : shape.back
+                  ? 0.06
+                  : hasMockup
+                    ? 0
+                    : Math.min(1, (shape.key === "front" ? 0.16 : shape.key === "floor" ? 0.34 : shape.top ? 0.24 : 0.32) + boost);
+
               return (
-                <g key={`${entity.id}-${i}`}>
+                <g key={`${entity.id}-${shape.key}-${i}`}>
+                  {matrixTransform && (
+                    <image
+                      href={mockupImage ?? undefined}
+                      x="0"
+                      y="0"
+                      width="100"
+                      height="100"
+                      preserveAspectRatio="none"
+                      transform={matrixTransform}
+                      className="pointer-events-none"
+                      opacity={0.98}
+                    />
+                  )}
                   {/* Invisible hit target: isi polygon + stroke lebar */}
-                  {interactive && (
+                  {entityInteractive && !shape.back && (
                     <polygon
                       points={points}
                       fill={fill}
@@ -301,46 +414,49 @@ function SpatialOverlayContent({
                       onClick={onHit}
                     />
                   )}
-                  <polygon
-                    points={points}
-                    fill="none"
-                    stroke="#052e16"
-                    strokeOpacity={0.55}
-                    strokeWidth={strokeW + 2.5}
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                    className="pointer-events-none"
-                  />
+                  {!shape.back && (
+                    <polygon
+                      points={points}
+                      fill="none"
+                      stroke="#052e16"
+                      strokeOpacity={0.55}
+                      strokeWidth={strokeW + 2.5}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      className="pointer-events-none"
+                    />
+                  )}
                   <polygon
                     points={points}
                     fill={fill}
-                    fillOpacity={fillOp}
+                    fillOpacity={shapeFill}
                     stroke={stroke}
-                    strokeOpacity={hovered ? 1 : style.strokeOpacity ?? 1}
-                    strokeWidth={strokeW}
+                    strokeOpacity={shape.back ? 0.6 : hovered ? 1 : style.strokeOpacity ?? 1}
+                    strokeWidth={shape.back ? Math.max(1, strokeW * 0.5) : strokeW}
+                    strokeDasharray={shape.back ? "4 4" : undefined}
                     strokeLinejoin="round"
                     strokeLinecap="round"
-                    filter={selected || hovered ? "url(#spatial-seal-glow)" : undefined}
+                    filter={!shape.back && (selected || hovered) ? "url(#spatial-seal-glow)" : undefined}
                     className={`pointer-events-none spatial-area-fill${selected ? " is-selected" : ""}${hovered ? " is-hovered" : ""}`}
                     style={{ transition: "fill-opacity 160ms ease-out, filter 160ms ease-out" }}
                   />
                 </g>
               );
-            })}
+            }))}
 
             {badge?.ownerId === entity.id && badge.anchor && (
               <g
                 transform={`translate(${Math.max(pillW / 2 + 8, Math.min(width - pillW / 2 - 8, badge.anchor.x))}, ${badge.anchor.y})`}
                 className={
-                  interactive
+                  entityInteractive
                     ? "spatial-badge pointer-events-auto cursor-pointer"
                     : "spatial-badge"
                 }
                 onPointerEnter={
-                  interactive ? () => setHoveredUnitKey(unitKey) : undefined
+                  entityInteractive ? () => setHoveredUnitKey(unitKey) : undefined
                 }
                 onPointerLeave={
-                  interactive
+                  entityInteractive
                     ? () => setHoveredUnitKey((key) => (key === unitKey ? null : key))
                     : undefined
                 }
@@ -348,7 +464,7 @@ function SpatialOverlayContent({
               >
                 <title>{caption}</title>
                 {/* Perluas hit badge */}
-                {interactive && (
+                {entityInteractive && (
                   <rect
                     x={-pillW / 2 - 6}
                     y={-pillH / 2 - 6}
@@ -386,7 +502,7 @@ function SpatialOverlayContent({
               </g>
             )}
 
-            {selected && interactive && onGeometryCommit && midpoints.map((h) => (
+            {selected && entityInteractive && onGeometryCommit && midpoints.map((h) => (
               <circle
                 key={`mid-${h.index}`}
                 cx={h.x} cy={h.y} r={4}
@@ -406,7 +522,7 @@ function SpatialOverlayContent({
                 }}
               />
             ))}
-            {selected && interactive &&
+            {selected && entityInteractive &&
               handles.map((h) => (
                 <circle
                   key={`sh-${entity.id}-${h.index}`}

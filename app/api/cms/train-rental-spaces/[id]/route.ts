@@ -8,6 +8,14 @@ import { MAX_STANDARD_IMAGE_UPLOAD_BYTES, readValidatedImageUpload } from "@/lib
 import { parseJsonRequest } from "@/lib/api-validation";
 import { trainRentalSpaceMutationSchema } from "@/lib/api-schemas";
 import { fetchTrainRentalSalesMap, writeTrainRentalSalesFields } from "@/lib/train-rental-spaces";
+import { diffChangedFields, logTenantChange } from "@/lib/tenant-change-log";
+import {
+  countLinks,
+  describeLinks,
+  findTrainSpaceLinks,
+  removeTrainSpaceLinks,
+  renameTrainSpaceCode,
+} from "@/lib/space-hotspot-links";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -36,17 +44,42 @@ export async function PUT(request: NextRequest, { params }: Params) {
   }
 
   try {
-    const space = await prisma.trainRentalSpace.update({
-      where: { id },
-      data: {
-        displayNumber: parsed.data.displayNumber,
-        title: parsed.data.title,
-        description: parsed.data.description ?? null,
-        imageUrl: parsed.data.imageUrl ?? null,
-        objectPosition: parsed.data.objectPosition ?? "50% 50%",
-        order: parsed.data.order ?? existing.order,
-        isActive: parsed.data.isActive ?? existing.isActive,
-      },
+    const nextData = {
+      displayNumber: parsed.data.displayNumber,
+      title: parsed.data.title,
+      description: parsed.data.description ?? null,
+      imageUrl: parsed.data.imageUrl ?? null,
+      objectPosition: parsed.data.objectPosition ?? "50% 50%",
+      order: parsed.data.order ?? existing.order,
+      isActive: parsed.data.isActive ?? existing.isActive,
+      lengthM: parsed.data.lengthM ?? null,
+      widthM: parsed.data.widthM ?? null,
+      heightM: parsed.data.heightM ?? null,
+    };
+    const space = await prisma.$transaction(async (tx) => {
+      const updated = await tx.trainRentalSpace.update({ where: { id }, data: nextData });
+      const hotspotsAffected =
+        existing.displayNumber !== updated.displayNumber
+          ? await renameTrainSpaceCode(tx, existing.trainId, existing.displayNumber, updated.displayNumber)
+          : 0;
+      const changedFields = diffChangedFields(existing, {
+        ...nextData,
+        status: parsed.data.status,
+        monthlyRent: parsed.data.monthlyRent ?? null,
+        howToOrder: parsed.data.howToOrder ?? null,
+      });
+      if (changedFields.length > 0) {
+        await logTenantChange(tx, {
+          entityType: "TRAIN_RENTAL_SPACE",
+          entityId: id,
+          entityLabel: `${updated.displayNumber} - ${updated.title}`,
+          action: "UPDATE",
+          changedFields,
+          hotspotsAffected,
+          performedBy: auth.user.email,
+        });
+      }
+      return updated;
     });
     await writeTrainRentalSalesFields(id, {
       availableTrainsets: parsed.data.availableTrainsets,
@@ -74,8 +107,41 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { id } = await params;
-  await prisma.trainRentalSpace.delete({ where: { id } });
-  return NextResponse.json({ message: "Ruang sewa dihapus" });
+  const cascade = request.nextUrl.searchParams.get("cascadeHotspots") === "1";
+  const space = await prisma.trainRentalSpace.findUnique({
+    where: { id },
+    select: { id: true, trainId: true, displayNumber: true, title: true },
+  });
+  if (!space) return NextResponse.json({ error: "Ruang sewa tidak ditemukan." }, { status: 404 });
+
+  const result = await prisma.$transaction(async (tx) => {
+    const links = await findTrainSpaceLinks(tx, space.trainId, space.displayNumber);
+    if (links.length > 0 && !cascade) return { ok: false as const, links };
+
+    const hotspotsAffected = links.length > 0 ? await removeTrainSpaceLinks(tx, space.trainId, space.displayNumber) : 0;
+    await tx.trainRentalSpace.delete({ where: { id } });
+    await logTenantChange(tx, {
+      entityType: "TRAIN_RENTAL_SPACE",
+      entityId: id,
+      entityLabel: `${space.displayNumber} - ${space.title}`,
+      action: "DELETE",
+      hotspotsAffected,
+      performedBy: auth.user.email,
+    });
+    return { ok: true as const, hotspotsAffected };
+  });
+
+  if (!result.ok) {
+    return NextResponse.json(
+      {
+        error: `Ruang sewa ${space.displayNumber} masih ditandai di ${countLinks(result.links)} hotspot (${describeLinks(result.links)}).`,
+        code: "HOTSPOT_LINKED",
+        links: result.links,
+      },
+      { status: 409 }
+    );
+  }
+  return NextResponse.json({ message: "Ruang sewa dihapus", hotspotsAffected: result.hotspotsAffected });
 }
 
 export async function POST(request: NextRequest, { params }: Params) {

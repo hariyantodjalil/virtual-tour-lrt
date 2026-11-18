@@ -10,6 +10,7 @@ import {
   getTrainRentalSpacesForCms,
   writeTrainRentalSalesFields,
 } from "@/lib/train-rental-spaces";
+import { logTenantChange } from "@/lib/tenant-change-log";
 
 function writeError(error: unknown) {
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -40,17 +41,30 @@ export async function POST(request: NextRequest) {
   const train = await ensureDefaultTrain();
 
   try {
-    const space = await prisma.trainRentalSpace.create({
-      data: {
-        trainId: train.id,
-        displayNumber: parsed.data.displayNumber,
-        title: parsed.data.title,
-        description: parsed.data.description ?? null,
-        imageUrl: parsed.data.imageUrl ?? null,
-        objectPosition: parsed.data.objectPosition ?? "50% 50%",
-        order: parsed.data.order ?? 0,
-        isActive: parsed.data.isActive ?? true,
-      },
+    const space = await prisma.$transaction(async (tx) => {
+      const created = await tx.trainRentalSpace.create({
+        data: {
+          trainId: train.id,
+          displayNumber: parsed.data.displayNumber,
+          title: parsed.data.title,
+          description: parsed.data.description ?? null,
+          imageUrl: parsed.data.imageUrl ?? null,
+          objectPosition: parsed.data.objectPosition ?? "50% 50%",
+          order: parsed.data.order ?? 0,
+          isActive: parsed.data.isActive ?? true,
+          lengthM: parsed.data.lengthM ?? null,
+          widthM: parsed.data.widthM ?? null,
+          heightM: parsed.data.heightM ?? null,
+        },
+      });
+      await logTenantChange(tx, {
+        entityType: "TRAIN_RENTAL_SPACE",
+        entityId: created.id,
+        entityLabel: `${created.displayNumber} - ${created.title}`,
+        action: "CREATE",
+        performedBy: auth.user.email,
+      });
+      return created;
     });
     await writeTrainRentalSalesFields(space.id, {
       availableTrainsets: parsed.data.availableTrainsets,

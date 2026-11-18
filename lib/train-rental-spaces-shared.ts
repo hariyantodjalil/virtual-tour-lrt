@@ -10,12 +10,19 @@ export type TrainRentalSpacePublic = {
   howToOrder: string | null;
   status: "TERSEDIA" | "TERBATAS" | "PENUH";
   monthlyRent: number | null;
+  /** Dimensi media (meter) untuk pratinjau volume 3D / denah 2D. */
+  lengthM?: number | null;
+  widthM?: number | null;
+  heightM?: number | null;
 };
 
 export type TrainRentalSpaceCms = TrainRentalSpacePublic & {
   order: number;
   isActive: boolean;
   imageUrl: string | null;
+  lengthM: number | null;
+  widthM: number | null;
+  heightM: number | null;
 };
 
 export const DEFAULT_TRAIN_RENTAL_SPACES = [

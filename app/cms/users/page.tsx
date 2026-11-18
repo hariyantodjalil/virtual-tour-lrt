@@ -105,13 +105,13 @@ export default function CmsUsersPage() {
 
   return (
     <div>
-      {error && <p className="mb-4 text-red-400">{error}</p>}
+      {error && <p className="mb-4 text-red-600">{error}</p>}
       <div className="grid lg:grid-cols-2 gap-6">
-        <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
+        <Card className="border-slate-200 bg-white text-[#101828]">
           <CardHeader><CardTitle>Daftar User</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {users.map((user) => (
-              <div key={user.id} className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg border border-[rgba(255,214,218,0.14)]">
+              <div key={user.id} className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg border border-slate-200">
                 <div className="min-w-0 flex-1">
                   {editingUserId === user.id ? (
                     <div className="flex max-w-md items-center gap-2">
@@ -129,7 +129,7 @@ export default function CmsUsersPage() {
                           }}
                           maxLength={160}
                           autoFocus
-                          className="h-9 border-[rgba(255,214,218,0.14)] bg-[#261015]"
+                          className="h-9 border-slate-200 bg-slate-50"
                         />
                       </div>
                       <Button
@@ -137,7 +137,7 @@ export default function CmsUsersPage() {
                         size="sm"
                         onClick={() => void saveName(user)}
                         disabled={savingUserId === user.id}
-                        className="bg-[#E31E2D] hover:bg-[#c41926]"
+                        className="bg-[#c41230] hover:bg-[#a30f28]"
                         aria-label="Simpan nama Mitra"
                       >
                         <Check className="h-3.5 w-3.5" />
@@ -157,7 +157,7 @@ export default function CmsUsersPage() {
                   ) : (
                     <p className="font-medium">{user.name}</p>
                   )}
-                  <p className="text-sm text-[#C4A8AD]">{user.email}</p>
+                  <p className="text-sm text-slate-600">{user.email}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className={cmsUi.outlineBadge}>
@@ -169,7 +169,7 @@ export default function CmsUsersPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => startEditName(user)}
-                      className="border-[rgba(255,214,218,0.14)]"
+                      className="border-slate-200"
                     >
                       <Pencil className="h-3.5 w-3.5" />
                       Edit Nama
@@ -183,22 +183,22 @@ export default function CmsUsersPage() {
             ))}
           </CardContent>
         </Card>
-        <Card className="border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
+        <Card className="border-slate-200 bg-white text-[#101828]">
           <CardHeader><CardTitle>Tambah User</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={createUser} className="space-y-3">
-              <div><Label>Nama</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" required /></div>
-              <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" required /></div>
-              <div><Label>Password</Label><Input type="password" minLength={12} maxLength={128} placeholder="Minimal 12 karakter" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]" required /></div>
+              <div><Label>Nama</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="border-slate-200 bg-white" required /></div>
+              <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="border-slate-200 bg-white" required /></div>
+              <div><Label>Password</Label><Input type="password" minLength={12} maxLength={128} placeholder="Minimal 12 karakter" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="border-slate-200 bg-white" required /></div>
               <div>
                 <Label>Role</Label>
-                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full bg-[#261015] border border-[rgba(255,214,218,0.14)] rounded-md p-2 text-sm">
+                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-md p-2 text-sm">
                   <option value="EDITOR">EDITOR</option>
                   <option value="ADMIN">ADMIN</option>
                   <option value="MITRA">MITRA</option>
                 </select>
               </div>
-              <Button type="submit" className="bg-[#E31E2D] hover:bg-[#c41926]">Buat User</Button>
+              <Button type="submit" className="bg-[#c41230] hover:bg-[#a30f28]">Buat User</Button>
             </form>
           </CardContent>
         </Card>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
 import type { ViewerBakeContext } from "@/lib/panorama-privacy-blur-geometry";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { AddMode, HotspotItem } from "@/lib/hotspot-types";
@@ -24,6 +24,7 @@ import { PANNELLUM_EDITOR_HFOV, PANNELLUM_INTERACTION, PANNELLUM_PITCH_LIMITS } 
 import type { SceneInitialView } from "@/lib/tour-types";
 import { PANNELLUM_HFOV } from "@/lib/pannellum-viewer-defaults";
 import { SpatialOverlay } from "@/components/tour/spatial/SpatialOverlay";
+import { canBuildPinVolume, pinVolumeEntity, pinVolumeOptions, type PinPlacement } from "@/lib/spatial/unit-volume";
 import type { SpatialEntity, SphericalPoint } from "@/lib/spatial/types";
 
 declare global {
@@ -72,6 +73,7 @@ function buildEditorHotspotEl(
   isSelected: boolean,
   getSpaceStatus: (code: string) => SpaceAvailabilityStatus | undefined,
   getSceneTitle: (sceneId: string | undefined, fallback: string) => string,
+  hasVolume: (h: HotspotItem) => boolean,
   onPointerDownRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string, e: PointerEvent) => void>,
   onDeleteRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string) => void>
 ) {
@@ -83,6 +85,8 @@ function buildEditorHotspotEl(
     scale: h.scale,
     spaceStatus,
     spaceCode: h.type === "space" ? h.spaceCode : undefined,
+    // Pin unit berdimensi digambar sebagai volume 3D oleh overlay; pin menjadi titik pegangan kecil.
+    volumeOverlay: hasVolume(h) ? "handle" : undefined,
     facilityIcon: h.type === "info" ? h.facilityIcon : undefined,
     sceneTitle:
       h.type === "scene" ? getSceneTitle(h.sceneId, h.text) : undefined,
@@ -151,8 +155,16 @@ interface Props {
   onBlurSelect: (id: string | null) => void;
   onHotspotDelete: (id: string) => void;
   onBlurDelete: (id: string) => void;
-  spaces?: { code: string; status: SpaceAvailabilityStatus }[];
+  spaces?: {
+    code: string;
+    status: SpaceAvailabilityStatus;
+    lengthM?: number | null;
+    widthM?: number | null;
+    heightM?: number | null;
+  }[];
   scenes?: { sceneId: string; title: string }[];
+  /** Jarak tetap volume pin (meter) — diisi editor kereta; kosong = unit berdiri di lantai (stasiun). */
+  pinVolumeDistanceM?: number;
   initialView?: SceneInitialView | null;
   minHfov?: number;
   /** Setelah pernah dibake: overlay tanpa backdrop (hindari double blur). */
@@ -169,6 +181,8 @@ interface Props {
 
 export type PannellumEditorHandle = {
   getView: () => { yaw: number; pitch: number; hfov: number } | null;
+  /** Gerakkan kamera editor ke POV tertentu (dipakai panel POV kamera). */
+  setView: (view: { yaw: number; pitch: number; hfov: number }) => void;
   getViewerBakeContext: () => ViewerBakeContext | null;
 };
 
@@ -189,6 +203,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
     onHotspotDelete,
     onBlurDelete,
     spaces = [],
+    pinVolumeDistanceM,
     scenes = [],
     initialView = null,
     minHfov = PANNELLUM_EDITOR_HFOV.minHfov,
@@ -225,6 +240,11 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
   const hotspotsRef = useRef(hotspots);
   const privacyBlursRef = useRef(privacyBlurs);
   const spacesRef = useRef(spaces);
+  const pinPlacement: PinPlacement = pinVolumeDistanceM
+    ? { mode: "distance", distanceM: pinVolumeDistanceM }
+    : { mode: "floor" };
+  const pinPlacementRef = useRef(pinPlacement);
+  pinPlacementRef.current = pinPlacement;
   const scenesRef = useRef(scenes);
   const getSpaceStatusRef = useRef((code: string) => findSpaceStatus(spacesRef.current, code));
 
@@ -263,6 +283,15 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         };
       } catch {
         return null;
+      }
+    },
+    setView: (view) => {
+      const viewer = viewerRef.current;
+      if (!viewer || !viewerReadyRef.current) return;
+      try {
+        viewer.lookAt(view.pitch, view.yaw, view.hfov, false);
+      } catch {
+        /* viewer belum siap */
       }
     },
   }));
@@ -415,6 +444,14 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
                 (code) => getSpaceStatusRef.current(code),
                 (sceneId, fallback) =>
                   resolveSceneHotspotTitle(sceneId, scenesRef.current, fallback),
+                (item) =>
+                  item.type === "space" &&
+                  !!item.spaceCode &&
+                  canBuildPinVolume(
+                    item,
+                    spacesRef.current.find((s) => s.code === item.spaceCode),
+                    pinVolumeOptions(item, pinPlacementRef.current)
+                  ),
                 onPointerDownItemRef,
                 onDeleteItemRef
               );
@@ -520,7 +557,38 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
       h.facilityIcon ?? "",
     ])
   );
-  const spacesSig = spaces.map((s) => `${s.code}:${s.status}`).join("|");
+  const spacesSig = spaces
+    .map((s) => `${s.code}:${s.status}:${s.lengthM ?? ""}x${s.widthM ?? ""}x${s.heightM ?? ""}`)
+    .join("|");
+  // Pin unit berdimensi → entitas volume 3D di overlay (sama seperti tour publik).
+  const pinVolumeEntities = useMemo(() => {
+    const dims = new Map(
+      spacesSig.split("|").filter(Boolean).map((row) => {
+        const [code, , size] = row.split(":");
+        const [lengthM, widthM, heightM] = (size ?? "").split("x").map((v) => (v ? Number(v) : null));
+        return [code, { lengthM, widthM, heightM }] as const;
+      })
+    );
+    const placement: PinPlacement = pinVolumeDistanceM
+      ? { mode: "distance", distanceM: pinVolumeDistanceM }
+      : { mode: "floor" };
+    return hotspots.flatMap((h, index) =>
+      h.type === "space" && h.spaceCode && canBuildPinVolume(h, dims.get(h.spaceCode), pinVolumeOptions(h, placement))
+        ? [
+            pinVolumeEntity(
+              "editor",
+              index,
+              { pitch: h.pitch, yaw: h.yaw, spaceCode: h.spaceCode, label: h.text },
+              pinVolumeOptions(h, placement)
+            ),
+          ]
+        : []
+    );
+  }, [hotspots, spacesSig, pinVolumeDistanceM]);
+  const overlayEntities = useMemo(
+    () => [...spatialEntities, ...pinVolumeEntities],
+    [spatialEntities, pinVolumeEntities]
+  );
   const blursSig = JSON.stringify(
     privacyBlurs.map((b) => [b._id, b.pitch, b.yaw, b.width, b.height, b.intensity, b.radius, b.scale ?? 1])
   );
@@ -754,7 +822,9 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         <SpatialOverlay
           viewer={viewerForOverlay}
           container={containerEl}
-          entities={spatialEntities}
+          entities={overlayEntities}
+          pinVolumesInteractive={false}
+          resolveUnitDimensions={(code) => spaces.find((space) => space.code === code)}
           draftVertices={draftSpatialVertices}
           selectedId={selectedSpatialId}
           interactive={addMode === "none"}
@@ -774,7 +844,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
 
       {dragging && (
         <div className="absolute inset-0 z-50 pointer-events-none">
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#261015]/90 backdrop-blur border border-amber-500/60 text-amber-300 text-xs px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-50/90 backdrop-blur border border-amber-500/60 text-amber-700 text-xs px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
             <span className="text-base">✥</span>
             Lepas untuk menetapkan posisi baru
           </div>
@@ -785,10 +855,10 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         <div
           className={`absolute left-1/2 top-3 z-20 -translate-x-1/2 pointer-events-none rounded-full border px-3 py-1.5 text-xs shadow-md backdrop-blur ${
             addMode === "blur"
-              ? "border-[rgba(255,214,218,0.28)] bg-[#261015]/90 text-[#E8C4D0]"
+              ? "border-slate-300 bg-slate-50/90 text-[#E8C4D0]"
               : addMode === "spatial"
-                ? "border-emerald-500/50 bg-[#261015]/90 text-emerald-200"
-                : "border-emerald-500/40 bg-[#261015]/90 text-emerald-200"
+                ? "border-emerald-500/50 bg-slate-50/90 text-emerald-800"
+                : "border-emerald-500/40 bg-slate-50/90 text-emerald-800"
           }`}
         >
           {addMode === "spatial"
@@ -804,13 +874,13 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
       )}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-2 px-3 pb-3">
-        <div className="rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/85 px-2.5 py-1.5 font-mono text-[10px] tabular-nums text-[#C4A8AD] backdrop-blur">
+        <div className="rounded-md border border-slate-200 bg-white/85 px-2.5 py-1.5 font-mono text-[10px] tabular-nums text-slate-600 backdrop-blur">
           {liveView
             ? `Yaw ${liveView.yaw.toFixed(1)}° · Pitch ${liveView.pitch.toFixed(1)}° · HFOV ${liveView.hfov.toFixed(0)}°`
             : "Yaw — · Pitch — · HFOV —"}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <span className="rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/85 px-2 py-1 text-[10px] text-[#C4A8AD] backdrop-blur">
+          <span className="rounded-md border border-slate-200 bg-white/85 px-2 py-1 text-[10px] text-slate-600 backdrop-blur">
             {hotspots.length} hotspot
             {spatialEntities.length > 0 ? ` · ${spatialEntities.length} spatial` : ""}
             {privacyBlurs.length > 0 ? ` · ${privacyBlurs.length} blur` : ""}
@@ -819,7 +889,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
       </div>
 
       {!panoramaUrl && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1C0A0E] text-[#C4A8AD] z-30">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white text-slate-600 z-30">
           <div className="text-5xl mb-3">🌐</div>
           <p className="text-sm">Upload panorama equirectangular untuk mulai edit</p>
         </div>

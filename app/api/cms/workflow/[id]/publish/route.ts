@@ -1,0 +1,75 @@
+import { NextRequest, NextResponse } from "next/server";
+import { requireRole } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import {
+  cmsWorkflowVersionInclude,
+  getNextPublishedVersionNumber,
+  serializeWorkflowVersion,
+  validateWorkflowForPublish,
+} from "@/lib/cms-workflow";
+
+type Context = { params: Promise<{ id: string }> };
+
+/** POST /api/cms/workflow/[id]/publish — Publikasikan `DRAFT` menjadi `ACTIVE` serta berikan nomor versi berurutan. */
+export async function POST(request: NextRequest, context: Context) {
+  const auth = await requireRole(request, ["ADMIN"]);
+  if ("error" in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  const { id } = await context.params;
+  const target = await prisma.pipelineWorkflowVersion.findUnique({
+    where: { id },
+    include: cmsWorkflowVersionInclude,
+  });
+
+  if (!target) {
+    return NextResponse.json({ error: "Versi workflow tidak ditemukan." }, { status: 404 });
+  }
+
+  if (target.status !== "DRAFT") {
+    return NextResponse.json(
+      { error: "Hanya versi berstatus DRAFT yang dapat dipublikasikan." },
+      { status: 400 }
+    );
+  }
+
+  const issues = validateWorkflowForPublish(target.steps);
+  if (issues.length > 0) {
+    return NextResponse.json(
+      {
+        error: issues[0],
+        issues,
+      },
+      { status: 400 }
+    );
+  }
+
+  const published = await prisma.$transaction(async (tx) => {
+    const nextVersion = target.version ?? (await getNextPublishedVersionNumber(tx));
+
+    await tx.pipelineWorkflowVersion.updateMany({
+      where: {
+        status: "ACTIVE",
+        id: { not: id },
+      },
+      data: {
+        status: "ARCHIVED",
+      },
+    });
+
+    return tx.pipelineWorkflowVersion.update({
+      where: { id },
+      data: {
+        version: nextVersion,
+        status: "ACTIVE",
+        publishedAt: new Date(),
+      },
+      include: cmsWorkflowVersionInclude,
+    });
+  });
+
+  return NextResponse.json({
+    version: serializeWorkflowVersion(published),
+  });
+}

@@ -21,6 +21,14 @@ export function hotspotIconSvg(type: HotspotType): string {
   return "";
 }
 
+/** Ikon "i" untuk titik pegangan pin unit yang tampil sebagai volume 3D (disc tetap berwarna status). */
+const VOLUME_HANDLE_INFO_SVG =
+  '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+  '<circle cx="12" cy="12" r="9.6" stroke="white" stroke-width="2.2"/>' +
+  '<circle cx="12.9" cy="7.4" r="1.7" fill="white"/>' +
+  '<path d="M12.3 10.6 10.9 15.9c-.3 1.2.6 1.6 1.6 1l1.2-.8" stroke="white" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>' +
+  "</svg>";
+
 /** Aset pin informasi (lingkaran putih + huruf i). */
 export const INFO_PIN_SRC = "/brand/tour-pins/info.png";
 export const INFO_PIN_W = 56;
@@ -42,6 +50,11 @@ export type HotspotVisualOptions = {
   spaceStatus?: SpaceAvailabilityStatus;
   /** Kode unit pada hotspot ruang */
   spaceCode?: string;
+  /**
+   * Pin unit digambar sebagai volume 3D oleh overlay: "hidden" = elemen pin disembunyikan (tour publik),
+   * "handle" = diganti titik kecil untuk dipilih/digeser (editor CMS).
+   */
+  volumeOverlay?: "hidden" | "handle";
   /** Ikon fasilitas untuk hotspot info */
   facilityIcon?: FacilityIconId;
 };
@@ -208,6 +221,18 @@ function applySceneHotspotStyle(div: HTMLDivElement, opts: HotspotVisualOptions)
 
 function applyPinHotspotStyle(div: HTMLDivElement, opts: HotspotVisualOptions) {
   applyPinHotspotOuterShell(div, opts);
+  if (opts.type === "space" && opts.volumeOverlay === "hidden") {
+    div.innerHTML = "";
+    div.style.pointerEvents = "none";
+    return;
+  }
+  if (opts.type === "space" && opts.volumeOverlay === "handle") {
+    const variant = spaceStatusPinClass(opts.spaceStatus);
+    const sel = opts.selected ? " is-selected" : "";
+    div.innerHTML = `<div class="lrt-pin-marker lrt-pin-marker--space ${variant}"><div class="lrt-pin-marker__pulse" aria-hidden="true"></div><div class="${PIN_MARKER_DISC_CLASS}${sel}">${VOLUME_HANDLE_INFO_SVG}</div></div>`;
+    applyHotspotScale(div, 0.6);
+    return;
+  }
   if (opts.type === "space") {
     div.innerHTML = buildSpaceFootprintHtml(opts.spaceStatus, opts.spaceCode, opts.selected ?? false);
     applyHotspotScale(div, opts.scale);
