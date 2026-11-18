@@ -36,11 +36,27 @@ export function extractMultiResProfilesFromCanvasData(value: unknown): PanoramaM
   }
 }
 
+/** F5/WAF prod menolak path tile yang berisi UUID → HTML "Request Rejected". */
+const UUID_IN_PATH =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+export function isWafSafePanoramaBasePath(basePath: string | undefined): boolean {
+  return Boolean(basePath) && !UUID_IN_PATH.test(basePath!);
+}
+
 export function selectSceneMultiRes(
   scene: { multiRes?: PannellumMultiRes; multiResProfiles?: PanoramaMultiResProfiles },
   viewportWidth: number,
 ): PannellumMultiRes | undefined {
-  return scene.multiResProfiles?.[viewportWidth >= 1024 ? "desktop" : "mobile"] ?? scene.multiRes;
+  const profile = scene.multiResProfiles?.[viewportWidth >= 1024 ? "desktop" : "mobile"];
+  // Prefer path legacy tanpa UUID (aman di WAF prod), baru profiles.
+  if (scene.multiRes && isWafSafePanoramaBasePath(scene.multiRes.basePath)) {
+    return scene.multiRes;
+  }
+  if (profile && isWafSafePanoramaBasePath(profile.basePath)) {
+    return profile;
+  }
+  return scene.multiRes ?? profile;
 }
 
 // ── Profil HD (aset asli/native) ──────────────────────────────────────────────

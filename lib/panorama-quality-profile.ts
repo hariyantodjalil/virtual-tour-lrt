@@ -1,4 +1,9 @@
-import { selectSceneMultiRes, type PanoramaMultiResProfiles, type PannellumMultiRes } from "./panorama-profile";
+import {
+  isWafSafePanoramaBasePath,
+  selectSceneMultiRes,
+  type PanoramaMultiResProfiles,
+  type PannellumMultiRes,
+} from "./panorama-profile";
 import { getAutomaticPanoramaQuality, type PanoramaQuality } from "./panorama-quality";
 
 export type QualityScene = {
@@ -12,6 +17,15 @@ export function selectQualityMultiRes(
 ): PannellumMultiRes | undefined {
   const hd = scene.multiResProfilesHd?.[width >= 1024 ? "desktop" : "mobile"];
   const economy = selectSceneMultiRes(scene, width);
-  // Retain a working economy / legacy fallback even when HD metadata is absent.
-  return quality === "hd" && hd && economy && hd.cubeResolution > economy.cubeResolution ? hd : economy;
+  // Jangan pilih HD ber-UUID — WAF prod memblok path itu (tour hitam).
+  if (
+    quality === "hd" &&
+    hd &&
+    economy &&
+    hd.cubeResolution > economy.cubeResolution &&
+    isWafSafePanoramaBasePath(hd.basePath)
+  ) {
+    return hd;
+  }
+  return economy;
 }
