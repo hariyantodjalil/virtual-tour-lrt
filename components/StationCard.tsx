@@ -36,7 +36,7 @@ export default function StationCard({
       href={`/station/${slug}`}
       className="group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-[0_2px_12px_rgba(16,24,40,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(196,18,48,0.18)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d32f2f]"
     >
-      <div className="relative aspect-[200/176] w-full overflow-hidden">
+      <div className="relative aspect-[200/176] w-full overflow-hidden bg-slate-100">
         <Image
           src={image}
           alt={`Stasiun ${name}`}

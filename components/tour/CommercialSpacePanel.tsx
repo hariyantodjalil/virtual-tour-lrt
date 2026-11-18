@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   X, Building2, MapPin, Zap, Droplets, Wind, Users,
-  MessageCircle, Download, CheckCircle, XCircle, AlertCircle, ArrowRight,
+  MessageCircle, CheckCircle, XCircle, AlertCircle, ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -99,61 +99,6 @@ export default function CommercialSpacePanel({ space, stationName, contactPhone,
     trackEvent("SPACE_VIEW");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [space.id]);
-
-  const handleDownloadSummary = () => {
-    trackEvent("PDF_DOWNLOAD");
-    const popup = window.open("", "_blank", "width=900,height=1200");
-    if (!popup) return;
-
-    popup.document.write(`
-      <!doctype html>
-      <html>
-        <head>
-          <title>Ringkasan ${space.code} - ${stationName}</title>
-          <style>
-            body { font-family: Arial, sans-serif; color: #111827; margin: 40px; }
-            .brand { color: #D81435; font-weight: 800; letter-spacing: .08em; font-size: 12px; text-transform: uppercase; }
-            h1 { margin: 8px 0 4px; font-size: 30px; color: #17355f; }
-            .muted { color: #6b7280; }
-            .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 24px 0; }
-            .box { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; }
-            .label { color: #6b7280; font-size: 12px; margin-bottom: 4px; }
-            .value { font-size: 18px; font-weight: 800; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            td { border-bottom: 1px solid #e5e7eb; padding: 10px 0; }
-            td:first-child { color: #6b7280; width: 38%; }
-            .cta { margin-top: 28px; padding: 18px; background: #17355f; color: white; border-radius: 14px; }
-            @media print { body { margin: 28px; } }
-          </style>
-        </head>
-        <body>
-          <div class="brand">LRT Jabodebek - Virtual Tour Komersial</div>
-          <h1>${space.name}</h1>
-          <div class="muted">${space.code} - Stasiun ${stationName} - ${TYPE_LABELS[space.type] ?? space.type}</div>
-          <div class="grid">
-            <div class="box"><div class="label">Status</div><div class="value">${statusConfig.label}</div></div>
-            <div class="box"><div class="label">Luas</div><div class="value">${space.area} m2</div></div>
-            <div class="box"><div class="label">Eksposur</div><div class="value">${formatNumber(Math.round(space.exposure))} orang/hari</div></div>
-          </div>
-          <table>
-            <tr><td>Lokasi</td><td>${space.location}</td></tr>
-            <tr><td>Lantai</td><td>${space.floor}</td></tr>
-            <tr><td>Exit Terdekat</td><td>${space.nearestExit ?? "-"}</td></tr>
-            <tr><td>Deposit</td><td>${formatRupiah(space.deposit)}</td></tr>
-            <tr><td>Daya Listrik</td><td>${space.powerSupply ?? "-"}</td></tr>
-            <tr><td>Air Bersih</td><td>${space.waterAccess ? "Tersedia" : "Tidak tersedia"}</td></tr>
-            <tr><td>AC</td><td>${space.airConditioning ? "Tersedia" : "Tidak tersedia"}</td></tr>
-            <tr><td>Catatan</td><td>${space.description ?? "Unit siap dievaluasi melalui virtual tour 360."}</td></tr>
-          </table>
-          <div class="cta">
-            Hubungi ${commercialProfile.teamName}: ${resolvedContactPhone}. Ringkasan ini dibuat otomatis dari data aset virtual tour.
-          </div>
-          <script>window.onload = () => setTimeout(() => window.print(), 250);</script>
-        </body>
-      </html>
-    `);
-    popup.document.close();
-  };
 
   return (
     <div className="flex flex-col h-full bg-white rounded-xl overflow-hidden border border-gray-200 shadow-lg">
@@ -273,18 +218,12 @@ export default function CommercialSpacePanel({ space, stationName, contactPhone,
               {showForm ? "Tutup Formulir" : "Ajukan Minat Sewa"}
               <ArrowRight className="h-4 w-4" />
             </Button>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="whatsapp" size="sm" asChild>
-                <a href={waUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent("WHATSAPP_CLICK")}>
-                  <MessageCircle className="h-4 w-4" />
-                  WhatsApp
-                </a>
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDownloadSummary}>
-                <Download className="h-4 w-4" />
-                Unduh PDF
-              </Button>
-            </div>
+            <Button variant="whatsapp" size="sm" className="w-full" asChild>
+              <a href={waUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent("WHATSAPP_CLICK")}>
+                <MessageCircle className="h-4 w-4" />
+                WhatsApp Tim
+              </a>
+            </Button>
           </>
         ) : (
           <div className="text-center py-2">

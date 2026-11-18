@@ -1,5 +1,8 @@
 import { uploadToS3 } from "@/lib/s3";
 import { buildPanoramaTiles, multiResConfig, type PannellumMultiRes } from "@/lib/panorama-multires";
+import type { PanoramaMultiResProfiles, PanoramaMultiResProfilesHd } from "./panorama-profile";
+import sharp from "sharp";
+import { randomUUID } from "node:crypto";
 
 function safeSegment(value: string) {
   return value.replace(/[^a-z0-9-]/gi, "-").toLowerCase() || "scene";
@@ -23,7 +26,7 @@ export async function uploadPanoramaTiles(
   ownerSlug: string,
   sceneId: string
 ): Promise<PannellumMultiRes> {
-  const prefix = `virtual-tour/panorama-tiles/${safeSegment(ownerSlug)}/${safeSegment(sceneId)}`;
+  const prefix = `virtual-tour/panorama-tiles/${safeSegment(ownerSlug)}/${safeSegment(sceneId)}/${randomUUID()}`;
   const tiles = await buildPanoramaTiles(panorama);
   await mapPool(tiles, 3, async (tile) => {
     await uploadToS3(tile.buffer, `${prefix}/${tile.name}`, "image/jpeg", {
@@ -32,4 +35,52 @@ export async function uploadPanoramaTiles(
     });
   });
   return multiResConfig(`/${prefix}`);
+}
+
+/** Two immutable pyramids from the same privacy-safe full-resolution source. */
+export async function uploadAdaptivePanoramaTiles(
+  panorama: Buffer, ownerSlug: string, sceneId: string,
+): Promise<PanoramaMultiResProfiles> {
+  const metadata = await sharp(panorama).metadata();
+  const cubeResolution = (metadata.width ?? 0) > 6400 ? 4096 : 2048;
+  const prefix = `virtual-tour/panorama-tiles/${safeSegment(ownerSlug)}/${safeSegment(sceneId)}/${randomUUID()}`;
+  const profiles = {} as Pick<PanoramaMultiResProfiles, "desktop" | "mobile">;
+  // Sequential generation limits peak memory; publish metadata only after both uploads finish.
+  for (const [name, tileResolution] of [["mobile", 512], ["desktop", 1024]] as const) {
+    const tiles = await buildPanoramaTiles(panorama, {
+      sourceWidth: null, cubeResolution, tileResolution, jpegQuality: 85,
+    });
+    await mapPool(tiles, 4, async (tile) => {
+      await uploadToS3(tile.buffer, `${prefix}/${name}/${tile.name}`, "image/jpeg", {
+        "scene-id": sceneId, "storage-mode": "pannellum-multires-jpeg85-v1", "profile": name,
+      });
+    });
+    profiles[name] = multiResConfig(`/${prefix}/${name}`, tileResolution, cubeResolution);
+  }
+  return { version: "jpeg85-v1", ...profiles };
+}
+
+/** Pyramid HD dari sumber asli (tanpa resize 6000px). Provenance dirakit pemanggil;
+ *  metadata baru boleh dipublikasi setelah kedua pyramid selesai dan tervalidasi. */
+export async function uploadHdPanoramaTiles(
+  panorama: Buffer, ownerSlug: string, sceneId: string,
+): Promise<Pick<PanoramaMultiResProfilesHd, "desktop" | "mobile">> {
+  const metadata = await sharp(panorama, { limitInputPixels: false }).metadata();
+  const cubeResolution = (metadata.width ?? 0) > 6400 ? 4096 : 2048;
+  const prefix = `virtual-tour/panorama-tiles/${safeSegment(ownerSlug)}/${safeSegment(sceneId)}/hd-${randomUUID()}`;
+  const profiles = {} as Pick<PanoramaMultiResProfilesHd, "desktop" | "mobile">;
+  // Sequential generation limits peak memory at native resolution.
+  for (const [name, tileResolution] of [["mobile", 512], ["desktop", 1024]] as const) {
+    const tiles = await buildPanoramaTiles(panorama, {
+      sourceWidth: null, cubeResolution, tileResolution, jpegQuality: 85,
+    });
+    await mapPool(tiles, 4, async (tile) => {
+      await uploadToS3(tile.buffer, `${prefix}/${name}/${tile.name}`, "image/jpeg", {
+        "scene-id": sceneId, "storage-mode": "pannellum-multires-hd-jpeg85-v1",
+        "profile": name, "quality": "hd",
+      });
+    });
+    profiles[name] = multiResConfig(`/${prefix}/${name}`, tileResolution, cubeResolution);
+  }
+  return profiles;
 }

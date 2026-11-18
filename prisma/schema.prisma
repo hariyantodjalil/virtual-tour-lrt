@@ -2,22 +2,38 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model Trainset {
+  id        String   @id @default(cuid())
+  trainId   String
+  train     Train    @relation(fields: [trainId], references: [id], onDelete: Cascade)
+  code      String
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([trainId, code])
+  @@index([trainId, isActive, order])
+  @@map("trainsets")
+}
+
 datasource db {
   provider = "postgresql"
 }
 
 model User {
-  id          String       @id @default(cuid())
-  email       String       @unique
+  id          String            @id @default(cuid())
+  email       String            @unique
   password    String
   name        String
   avatarUrl   String?
-  role        UserRole     @default(EDITOR)
-  isActive    Boolean      @default(true)
+  role        UserRole          @default(EDITOR)
+  isActive    Boolean           @default(true)
   tenantLeads TenantLead[]
   tenants     Tenant[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  feedbacks   PartnerFeedback[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   @@map("users")
 }
@@ -58,7 +74,7 @@ model CommercialProfile {
   id                     String   @id @default("default")
   teamName               String   @default("Tim Komersial LRT Jabodebek")
   contactPersonName      String?
-  whatsappNumber         String   @default("628118012012")
+  whatsappNumber         String   @default("")
   phoneNumber            String?
   email                  String?
   officeAddress          String?
@@ -170,7 +186,7 @@ model CommercialSpace {
   type            SpaceType    @default(KIOS)
   status          SpaceStatus  @default(TERSEDIA)
   area            Float
-  monthlyRent     Float
+  monthlyRent     Float?
   deposit         Float        @default(0)
   floor           String       @default("G")
   location        String
@@ -178,6 +194,8 @@ model CommercialSpace {
   nearbyFacilities String[]      @default([])
   exposure        Int          @default(0)
   powerSupply     String?
+  /** Preferensi peruntukan unit untuk modal publik (mis. F&B, Retail). Kosong = tampil as-is. */
+  preferredUses   String[]     @default([])
   waterAccess     Boolean      @default(false)
   airConditioning Boolean      @default(false)
   description     String?
@@ -233,10 +251,17 @@ model SpaceOccupancy {
 
 model TenantLead {
   id               String           @id @default(cuid())
+  inquiryCode      String           @unique @default(dbgenerated("'LRT-'::text || nextval('inquiry_code_seq'::regclass)::text"))
+  workflowVersionId String?
+  workflowVersion PipelineWorkflowVersion? @relation(fields: [workflowVersionId], references: [id])
+  rejectionReason String?           @db.Text
+  mediaAttachments InquiryMedia[]
+  stepLogs         InquiryStepLog[]
   userId           String?
   user             User?            @relation(fields: [userId], references: [id])
   spaceId          String?
   space            CommercialSpace? @relation(fields: [spaceId], references: [id])
+  trainInquiry     TrainInquiry?
   companyName      String
   contactName      String
   phone            String
@@ -252,6 +277,10 @@ model TenantLead {
   status           LeadStatus       @default(NEW)
   notes            String?
   followUpAt       DateTime?
+  leaseStartAt     DateTime?        @db.Date
+  leaseEndAt       DateTime?        @db.Date
+  paymentVerifiedAt DateTime?
+  paymentVerifiedByAdmin String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
@@ -259,7 +288,83 @@ model TenantLead {
   @@index([userId, createdAt])
   @@index([status])
   @@index([createdAt])
+  @@index([leaseEndAt])
   @@map("tenant_leads")
+}
+
+model PipelineWorkflowVersion {
+  id          String       @id @default(cuid())
+  version     Int          @unique
+  title       String
+  description String?
+  status      String       @default("DRAFT")
+  publishedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  steps       PipelineStep[]
+  leads       TenantLead[]
+
+  @@index([status])
+  @@map("pipeline_workflow_versions")
+}
+
+model PipelineStep {
+  id                String                  @id @default(cuid())
+  workflowVersionId String
+  workflowVersion   PipelineWorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  stepOrder         Int
+  leadStatus        LeadStatus
+  title             String
+  description       String?
+  publicMessage     String                  @db.Text
+  requiresMedia     Boolean                 @default(false)
+  showInSummary     Boolean                 @default(false)
+  stepLogs          InquiryStepLog[]
+
+  @@unique([workflowVersionId, stepOrder])
+  @@unique([workflowVersionId, leadStatus])
+  @@map("pipeline_steps")
+}
+
+model InquiryMedia {
+  id               String     @id @default(cuid())
+  tenantLeadId     String
+  tenantLead       TenantLead @relation(fields: [tenantLeadId], references: [id], onDelete: Cascade)
+  stepOrder        Int
+  mediaTitle       String
+  documentNumber   String?
+  mediaLink        String
+  documentType     String     @default("OTHER")
+  storageKey       String?
+  fileName         String?
+  mimeType         String?
+  sizeBytes        Int?
+  verifiedAt       DateTime?
+  verifiedByAdmin  String?
+  isVisibleToMitra Boolean    @default(false)
+  uploadedByAdmin  String
+  createdAt        DateTime   @default(now())
+
+  @@index([tenantLeadId, stepOrder])
+  @@map("inquiry_media")
+}
+
+model InquiryStepLog {
+  id             String        @id @default(cuid())
+  tenantLeadId   String
+  tenantLead     TenantLead    @relation(fields: [tenantLeadId], references: [id], onDelete: Cascade)
+  pipelineStepId String?
+  pipelineStep   PipelineStep? @relation(fields: [pipelineStepId], references: [id], onDelete: SetNull)
+  stepOrder      Int
+  status         LeadStatus
+  fromStatus     LeadStatus?
+  action         String
+  notes          String?       @db.Text
+  performedBy    String
+  createdAt      DateTime      @default(now())
+
+  @@index([tenantLeadId, createdAt])
+  @@map("inquiry_step_logs")
 }
 
 model VisitEvent {
@@ -357,6 +462,10 @@ model Train {
   trainTourScenes TrainTourScene[]
   virtualTour     TrainVirtualTour?
   rentalSpaces    TrainRentalSpace[]
+  advertisingCapacity Int?
+  infoNotices     Json              @default("[]")
+  inquiries       TrainInquiry[]
+  trainsets       Trainset[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -385,6 +494,9 @@ model TrainTourCar {
   label     String
   color     String           @default("#3b82f6")
   hint      String?
+  description String?
+  facilities String[]       @default([])
+  infoNotices Json          @default("[]")
   order     Int              @default(0)
   isActive  Boolean          @default(true)
   zones     TrainTourZone[]
@@ -452,6 +564,8 @@ model TrainRentalSpace {
   objectPosition      String            @default("50% 50%")
   availableTrainsets  String[]          @default([])
   availableByCar      Json              @default("{}")
+  inquiryMode         TrainInquiryMode  @default(MEDIA)
+  inquiries           TrainInquiry[]
   howToOrder          String?
   status              TrainRentalStatus @default(TERSEDIA)
   monthlyRent         Float?
@@ -463,4 +577,81 @@ model TrainRentalSpace {
   @@unique([trainId, displayNumber])
   @@index([trainId, isActive, order])
   @@map("train_rental_spaces")
+}
+
+enum TrainInquiryMode {
+  MEDIA
+  FULL_BRANDING
+}
+
+model TrainInquiry {
+  id                    String           @id @default(cuid())
+  leadId                String           @unique
+  lead                  TenantLead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  trainId               String
+  train                 Train            @relation(fields: [trainId], references: [id], onDelete: Restrict)
+  mediaId               String?
+  media                 TrainRentalSpace? @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+  mediaCode             String
+  mediaTitle            String
+  mode                  TrainInquiryMode
+  applicantStatusId     String?
+  applicantStatus       AdvertisingFormOption? @relation("ApplicantStatus", fields: [applicantStatusId], references: [id], onDelete: Restrict)
+  applicantStatusLabel  String?
+  representedBrand      String?
+  businessCategoryId    String?
+  businessCategory      AdvertisingFormOption? @relation("BusinessCategory", fields: [businessCategoryId], references: [id], onDelete: Restrict)
+  businessCategoryLabel String?
+  businessCategoryOther String?
+  requestedTrainsetCount Int?
+  campaignStart         DateTime?        @db.Date
+  campaignEnd           DateTime?        @db.Date
+  campaignNeeds         String?          @db.Text
+  allocatedTrainsets    String[]         @default([])
+  allocationNotes       String?          @db.Text
+  carPreferences        TrainInquiryCar[]
+
+  @@index([mediaId])
+  @@map("train_inquiries")
+}
+
+model AdvertisingFormOption {
+  id                     String @id @default(cuid())
+  kind                   String
+  label                  String
+  allowsRepresentedBrand Boolean @default(false)
+  requiresDetail         Boolean @default(false)
+  isActive               Boolean @default(true)
+  order                  Int @default(0)
+  updatedAt              DateTime @updatedAt
+  applicantInquiries     TrainInquiry[] @relation("ApplicantStatus")
+  categoryInquiries      TrainInquiry[] @relation("BusinessCategory")
+
+  @@unique([kind, label])
+  @@index([kind, isActive, order])
+  @@map("advertising_form_options")
+}
+
+model TrainInquiryCar {
+  inquiryId String
+  inquiry   TrainInquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  carSlug   String
+  carLabel  String
+
+  @@id([inquiryId, carSlug])
+  @@map("train_inquiry_cars")
+}
+
+/** Masukan mitra dari portal partner — dibaca di CMS Feedback. */
+model PartnerFeedback {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic     String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@map("partner_feedbacks")
 }

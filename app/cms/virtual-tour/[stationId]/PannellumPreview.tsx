@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Grid3X3, Info, Route, X } from "lucide-react";
+import { Grid3X3, ImageIcon, Info, Route, X } from "lucide-react";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { HotspotItem } from "@/lib/hotspot-types";
 import type { PrivacyBlurItem } from "@/lib/privacy-blur-types";
 import type { PanoramaScene, SceneInitialView, TourLevelPublic } from "@/lib/tour-types";
 import { resolveSceneEntryView } from "@/lib/scene-entry-view";
-import { setupHotspotElement, resolveSceneHotspotTitle } from "@/lib/pannellum-hotspot";
+import { setupHotspotElement, resolveSceneHotspotTitle, type SpaceHotspotMarker } from "@/lib/pannellum-hotspot";
 import {
   findSpaceStatus,
   type SpaceAvailabilityStatus,
@@ -28,13 +28,14 @@ type CommercialSpace = {
   type: string;
   status: SpaceAvailabilityStatus;
   area: number;
-  monthlyRent: number;
+  monthlyRent: number | null;
   deposit: number;
   floor: string;
   location: string;
   nearestExit: string | null;
   exposure: number;
   powerSupply: string | null;
+  preferredUses?: string[];
   waterAccess: boolean;
   airConditioning: boolean;
   description: string | null;
@@ -49,6 +50,7 @@ type PreviewScene = {
 };
 
 interface Props {
+  spaceMarker?: SpaceHotspotMarker;
   panoramaUrl: string;
   hotspots: HotspotItem[];
   privacyBlurs?: PrivacyBlurItem[];
@@ -115,6 +117,7 @@ export function PannellumPreview({
   levels = [],
   spaces = [],
   spatialEntities = [],
+  spaceMarker = "info-pin",
   stationName = "",
   onSceneNavigate,
   initialView = null,
@@ -240,6 +243,7 @@ export function PannellumPreview({
                   ? findSpaceStatus(spacesRef.current, h.spaceCode)
                   : undefined;
               setupHotspotElement(div, {
+                spaceMarker,
                 type: h.type,
                 onClick,
                 scale: h.scale,
@@ -300,12 +304,12 @@ export function PannellumPreview({
         viewerRef.current = null;
       }
     };
-  }, [panoramaUrl, hotspots, scenes, initialView]);
+  }, [panoramaUrl, hotspots, scenes, initialView, spaceMarker]);
 
   if (!panoramaUrl) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-[#1C0A0E] text-[#C4A8AD]">
-        <div className="text-5xl mb-3">360</div>
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#1C0A0E] text-[#C4A8AD]">
+        <ImageIcon className="size-10 opacity-50" aria-hidden />
         <p className="text-sm">Upload panorama terlebih dahulu untuk melihat preview</p>
       </div>
     );

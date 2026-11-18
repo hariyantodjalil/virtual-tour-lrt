@@ -1,92 +1,43 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
-  Building2,
-  CalendarClock,
-  ChevronDown,
-  ChevronUp,
-  MapPin,
-  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
   RefreshCw,
-  Save,
+  RotateCcw,
   Search,
-  SlidersHorizontal,
-  Trash2,
-  UserRound,
 } from "lucide-react";
 import { cmsFetch } from "@/lib/cms-fetch";
+import { cmsLeadDetailHref, leadStageBadgeClass, type LeadItem } from "@/lib/cms-leads-shared";
+import { leaseExpiryReminder } from "@/lib/inquiry-workflow";
 import {
-  LEAD_PIPELINE_STATUSES,
+  ADMIN_LEAD_STATUSES,
+  canonicalLeadStatus,
   LEAD_STATUS_LABELS,
   SITE_VISIT_STATUS_LABELS,
   SITE_VISIT_STATUS_VALUES,
   type CommercialLeadStatus,
   type CommercialSiteVisitStatus,
 } from "@/lib/commercial-pipeline";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export type LeadItem = {
-  id: string;
-  userId: string | null;
-  companyName: string;
-  contactName: string;
-  phone: string;
-  email: string;
-  businessType: string;
-  status: string;
-  message: string | null;
-  surveyPreference: string | null;
-  siteVisitStatus: string;
-  siteVisitScheduledAt: string | null;
-  notes: string | null;
-  rdsOfferNo: string | null;
-  baNegotiationNo: string | null;
-  followUpAt: string | null;
-  createdAt: string;
-  space: {
-    id: string;
-    code: string;
-    name: string;
-    status: string;
-    station: { name: string };
-  } | null;
-};
+export type { LeadItem } from "@/lib/cms-leads-shared";
 
-function asLeadList(value: unknown): LeadItem[] {
-  return Array.isArray(value) ? (value as LeadItem[]) : [];
-}
+const PAGE_SIZES = [10, 25, 50];
 
-function dateTimeInputValue(value: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.slice(0, 16);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
-
-function leadStatusLabel(status: string) {
-  return (
-    LEAD_STATUS_LABELS[status as CommercialLeadStatus] ??
-    status.replaceAll("_", " ")
-  );
-}
-
-function siteVisitLabel(status: string) {
-  return (
-    SITE_VISIT_STATUS_LABELS[status as CommercialSiteVisitStatus] ??
-    status.replaceAll("_", " ")
-  );
+function unitLabel(lead: LeadItem) {
+  if (lead.space) return `${lead.space.code} · ${lead.space.station.name}`;
+  if (lead.trainInquiry?.mediaTitle) return lead.trainInquiry.mediaTitle;
+  return "Tanpa unit spesifik";
 }
 
 export default function LeadsClient({
@@ -96,588 +47,420 @@ export default function LeadsClient({
   initialLeads: LeadItem[];
   initialLoadError: string | null;
 }) {
-  const [leads, setLeads] = useState(() => asLeadList(initialLeads));
+  const [leads, setLeads] = useState<LeadItem[]>(() =>
+    Array.isArray(initialLeads) ? initialLeads : []
+  );
   const [loadError, setLoadError] = useState(initialLoadError);
   const [isLoading, setIsLoading] = useState(false);
-  const [savingId, setSavingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [siteVisitFilter, setSiteVisitFilter] = useState("ALL");
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // App Router may restore this client state on Back. Refresh data without resetting filters.
+  useEffect(() => {
+    let request: AbortController | undefined;
+    async function revalidateOnReturn() {
+      if (window.location.pathname !== "/cms/leads") return;
+      request?.abort();
+      const controller = new AbortController();
+      request = controller;
+      try {
+        const response = await cmsFetch("/api/cms/leads", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const data: unknown = await response.json();
+        if (!response.ok || !Array.isArray(data)) throw new Error("Invalid lead response");
+        if (!controller.signal.aborted) {
+          setLeads(data as LeadItem[]);
+          setLoadError(null);
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setLoadError(
+            "Data mungkin belum terbaru. Gunakan Muat ulang untuk memperbarui daftar."
+          );
+        }
+      }
+    }
+    void revalidateOnReturn();
+    window.addEventListener("pageshow", revalidateOnReturn);
+    window.addEventListener("popstate", revalidateOnReturn);
+    return () => {
+      request?.abort();
+      window.removeEventListener("pageshow", revalidateOnReturn);
+      window.removeEventListener("popstate", revalidateOnReturn);
+    };
+  }, []);
 
   const filteredLeads = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return leads.filter((lead) => {
-      const matchesStatus =
-        statusFilter === "ALL" ||
-        lead.status === statusFilter ||
-        (statusFilter === "COMMERCIAL_OPERATION" && lead.status === "CLOSED_WON");
-      const matchesSiteVisit =
-        siteVisitFilter === "ALL" || lead.siteVisitStatus === siteVisitFilter;
-      const searchableText = [
-        lead.companyName,
-        lead.contactName,
-        lead.phone,
-        lead.email,
-        lead.businessType,
-        lead.space?.code,
-        lead.space?.name,
-        lead.space?.station.name,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+    const text = query.trim().toLowerCase();
+    return leads.filter(
+      (lead) =>
+        (statusFilter === "ALL" ||
+          canonicalLeadStatus(lead.status as CommercialLeadStatus) === statusFilter) &&
+        (siteVisitFilter === "ALL" || lead.siteVisitStatus === siteVisitFilter) &&
+        (!text ||
+          [
+            lead.inquiryCode,
+            lead.companyName,
+            lead.contactName,
+            lead.phone,
+            lead.email,
+            lead.businessType,
+            lead.space?.code,
+            lead.space?.name,
+            lead.space?.station.name,
+            lead.trainInquiry?.mediaTitle,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+            .includes(text))
+    );
+  }, [leads, query, statusFilter, siteVisitFilter]);
 
-      return (
-        matchesStatus &&
-        matchesSiteVisit &&
-        (!normalizedQuery || searchableText.includes(normalizedQuery))
-      );
-    });
-  }, [leads, query, siteVisitFilter, statusFilter]);
+  const reminders = leads
+    .flatMap((lead) => {
+    if (!["COMMERCIAL_OPERATION", "CLOSED_WON"].includes(lead.status)) return [];
+    const reminder = leaseExpiryReminder(lead.leaseEndAt);
+    return reminder ? [{ lead, reminder }] : [];
+    })
+    .sort((a, b) => a.reminder.remainingDays - b.reminder.remainingDays);
 
+  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paged = filteredLeads.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const from = filteredLeads.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const to = Math.min(currentPage * pageSize, filteredLeads.length);
   const filtersActive =
     Boolean(query.trim()) || statusFilter !== "ALL" || siteVisitFilter !== "ALL";
-  const allVisibleExpanded =
-    filteredLeads.length > 0 &&
-    filteredLeads.every((lead) => expandedIds.has(lead.id));
+
+  function resetFilters() {
+    setQuery("");
+    setStatusFilter("ALL");
+    setSiteVisitFilter("ALL");
+    setPage(1);
+  }
 
   async function load() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const res = await cmsFetch("/api/cms/leads");
-      if (!res.ok) {
-        setLoadError("Data pengajuan gagal dimuat. Data yang tampil mungkin belum terbaru.");
-        return;
+      const response = await cmsFetch("/api/cms/leads", { cache: "no-store" });
+      const data: unknown = await response.json().catch(() => null);
+      if (!response.ok || !Array.isArray(data)) {
+        throw new Error("Data pengajuan gagal dimuat. Silakan coba lagi.");
       }
-      const data = await res.json().catch(() => null);
-      if (!Array.isArray(data)) {
-        setLoadError("Respons data pengajuan tidak valid.");
-        return;
-      }
-      setLeads(asLeadList(data));
-    } catch {
-      setLoadError("Tidak dapat terhubung ke layanan pengajuan.");
+      setLeads(data as LeadItem[]);
+    } catch (cause) {
+      setLoadError(
+        cause instanceof Error
+          ? cause.message
+          : "Tidak dapat terhubung ke layanan pengajuan."
+      );
     } finally {
       setIsLoading(false);
     }
   }
 
-  function updateLocal(id: string, patch: Partial<LeadItem>) {
-    setLeads((current) =>
-      current.map((lead) => (lead.id === id ? { ...lead, ...patch } : lead))
-    );
-  }
-
-  function toggleLead(id: string) {
-    setExpandedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAllVisible() {
-    setExpandedIds((current) => {
-      const next = new Set(current);
-      for (const lead of filteredLeads) {
-        if (allVisibleExpanded) next.delete(lead.id);
-        else next.add(lead.id);
-      }
-      return next;
-    });
-  }
-
-  function clearFilters() {
-    setQuery("");
-    setStatusFilter("ALL");
-    setSiteVisitFilter("ALL");
-  }
-
-  async function patchLead(id: string, body: Record<string, unknown>) {
-    setSavingId(id);
-    const res = await cmsFetch("/api/cms/leads", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...body }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setSavingId(null);
-    if (!res.ok) {
-      alert((data as { error?: string }).error ?? "Gagal memperbarui pengajuan.");
-      await load();
-      return false;
-    }
-    await load();
-    return true;
-  }
-
-  async function updateStatus(lead: LeadItem, status: string) {
-    if (status === "COMMERCIAL_OPERATION") {
-      const confirmed = confirm(
-        `Ubah "${lead.companyName}" menjadi Operasional Komersial?\n\nSistem akan otomatis membuat atau memperbarui Penyewa Aktif dan mengisi unit ${lead.space?.code ?? ""}.`
-      );
-      if (!confirmed) return;
-    }
-    if (status === "CLOSED_LOST") {
-      const confirmed = confirm(
-        "Tandai pengajuan sebagai Drop-off? Reservasi unit dari pengajuan ini akan dilepas."
-      );
-      if (!confirmed) return;
-    }
-    await patchLead(lead.id, {
-      status,
-      rdsOfferNo: lead.rdsOfferNo,
-      baNegotiationNo: lead.baNegotiationNo,
-    });
-  }
-
-  async function saveSiteVisit(lead: LeadItem) {
-    const scheduledAt = lead.siteVisitScheduledAt
-      ? new Date(lead.siteVisitScheduledAt).toISOString()
-      : null;
-    await patchLead(lead.id, {
-      siteVisitStatus: lead.siteVisitStatus,
-      siteVisitScheduledAt: scheduledAt,
-      notes: lead.notes || null,
-    });
-  }
-
-  async function deleteLead(lead: LeadItem) {
-    if (
-      !confirm(
-        `Hapus pengajuan "${lead.companyName}"? Tindakan ini tidak bisa dibatalkan.`
-      )
-    ) {
-      return;
-    }
-    const res = await cmsFetch(`/api/cms/leads/${lead.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      alert((data as { error?: string }).error ?? "Gagal menghapus pengajuan.");
-      return;
-    }
-    setExpandedIds((current) => {
-      const next = new Set(current);
-      next.delete(lead.id);
-      return next;
-    });
-    await load();
-  }
-
   return (
-    <div>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Pengajuan & Site Visit</h1>
-          <p className="mt-1 text-sm text-[#C4A8AD]">
-            Alur calon mitra: penawaran resmi, verifikasi lokasi, BA Negosiasi, lalu perjanjian.
-          </p>
-        </div>
-        <p className="text-sm text-[#C4A8AD]" aria-live="polite">
-          <span className="font-semibold text-white">{filteredLeads.length}</span> dari{" "}
-          {leads.length} pengajuan
-        </p>
+    <div className="space-y-5">
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={isLoading}
+          onClick={() => void load()}
+        >
+          <RefreshCw
+            className={`h-3.5 w-3.5 ${isLoading ? "animate-spin motion-reduce:animate-none" : ""}`}
+          />
+          {isLoading ? "Memuat…" : "Muat ulang"}
+        </Button>
       </div>
+
+      {reminders.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-amber-900">
+              Monitoring masa sewa · {reminders.length} perlu tindak lanjut
+            </CardTitle>
+            <CardDescription className="text-amber-800">
+              Pengingat internal H-90, H-60, dan H-30 berdasarkan tanggal akhir PKS.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-amber-200">
+              {reminders.map(({ lead, reminder }) => (
+                <li key={lead.id}>
+                  <Link
+                    href={cmsLeadDetailHref(lead.id)}
+                    prefetch={false}
+                    className="flex min-h-11 flex-wrap items-center justify-between gap-2 rounded py-2 text-sm text-amber-900 focus-visible:outline-2 focus-visible:outline-amber-700"
+                  >
+                    <span className="min-w-0 break-words">
+                      {lead.companyName} · {lead.inquiryCode}
+                    </span>
+                    <span className="font-semibold">
+                      {reminder.label} ·{" "}
+                      {reminder.remainingDays >= 0
+                        ? `${reminder.remainingDays} hari tersisa`
+                        : `${-reminder.remainingDays} hari lewat`}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {loadError && (
         <div
           role="alert"
-          className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-amber-50 sm:flex-row sm:items-center sm:justify-between"
+          className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
         >
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
-            <div>
-              <p className="font-semibold">Pengajuan tidak dapat dimuat</p>
-              <p className="mt-0.5 text-sm text-amber-100/80">{loadError}</p>
-            </div>
+          <AlertTriangle aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+          <div>
+            <p className="font-semibold">Pengajuan tidak dapat dimuat</p>
+            <p className="mt-1">{loadError}</p>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={load}
-            disabled={isLoading}
-            className="shrink-0 border-amber-200/30 bg-transparent text-amber-50 hover:bg-amber-100/10"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            {isLoading ? "Memuat..." : "Coba lagi"}
-          </Button>
         </div>
       )}
 
-      <div className="mb-5 rounded-xl border border-[rgba(255,214,218,0.14)] bg-[#261015] p-3">
-        <div className="flex flex-col gap-2 lg:flex-row">
-          <label className="relative min-w-0 flex-1">
-            <span className="sr-only">Cari pengajuan</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#C4A8AD]" />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Cari brand, PIC, telepon, email, unit, atau stasiun..."
-              className="h-10 w-full rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] pl-9 pr-3 text-sm text-[#F8ECEE] outline-none placeholder:text-[#C4A8AD] focus:border-[#E31E2D] focus:ring-2 focus:ring-[#E31E2D]/25"
-            />
-          </label>
-
-          <div className="grid gap-2 sm:grid-cols-2 lg:w-[430px]">
-            <label className="relative">
-              <span className="sr-only">Filter tahap proses</span>
-              <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-[#C4A8AD]" />
-              <select
+      <Card>
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1.5">
+            <CardTitle>Daftar Pengajuan</CardTitle>
+            <CardDescription>
+              {filteredLeads.length} dari {leads.length} pengajuan
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative min-w-0 flex-1 sm:max-w-sm">
+              <Search
+                aria-hidden="true"
+                className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
+              />
+              <Input
+                type="search"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Cari nomor, brand, PIC, unit…"
+                aria-label="Cari pengajuan"
+                className="pl-9"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                className="h-10 w-full appearance-none rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] pl-9 pr-8 text-sm text-[#F8ECEE] outline-none focus:border-[#E31E2D] focus:ring-2 focus:ring-[#E31E2D]/25"
+                onValueChange={(value) => {
+                  setStatusFilter(value);
+                  setPage(1);
+                }}
               >
-                <option value="ALL">Semua tahap</option>
-                {LEAD_PIPELINE_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {LEAD_STATUS_LABELS[status]}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#C4A8AD]" />
-            </label>
-
-            <label className="relative">
-              <span className="sr-only">Filter status site visit</span>
-              <CalendarClock className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-[#C4A8AD]" />
-              <select
+                <SelectTrigger className="w-44" aria-label="Filter tahap proses">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Semua tahap</SelectItem>
+                  {ADMIN_LEAD_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {LEAD_STATUS_LABELS[status]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
                 value={siteVisitFilter}
-                onChange={(event) => setSiteVisitFilter(event.target.value)}
-                className="h-10 w-full appearance-none rounded-lg border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] pl-9 pr-8 text-sm text-[#F8ECEE] outline-none focus:border-[#E31E2D] focus:ring-2 focus:ring-[#E31E2D]/25"
+                onValueChange={(value) => {
+                  setSiteVisitFilter(value);
+                  setPage(1);
+                }}
               >
-                <option value="ALL">Semua site visit</option>
-                {SITE_VISIT_STATUS_VALUES.map((status) => (
-                  <option key={status} value={status}>
-                    {SITE_VISIT_STATUS_LABELS[status]}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#C4A8AD]" />
-            </label>
-          </div>
-        </div>
-
-        <div className="mt-3 flex min-h-8 flex-wrap items-center justify-between gap-2 border-t border-[rgba(255,214,218,0.14)] pt-3">
-          <div>
-            {filtersActive && (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={clearFilters}
-                className="h-8 text-[#F8ECEE]"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reset filter
-              </Button>
-            )}
-          </div>
-          {filteredLeads.length > 0 && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={toggleAllVisible}
-              className="h-8 text-[#F8ECEE]"
-            >
-              {allVisibleExpanded ? (
-                <ChevronUp className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5" />
-              )}
-              {allVisibleExpanded ? "Tutup semua" : "Buka semua"}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-2.5">
-        {filteredLeads.map((lead) => (
-          <LeadCard
-            key={lead.id}
-            lead={lead}
-            expanded={expandedIds.has(lead.id)}
-            saving={savingId === lead.id}
-            onToggle={() => toggleLead(lead.id)}
-            onUpdateStatus={(status) => updateStatus(lead, status)}
-            onUpdateLocal={(patch) => updateLocal(lead.id, patch)}
-            onSaveSiteVisit={() => saveSiteVisit(lead)}
-            onDelete={() => deleteLead(lead)}
-          />
-        ))}
-
-        {!loadError && leads.length === 0 && (
-          <div className="rounded-xl border border-dashed border-[rgba(255,214,218,0.14)] py-14 text-center text-[#C4A8AD]">
-            Belum ada pengajuan.
-          </div>
-        )}
-
-        {leads.length > 0 && filteredLeads.length === 0 && (
-          <div className="rounded-xl border border-dashed border-[rgba(255,214,218,0.14)] px-5 py-14 text-center">
-            <Search className="mx-auto h-8 w-8 text-[#C4A8AD]" />
-            <p className="mt-3 font-medium text-[#F8ECEE]">Pengajuan tidak ditemukan</p>
-            <p className="mt-1 text-sm text-[#C4A8AD]">
-              Coba kata kunci lain atau reset filter.
-            </p>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={clearFilters}
-              className="mt-4"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset filter
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function LeadCard({
-  lead,
-  expanded,
-  saving,
-  onToggle,
-  onUpdateStatus,
-  onUpdateLocal,
-  onSaveSiteVisit,
-  onDelete,
-}: {
-  lead: LeadItem;
-  expanded: boolean;
-  saving: boolean;
-  onToggle: () => void;
-  onUpdateStatus: (status: string) => void;
-  onUpdateLocal: (patch: Partial<LeadItem>) => void;
-  onSaveSiteVisit: () => void;
-  onDelete: () => void;
-}) {
-  const detailId = `lead-detail-${lead.id}`;
-
-  return (
-    <Card className="overflow-hidden border-[rgba(255,214,218,0.14)] bg-[#3A161C]">
-      <CardContent className="p-0">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={expanded}
-          aria-controls={detailId}
-          className="flex w-full items-start gap-3 px-4 py-3.5 text-left outline-none transition hover:bg-white/[0.035] focus-visible:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E31E2D]"
-        >
-          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#261015] text-[#F8ECEE]">
-            {expanded ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </span>
-
-          <span className="min-w-0 flex-1">
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-white">{lead.companyName}</span>
-              <Badge
-                variant="outline"
-                className="border-[rgba(255,214,218,0.18)] bg-transparent text-[#F0DDE1]"
-              >
-                {leadStatusLabel(lead.status)}
-              </Badge>
-              {lead.siteVisitStatus !== "NONE" && (
-                <Badge
-                  variant="outline"
-                  className="border-[rgba(255,214,218,0.2)] bg-[#261015] text-[#F8ECEE]"
-                >
-                  Site Visit: {siteVisitLabel(lead.siteVisitStatus)}
-                </Badge>
-              )}
-            </span>
-            <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#C4A8AD]">
-              <span className="inline-flex items-center gap-1.5">
-                <UserRound className="h-3.5 w-3.5" />
-                {lead.contactName} · {lead.phone}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Building2 className="h-3.5 w-3.5" />
-                {lead.space
-                  ? `${lead.space.code} · ${lead.space.station.name}`
-                  : "Tanpa unit"}
-              </span>
-            </span>
-          </span>
-
-          <span className="hidden shrink-0 pt-1 text-xs text-[#C4A8AD] sm:block">
-            {new Date(lead.createdAt).toLocaleDateString("id-ID", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
-          </span>
-        </button>
-
-        {expanded && (
-          <div id={detailId} className="border-t border-[rgba(255,214,218,0.14)] px-4 py-4">
-            <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-1.5 text-sm text-[#C4A8AD]">
-                  <UserRound className="h-3.5 w-3.5" />
-                  {lead.contactName} · {lead.phone} · {lead.email}
-                </p>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl bg-[#1C0A0E]/60 p-3">
-                    <p className="flex items-center gap-1.5 text-xs font-semibold text-[#C4A8AD]">
-                      <Building2 className="h-3.5 w-3.5" />
-                      Unit
-                    </p>
-                    <p className="mt-1 text-sm font-medium text-[#F8ECEE]">
-                      {lead.space
-                        ? `${lead.space.code} — ${lead.space.name}`
-                        : "Tanpa unit spesifik"}
-                    </p>
-                    {lead.space && (
-                      <p className="mt-1 flex items-center gap-1 text-xs text-[#C4A8AD]">
-                        <MapPin className="h-3 w-3" />
-                        {lead.space.station.name} · {lead.space.status}
-                      </p>
-                    )}
-                  </div>
-                  <div className="rounded-xl bg-[#1C0A0E]/60 p-3">
-                    <p className="text-xs font-semibold text-[#C4A8AD]">Kebutuhan</p>
-                    <p className="mt-1 text-sm text-[#F8ECEE]">{lead.businessType}</p>
-                    {lead.message && (
-                      <p className="mt-1 text-xs leading-relaxed text-[#C4A8AD]">
-                        {lead.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="w-full shrink-0 space-y-3 xl:w-[340px]">
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#C4A8AD]">
-                    Nomor penawaran resmi
-                  </label>
-                  <input
-                    value={lead.rdsOfferNo ?? ""}
-                    onChange={(event) => onUpdateLocal({ rdsOfferNo: event.target.value })}
-                    placeholder="Nomor dari RDS KAI"
-                    className="h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#261015] px-3 text-sm text-[#F8ECEE] placeholder:text-[#C4A8AD]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#C4A8AD]">
-                    Nomor BA Negosiasi
-                  </label>
-                  <input
-                    value={lead.baNegotiationNo ?? ""}
-                    onChange={(event) => onUpdateLocal({ baNegotiationNo: event.target.value })}
-                    placeholder="Diisi setelah kesepakatan komersial"
-                    className="h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#261015] px-3 text-sm text-[#F8ECEE] placeholder:text-[#C4A8AD]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#C4A8AD]">
-                    Tahap Proses
-                  </label>
-                  <Select
-                    value={
-                      lead.status === "CLOSED_WON"
-                        ? "COMMERCIAL_OPERATION"
-                        : lead.status
-                    }
-                    onValueChange={onUpdateStatus}
-                    disabled={saving}
-                  >
-                    <SelectTrigger className="w-full border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LEAD_PIPELINE_STATUSES.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {LEAD_STATUS_LABELS[status]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="rounded-xl bg-[#1C0A0E]/50 p-3">
-                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-[#F8ECEE]">
-                    <CalendarClock className="h-3.5 w-3.5" />
-                    Site Visit
-                  </p>
-                  {lead.surveyPreference && (
-                    <p className="mb-2 rounded-lg bg-[#1C0A0E] px-2.5 py-2 text-xs text-[#F8ECEE]">
-                      Preferensi Mitra: {lead.surveyPreference}
-                    </p>
-                  )}
-                  <Select
-                    value={lead.siteVisitStatus}
-                    onValueChange={(value) =>
-                      onUpdateLocal({ siteVisitStatus: value })
-                    }
-                  >
-                    <SelectTrigger className="w-full border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SITE_VISIT_STATUS_VALUES.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {siteVisitLabel(status)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <input
-                    type="datetime-local"
-                    value={dateTimeInputValue(lead.siteVisitScheduledAt)}
-                    onChange={(event) =>
-                      onUpdateLocal({
-                        siteVisitScheduledAt: event.target.value || null,
-                      })
-                    }
-                    className="mt-2 h-10 w-full rounded-md border border-[rgba(255,214,218,0.14)] bg-[#261015] px-3 text-sm text-[#F8ECEE]"
-                  />
-                  <textarea
-                    value={lead.notes ?? ""}
-                    onChange={(event) => onUpdateLocal({ notes: event.target.value })}
-                    placeholder="Catatan internal tim leasing"
-                    rows={2}
-                    className="mt-2 w-full resize-none rounded-md border border-[rgba(255,214,218,0.14)] bg-[#261015] px-3 py-2 text-sm text-[#F8ECEE] placeholder:text-[#C4A8AD]"
-                  />
-                  <Button
-                    size="sm"
-                    className="mt-2 w-full"
-                    onClick={onSaveSiteVisit}
-                    disabled={saving}
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    {saving ? "Menyimpan..." : "Simpan Site Visit"}
-                  </Button>
-                </div>
-
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="w-full text-red-400 hover:bg-red-950/40"
-                  onClick={onDelete}
-                  disabled={saving}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Hapus Pengajuan
+                <SelectTrigger className="w-44" aria-label="Filter status site visit">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Semua site visit</SelectItem>
+                  {SITE_VISIT_STATUS_VALUES.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {SITE_VISIT_STATUS_LABELS[status]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {filtersActive && (
+                <Button type="button" size="sm" variant="ghost" onClick={resetFilters}>
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset
                 </Button>
-              </div>
+              )}
             </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          <div className="rounded-lg border border-slate-200">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Brand</TableHead>
+                  <TableHead>Kode</TableHead>
+                  <TableHead>Tahap</TableHead>
+                  <TableHead className="hidden md:table-cell">Site visit</TableHead>
+                  <TableHead className="hidden lg:table-cell">Unit</TableHead>
+                  <TableHead className="hidden xl:table-cell">PIC</TableHead>
+                  <TableHead className="hidden sm:table-cell">Tanggal</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paged.map((lead) => {
+                  const status =
+                    LEAD_STATUS_LABELS[lead.status as CommercialLeadStatus] ??
+                    lead.status.replaceAll("_", " ");
+                  const visit =
+                    SITE_VISIT_STATUS_LABELS[
+                      lead.siteVisitStatus as CommercialSiteVisitStatus
+                    ] ?? lead.siteVisitStatus;
+                  return (
+                    <TableRow key={lead.id} id={`lead-${lead.id}`}>
+                      <TableCell className="max-w-48">
+                        <span className="break-words font-medium">{lead.companyName}</span>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-slate-600">
+                        {lead.inquiryCode}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={leadStageBadgeClass(lead.status)}>
+                          {status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden text-sm text-slate-600 md:table-cell">
+                        {lead.siteVisitStatus === "NONE" ? (
+                          <span className="text-slate-400">—</span>
+                        ) : (
+                          visit
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden max-w-56 break-words text-sm text-slate-600 lg:table-cell">
+                        {unitLabel(lead)}
+                      </TableCell>
+                      <TableCell className="hidden max-w-40 break-words text-sm text-slate-600 xl:table-cell">
+                        {lead.contactName}
+                        <span className="mt-0.5 block text-xs text-slate-400">{lead.phone}</span>
+                      </TableCell>
+                      <TableCell className="hidden whitespace-nowrap text-sm text-slate-600 sm:table-cell">
+                        {new Date(lead.createdAt).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          timeZone: "Asia/Jakarta",
+                        })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={cmsLeadDetailHref(lead.id)} prefetch={false}>
+                            Detail
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          {!loadError && leads.length === 0 && (
+            <p className="rounded-lg border border-dashed border-slate-200 px-5 py-12 text-center text-sm text-slate-500">
+              Belum ada pengajuan.
+            </p>
+          )}
+          {leads.length > 0 && filteredLeads.length === 0 && (
+            <div className="rounded-lg border border-dashed border-slate-200 px-5 py-12 text-center">
+              <Search aria-hidden="true" className="mx-auto size-7 text-slate-400" />
+              <h2 className="mt-3 font-semibold">Pengajuan tidak ditemukan</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Coba kata kunci lain atau reset filter.
+              </p>
+              <Button type="button" variant="ghost" className="mt-3" onClick={resetFilters}>
+                Reset filter
+              </Button>
+            </div>
+          )}
+
+          {filteredLeads.length > 0 && (
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-slate-600">
+                Menampilkan {from}–{to} dari {filteredLeads.length} pengajuan
+                {filteredLeads.length !== leads.length ? ` (total ${leads.length})` : ""}
+              </p>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="leads-page-size" className="text-sm text-slate-600">
+                    Baris/halaman
+                  </Label>
+                  <Select
+                    value={String(pageSize)}
+                    onValueChange={(value) => {
+                      setPageSize(Number(value));
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger id="leads-page-size" className="h-9 w-[4.5rem]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAGE_SIZES.map((size) => (
+                        <SelectItem key={size} value={String(size)}>
+                          {size}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-sm text-slate-600">
+                  Halaman {currentPage} dari {totalPages}
+                </p>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-9 p-0"
+                    onClick={() => setPage(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                    aria-label="Halaman sebelumnya"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-9 p-0"
+                    onClick={() => setPage(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                    aria-label="Halaman berikutnya"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

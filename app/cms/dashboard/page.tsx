@@ -14,8 +14,14 @@ async function getDashboardData() {
   }
 
   const [
-    totalVisits, totalLeads, totalSpaces, availableSpaces,
-    eventsByType, recentLeads, stationVisits, leadsByStatus, dailyVisits,
+    totalVisits,
+    totalLeads,
+    totalSpaces,
+    availableSpaces,
+    eventsByType,
+    stationVisits,
+    leadsByStatus,
+    dailyVisits,
   ] = await Promise.all([
     settle("totalVisits", prisma.visitEvent.count(), null),
     settle("totalLeads", prisma.tenantLead.count(), null),
@@ -28,15 +34,6 @@ async function getDashboardData() {
     settle(
       "eventsByType",
       prisma.visitEvent.groupBy({ by: ["eventType"], _count: { id: true } }),
-      []
-    ),
-    settle(
-      "recentLeads",
-      prisma.tenantLead.findMany({
-        take: 10,
-        orderBy: { createdAt: "desc" },
-        include: { space: { include: { station: { select: { name: true, slug: true } } } } },
-      }),
       []
     ),
     settle(
@@ -70,21 +67,20 @@ async function getDashboardData() {
   ]);
 
   const stationIds = stationVisits.map((sv) => sv.stationId!).filter(Boolean);
-  const stations = stationIds.length > 0
-    ? await settle(
-        "topStations",
-        prisma.station.findMany({
-          where: { id: { in: stationIds } },
-          select: { id: true, name: true },
-        }),
-        []
-      )
-    : [];
+  const stations =
+    stationIds.length > 0
+      ? await settle(
+          "topStations",
+          prisma.station.findMany({
+            where: { id: { in: stationIds } },
+            select: { id: true, name: true },
+          }),
+          []
+        )
+      : [];
   const stationMap = Object.fromEntries(stations.map((s) => [s.id, s.name]));
   const occupiedSpaces =
-    totalSpaces !== null && availableSpaces !== null
-      ? totalSpaces - availableSpaces
-      : null;
+    totalSpaces !== null && availableSpaces !== null ? totalSpaces - availableSpaces : null;
 
   return {
     stats: {
@@ -101,19 +97,6 @@ async function getDashboardData() {
             : null,
     },
     eventsByType: eventsByType.map((e) => ({ type: e.eventType, count: e._count.id })),
-    recentLeads: recentLeads.map((l) => ({
-      id: l.id,
-      companyName: l.companyName,
-      contactName: l.contactName,
-      phone: l.phone,
-      email: l.email,
-      businessType: l.businessType,
-      status: l.status,
-      spaceName: l.space?.name ?? "-",
-      stationName: l.space?.station?.name ?? "-",
-      stationSlug: l.space?.station?.slug ?? "",
-      createdAt: l.createdAt.toISOString(),
-    })),
     topStations: stationVisits.map((sv) => ({
       stationId: sv.stationId!,
       stationName: stationMap[sv.stationId!] ?? sv.stationId!,
@@ -132,9 +115,5 @@ export const dynamic = "force-dynamic";
 
 export default async function CmsDashboardPage() {
   const data = await getDashboardData();
-  return (
-    <div>
-      <DashboardClient data={data} />
-    </div>
-  );
+  return <DashboardClient data={data} />;
 }

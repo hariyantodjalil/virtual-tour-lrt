@@ -1,28 +1,28 @@
 /**
- * Shared CMS surface tokens — align with CmsShell / Leads Void Portal maroon.
- * Prefer these over slate-* so list pages don't read as cool blue-gray.
+ * Shared CMS surface tokens — light operate workspace (matches the inquiry/detail modal).
+ * Resolves inside `.cms-light` on the CMS shell; keep values in sync with globals.css.
  */
 export const cmsUi = {
-  card: "border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]",
-  cardSoft: "border-[rgba(255,214,218,0.14)] bg-[#3A161C]/60 text-[#F8ECEE]",
-  nested: "border-[rgba(255,214,218,0.14)] bg-[#261015]",
-  void: "bg-[#1C0A0E]",
-  panel: "bg-[#3A161C]",
-  surface: "bg-[#261015]",
-  ink: "text-[#F8ECEE]",
-  muted: "text-[#C4A8AD]",
-  faint: "text-[#A88990]",
-  hairline: "border-[rgba(255,214,218,0.14)]",
+  card: "border-[var(--work-line)] bg-[var(--work-surface)] text-[var(--work-text)]",
+  cardSoft: "border-[var(--work-line)] bg-[var(--work-surface)] text-[var(--work-text)]",
+  nested: "border-[var(--work-line)] bg-[var(--work-subtle)]",
+  void: "bg-[var(--work-subtle)]",
+  panel: "bg-[var(--work-surface)]",
+  surface: "bg-[var(--work-subtle)]",
+  ink: "text-[var(--work-text)]",
+  muted: "text-[var(--work-muted)]",
+  faint: "text-[var(--work-muted)]",
+  hairline: "border-[var(--work-line)]",
   input:
-    "border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] placeholder:text-[#C4A8AD] focus-visible:border-[#E31E2D] focus-visible:ring-[#E31E2D]/25",
+    "border-[var(--work-control)] bg-[var(--work-surface)] text-[var(--work-text)] placeholder:text-[var(--work-muted)] focus-visible:border-[#D81435] focus-visible:ring-[#D81435]/25",
   select:
-    "border-[rgba(255,214,218,0.14)] bg-[#1C0A0E] text-[#F8ECEE] focus:border-[#E31E2D] focus:ring-[#E31E2D]/25",
+    "border-[var(--work-control)] bg-[var(--work-surface)] text-[var(--work-text)] focus:border-[#D81435] focus:ring-[#D81435]/25",
   outlineBtn:
-    "border-[rgba(255,214,218,0.14)] bg-transparent text-[#F8ECEE] hover:bg-[#261015] hover:text-[#F8ECEE]",
-  primaryBtn: "bg-[#E31E2D] text-white hover:bg-[#c41926]",
-  successBadge: "border-emerald-700/50 bg-emerald-950/40 text-emerald-300",
-  inactiveBadge: "border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#C4A8AD]",
-  outlineBadge: "border-[rgba(255,214,218,0.18)] bg-transparent text-[#F0DDE1]",
-  softBadge: "border-transparent bg-[#261015] text-[#C4A8AD]",
-  modal: "border-[rgba(255,214,218,0.18)] bg-[#261015] text-[#F8ECEE]",
+    "border-[var(--work-control)] bg-transparent text-[var(--work-text)] hover:bg-[var(--work-subtle)]",
+  primaryBtn: "bg-[#D81435] text-white hover:bg-[#B8112D]",
+  successBadge: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  inactiveBadge: "border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-muted)]",
+  outlineBadge: "border-[var(--work-line)] bg-transparent text-[var(--work-muted)]",
+  softBadge: "border-transparent bg-[var(--work-subtle)] text-[var(--work-muted)]",
+  modal: "border-[var(--work-line)] bg-[var(--work-surface)] text-[var(--work-text)]",
 } as const;

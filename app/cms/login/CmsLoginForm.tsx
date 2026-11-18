@@ -47,17 +47,17 @@ export default function CmsLoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#1C0A0E] p-4">
-      <Card className="w-full max-w-md border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--work-subtle)] p-4">
+      <Card className="w-full max-w-md border-[var(--work-line)] bg-[var(--work-surface)] text-[var(--work-text)]">
         <CardHeader>
           <CardTitle>CMS Virtual Tour</CardTitle>
-          <CardDescription className="text-[#C4A8AD]">
+          <CardDescription className="text-[var(--work-muted)]">
             Masuk untuk mengelola konten LRT Jabodebek
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isExpired && (
-            <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+            <div className="mb-4 rounded-lg border border-amber-500/40 bg-[var(--work-warning-soft)] px-4 py-3 text-sm text-amber-300">
               Sesi Anda telah berakhir. Silakan login kembali untuk melanjutkan.
             </div>
           )}
@@ -69,7 +69,7 @@ export default function CmsLoginForm() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE]"
+                className="border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-text)]"
                 required
               />
             </div>
@@ -80,11 +80,11 @@ export default function CmsLoginForm() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE]"
+                className="border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-text)]"
                 required
               />
             </div>
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className="text-sm text-[var(--work-danger)]">{error}</p>}
             <Button type="submit" className="w-full bg-[#E31E2D] hover:bg-[#c41926]" disabled={loading}>
               {loading ? "Memproses..." : "Login"}
             </Button>
@@ -92,14 +92,14 @@ export default function CmsLoginForm() {
 
           <div className="my-4 flex items-center gap-2">
             <div className="h-px flex-1 bg-[rgba(255,214,218,0.14)]" />
-            <span className="text-xs font-medium whitespace-nowrap text-[#C4A8AD]">
+            <span className="text-xs font-medium whitespace-nowrap text-[var(--work-muted)]">
               atau masuk dengan
             </span>
             <div className="h-px flex-1 bg-[rgba(255,214,218,0.14)]" />
           </div>
 
           <GoogleSignInButton
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[rgba(255,214,218,0.14)] bg-[#261015] text-xs font-medium text-[#F8ECEE] transition hover:bg-[#3A161C]"
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)] text-xs font-medium text-[var(--work-text)] transition hover:bg-[var(--work-surface)]"
             label="Masuk dengan Google"
             onSuccess={(u, redirect) => {
               if (u.role === "MITRA") {

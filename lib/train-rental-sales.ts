@@ -1,4 +1,4 @@
-import { DEFAULT_TRAIN_CARS } from "@/lib/train-tour-defaults";
+import type { TrainFleetCar } from "@/lib/train-fleet-shared";
 
 export const TRAIN_RENTAL_STATUS_VALUES = ["TERSEDIA", "TERBATAS", "PENUH"] as const;
 export type TrainRentalStatus = (typeof TRAIN_RENTAL_STATUS_VALUES)[number];
@@ -9,30 +9,38 @@ export const TRAIN_RENTAL_STATUS_LABELS: Record<TrainRentalStatus, string> = {
   PENUH: "Penuh",
 };
 
-export const TRAINSET_OPTIONS = Array.from(
-  { length: 31 },
-  (_, index) => `TS${String(index + 1).padStart(2, "0")}`
-);
+export function trainRentalStatusBadgeClass(status: string): string {
+  switch (status) {
+    case "TERSEDIA":
+      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    case "TERBATAS":
+      return "border-amber-200 bg-amber-50 text-amber-900";
+    case "PENUH":
+      return "border-violet-200 bg-violet-50 text-violet-800";
+    default:
+      return "border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-muted)]";
+  }
+}
 
 export type CarTrainsetMap = Record<string, string[]>;
 
-export function emptyCarTrainsetMap(): CarTrainsetMap {
-  return Object.fromEntries(DEFAULT_TRAIN_CARS.map((car) => [car.slug, []]));
+export function emptyCarTrainsetMap(cars: Pick<TrainFleetCar, "slug">[] = []): CarTrainsetMap {
+  return Object.fromEntries(cars.map((car) => [car.slug, []]));
 }
 
 export function parseCarTrainsetMap(
   value: unknown,
-  fallbackTrainsets: string[] = []
+  fallbackTrainsets: string[] = [],
+  cars: Pick<TrainFleetCar, "slug">[] = []
 ): CarTrainsetMap {
-  const map = emptyCarTrainsetMap();
+  const map = emptyCarTrainsetMap(cars);
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const record = value as Record<string, unknown>;
-    const hasCarKeys = DEFAULT_TRAIN_CARS.some((car) => car.slug in record);
+    const hasCarKeys = Object.keys(record).length > 0;
     if (hasCarKeys) {
-      for (const car of DEFAULT_TRAIN_CARS) {
-        const raw = record[car.slug];
+      for (const [slug, raw] of Object.entries(record)) {
         if (Array.isArray(raw)) {
-          map[car.slug] = normalizeTrainsets(raw.filter((item) => typeof item === "string"));
+          Object.defineProperty(map, slug, { value: normalizeTrainsets(raw.filter((item) => typeof item === "string")), enumerable: true, writable: true, configurable: true });
         }
       }
       return map;
@@ -41,7 +49,7 @@ export function parseCarTrainsetMap(
 
   const shared = normalizeTrainsets(fallbackTrainsets);
   if (shared.length > 0) {
-    for (const car of DEFAULT_TRAIN_CARS) {
+    for (const car of cars) {
       map[car.slug] = [...shared];
     }
   }
@@ -52,18 +60,15 @@ export function unionCarTrainsets(map: CarTrainsetMap): string[] {
   return normalizeTrainsets(Object.values(map).flat());
 }
 
-export function isAllTrainsets(values: string[]): boolean {
-  return (
-    values.length >= TRAINSET_OPTIONS.length ||
-    TRAINSET_OPTIONS.every((trainset) => values.includes(trainset))
-  );
+export function isAllTrainsets(values: string[], options: string[] = []): boolean {
+  return options.length > 0 && options.every((trainset) => values.includes(trainset));
 }
 
-export function formatCarTrainsetSummary(map: CarTrainsetMap): string {
-  const cars = DEFAULT_TRAIN_CARS.map((car) => {
+export function formatCarTrainsetSummary(map: CarTrainsetMap, fleetCars: Pick<TrainFleetCar, "slug" | "label">[] = [], trainsets: string[] = []): string {
+  const cars = fleetCars.map((car) => {
     const items = map[car.slug] ?? [];
     if (items.length === 0) return `${car.label}: belum diatur`;
-    if (isAllTrainsets(items)) return `${car.label}: semua TS`;
+    if (isAllTrainsets(items, trainsets)) return `${car.label}: semua TS`;
     return `${car.label}: ${items.length} TS`;
   });
   return cars.join(" · ");

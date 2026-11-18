@@ -217,13 +217,9 @@ pipeline {
 
                         sudo chmod 777 -R "$WORKSPACE"
 
-                        SPATIAL_BUILD_FLAG="$(sed -n 's/^NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT=//p' "$WORKSPACE/.env" | tail -n 1)"
-                        case "$SPATIAL_BUILD_FLAG" in 1|true|on) ;; *) SPATIAL_BUILD_FLAG=0 ;; esac
-
                         sudo docker build \
                             --no-cache \
                             --pull \
-                            --build-arg "NEXT_PUBLIC_CMS_SPATIAL_HOTSPOT=$SPATIAL_BUILD_FLAG" \
                             -t "$HARBOR_REGISTRY/$APP_NAME:$TAG" \
                             .
                     '''

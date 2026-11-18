@@ -26,7 +26,7 @@ export default async function TrainPage({ params }: Props) {
   const resolvedSlug = slug === "default" ? DEFAULT_TRAIN_SLUG : slug;
   const [trainInfo, rentalSpaces] = await Promise.all([
     getTrainBySlug(resolvedSlug),
-    getTrainRentalSpaces(),
+    getTrainRentalSpaces(resolvedSlug),
   ]);
 
   if (!trainInfo) {

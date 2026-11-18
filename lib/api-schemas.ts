@@ -61,7 +61,7 @@ export const spaceMutationSchema = z.object({
   type: z.enum(["KIOS", "RUKO", "ATM", "VENDING", "MEDIA_IKLAN", "AREA_PROMOSI"]),
   status: z.enum(["TERSEDIA", "RESERVED", "FIT_OUT", "TERISI", "MAINTENANCE"]),
   area: nonNegativeNumber,
-  monthlyRent: nonNegativeNumber,
+  monthlyRent: nonNegativeNumber.nullable(),
   deposit: nonNegativeNumber,
   floor: z.string().trim().min(1).max(64),
   location: z.string().trim().min(1).max(300),
@@ -72,6 +72,10 @@ export const spaceMutationSchema = z.object({
     .default([]),
   exposure: z.number().int().min(0).max(1_000_000),
   powerSupply: optionalText(160),
+  preferredUses: z
+    .array(z.string().trim().min(1).max(64))
+    .max(12)
+    .default([]),
   waterAccess: z.boolean(),
   airConditioning: z.boolean(),
   description: optionalText(5_000),
@@ -85,8 +89,9 @@ export const trainRentalSpaceMutationSchema = z.object({
   description: optionalText(5_000),
   imageUrl: nullableUrl,
   objectPosition: z.string().trim().min(1).max(32).default("50% 50%"),
-  availableTrainsets: z.array(z.string().trim().min(1).max(16)).max(40).default([]),
+  availableTrainsets: z.array(z.string().trim().min(1).max(16)).max(40).optional(),
   availableByCar: z.record(z.string(), z.array(z.string().trim().min(1).max(16)).max(40)).optional(),
+  inquiryMode: z.enum(["MEDIA", "FULL_BRANDING"]).optional(),
   howToOrder: optionalText(2_000),
   status: z.enum(["TERSEDIA", "TERBATAS", "PENUH"]).default("TERSEDIA"),
   monthlyRent: nonNegativeNumber.nullable().optional(),
@@ -171,6 +176,10 @@ export const leadUpdateSchema = z.object({
   followUpAt: optionalDate,
   rdsOfferNo: optionalText(80),
   baNegotiationNo: optionalText(80),
+  rejectionReason: optionalText(2_000),
+  leaseStartAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Gunakan tanggal YYYY-MM-DD").refine(value => !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value, "Tanggal tidak valid").nullable().optional(),
+  leaseEndAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Gunakan tanggal YYYY-MM-DD").refine(value => !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value, "Tanggal tidak valid").nullable().optional(),
+  paymentVerified: z.boolean().optional(),
 }).strict().refine((value) => Object.keys(value).length > 1, "Minimal satu perubahan harus diisi");
 
 const orderItem = z.object({ sceneId: id, order: safeInteger }).strict();
@@ -251,12 +260,36 @@ export const areaUpdateSchema = z.object({
   isActive: z.boolean().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "Minimal satu field harus diisi");
 
+export const privacyBlurBakeTargetSchema = z.enum(["both", "hemat", "hd"]);
+
 export const privacyBlurBakeSchema = z.object({
   privacyBlurs: z.array(z.unknown()).min(1).max(100),
   viewerWidth: z.number().finite().positive().max(20_000).optional(),
   viewerHeight: z.number().finite().positive().max(20_000).optional(),
   hfov: z.number().finite().positive().max(180).optional(),
+  /** both = Hemat sync + HD background; hemat/hd = hanya target itu. */
+  target: privacyBlurBakeTargetSchema.optional().default("both"),
 }).strict();
+
+export const aiPatchBakeSchema = z
+  .object({
+    action: z.literal("generate").optional(),
+    prompt: z.string().trim().min(3).max(2000),
+    yaw: z.number().finite().min(-180).max(180),
+    pitch: z.number().finite().min(-90).max(90),
+    hfov: z.number().finite().positive().max(180),
+    patchWidth: z.number().int().min(512).max(1536).optional(),
+    patchHeight: z.number().int().min(512).max(1536).optional(),
+    enhancePrompt: z.boolean().optional(),
+    seed: z.number().int().optional(),
+  })
+  .strict();
+
+export const aiPatchRestoreSchema = z
+  .object({
+    action: z.literal("restore"),
+  })
+  .strict();
 
 export const googleAuthSchema = z.object({
   credential: z.string().trim().min(10).max(4096),

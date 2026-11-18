@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
         trainId: train.id,
         displayNumber: parsed.data.displayNumber,
         title: parsed.data.title,
+        ...(parsed.data.inquiryMode ? { inquiryMode: parsed.data.inquiryMode } : {}),
         description: parsed.data.description ?? null,
         imageUrl: parsed.data.imageUrl ?? null,
         objectPosition: parsed.data.objectPosition ?? "50% 50%",
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
       },
     });
     await writeTrainRentalSalesFields(space.id, {
-      availableTrainsets: parsed.data.availableTrainsets,
+      availableTrainsets: parsed.data.availableTrainsets ?? [],
       availableByCar: parsed.data.availableByCar,
       howToOrder: parsed.data.howToOrder ?? null,
       status: parsed.data.status,

@@ -50,7 +50,7 @@ export default function CommercialSpaceCard({ space, favorited, onFavorite }: Pr
       href={`/station/${space.stationSlug}?unit=${space.id}`}
       className="group flex flex-col overflow-hidden rounded-xl bg-white shadow-[0_2px_12px_rgba(16,24,40,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(16,24,40,0.14)]"
     >
-      <div className="relative aspect-[16/10] overflow-hidden">
+      <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
         <Image
           src={getStationImage(space.stationSlug, space.stationOrder)}
           alt={`${space.name} di ${space.stationName}`}

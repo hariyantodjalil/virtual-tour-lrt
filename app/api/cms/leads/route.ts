@@ -1,319 +1,120 @@
+import { Prisma } from "@prisma/client";
+import { cmsTrainInquirySelect } from "@/lib/train-advertising";
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { leadUpdateSchema } from "@/lib/api-schemas";
-import {
-  ACTIVE_LEAD_STATUSES,
-  isAtOrAfterLeadStage,
-  isCommercialOperation,
-  SPACE_HOLD_STATUSES,
-} from "@/lib/commercial-pipeline";
+import { recordInquiryStatus } from "@/lib/partner-inquiries";
+import { ACTIVE_LEAD_STATUSES, canonicalLeadStatus, completedLeadStageIndex, isCommercialOperation, SPACE_HOLD_STATUSES } from "@/lib/commercial-pipeline";
+import { inquiryTransitionError } from "@/lib/inquiry-workflow";
+
+const include = { trainInquiry: { select: cmsTrainInquirySelect }, space: { include: { station: true } } } satisfies Prisma.TenantLeadInclude;
+class WorkflowError extends Error {
+  constructor(message: string, readonly status = 409) { super(message); }
+}
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
+  const auth = await requireRole(request, ["ADMIN", "EDITOR"]);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
-
-  const leads = await prisma.tenantLead.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { space: { include: { station: true } } },
-  });
-  return NextResponse.json(leads);
+  const leads = await prisma.tenantLead.findMany({ orderBy: { createdAt: "desc" }, include });
+  return NextResponse.json(leads, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function PATCH(request: NextRequest) {
-  const auth = await requireAuth(request);
+  const auth = await requireRole(request, ["ADMIN"]);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
-
   const parsed = await parseJsonRequest(request, leadUpdateSchema);
   if (!parsed.success) return parsed.response;
-  const {
-    id,
-    status,
-    siteVisitStatus,
-    siteVisitScheduledAt,
-    notes,
-    followUpAt,
-    rdsOfferNo,
-    baNegotiationNo,
-  } = parsed.data;
-  const targetStatus = status === "CLOSED_WON" ? "COMMERCIAL_OPERATION" : status;
-
-  const existing = await prisma.tenantLead.findUnique({
-    where: { id },
-    include: {
-      space: {
-        select: {
-          id: true,
-          stationId: true,
-          status: true,
-          occupancy: {
-            include: {
-              tenant: {
-                select: { id: true, userId: true, brandName: true },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-  if (!existing) {
-    return NextResponse.json({ error: "Pengajuan tidak ditemukan." }, { status: 404 });
-  }
-
-  if (
-    isCommercialOperation(existing.status) &&
-    targetStatus &&
-    !isCommercialOperation(targetStatus)
-  ) {
-    return NextResponse.json(
-      {
-        error:
-          "Penyewaan sudah beroperasi. Akhiri melalui menu Penyewa Aktif, bukan dengan mengubah status pengajuan.",
-      },
-      { status: 409 }
-    );
-  }
-
-  const nextSiteVisitStatus =
-    siteVisitStatus ??
-    (siteVisitScheduledAt ? "SCHEDULED" : undefined);
-  const scheduledAt =
-    siteVisitScheduledAt === undefined
-      ? existing.siteVisitScheduledAt
-      : siteVisitScheduledAt
-        ? new Date(siteVisitScheduledAt)
-        : null;
-
-  if (nextSiteVisitStatus === "SCHEDULED" && !scheduledAt) {
-    return NextResponse.json(
-      { error: "Tanggal dan waktu site visit wajib diisi ketika status dijadwalkan." },
-      { status: 400 }
-    );
-  }
-
-  const nextRdsOfferNo = (rdsOfferNo !== undefined ? rdsOfferNo : existing.rdsOfferNo)?.trim() || "";
-  const nextBaNumber = (baNegotiationNo !== undefined ? baNegotiationNo : existing.baNegotiationNo)?.trim() || "";
-  const nextVisit = nextSiteVisitStatus ?? existing.siteVisitStatus;
-
-  if (targetStatus && isAtOrAfterLeadStage(targetStatus, "RDS_OFFER") && !nextRdsOfferNo) {
-    return NextResponse.json(
-      { error: "Nomor penawaran resmi wajib diisi sebelum tahap ini." },
-      { status: 400 }
-    );
-  }
-  if (targetStatus && isAtOrAfterLeadStage(targetStatus, "BA_SIGNED")) {
-    if (nextVisit !== "COMPLETED") {
-      return NextResponse.json(
-        { error: "Verifikasi lokasi harus selesai sebelum BA Negosiasi." },
-        { status: 400 }
-      );
-    }
-    if (!nextBaNumber) {
-      return NextResponse.json(
-        { error: "Nomor BA Negosiasi wajib diisi sebelum review desain dan perjanjian." },
-        { status: 400 }
-      );
-    }
-  }
-
+  const input = parsed.data;
   try {
-    const lead = await prisma.$transaction(async (tx) => {
+    const lead = await prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT id FROM tenant_leads WHERE id = ${input.id} FOR UPDATE`;
+      const existing = await tx.tenantLead.findUnique({ where: { id: input.id }, include: { mediaAttachments: true, trainInquiry: true } });
+      if (!existing) throw new WorkflowError("Pengajuan tidak ditemukan.", 404);
+      const target = input.status ? canonicalLeadStatus(input.status) : existing.status;
+      const changedStatus = target !== existing.status;
+      const active = isCommercialOperation(existing.status);
+      if (active && (changedStatus || input.leaseStartAt !== undefined || input.leaseEndAt !== undefined || input.paymentVerified === false)) {
+        throw new WorkflowError("Sewa sudah aktif. Perubahan kontrak atau penghentian dikelola melalui Penyewa Aktif.");
+      }
+      const leaseStartAt = input.leaseStartAt === undefined ? existing.leaseStartAt : input.leaseStartAt ? new Date(input.leaseStartAt) : null;
+      const leaseEndAt = input.leaseEndAt === undefined ? existing.leaseEndAt : input.leaseEndAt ? new Date(input.leaseEndAt) : null;
+      if (leaseStartAt && leaseEndAt && leaseEndAt < leaseStartAt) throw new WorkflowError("Tanggal akhir sewa tidak boleh sebelum tanggal mulai.", 400);
+      const visit = input.siteVisitStatus ?? (input.siteVisitScheduledAt ? "SCHEDULED" : existing.siteVisitStatus);
+      const scheduledAt = input.siteVisitScheduledAt === undefined ? existing.siteVisitScheduledAt : input.siteVisitScheduledAt ? new Date(input.siteVisitScheduledAt) : null;
+      if (visit === "SCHEDULED" && !scheduledAt) throw new WorkflowError("Tanggal dan waktu site visit wajib diisi.", 400);
+      if ((input.siteVisitStatus !== undefined || input.siteVisitScheduledAt !== undefined) && completedLeadStageIndex(existing.status) >= 2) {
+        throw new WorkflowError("Site visit dikelola selama negosiasi, sebelum negosiasi dinyatakan selesai.");
+      }
+      if (input.paymentVerified === true && completedLeadStageIndex(target) < 4) throw new WorkflowError("Verifikasi pembayaran dilakukan setelah PKS ditandatangani.");
+      const paymentVerifiedAt = input.paymentVerified === undefined ? existing.paymentVerifiedAt : input.paymentVerified ? existing.paymentVerifiedAt ?? new Date() : null;
+      const state = { status: target, leaseStartAt, leaseEndAt, paymentVerifiedAt, siteVisitStatus: visit, mediaAttachments: existing.mediaAttachments };
+      // Revalidate dates/payment at an already-reached gate too; metadata-only edits preserve legacy history.
+      if (changedStatus || ((input.leaseStartAt !== undefined || input.leaseEndAt !== undefined || input.paymentVerified !== undefined) && completedLeadStageIndex(target) >= 4)) {
+        const error = inquiryTransitionError(existing.status, target, state);
+        if (error) throw new WorkflowError(error);
+      }
+      if (target === "CLOSED_LOST" && changedStatus && !(input.rejectionReason ?? existing.rejectionReason)?.trim()) throw new WorkflowError("Isi alasan penghentian agar mitra mengetahui hasil pengajuannya.", 400);
+
       const spaceId = existing.spaceId;
-      const space = existing.space;
-
-      const holdsSpace = targetStatus ? SPACE_HOLD_STATUSES.includes(targetStatus) : false;
-      if (holdsSpace || targetStatus === "FIT_OUT_HANDOVER") {
-        if (!spaceId || !space) {
-          throw new Error("SPACE_REQUIRED");
+      if (spaceId && changedStatus) await tx.$executeRaw`SELECT id FROM commercial_spaces WHERE id = ${spaceId} FOR UPDATE`;
+      const space = spaceId ? await tx.commercialSpace.findUnique({ where: { id: spaceId }, include: { occupancy: { include: { tenant: true } } } }) : null;
+      const holds = SPACE_HOLD_STATUSES.includes(target) || target === "FIT_OUT_HANDOVER";
+      if (changedStatus && !existing.trainInquiry && (holds || isCommercialOperation(target))) {
+        if (!spaceId || !space) throw new WorkflowError("Tahap ini memerlukan unit komersial yang terhubung.", 400);
+        if (space.status === "MAINTENANCE" || (space.status === "TERISI" && !space.occupancy)) throw new WorkflowError("Unit sedang maintenance atau terisi. Perbarui ketersediaan unit terlebih dahulu.");
+        if (space.occupancy && (holds || space.occupancy.tenant.userId !== existing.userId)) throw new WorkflowError("Unit sudah ditempati penyewa lain.");
+        const competing = await tx.tenantLead.findFirst({ where: { spaceId, id: { not: input.id }, status: { in: [...SPACE_HOLD_STATUSES, "FIT_OUT_HANDOVER", "COMMERCIAL_OPERATION", "CLOSED_WON"] } }, select: { id: true } });
+        if (competing) throw new WorkflowError("Unit sudah direservasi oleh pengajuan lain.");
+        await tx.commercialSpace.update({ where: { id: spaceId }, data: { status: isCommercialOperation(target) ? "TERISI" : "RESERVED" } });
+        const affected = await tx.tenantLead.findMany({ where: { spaceId, id: { not: input.id }, status: { in: ACTIVE_LEAD_STATUSES } }, select: { id: true, status: true, workflowVersionId: true } });
+        for (const other of affected) {
+          await tx.tenantLead.update({ where: { id: other.id }, data: { status: "CLOSED_LOST", rejectionReason: "Unit sudah dialokasikan untuk pengajuan lain." } });
+          await recordInquiryStatus(tx, { id: other.id, workflowVersionId: other.workflowVersionId, fromStatus: other.status, status: "CLOSED_LOST", rejectionReason: "Unit sudah dialokasikan untuk pengajuan lain.", actor: auth.user.userId });
         }
-        if (space.occupancy) {
-          throw new Error("SPACE_OCCUPIED");
-        }
-
-        const competing = await tx.tenantLead.findFirst({
-          where: {
-            spaceId,
-            id: { not: id },
-            status: {
-              in: [...SPACE_HOLD_STATUSES, "FIT_OUT_HANDOVER", "COMMERCIAL_OPERATION", "CLOSED_WON"],
-            },
-          },
-          select: { id: true },
-        });
-        if (competing) {
-          throw new Error("SPACE_RESERVED");
-        }
-
-        await tx.commercialSpace.update({
-          where: { id: spaceId },
-          data: {
-            status: targetStatus === "FIT_OUT_HANDOVER" ? "FIT_OUT" : "RESERVED",
-          },
-        });
-
-        if (holdsSpace || targetStatus === "FIT_OUT_HANDOVER") {
-          await tx.tenantLead.updateMany({
-            where: {
-              spaceId,
-              id: { not: id },
-              status: { in: ACTIVE_LEAD_STATUSES },
-            },
-            data: { status: "CLOSED_LOST" },
-          });
+        if (isCommercialOperation(target)) {
+          if (!existing.userId) throw new WorkflowError("Hubungkan akun mitra sebelum mengaktifkan sewa.");
+          // Never match another tenant just by brand name: ownership follows the inquiry account.
+          const tenantData = { userId: existing.userId, stationId: space.stationId, brandName: existing.companyName, contactName: existing.contactName, phone: existing.phone, email: existing.email, isActive: true };
+          const previous = await tx.tenant.findFirst({ where: { userId: existing.userId, stationId: space.stationId } });
+          const tenant = previous ? await tx.tenant.update({ where: { id: previous.id }, data: tenantData }) : await tx.tenant.create({ data: tenantData });
+          await tx.spaceOccupancy.upsert({ where: { spaceId }, create: { spaceId, tenantId: tenant.id, startDate: leaseStartAt, endDate: leaseEndAt }, update: { tenantId: tenant.id, startDate: leaseStartAt, endDate: leaseEndAt } });
         }
       }
-
-      if (targetStatus === "COMMERCIAL_OPERATION") {
-        if (!spaceId || !space) {
-          throw new Error("SPACE_REQUIRED");
-        }
-        if (
-          space.occupancy &&
-          space.occupancy.tenant.userId !== existing.userId
-        ) {
-          throw new Error("SPACE_OCCUPIED");
-        }
-
-        let tenant = existing.userId
-          ? await tx.tenant.findFirst({
-              where: { userId: existing.userId, stationId: space.stationId },
-            })
-          : null;
-
-        if (!tenant) {
-          tenant = await tx.tenant.findFirst({
-            where: {
-              stationId: space.stationId,
-              brandName: { equals: existing.companyName, mode: "insensitive" },
-            },
-          });
-        }
-
-        if (tenant) {
-          tenant = await tx.tenant.update({
-            where: { id: tenant.id },
-            data: {
-              userId: existing.userId ?? tenant.userId,
-              brandName: existing.companyName,
-              contactName: existing.contactName,
-              phone: existing.phone,
-              email: existing.email,
-              isActive: true,
-            },
-          });
-        } else {
-          tenant = await tx.tenant.create({
-            data: {
-              userId: existing.userId,
-              stationId: space.stationId,
-              brandName: existing.companyName,
-              contactName: existing.contactName,
-              phone: existing.phone,
-              email: existing.email,
-              notes: `Konversi otomatis dari pengajuan ${existing.id}`,
-            },
-          });
-        }
-
-        await tx.spaceOccupancy.upsert({
-          where: { spaceId },
-          create: {
-            spaceId,
-            tenantId: tenant.id,
-            startDate: new Date(),
-          },
-          update: {
-            tenantId: tenant.id,
-            startDate: new Date(),
-            endDate: null,
-          },
-        });
-
-        await tx.commercialSpace.update({
-          where: { id: spaceId },
-          data: { status: "TERISI" },
-        });
-
-        await tx.tenantLead.updateMany({
-          where: {
-            spaceId,
-            id: { not: id },
-            status: { in: ACTIVE_LEAD_STATUSES },
-          },
-          data: { status: "CLOSED_LOST" },
-        });
+      if (changedStatus && existing.trainInquiry && isCommercialOperation(target)) {
+        const inquiry = existing.trainInquiry;
+        if (!inquiry.allocatedTrainsets.length) throw new WorkflowError("Alokasikan trainset sebelum mengaktifkan sewa.");
+        const count = await tx.trainset.count({ where: { trainId: inquiry.trainId, code: { in: inquiry.allocatedTrainsets }, isActive: true } });
+        if (count !== inquiry.allocatedTrainsets.length) throw new WorkflowError("Alokasi harus menggunakan trainset aktif.");
+        if (inquiry.requestedTrainsetCount !== null && inquiry.allocatedTrainsets.length !== inquiry.requestedTrainsetCount) throw new WorkflowError("Jumlah alokasi trainset harus sesuai permintaan pengajuan.");
       }
-
-      if (
-        targetStatus &&
-        !isAtOrAfterLeadStage(targetStatus, "BA_SIGNED") &&
-        spaceId &&
-        space &&
-        !space.occupancy &&
-        ["RESERVED", "FIT_OUT"].includes(space.status)
-      ) {
-        const otherHold = await tx.tenantLead.findFirst({
-          where: {
-            spaceId,
-            id: { not: id },
-            status: { in: [...SPACE_HOLD_STATUSES, "FIT_OUT_HANDOVER"] },
-          },
-          select: { status: true },
-        });
-        if (!otherHold) {
-          await tx.commercialSpace.update({
-            where: { id: spaceId },
-            data: { status: "TERSEDIA" },
-          });
-        }
+      if (changedStatus && !holds && !isCommercialOperation(target) && space && !space.occupancy && ["RESERVED", "FIT_OUT"].includes(space.status)) {
+        const otherHold = await tx.tenantLead.findFirst({ where: { spaceId, id: { not: input.id }, status: { in: [...SPACE_HOLD_STATUSES, "FIT_OUT_HANDOVER"] } }, select: { id: true } });
+        if (!otherHold) await tx.commercialSpace.update({ where: { id: space.id }, data: { status: "TERSEDIA" } });
       }
-
-      return tx.tenantLead.update({
-        where: { id },
-        data: {
-          ...(targetStatus && { status: targetStatus }),
-          ...(notes !== undefined && { notes }),
-          ...(followUpAt !== undefined && {
-            followUpAt: followUpAt ? new Date(followUpAt) : null,
-          }),
-          ...(nextSiteVisitStatus && { siteVisitStatus: nextSiteVisitStatus }),
-          ...(siteVisitScheduledAt !== undefined && {
-            siteVisitScheduledAt: scheduledAt,
-          }),
-          ...(rdsOfferNo !== undefined && { rdsOfferNo: nextRdsOfferNo || null }),
-          ...(baNegotiationNo !== undefined && { baNegotiationNo: nextBaNumber || null }),
-        },
-        include: { space: { include: { station: true } } },
-      });
-    });
-
-    return NextResponse.json(lead);
+      const updated = await tx.tenantLead.update({ where: { id: input.id }, data: {
+        ...(changedStatus && { status: target }),
+        ...(input.notes !== undefined && { notes: input.notes }),
+        ...(input.followUpAt !== undefined && { followUpAt: input.followUpAt ? new Date(input.followUpAt) : null }),
+        ...(input.siteVisitStatus !== undefined || input.siteVisitScheduledAt !== undefined ? { siteVisitStatus: visit, siteVisitScheduledAt: scheduledAt } : {}),
+        ...(input.rdsOfferNo !== undefined && { rdsOfferNo: input.rdsOfferNo?.trim() || null }),
+        ...(input.baNegotiationNo !== undefined && { baNegotiationNo: input.baNegotiationNo?.trim() || null }),
+        ...(input.leaseStartAt !== undefined && { leaseStartAt }),
+        ...(input.leaseEndAt !== undefined && { leaseEndAt }),
+        ...(input.paymentVerified !== undefined && { paymentVerifiedAt, paymentVerifiedByAdmin: input.paymentVerified ? existing.paymentVerifiedByAdmin ?? auth.user.userId : null }),
+        ...(input.rejectionReason !== undefined && { rejectionReason: input.rejectionReason?.trim() || null }),
+        ...(changedStatus && target !== "CLOSED_LOST" && { rejectionReason: null }),
+      }, include });
+      if (changedStatus) await recordInquiryStatus(tx, { id: input.id, workflowVersionId: existing.workflowVersionId, fromStatus: existing.status, status: target, rejectionReason: input.rejectionReason ?? existing.rejectionReason, actor: auth.user.userId });
+      if (input.paymentVerified !== undefined && Boolean(existing.paymentVerifiedAt) !== input.paymentVerified) await tx.inquiryStepLog.create({ data: { tenantLeadId: input.id, stepOrder: 6, status: target, action: input.paymentVerified ? "PAYMENT_VERIFIED" : "PAYMENT_VERIFICATION_REVOKED", notes: input.paymentVerified ? "Pembayaran telah diverifikasi tim komersial." : "Verifikasi pembayaran diperbarui tim komersial.", performedBy: auth.user.userId } });
+      return updated;
+    }, { isolationLevel: "Serializable", timeout: 15000 });
+    return NextResponse.json(lead, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (message === "SPACE_REQUIRED") {
-      return NextResponse.json(
-        { error: "Tahap ini memerlukan unit komersial yang terhubung." },
-        { status: 400 }
-      );
-    }
-    if (message === "SPACE_OCCUPIED") {
-      return NextResponse.json(
-        { error: "Unit sudah ditempati penyewa lain." },
-        { status: 409 }
-      );
-    }
-    if (message === "SPACE_RESERVED") {
-      return NextResponse.json(
-        { error: "Unit sudah direservasi oleh pengajuan lain." },
-        { status: 409 }
-      );
-    }
+    if (error instanceof WorkflowError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") return NextResponse.json({ error: "Pengajuan sedang diperbarui. Muat ulang dan coba lagi." }, { status: 409 });
     console.error("[cms/leads] update failed", error);
-    return NextResponse.json(
-      { error: "Gagal memperbarui proses pengajuan." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Gagal memperbarui proses pengajuan." }, { status: 500 });
   }
 }

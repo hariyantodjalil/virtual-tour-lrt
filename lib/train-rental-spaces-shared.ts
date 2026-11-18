@@ -1,18 +1,21 @@
+
 export type TrainRentalSpacePublic = {
+  inquiryMode?: "MEDIA" | "FULL_BRANDING";
+  train?: { name: string; slug: string; advertisingCapacity: number | null; cars?: { slug: string; label: string }[] };
   id: string;
   displayNumber: string;
   title: string;
   description: string | null;
   image: string;
   objectPosition: string;
-  availableTrainsets: string[];
-  availableByCar: Record<string, string[]>;
   howToOrder: string | null;
   status: "TERSEDIA" | "TERBATAS" | "PENUH";
   monthlyRent: number | null;
 };
 
 export type TrainRentalSpaceCms = TrainRentalSpacePublic & {
+  availableTrainsets: string[];
+  availableByCar: Record<string, string[]>;
   order: number;
   isActive: boolean;
   imageUrl: string | null;

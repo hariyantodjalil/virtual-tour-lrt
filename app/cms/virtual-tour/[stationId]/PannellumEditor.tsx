@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
+import { ImageIcon } from "lucide-react";
 import type { ViewerBakeContext } from "@/lib/panorama-privacy-blur-geometry";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import type { AddMode, HotspotItem } from "@/lib/hotspot-types";
@@ -13,6 +14,7 @@ import {
   setHotspotSelected,
   setHotspotScale,
   setSceneNavDirection,
+  type SpaceHotspotMarker,
 } from "@/lib/pannellum-hotspot";
 import {
   bindPrivacyBlursInContainer,
@@ -25,6 +27,13 @@ import type { SceneInitialView } from "@/lib/tour-types";
 import { PANNELLUM_HFOV } from "@/lib/pannellum-viewer-defaults";
 import { SpatialOverlay } from "@/components/tour/spatial/SpatialOverlay";
 import type { SpatialEntity, SphericalPoint } from "@/lib/spatial/types";
+import type { PannellumMultiRes } from "@/lib/panorama-profile";
+import {
+  EditorPanoramaPreviewToggle,
+  type EditorPanoramaPreviewMode,
+} from "@/components/cms/EditorPanoramaPreviewToggle";
+
+export type { EditorPanoramaPreviewMode };
 
 declare global {
   interface Window {
@@ -73,12 +82,14 @@ function buildEditorHotspotEl(
   getSpaceStatus: (code: string) => SpaceAvailabilityStatus | undefined,
   getSceneTitle: (sceneId: string | undefined, fallback: string) => string,
   onPointerDownRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string, e: PointerEvent) => void>,
-  onDeleteRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string) => void>
+  onDeleteRef: React.MutableRefObject<(kind: "hotspot" | "blur", id: string) => void>,
+  spaceMarker: SpaceHotspotMarker
 ) {
   const spaceStatus =
     h.type === "space" && h.spaceCode ? getSpaceStatus(h.spaceCode) : undefined;
   setupHotspotElement(div, {
     type: h.type,
+    spaceMarker,
     selected: isSelected,
     scale: h.scale,
     spaceStatus,
@@ -137,7 +148,17 @@ function buildEditorBlurEl(
 }
 
 interface Props {
+  spaceMarker?: SpaceHotspotMarker;
+  /** Panorama display (~6000px) — mode Display / fallback Hemat. */
   panoramaUrl: string;
+  /** Master native asli — fallback mode HD bila tile HD belum siap. */
+  originalPanoramaUrl?: string | null;
+  /** Tile Hemat opsional — kalau ada, mode Hemat pakai tile publik (hasil bake). */
+  hematMultiRes?: PannellumMultiRes | null;
+  /** Tile HD publik (hasil bake) — prioritas mode HD di editor. */
+  hdMultiRes?: PannellumMultiRes | null;
+  previewMode?: EditorPanoramaPreviewMode;
+  onPreviewModeChange?: (mode: EditorPanoramaPreviewMode) => void;
   hotspots: HotspotItem[];
   privacyBlurs: PrivacyBlurItem[];
   selectedId: string | null;
@@ -167,6 +188,13 @@ interface Props {
   onSpatialCloseDraft?: () => void;
 }
 
+function proxyMultiRes(multiRes: PannellumMultiRes) {
+  return {
+    ...multiRes,
+    basePath: getS3ProxyUrl(multiRes.basePath).replace(/\/$/, ""),
+  };
+}
+
 export type PannellumEditorHandle = {
   getView: () => { yaw: number; pitch: number; hfov: number } | null;
   getViewerBakeContext: () => ViewerBakeContext | null;
@@ -175,6 +203,11 @@ export type PannellumEditorHandle = {
 export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function PannellumEditor(
   {
     panoramaUrl,
+    originalPanoramaUrl = null,
+    hematMultiRes = null,
+    hdMultiRes = null,
+    previewMode = "display",
+    onPreviewModeChange,
     hotspots,
     privacyBlurs,
     selectedId,
@@ -193,6 +226,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
     initialView = null,
     minHfov = PANNELLUM_EDITOR_HFOV.minHfov,
     privacyBlurGuideOnly = false,
+    spaceMarker = "info-pin",
     spatialEntities = [],
     draftSpatialVertices = [],
     selectedSpatialId = null,
@@ -237,7 +271,35 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
   const onMoveRef = useRef(onHotspotMove);
   const onBlurMoveRef = useRef(onBlurMove);
   const addModeRef = useRef(addMode);
-  const privacyBlurGuideOnlyRef = useRef(privacyBlurGuideOnly);
+
+  // Display/Hemat = hasil bake (display / tile Hemat). HD = tile HD bake bila ada, else original.
+  const hasHdPreview = Boolean(hdMultiRes) || Boolean(originalPanoramaUrl);
+  const resolvedPreviewMode: EditorPanoramaPreviewMode =
+    previewMode === "hd" && hasHdPreview
+      ? "hd"
+      : previewMode === "hemat"
+        ? "hemat"
+        : "display";
+  const hdUsesBakedTiles =
+    resolvedPreviewMode === "hd" && Boolean(hdMultiRes);
+  const activeEquirectUrl =
+    resolvedPreviewMode === "hd" && !hdMultiRes && originalPanoramaUrl
+      ? originalPanoramaUrl
+      : panoramaUrl;
+  const activeMultiRes =
+    resolvedPreviewMode === "hemat" && hematMultiRes
+      ? hematMultiRes
+      : hdUsesBakedTiles && hdMultiRes
+        ? hdMultiRes
+        : null;
+  const sourceKey = activeMultiRes
+    ? `mr:${activeMultiRes.basePath}|${activeMultiRes.cubeResolution}|${activeMultiRes.tileResolution}`
+    : `eq:${activeEquirectUrl}`;
+  // Guide-only saat piksel sudah bake. Original native belum bake → overlay CSS blur.
+  const effectiveGuideOnly =
+    privacyBlurGuideOnly &&
+    !(resolvedPreviewMode === "hd" && !hdUsesBakedTiles);
+  const privacyBlurGuideOnlyRef = useRef(effectiveGuideOnly);
 
   useImperativeHandle(ref, () => ({
     getViewerBakeContext: () => {
@@ -268,8 +330,8 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
   }));
 
   useEffect(() => {
-    privacyBlurGuideOnlyRef.current = privacyBlurGuideOnly;
-  }, [privacyBlurGuideOnly]);
+    privacyBlurGuideOnlyRef.current = effectiveGuideOnly;
+  }, [effectiveGuideOnly]);
 
   useEffect(() => {
     hotspotsRef.current = hotspots;
@@ -416,7 +478,8 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
                 (sceneId, fallback) =>
                   resolveSceneHotspotTitle(sceneId, scenesRef.current, fallback),
                 onPointerDownItemRef,
-                onDeleteItemRef
+                onDeleteItemRef,
+                spaceMarker
               );
             },
           });
@@ -424,7 +487,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         } catch { /* ignore */ }
       }
     },
-    []
+    [spaceMarker]
   );
 
   const syncAllOverlays = useCallback(
@@ -436,7 +499,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
     [syncHotspots, syncPrivacyBlurs]
   );
 
-  // Init viewer — sengaja hanya re-init saat panoramaUrl berubah
+  // Init viewer — re-init saat sumber panorama / mode preview berubah
   useEffect(() => {
     if (!containerRef.current || !panoramaUrl) return;
     const isMounted = { current: true };
@@ -454,9 +517,12 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         }
         viewerReadyRef.current = false;
 
+        const sourceConfig = activeMultiRes
+          ? { type: "multires" as const, multiRes: proxyMultiRes(activeMultiRes) }
+          : { type: "equirectangular" as const, panorama: getS3ProxyUrl(activeEquirectUrl) };
+
         viewerRef.current = window.pannellum.viewer(containerRef.current, {
-          type: "equirectangular",
-          panorama: getS3ProxyUrl(panoramaUrl),
+          ...sourceConfig,
           autoLoad: true,
           autoRotate: 0,
           draggable: true,
@@ -503,9 +569,8 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         viewerRef.current = null;
       }
     };
-    // panoramaUrl is the intentional init key; overlays sync in a separate effect
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panoramaUrl]);
+  }, [panoramaUrl, originalPanoramaUrl, resolvedPreviewMode, sourceKey]);
 
   const hotspotsSig = JSON.stringify(
     hotspots.map((h) => [
@@ -556,14 +621,14 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
   const blurDimSig = privacyBlurs
     .map((b) => `${b._id}:${b.width}:${b.height}:${b.intensity}:${b.radius}:${b.scale ?? 1}`)
     .join("|");
-  const guideSig = privacyBlurGuideOnly ? "1" : "0";
+  const guideSig = effectiveGuideOnly ? "1" : "0";
   useEffect(() => {
     if (!viewerReadyRef.current) return;
     for (const b of privacyBlurs) {
       const div = blurDomRef.current.get(b._id);
-      if (div) setPrivacyBlurDimensions(div, b, true, privacyBlurGuideOnly);
+      if (div) setPrivacyBlurDimensions(div, b, true, effectiveGuideOnly);
     }
-  }, [blurDimSig, privacyBlurs, guideSig, privacyBlurGuideOnly]);
+  }, [blurDimSig, privacyBlurs, guideSig, effectiveGuideOnly]);
 
   useEffect(() => {
     hotspotDomRef.current.forEach((div, id) => {
@@ -774,7 +839,7 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
 
       {dragging && (
         <div className="absolute inset-0 z-50 pointer-events-none">
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#261015]/90 backdrop-blur border border-amber-500/60 text-amber-300 text-xs px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[var(--work-subtle)]/90 backdrop-blur border border-amber-500/60 text-amber-300 text-xs px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
             <span className="text-base">✥</span>
             Lepas untuk menetapkan posisi baru
           </div>
@@ -785,10 +850,10 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
         <div
           className={`absolute left-1/2 top-3 z-20 -translate-x-1/2 pointer-events-none rounded-full border px-3 py-1.5 text-xs shadow-md backdrop-blur ${
             addMode === "blur"
-              ? "border-[rgba(255,214,218,0.28)] bg-[#261015]/90 text-[#E8C4D0]"
+              ? "border-[var(--work-line)] bg-[var(--work-subtle)]/90 text-[var(--work-muted)]"
               : addMode === "spatial"
-                ? "border-emerald-500/50 bg-[#261015]/90 text-emerald-200"
-                : "border-emerald-500/40 bg-[#261015]/90 text-emerald-200"
+                ? "border-emerald-500/50 bg-[var(--work-subtle)]/90 text-[var(--work-success)]"
+                : "border-emerald-500/40 bg-[var(--work-subtle)]/90 text-[var(--work-success)]"
           }`}
         >
           {addMode === "spatial"
@@ -804,23 +869,51 @@ export const PannellumEditor = forwardRef<PannellumEditorHandle, Props>(function
       )}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between gap-2 px-3 pb-3">
-        <div className="rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/85 px-2.5 py-1.5 font-mono text-[10px] tabular-nums text-[#C4A8AD] backdrop-blur">
-          {liveView
-            ? `Yaw ${liveView.yaw.toFixed(1)}° · Pitch ${liveView.pitch.toFixed(1)}° · HFOV ${liveView.hfov.toFixed(0)}°`
-            : "Yaw — · Pitch — · HFOV —"}
+        <div className="flex flex-col gap-1.5">
+          <div className="rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)]/85 px-2.5 py-1.5 font-mono text-[10px] tabular-nums text-[var(--work-muted)] backdrop-blur">
+            {liveView
+              ? `Yaw ${liveView.yaw.toFixed(1)}° · Pitch ${liveView.pitch.toFixed(1)}° · HFOV ${liveView.hfov.toFixed(0)}°`
+              : "Yaw — · Pitch — · HFOV —"}
+          </div>
+          {onPreviewModeChange && (
+            <div className="pointer-events-auto">
+              <EditorPanoramaPreviewToggle
+                size="canvas"
+                value={resolvedPreviewMode}
+                onChange={onPreviewModeChange}
+                hasHematTiles={Boolean(hematMultiRes)}
+                hasHdTiles={Boolean(hdMultiRes)}
+                hasHdOriginal={Boolean(originalPanoramaUrl)}
+              />
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <span className="rounded-md border border-[rgba(255,214,218,0.14)] bg-[#1C0A0E]/85 px-2 py-1 text-[10px] text-[#C4A8AD] backdrop-blur">
-            {hotspots.length} hotspot
-            {spatialEntities.length > 0 ? ` · ${spatialEntities.length} spatial` : ""}
-            {privacyBlurs.length > 0 ? ` · ${privacyBlurs.length} blur` : ""}
+          <span className="inline-flex h-7 items-center rounded-md border border-[var(--work-line)] bg-[var(--work-subtle)]/85 px-2 text-[10px] text-[var(--work-muted)] backdrop-blur">
+            <span className="inline-block w-[7.5rem] shrink-0 truncate tabular-nums">
+              {resolvedPreviewMode === "display"
+                ? "Display (edit)"
+                : resolvedPreviewMode === "hemat"
+                  ? hematMultiRes
+                    ? "Hemat (tile bake)"
+                    : "Hemat (display)"
+                  : hdUsesBakedTiles
+                    ? "HD (tile bake)"
+                    : "HD (original)"}
+            </span>
+            <span className="shrink-0 text-[var(--work-muted)]"> · </span>
+            <span className="shrink-0 tabular-nums">
+              {hotspots.length} hotspot
+              {spatialEntities.length > 0 ? ` · ${spatialEntities.length} spatial` : ""}
+              {privacyBlurs.length > 0 ? ` · ${privacyBlurs.length} blur` : ""}
+            </span>
           </span>
         </div>
       </div>
 
       {!panoramaUrl && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1C0A0E] text-[#C4A8AD] z-30">
-          <div className="text-5xl mb-3">🌐</div>
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[var(--work-subtle)] text-[var(--work-muted)]">
+          <ImageIcon className="size-10 opacity-40" aria-hidden />
           <p className="text-sm">Upload panorama equirectangular untuk mulai edit</p>
         </div>
       )}

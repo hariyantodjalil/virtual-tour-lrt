@@ -1,19 +1,13 @@
 import sharp from "sharp";
+import { isPannellumMultiRes, type PannellumMultiRes } from "./panorama-profile";
+export { isPannellumMultiRes } from "./panorama-profile";
+export type { PannellumMultiRes } from "./panorama-profile";
 
 /** Kubus 2048, tile 512. Level 1 = 512px (1 tile), level 3 = 2048px (4×4). */
 export const PANO_TILE = 512;
 export const PANO_CUBE = 2048;
 export const PANO_MAX_LEVEL = 3;
 export const PANO_FACES = ["f", "r", "b", "l", "u", "d"] as const;
-
-export type PannellumMultiRes = {
-  basePath: string;
-  path: "/%l/%s%y_%x";
-  extension: "jpg";
-  tileResolution: number;
-  maxLevel: number;
-  cubeResolution: number;
-};
 
 export type PanoramaTile = {
   name: string;
@@ -72,7 +66,7 @@ function sampleEquirect(
   out[offset + 2] = rgb[i00 + 2] * w00 + rgb[i10 + 2] * w10 + rgb[i01 + 2] * w01 + rgb[i11 + 2] * w11;
 }
 
-function renderFace(rgb: Uint8Array, width: number, height: number, face: Face, size: number) {
+export function projectPanoramaFace(rgb: Uint8Array, width: number, height: number, face: Face, size: number) {
   const out = new Uint8Array(size * size * 3);
   for (let j = 0; j < size; j++) {
     const ny = ((j + 0.5) / size) * 2 - 1;
@@ -93,65 +87,70 @@ function renderFace(rgb: Uint8Array, width: number, height: number, face: Face, 
   return out;
 }
 
-async function tilesFromFace(face: Face, raw: Uint8Array, size: number): Promise<PanoramaTile[]> {
+async function tilesFromFace(face: Face, raw: Uint8Array, size: number, options: PanoramaTileOptions): Promise<PanoramaTile[]> {
   const image = sharp(raw, { raw: { width: size, height: size, channels: 3 } });
   const tiles: PanoramaTile[] = [];
-  for (let level = 1; level <= PANO_MAX_LEVEL; level++) {
-    const levelSize = PANO_CUBE / 2 ** (PANO_MAX_LEVEL - level);
-    const across = levelSize / PANO_TILE;
+  const tileResolution = options.tileResolution ?? PANO_TILE;
+  const maxLevel = Math.log2(size / tileResolution) + 1;
+  for (let level = 1; level <= maxLevel; level++) {
+    const levelSize = size / 2 ** (maxLevel - level);
+    const across = levelSize / tileResolution;
     const resized =
       levelSize === size
         ? image.clone()
         : image.clone().resize(levelSize, levelSize, { fit: "fill" });
     for (let y = 0; y < across; y++) {
       for (let x = 0; x < across; x++) {
-        const buffer = await resized
+        const tile = resized
           .clone()
-          .extract({ left: x * PANO_TILE, top: y * PANO_TILE, width: PANO_TILE, height: PANO_TILE })
-          .jpeg({ quality: 72, mozjpeg: true })
-          .toBuffer();
-        tiles.push({ name: `${level}/${face}${y}_${x}.jpg`, buffer });
+          .extract({ left: x * tileResolution, top: y * tileResolution, width: tileResolution, height: tileResolution });
+        const extension = options.extension ?? "jpg";
+        const buffer = await (extension === "webp"
+          ? tile.webp({ quality: options.webpQuality ?? 85, effort: 4 })
+          : tile.jpeg({ quality: options.jpegQuality ?? 72, mozjpeg: true })).toBuffer();
+        tiles.push({ name: `${level}/${face}${y}_${x}.${extension}`, buffer });
       }
     }
   }
   return tiles;
 }
 
-export async function buildPanoramaTiles(input: Buffer): Promise<PanoramaTile[]> {
-  const source = await sharp(input, { limitInputPixels: 80_000_000 })
-    .resize(4096, 2048, { fit: "fill" })
+export type PanoramaTileOptions = {
+  /** Omit to retain the existing 4096px profile; null preserves source dimensions. */
+  sourceWidth?: number | null;
+  jpegQuality?: number;
+  cubeResolution?: 2048 | 4096;
+  tileResolution?: 512 | 1024;
+  extension?: "jpg" | "webp";
+  webpQuality?: number;
+};
+
+export async function buildPanoramaTiles(input: Buffer, options: PanoramaTileOptions = {}): Promise<PanoramaTile[]> {
+  const sourceWidth = options.sourceWidth === undefined ? 4096 : options.sourceWidth;
+  const image = sharp(input, { limitInputPixels: 80_000_000 });
+  if (sourceWidth !== null) image.resize(sourceWidth, sourceWidth / 2, { fit: "fill" });
+  const { data: source, info } = await image
     .removeAlpha()
+    .toColourspace("srgb")
     .raw()
-    .toBuffer();
+    .toBuffer({ resolveWithObject: true });
   const rgb = new Uint8Array(source.buffer, source.byteOffset, source.byteLength);
+  const cubeResolution = options.cubeResolution ?? PANO_CUBE;
   const batches = await Promise.all(
-    PANO_FACES.map(async (face) => tilesFromFace(face, renderFace(rgb, 4096, 2048, face, PANO_CUBE), PANO_CUBE))
+    PANO_FACES.map(async (face) => tilesFromFace(face, projectPanoramaFace(rgb, info.width, info.height, face, cubeResolution), cubeResolution, options))
   );
   return batches.flat();
 }
 
-export function multiResConfig(basePath: string): PannellumMultiRes {
+export function multiResConfig(basePath: string, tileResolution = PANO_TILE, cubeResolution = PANO_CUBE): PannellumMultiRes {
   return {
     basePath,
     path: "/%l/%s%y_%x",
     extension: "jpg",
-    tileResolution: PANO_TILE,
-    maxLevel: PANO_MAX_LEVEL,
-    cubeResolution: PANO_CUBE,
+    tileResolution,
+    maxLevel: Math.log2(cubeResolution / tileResolution) + 1,
+    cubeResolution,
   };
-}
-
-export function isPannellumMultiRes(value: unknown): value is PannellumMultiRes {
-  if (!value || typeof value !== "object") return false;
-  const row = value as Record<string, unknown>;
-  return (
-    typeof row.basePath === "string" &&
-    row.basePath.length > 0 &&
-    row.extension === "jpg" &&
-    row.tileResolution === PANO_TILE &&
-    row.maxLevel === PANO_MAX_LEVEL &&
-    row.cubeResolution === PANO_CUBE
-  );
 }
 
 export function extractMultiResFromCanvasData(canvasData: unknown): PannellumMultiRes | undefined {

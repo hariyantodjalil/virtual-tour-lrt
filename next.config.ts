@@ -3,8 +3,24 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "pg"],
+  // Dev cross-origin: tunnel + akses via IP intranet (bukan hanya localhost).
+  allowedDevOrigins: [
+    "*.trycloudflare.com",
+    "*.lhr.life",
+    "*.localhost.run",
+    "10.45.3.129",
+  ],
   experimental: {
     proxyClientMaxBodySize: "40mb",
+    agentUpgrade: "security",
+    serverActions: {
+      allowedOrigins: [
+        "*.trycloudflare.com",
+        "*.lhr.life",
+        "*.localhost.run",
+        "10.45.3.129",
+      ],
+    },
   },
   // Cloudflare WAF memblokir /_next/image?url=... (403 di jalur internet).
   // Asset lokal & proxy S3 dilayani langsung tanpa image optimizer.

@@ -1,3 +1,4 @@
+import { extractHdMultiResProfilesFromCanvasData } from "./panorama-hd-profile";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import type { PanoramaScene, TourLevelPublic } from "@/lib/tour-types";
@@ -5,7 +6,8 @@ import { normalizeHotspots } from "@/lib/hotspot-normalize";
 import { extractPrivacyBlursFromCanvasData } from "@/lib/privacy-blur-normalize";
 import { extractInitialViewFromCanvasData } from "@/lib/scene-initial-view";
 import { extractMultiResFromCanvasData } from "@/lib/panorama-multires";
-import { sortTrainScenesByTourOrder, ensureTrainTourStructure } from "@/lib/train-tour-structure";
+import { extractMultiResProfilesFromCanvasData } from "./panorama-profile";
+import { sortTrainScenesByTourOrder } from "@/lib/train-tour-structure";
 import { buildPublicTrainTourLevels } from "@/lib/public-train-tour-structure";
 
 export type TrainInfo = {
@@ -62,6 +64,8 @@ async function mapTrainToInfo(train: TrainRow): Promise<TrainInfo> {
       title: scene.title,
       panoramaUrl: scene.panoramaUrl,
       multiRes: extractMultiResFromCanvasData(scene.canvasData),
+      multiResProfiles: extractMultiResProfilesFromCanvasData(scene.canvasData),
+      multiResProfilesHd: extractHdMultiResProfilesFromCanvasData(scene.canvasData, scene.panoramaUrl),
       levelId: scene.carId,
       areaId: scene.zoneId,
       levelSlug: scene.car,
@@ -85,7 +89,6 @@ export const getTrainBySlug = cache(async (slug: string): Promise<TrainInfo | nu
     },
   });
   if (!train) return null;
-  await ensureTrainTourStructure(train.id);
   return mapTrainToInfo(train);
 });
 

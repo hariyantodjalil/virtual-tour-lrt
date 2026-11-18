@@ -1,0 +1,19 @@
+/* Operate surface: match the white inquiry/detail modal without recoloring the CMS rail. */
+.workspace {
+  --work-surface: #ffffff;
+  --work-subtle: #f6f7f9;
+  --work-text: #0f172a;
+  --work-muted: #475569;
+  --work-line: #e2e8f0;
+  --work-control: #7c8ba1;
+  --work-accent: #c41926;
+  --work-accent-soft: #fff1f2;
+  --work-success: #047857;
+  --work-success-soft: #ecfdf5;
+  --work-warning: #92400e;
+  --work-warning-soft: #fffbeb;
+  --work-danger: #b91c1c;
+  --work-danger-soft: #fef2f2;
+  color: var(--work-text);
+  color-scheme: light;
+}

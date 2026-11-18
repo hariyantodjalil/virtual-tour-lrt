@@ -18,10 +18,12 @@ import {
   roundedBlurMaskSvg,
 } from "./privacy-blur-shape";
 
-function cappedBlurSigma(sigma: number, width: number, height: number): number {
+function cappedBlurSigma(
+  sigma: number, width: number, height: number, hardCap: number
+): number {
   const minDim = Math.min(width, height);
   const maxSigma = Math.max(1, Math.floor(minDim / 6));
-  return Math.max(1, Math.min(Math.round(sigma), maxSigma, 120));
+  return Math.max(1, Math.min(Math.round(sigma), maxSigma, hardCap));
 }
 
 async function applyBlurRect(
@@ -30,13 +32,14 @@ async function applyBlurRect(
   panoH: number,
   rect: EquirectRect,
   sigma: number,
-  blur: PrivacyBlur
+  blur: PrivacyBlur,
+  sigmaHardCap: number
 ): Promise<Buffer> {
   const region = clampEquirectRect(rect, panoW, panoH);
   if (!region) return input;
 
   const { left, top, width, height } = region;
-  const blurSigma = cappedBlurSigma(sigma, width, height);
+  const blurSigma = cappedBlurSigma(sigma, width, height, sigmaHardCap);
   const cornerR = blurCornerRadiusPatchPx(width, height, blur);
 
   const blurred = await sharp(input, { limitInputPixels: false })
@@ -80,7 +83,11 @@ async function applyBlurRect(
 export async function bakePrivacyBlursIntoPanoramaBuffer(
   input: Buffer,
   rawBlurs: unknown,
-  viewerContext?: Partial<ViewerBakeContext>
+  viewerContext?: Partial<ViewerBakeContext>,
+  opts?: {
+    sigmaHardCapScale?: number;
+    onProgress?: (done: number, total: number) => void | Promise<void>;
+  }
 ): Promise<{ buffer: Buffer; width: number; height: number }> {
   const blurs = normalizePrivacyBlurs(rawBlurs);
   const sourceMeta = await sharp(input, { limitInputPixels: false }).metadata();
@@ -94,6 +101,10 @@ export async function bakePrivacyBlursIntoPanoramaBuffer(
     return { buffer: input, width: panoW, height: panoH };
   }
 
+  // Cap 120px bersifat resolusi-independen; bake di resolusi berbeda dari
+  // authoring perlu cap yang diskalakan supaya blur-nya angular setara.
+  const sigmaHardCap = Math.max(1, Math.round(120 * (opts?.sigmaHardCapScale ?? 1)));
+
   const viewer: ViewerBakeContext = {
     ...defaultViewerBakeContext(),
     ...viewerContext,
@@ -106,12 +117,15 @@ export async function bakePrivacyBlursIntoPanoramaBuffer(
     await sharp(input, { limitInputPixels: false }).png().toBuffer()
   );
 
+  let done = 0;
   for (const blur of blurs) {
     const rects = blurRegionRects(blur, panoW, panoH, viewer);
     for (const rect of rects) {
       const sigma = blurSigmaForRegion(blur, rect.width, viewer);
-      buffer = await applyBlurRect(buffer, panoW, panoH, rect, sigma, blur);
+      buffer = await applyBlurRect(buffer, panoW, panoH, rect, sigma, blur, sigmaHardCap);
     }
+    done += 1;
+    await opts?.onProgress?.(done, blurs.length);
   }
 
   const finalMeta = await sharp(buffer).metadata();

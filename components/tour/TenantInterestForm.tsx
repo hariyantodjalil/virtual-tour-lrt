@@ -2,13 +2,14 @@
 
 import { useEffect, useState, type BaseSyntheticEvent, type ReactNode } from "react";
 import Link from "next/link";
+import { useActiveInquiry } from "@/lib/use-active-inquiry";
+import { trainInquiryInputSchema, type TrainInquiryInput } from "@/lib/train-advertising-shared";
 import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   Briefcase,
   Building2,
-  CalendarDays,
   CheckCircle,
   KeyRound,
   Loader2,
@@ -22,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PUBLIC_LEASING_STEPS } from "@/lib/commercial-pipeline";
+import { useInquiryWorkflow } from "@/lib/use-inquiry-workflow";
 import { cn } from "@/lib/utils";
 
 const guestSchema = z.object({
@@ -32,7 +33,6 @@ const guestSchema = z.object({
   email: z.string().email("Format email tidak valid"),
   password: z.string().min(8, "Password minimal 8 karakter"),
   businessType: z.string().min(3, "Jenis usaha wajib diisi"),
-  surveyPreference: z.string().optional(),
   message: z.string().optional(),
 });
 
@@ -46,7 +46,6 @@ const partnerSchema = z.object({
     })
     .optional(),
   companyName: z.string().optional(),
-  surveyPreference: z.string().optional(),
   message: z.string().optional(),
 });
 
@@ -63,6 +62,7 @@ type AuthUser = {
 type Props = {
   spaceId?: string;
   trainRentalSpaceId?: string;
+  trainInquiry?: TrainInquiryInput;
   spaceCode: string;
   stationName: string;
   extraMessage?: string;
@@ -180,6 +180,7 @@ function fieldPad(filled: boolean) {
 export default function TenantInterestForm({
   spaceId,
   trainRentalSpaceId,
+  trainInquiry,
   spaceCode,
   stationName,
   extraMessage,
@@ -223,7 +224,13 @@ export default function TenantInterestForm({
     };
   }, []);
 
+  const workflow = useInquiryWorkflow();
+  const leasingSteps = (workflow?.steps ?? []).filter(step => step.showInSummary && step.stepOrder > 1);
+  const [submittedInquiryId, setSubmittedInquiryId] = useState<string | null>(null);
   const isPartner = Boolean(authUser);
+  const activeInquiry = useActiveInquiry(authUser?.id, spaceId, trainRentalSpaceId);
+  const [duplicateInquiryId, setDuplicateInquiryId] = useState<string | null>(null);
+  const existingInquiryId = duplicateInquiryId ?? activeInquiry.id;
 
   const guestForm = useForm<GuestFormValues>({
     resolver: zodResolver(guestSchema),
@@ -235,7 +242,6 @@ export default function TenantInterestForm({
       businessType: "",
       phone: "",
       companyName: "",
-      surveyPreference: "",
       message: "",
     },
   });
@@ -246,7 +252,7 @@ export default function TenantInterestForm({
   const onGuestSubmit = async (data: GuestFormValues) => {
     setIsLoading(true);
     try {
-      const message = [extraMessage?.trim(), data.message?.trim()].filter(Boolean).join("\n\n");
+      const message = [trainRentalSpaceId ? undefined : extraMessage?.trim(), data.message?.trim()].filter(Boolean).join("\n\n");
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -254,19 +260,25 @@ export default function TenantInterestForm({
           ...data,
           ...(message ? { message } : {}),
           ...(spaceId ? { spaceId } : {}),
-          ...(trainRentalSpaceId ? { trainRentalSpaceId } : {}),
+          ...(trainRentalSpaceId ? { trainRentalSpaceId, trainInquiry: trainInquiryInputSchema.parse(trainInquiry ?? {}) } : {}),
         }),
       });
 
       if (res.ok) {
+        const receipt = await res.json();
+        if (typeof receipt.id === "string") setSubmittedInquiryId(receipt.id);
         setSubmitted(true);
         onSuccess?.();
       } else {
         const error = await res.json().catch(() => null);
-        alert(error?.error ?? "Gagal mengirim formulir. Coba lagi.");
+        if (res.status === 409 && typeof error?.existingInquiryId === "string") {
+          setDuplicateInquiryId(error.existingInquiryId);
+        } else {
+          alert(error?.error ?? "Gagal mengirim formulir. Coba lagi.");
+        }
       }
-    } catch {
-      alert("Gagal mengirim formulir. Coba lagi.");
+    } catch (error) {
+      alert(error instanceof z.ZodError ? error.issues[0].message : "Gagal mengirim formulir. Coba lagi.");
     } finally {
       setIsLoading(false);
     }
@@ -275,16 +287,18 @@ export default function TenantInterestForm({
   const onPartnerSubmit = async (data: PartnerFormValues) => {
     setIsLoading(true);
     try {
-      const payload: Record<string, string> = {
+      const payload: PartnerFormValues & { spaceId?: string; trainRentalSpaceId?: string; trainInquiry?: TrainInquiryInput } = {
         businessType: data.businessType,
       };
-      if (trainRentalSpaceId) payload.trainRentalSpaceId = trainRentalSpaceId;
+      if (trainRentalSpaceId) {
+        payload.trainRentalSpaceId = trainRentalSpaceId;
+        payload.trainInquiry = trainInquiryInputSchema.parse(trainInquiry ?? {});
+      }
       else if (spaceId) payload.spaceId = spaceId;
-      const message = [extraMessage?.trim(), data.message?.trim()].filter(Boolean).join("\n\n");
+      const message = [trainRentalSpaceId ? undefined : extraMessage?.trim(), data.message?.trim()].filter(Boolean).join("\n\n");
       if (message) payload.message = message;
       if (data.companyName?.trim()) payload.companyName = data.companyName.trim();
       if (data.phone?.trim()) payload.phone = data.phone.trim();
-      if (data.surveyPreference?.trim()) payload.surveyPreference = data.surveyPreference.trim();
 
       const res = await fetch("/api/partner/leads", {
         method: "POST",
@@ -293,6 +307,8 @@ export default function TenantInterestForm({
       });
 
       if (res.ok) {
+        const receipt = await res.json();
+        if (typeof receipt.id === "string") setSubmittedInquiryId(receipt.id);
         setSubmitted(true);
         onSuccess?.();
         return;
@@ -302,9 +318,13 @@ export default function TenantInterestForm({
       if (res.status === 400 && String(error?.error ?? "").includes("telepon")) {
         setNeedsPhone(true);
       }
-      alert(error?.error ?? "Gagal mengirim pengajuan. Coba lagi.");
-    } catch {
-      alert("Gagal mengirim pengajuan. Coba lagi.");
+      if (res.status === 409 && typeof error?.existingInquiryId === "string") {
+        setDuplicateInquiryId(error.existingInquiryId);
+      } else {
+        alert(error?.error ?? "Gagal mengirim pengajuan. Coba lagi.");
+      }
+    } catch (error) {
+      alert(error instanceof z.ZodError ? error.issues[0].message : "Gagal mengirim pengajuan. Coba lagi.");
     } finally {
       setIsLoading(false);
     }
@@ -347,9 +367,9 @@ export default function TenantInterestForm({
     <form
       onSubmit={onSubmit}
       noValidate
-      className={cn("grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)]", t.text)}
+      className={cn(trainRentalSpaceId ? "flex min-h-0 flex-1 flex-col overflow-y-auto lg:grid lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)_auto] lg:overflow-hidden" : "grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)]", t.text)}
     >
-      <div className={cn("flex shrink-0 flex-col justify-between gap-6 border-b px-5 py-5 sm:px-6 lg:border-r lg:border-b-0 lg:px-10 lg:pt-10 lg:pb-8", t.ledgerHairline)}>
+      <div className={cn("flex shrink-0 flex-col justify-between gap-6 border-b px-5 py-5 sm:px-6 lg:border-r lg:border-b-0 lg:px-10 lg:pt-10 lg:pb-8", trainRentalSpaceId && "lg:overflow-y-auto", t.ledgerHairline)}>
         <div>
           {aside}
           {note ? <div className="mt-4 lg:mt-6">{note}</div> : null}
@@ -358,24 +378,24 @@ export default function TenantInterestForm({
               Setelah dikirim
             </p>
             <ol className="mt-4 space-y-4">
-              {PUBLIC_LEASING_STEPS.slice(2).map((step) => (
-                <li key={step.n} className="flex gap-4">
+              {leasingSteps.map((step) => (
+                <li key={step.stepOrder} className="flex gap-4">
                   <span className="font-display w-6 shrink-0 pt-0.5 text-xs font-bold text-[#FF5A66]">
-                    {step.n}
+                    {step.stepOrder}
                   </span>
                   <span className="min-w-0">
                     <span className={cn("block text-sm font-semibold", t.ledgerStepTitle)}>{step.title}</span>
-                    <span className={cn("mt-0.5 block text-xs leading-snug", t.ledgerStepDetail)}>{step.detail}</span>
+                    <span className={cn("mt-0.5 block text-xs leading-snug", t.ledgerStepDetail)}>{step.publicMessage}</span>
                   </span>
                 </li>
               ))}
             </ol>
           </div>
         </div>
-        {submitButton(submitLabel, "hidden h-14 text-base lg:inline-flex")}
+        {!trainRentalSpaceId && submitButton(submitLabel, "hidden h-14 text-base lg:inline-flex")}
       </div>
 
-      <div className="min-h-0 overflow-y-auto overscroll-contain px-5 py-1 sm:px-6 lg:px-10 lg:pt-5 lg:pb-6">
+      <div className={cn("min-h-0 overscroll-contain px-5 py-1 sm:px-6 lg:px-10 lg:pt-5 lg:pb-6", trainRentalSpaceId ? "shrink-0 lg:shrink lg:overflow-y-auto" : "overflow-y-auto")}>
         <ul className={cn("divide-y", t.ledgerDivide)}>
           {fields.map((field, index) => {
             const describedBy = [
@@ -453,19 +473,30 @@ export default function TenantInterestForm({
         </ul>
       </div>
 
-      <div className={cn("shrink-0 border-t px-5 pt-4 pb-5 sm:px-6 lg:hidden", t.ledgerHairline)}>
+      <div className={cn("shrink-0 border-t px-5 pt-4 pb-5 sm:px-6", trainRentalSpaceId ? "lg:col-span-2" : "lg:hidden", t.ledgerHairline)}>
         {submitButton(submitLabel, "h-12 text-sm")}
       </div>
     </form>
   );
 
-  if (!authChecked) {
+  if (!authChecked || activeInquiry.checking) {
     return (
       <div className={cn("flex items-center justify-center gap-2 py-10 text-sm", t.muted, isLedger && "flex-1")}>
         <Loader2 className="h-4 w-4 animate-spin" />
         Memuat formulir...
       </div>
     );
+  }
+
+  if (activeInquiry.error) {
+    return <div role="alert" className="space-y-3 p-5"><p className="text-sm">{activeInquiry.error}</p><Button type="button" onClick={activeInquiry.retry}>Coba lagi</Button></div>;
+  }
+
+  if (existingInquiryId) {
+    return <div role="status" className={cn("space-y-4 p-5", t.text)}>
+      <p className="text-sm">Pengajuan aktif untuk unit ini sudah tercatat.</p>
+      <Button asChild className="bg-[#E31E2D] text-white hover:bg-[#c41926]"><Link href={`/partner/inquiries/${encodeURIComponent(existingInquiryId)}`}>Pantau pengajuan</Link></Button>
+    </div>;
   }
 
   if (submitted) {
@@ -481,19 +512,19 @@ export default function TenantInterestForm({
           </div>
         </div>
         <ol className="mt-5 space-y-3 text-left">
-          {PUBLIC_LEASING_STEPS.slice(2).map((step) => (
-            <li key={step.n} className="flex gap-3">
-              <span className="font-display text-xs font-bold text-[#E31E2D]">{step.n}</span>
+          {leasingSteps.map((step) => (
+            <li key={step.stepOrder} className="flex gap-3">
+              <span className="font-display text-xs font-bold text-[#E31E2D]">{step.stepOrder}</span>
               <span>
                 <span className="block text-sm font-semibold">{step.title}</span>
-                <span className={cn("block text-xs", t.muted)}>{step.detail}</span>
+                <span className={cn("block text-xs", t.muted)}>{step.publicMessage}</span>
               </span>
             </li>
           ))}
         </ol>
         <div className="mt-5 flex justify-center">
           <Button asChild className="bg-[#E31E2D] hover:bg-[#c41926]">
-            <Link href="/partner">Buka Panel Mitra</Link>
+            <Link href={submittedInquiryId ? `/partner/inquiries/${encodeURIComponent(submittedInquiryId)}` : "/partner"}>Pantau pengajuan</Link>
           </Button>
         </div>
       </div>
@@ -510,7 +541,6 @@ export default function TenantInterestForm({
     const businessFilled = Boolean(partnerValues.businessType?.trim());
     const companyFilled = Boolean(partnerValues.companyName?.trim());
     const phoneFilled = Boolean(partnerValues.phone?.trim());
-    const surveyFilled = Boolean(partnerValues.surveyPreference?.trim());
     const messageFilled = Boolean(partnerValues.message?.trim());
 
     if (isLedger) {
@@ -556,14 +586,6 @@ export default function TenantInterestForm({
             autoComplete: "tel",
             registration: register("phone"),
             error: errors.phone?.message,
-          },
-          {
-            id: "surveyPreference",
-            label: "Jadwal Survei",
-            optional: true,
-            icon: <CalendarDays className="size-[18px]" strokeWidth={1.8} />,
-            placeholder: "Senin pagi, atau hubungi dulu",
-            registration: register("surveyPreference"),
           },
           {
             id: "message",
@@ -659,20 +681,6 @@ export default function TenantInterestForm({
         </div>
 
         <div className={cn("space-y-2", full)}>
-          <Label htmlFor="surveyPreference" className={labelClass}>
-            Jadwal Survei <span className={cn("font-medium", t.faint)}>(opsional)</span>
-          </Label>
-          <FieldShell icon={<CalendarDays className="size-4" />} filled={surveyFilled} iconClass={t.faint}>
-            <Input
-              id="surveyPreference"
-              placeholder="Contoh: Senin pagi, atau hubungi saya dulu"
-              className={cn(inputClass, fieldPad(surveyFilled))}
-              {...register("surveyPreference")}
-            />
-          </FieldShell>
-        </div>
-
-        <div className={cn("space-y-2", full)}>
           <Label htmlFor="message" className={labelClass}>
             Pesan Tambahan
           </Label>
@@ -726,7 +734,6 @@ export default function TenantInterestForm({
   const phoneFilled = Boolean(guestValues.phone?.trim());
   const emailFilled = Boolean(guestValues.email?.trim());
   const businessFilled = Boolean(guestValues.businessType?.trim());
-  const surveyFilled = Boolean(guestValues.surveyPreference?.trim());
   const messageFilled = Boolean(guestValues.message?.trim());
 
   if (isLedger) {
@@ -796,14 +803,6 @@ export default function TenantInterestForm({
           placeholder: "F&B, Retail, Perbankan, dll.",
           registration: register("businessType"),
           error: errors.businessType?.message,
-        },
-        {
-          id: "surveyPreference",
-          label: "Jadwal Survei",
-          optional: true,
-          icon: <CalendarDays className="size-[18px]" strokeWidth={1.8} />,
-          placeholder: "Senin pagi, atau hubungi dulu",
-          registration: register("surveyPreference"),
         },
         {
           id: "message",
@@ -922,20 +921,6 @@ export default function TenantInterestForm({
             />
           </FieldShell>
           {errors.businessType && <p className={t.error}>{errors.businessType.message}</p>}
-        </div>
-
-        <div className={cn("space-y-2", full)}>
-          <Label htmlFor="surveyPreference" className={labelClass}>
-            Jadwal Survei <span className={cn("font-medium", t.faint)}>(opsional)</span>
-          </Label>
-          <FieldShell icon={<CalendarDays className="size-4" />} filled={surveyFilled} iconClass={t.faint}>
-            <Input
-              id="surveyPreference"
-              placeholder="Contoh: Senin pagi, atau hubungi saya dulu"
-              className={cn(inputClass, fieldPad(surveyFilled))}
-              {...register("surveyPreference")}
-            />
-          </FieldShell>
         </div>
 
         <div className={cn("space-y-2", full)}>

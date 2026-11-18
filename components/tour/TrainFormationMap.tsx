@@ -13,26 +13,13 @@ type Props = {
   onSelectCar: (carId: string) => void;
   className?: string;
   svgClassName?: string;
+  touchTargets?: boolean;
 };
 
 const ACTIVE = "#22C55E";
 const IDLE = "#FFFFFF";
 
-/** Layout & path persis export Figma node 51:861 (Group 229). */
-const FIGMA_SLOTS = [
-  {
-    kind: "path" as const,
-    d: "M240 20C240 8.95431 231.046 0 220 0H126.449C105.868 0 86.3302 9.05685 73.03 24.7625L27.8824 78.075C16.8761 91.0718 26.1139 111 43.1449 111H220C231.046 111 240 102.046 240 91V20Z",
-  },
-  { kind: "rect" as const, x: 258 },
-  { kind: "rect" as const, x: 516 },
-  { kind: "rect" as const, x: 774 },
-  { kind: "rect" as const, x: 1032 },
-  {
-    kind: "path" as const,
-    d: "M1290 20C1290 8.95431 1298.95 0 1310 0H1403.55C1424.13 0 1443.67 9.05685 1456.97 24.7625L1502.12 78.075C1513.12 91.0718 1503.89 111 1486.86 111H1310C1298.95 111 1290 102.046 1290 91V20Z",
-  },
-] as const;
+const CAB_PATH = "M240 20C240 8.95431 231.046 0 220 0H126.449C105.868 0 86.3302 9.05685 73.03 24.7625L27.8824 78.075C16.8761 91.0718 26.1139 111 43.1449 111H220C231.046 111 240 102.046 240 91V20Z";
 
 /**
  * Mini-map formasi — visual Figma `51:861`, gerbong aktif hijau.
@@ -44,10 +31,22 @@ export default function TrainFormationMap({
   onSelectCar,
   className = "",
   svgClassName,
+  touchTargets = false,
 }: Props) {
   if (cars.length === 0) return null;
 
-  const slots = FIGMA_SLOTS.slice(0, Math.min(cars.length, FIGMA_SLOTS.length));
+  if (touchTargets) return (
+    <div role="group" aria-label="Peta formasi gerbong" className={`pointer-events-auto flex max-w-full gap-0.5 overflow-x-auto overscroll-x-contain ${className}`}>
+      {cars.map((car, index) => <button key={car.id} type="button" title={car.label} aria-label={car.label} aria-pressed={car.id === activeCarId}
+        onClick={() => onSelectCar(car.id)} className="flex h-11 min-w-6 flex-1 items-center justify-center rounded-lg px-0.5 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white md:min-w-11">
+        <svg viewBox="0 0 240 111" className="h-6 w-full" aria-hidden="true" fill={car.id === activeCarId ? ACTIVE : IDLE}>
+          {index === 0 || index === cars.length - 1
+            ? <path d={CAB_PATH} transform={index === 0 ? undefined : "translate(240 0) scale(-1 1)"} />
+            : <rect width={240} height={111} rx={20} />}
+        </svg>
+      </button>)}
+    </div>
+  );
 
   function bindCar(car: CarItem) {
     return {
@@ -74,7 +73,7 @@ export default function TrainFormationMap({
       aria-label="Peta formasi gerbong"
     >
       <svg
-        viewBox="0 0 1530 111"
+        viewBox={`0 0 ${cars.length * 258 - 18} 111`}
         width={306}
         height={22}
         className={
@@ -84,21 +83,19 @@ export default function TrainFormationMap({
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        {slots.map((slot, index) => {
-          const car = cars[index];
-          if (!car) return null;
+        {cars.map((car, index) => {
           const props = bindCar(car);
 
-          if (slot.kind === "path") {
+          if (index === 0 || index === cars.length - 1) {
             return (
-              <path key={car.id} d={slot.d} {...props}>
+              <path key={car.id} d={CAB_PATH} transform={index === 0 ? undefined : `translate(${index * 258 + 240} 0) scale(-1 1)`} {...props}>
                 <title>{car.label}</title>
               </path>
             );
           }
 
           return (
-            <rect key={car.id} x={slot.x} width={240} height={111} rx={20} {...props}>
+            <rect key={car.id} x={index * 258} width={240} height={111} rx={20} {...props}>
               <title>{car.label}</title>
             </rect>
           );

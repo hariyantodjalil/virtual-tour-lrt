@@ -1,3 +1,4 @@
+import { extractHdMultiResProfilesFromCanvasData } from "./panorama-hd-profile";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import type { StationInfo } from "@/lib/tour-types";
@@ -5,6 +6,7 @@ import { normalizeHotspots } from "@/lib/hotspot-normalize";
 import { extractPrivacyBlursFromCanvasData } from "@/lib/privacy-blur-normalize";
 import { extractInitialViewFromCanvasData } from "@/lib/scene-initial-view";
 import { extractMultiResFromCanvasData } from "@/lib/panorama-multires";
+import { extractMultiResProfilesFromCanvasData } from "./panorama-profile";
 import { sortScenesByTourOrder } from "@/lib/virtual-tour-structure";
 import { buildPublicTourLevels } from "@/lib/public-tour-structure";
 import { normalizeSpatialEntities } from "@/lib/spatial/normalize";
@@ -63,6 +65,8 @@ async function mapStationToInfo(station: StationRow): Promise<StationInfo> {
       title: scene.title,
       panoramaUrl: scene.panoramaUrl,
       multiRes: extractMultiResFromCanvasData(scene.canvasData),
+      multiResProfiles: extractMultiResProfilesFromCanvasData(scene.canvasData),
+      multiResProfilesHd: extractHdMultiResProfilesFromCanvasData(scene.canvasData, scene.panoramaUrl),
       levelId: scene.levelId,
       areaId: scene.areaId,
       levelSlug: scene.level,

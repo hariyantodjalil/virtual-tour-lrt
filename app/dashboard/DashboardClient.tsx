@@ -1,17 +1,36 @@
 "use client";
 
+import Link from "next/link";
 import {
-  BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, PieChart, Pie, Cell,
+  BarChart,
+  Bar,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 import {
-  AlertTriangle, Users, Building2, TrendingUp, Eye, MessageCircle,
-  Download, CheckCircle, Clock, XCircle,
+  AlertTriangle,
+  Users,
+  Building2,
+  TrendingUp,
+  Eye,
+  ArrowRight,
+  Check,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LEAD_STATUS_LABELS, type CommercialLeadStatus } from "@/lib/commercial-pipeline";
-import { formatNumber } from "@/lib/utils";
+import {
+  PUBLIC_LEAD_PROCESS_STEPS,
+  publicLeadStageIndex,
+} from "@/lib/commercial-pipeline";
+import { cn, formatNumber } from "@/lib/utils";
 
 type DashboardData = {
   stats: {
@@ -23,19 +42,6 @@ type DashboardData = {
     occupancyRate: number | null;
   };
   eventsByType: { type: string; count: number }[];
-  recentLeads: {
-    id: string;
-    companyName: string;
-    contactName: string;
-    phone: string;
-    email: string;
-    businessType: string;
-    status: string;
-    spaceName: string;
-    stationName: string;
-    stationSlug: string;
-    createdAt: string;
-  }[];
   topStations: { stationId: string; stationName: string; visits: number }[];
   leadsByStatus: { status: string; count: number }[];
   dailyVisits: { date: string; count: number }[];
@@ -51,140 +57,180 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   PDF_DOWNLOAD: "Unduh PDF",
 };
 
-const CHIP = "border-[rgba(255,214,218,0.22)] bg-[#261015] text-[#F8ECEE]";
-const LEAD_STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  NEW: { label: LEAD_STATUS_LABELS.NEW, color: CHIP, icon: <Clock className="h-3 w-3" /> },
-  CONTACTED: { label: LEAD_STATUS_LABELS.CONTACTED, color: CHIP, icon: <MessageCircle className="h-3 w-3" /> },
-  RDS_OFFER: { label: LEAD_STATUS_LABELS.RDS_OFFER, color: CHIP, icon: <MessageCircle className="h-3 w-3" /> },
-  NEGOTIATING: { label: LEAD_STATUS_LABELS.NEGOTIATING, color: CHIP, icon: <TrendingUp className="h-3 w-3" /> },
-  SITE_CHECK: { label: LEAD_STATUS_LABELS.SITE_CHECK, color: CHIP, icon: <Clock className="h-3 w-3" /> },
-  BA_SIGNED: { label: LEAD_STATUS_LABELS.BA_SIGNED, color: CHIP, icon: <CheckCircle className="h-3 w-3" /> },
-  DESIGN_REVIEW: { label: LEAD_STATUS_LABELS.DESIGN_REVIEW, color: CHIP, icon: <Clock className="h-3 w-3" /> },
-  PKS: { label: LEAD_STATUS_LABELS.PKS, color: CHIP, icon: <CheckCircle className="h-3 w-3" /> },
-  BILLING: { label: LEAD_STATUS_LABELS.BILLING, color: CHIP, icon: <Clock className="h-3 w-3" /> },
-  FIT_OUT_HANDOVER: { label: LEAD_STATUS_LABELS.FIT_OUT_HANDOVER, color: CHIP, icon: <Clock className="h-3 w-3" /> },
-  COMMERCIAL_OPERATION: { label: LEAD_STATUS_LABELS.COMMERCIAL_OPERATION, color: "border-emerald-400/30 bg-emerald-500/10 text-emerald-100", icon: <CheckCircle className="h-3 w-3" /> },
-  CLOSED_WON: { label: LEAD_STATUS_LABELS.CLOSED_WON, color: "border-emerald-400/30 bg-emerald-500/10 text-emerald-100", icon: <CheckCircle className="h-3 w-3" /> },
-  CLOSED_LOST: { label: LEAD_STATUS_LABELS.CLOSED_LOST, color: "border-red-400/30 bg-red-500/10 text-red-100", icon: <XCircle className="h-3 w-3" /> },
-};
+const JOURNEY_SHORT_TITLES = [
+  "Pengajuan",
+  "Kontak",
+  "Negosiasi",
+  "Desain",
+  "PKS",
+  "Sewa aktif",
+] as const;
 
-const CHART_COLORS = ["#fb3444", "#34d399", "#38bdf8", "#f59e0b", "#a78bfa"];
-const PANEL_CLASS = "border-[rgba(255,214,218,0.14)] bg-[#3A161C] text-[#F8ECEE]";
-const GRID_COLOR = "rgba(255,214,218,.12)";
-const AXIS_COLOR = "#C4A8AD";
+const CHART_COLORS = ["#E31E2D", "#1B3A6B", "#0f766e", "#b45309", "#7c3aed"];
+/** Chart chrome pakai netral Operate (bukan Void); hex wajib untuk Recharts. */
+const GRID_COLOR = "#e2e8f0";
+const AXIS_COLOR = "#64748b";
 const TOOLTIP_STYLE = {
-  backgroundColor: "#261015",
-  border: "1px solid rgba(255,214,218,.18)",
+  backgroundColor: "#ffffff",
+  border: "1px solid #e2e8f0",
   borderRadius: 12,
-  color: "#F8ECEE",
-  boxShadow: "0 18px 50px rgba(0,0,0,.35)",
+  color: "#0f172a",
+  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.12)",
 };
 
-function StatCard({ title, value, subtitle, icon: Icon, color }: {
-  title: string; value: string | number; subtitle?: string; icon: React.ElementType; color: string;
+function StatCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+}: {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: React.ElementType;
 }) {
   return (
-    <Card className={PANEL_CLASS}>
+    <Card>
       <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm font-medium text-[#C4A8AD]">{title}</p>
-            <p className="mt-1 text-3xl font-black text-white">{value}</p>
-            {subtitle && <p className="mt-1 text-xs text-[#C4A8AD]">{subtitle}</p>}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-500">{title}</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{value}</p>
+            {subtitle ? <p className="mt-1 text-xs text-slate-500">{subtitle}</p> : null}
           </div>
-          <div className={`rounded-xl p-3 shadow-lg ${color}`}>
-            <Icon className="h-5 w-5 text-white" />
-          </div>
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600">
+            <Icon className="size-4" aria-hidden />
+          </span>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function exportCSV(leads: DashboardData["recentLeads"]) {
-  const headers = ["ID", "Perusahaan", "Kontak", "Telepon", "Email", "Jenis Usaha", "Status", "Ruang", "Stasiun", "Tanggal"];
-  const rows = leads.map((l) => [
-    l.id, l.companyName, l.contactName, l.phone, l.email,
-    l.businessType, l.status, l.spaceName, l.stationName,
-    new Date(l.createdAt).toLocaleDateString("id-ID"),
-  ]);
-  const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `leads-lrt-jabodebek-${new Date().toISOString().split("T")[0]}.csv`;
-  a.click();
+function ChartEmpty({ message }: { message: string }) {
+  return (
+    <div className="flex h-52 items-center justify-center text-sm text-slate-500">{message}</div>
+  );
+}
+
+function buildLeadJourney(leadsByStatus: DashboardData["leadsByStatus"]) {
+  const steps = PUBLIC_LEAD_PROCESS_STEPS.map((step, index) => {
+    const count = leadsByStatus.reduce((sum, item) => {
+      if (item.status === "CLOSED_LOST") return sum;
+      return publicLeadStageIndex(item.status) === index ? sum + item.count : sum;
+    }, 0);
+    return {
+      key: step.status,
+      title: JOURNEY_SHORT_TITLES[index] ?? step.title,
+      fullTitle: step.title,
+      count,
+    };
+  });
+  const inJourney = steps.reduce((sum, step) => sum + step.count, 0);
+  const peak = Math.max(1, ...steps.map((step) => step.count));
+  return { steps, inJourney, peak };
 }
 
 export default function DashboardClient({ data }: { data: DashboardData }) {
-  const { stats, eventsByType, recentLeads, topStations, leadsByStatus, dailyVisits, errors } = data;
+  const { stats, eventsByType, topStations, leadsByStatus, dailyVisits, errors } = data;
   const hasError = (key: string) => errors.includes(key);
   const unavailable = "—";
+  const journey = buildLeadJourney(leadsByStatus);
 
   return (
-    <div className="space-y-6">
-      {errors.length > 0 && (
+    <div className="space-y-5">
+      {errors.length > 0 ? (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-amber-50"
+          className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
         >
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+          <AlertTriangle aria-hidden className="mt-0.5 size-5 shrink-0" />
           <div>
             <p className="font-semibold">Sebagian data dashboard gagal dimuat</p>
-            <p className="mt-0.5 text-sm text-amber-100/80">
+            <p className="mt-1 text-amber-800">
               Nilai yang tidak tersedia ditandai dengan garis. Muat ulang halaman untuk mencoba lagi.
             </p>
           </div>
         </div>
-      )}
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Kunjungan" value={stats.totalVisits === null ? unavailable : formatNumber(stats.totalVisits)} icon={Eye} color="bg-sky-500/80" subtitle="Semua sesi virtual tour" />
-        <StatCard title="Total Lead" value={stats.totalLeads === null ? unavailable : formatNumber(stats.totalLeads)} icon={Users} color="bg-[#E31E2D]" subtitle="Calon tenant terdaftar" />
-        <StatCard title="Unit Tersedia" value={stats.availableSpaces ?? unavailable} icon={Building2} color="bg-emerald-500/85" subtitle={`dari ${stats.totalSpaces ?? unavailable} total unit`} />
-        <StatCard title="Tingkat Hunian" value={stats.occupancyRate === null ? unavailable : `${stats.occupancyRate}%`} icon={TrendingUp} color="bg-amber-500/85" subtitle={stats.occupiedSpaces === null ? "Data unit tidak tersedia" : `${stats.occupiedSpaces} unit terisi`} />
+      ) : null}
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          title="Total Kunjungan"
+          value={stats.totalVisits === null ? unavailable : formatNumber(stats.totalVisits)}
+          icon={Eye}
+          subtitle="Semua sesi virtual tour"
+        />
+        <StatCard
+          title="Total Lead"
+          value={stats.totalLeads === null ? unavailable : formatNumber(stats.totalLeads)}
+          icon={Users}
+          subtitle="Calon tenant terdaftar"
+        />
+        <StatCard
+          title="Unit Tersedia"
+          value={stats.availableSpaces ?? unavailable}
+          icon={Building2}
+          subtitle={`dari ${stats.totalSpaces ?? unavailable} total unit`}
+        />
+        <StatCard
+          title="Tingkat Hunian"
+          value={stats.occupancyRate === null ? unavailable : `${stats.occupancyRate}%`}
+          icon={TrendingUp}
+          subtitle={
+            stats.occupiedSpaces === null ? "Data unit tidak tersedia" : `${stats.occupiedSpaces} unit terisi`
+          }
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Daily Visits Chart */}
-        <Card className={`lg:col-span-2 ${PANEL_CLASS}`}>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-white">Kunjungan 7 Hari Terakhir</CardTitle>
+            <CardTitle className="text-base">Kunjungan 7 Hari Terakhir</CardTitle>
+            <CardDescription>Agregat STATION_VIEW per hari</CardDescription>
           </CardHeader>
           <CardContent>
             {hasError("dailyVisits") ? (
-              <div className="h-52 flex items-center justify-center text-amber-200 text-sm">
-                Data kunjungan gagal dimuat
-              </div>
+              <ChartEmpty message="Data kunjungan gagal dimuat" />
             ) : dailyVisits.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={dailyVisits}>
                   <CartesianGrid stroke={GRID_COLOR} vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: AXIS_COLOR }} axisLine={false} tickLine={false} tickFormatter={(d) => d.slice(5)} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) => String(value).slice(5)}
+                  />
                   <YAxis tick={{ fontSize: 11, fill: AXIS_COLOR }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [formatNumber(Number(v)), "Kunjungan"]} />
-                  <Line type="monotone" dataKey="count" stroke="#34d399" strokeWidth={2.5} dot={{ fill: "#34d399", r: 4 }} />
+                  <Tooltip
+                    contentStyle={TOOLTIP_STYLE}
+                    formatter={(value) => [formatNumber(Number(value)), "Kunjungan"]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="#1B3A6B"
+                    strokeWidth={2.5}
+                    dot={{ fill: "#1B3A6B", r: 3.5 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-52 flex items-center justify-center text-[#C4A8AD] text-sm">
-                Data kunjungan belum tersedia
-              </div>
+              <ChartEmpty message="Data kunjungan belum tersedia" />
             )}
           </CardContent>
         </Card>
 
-        {/* Occupancy Pie */}
-        <Card className={PANEL_CLASS}>
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-white">Status Hunian</CardTitle>
+            <CardTitle className="text-base">Status Hunian</CardTitle>
+            <CardDescription>Terisi vs tersedia</CardDescription>
           </CardHeader>
           <CardContent>
             {stats.occupiedSpaces === null || stats.availableSpaces === null ? (
-              <div className="h-52 flex items-center justify-center text-amber-200 text-sm">
-                Data hunian gagal dimuat
-              </div>
+              <ChartEmpty message="Data hunian gagal dimuat" />
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={180}>
@@ -200,16 +246,22 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                       outerRadius={80}
                       dataKey="value"
                     >
-                      {[0, 1].map((_, i) => (
-                        <Cell key={i} fill={i === 0 ? "#E31E2D" : "#10B981"} />
+                      {[0, 1].map((index) => (
+                        <Cell key={index} fill={index === 0 ? "#E31E2D" : "#0f766e"} />
                       ))}
                     </Pie>
                     <Tooltip contentStyle={TOOLTIP_STYLE} />
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="flex justify-center gap-4 text-xs text-[#F8ECEE]">
-                  <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-[#E31E2D]" /> Terisi ({stats.occupiedSpaces})</div>
-                  <div className="flex items-center gap-1"><div className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Tersedia ({stats.availableSpaces})</div>
+                <div className="flex justify-center gap-4 text-xs text-slate-600">
+                  <div className="flex items-center gap-1.5">
+                    <span className="size-2.5 rounded-full bg-[#E31E2D]" aria-hidden />
+                    Terisi ({stats.occupiedSpaces})
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="size-2.5 rounded-full bg-teal-700" aria-hidden />
+                    Tersedia ({stats.availableSpaces})
+                  </div>
                 </div>
               </>
             )}
@@ -217,150 +269,174 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Stations */}
-        <Card className={PANEL_CLASS}>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-white">Stasiun Paling Banyak Dikunjungi</CardTitle>
+            <CardTitle className="text-base">Stasiun Paling Banyak Dikunjungi</CardTitle>
+            <CardDescription>Top 8 stasiun dari STATION_VIEW</CardDescription>
           </CardHeader>
           <CardContent>
             {hasError("topStations") ? (
-              <div className="h-52 flex items-center justify-center text-amber-200 text-sm">
-                Data stasiun gagal dimuat
-              </div>
+              <ChartEmpty message="Data stasiun gagal dimuat" />
             ) : topStations.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={topStations} layout="vertical">
                   <CartesianGrid stroke={GRID_COLOR} horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11, fill: AXIS_COLOR }} axisLine={false} tickLine={false} />
-                  <YAxis dataKey="stationName" type="category" tick={{ fontSize: 10, fill: AXIS_COLOR }} width={120} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [formatNumber(Number(v)), "Kunjungan"]} />
-                  <Bar dataKey="visits" fill="#34d399" radius={[0, 6, 6, 0]} />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    dataKey="stationName"
+                    type="category"
+                    tick={{ fontSize: 10, fill: AXIS_COLOR }}
+                    width={120}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={TOOLTIP_STYLE}
+                    formatter={(value) => [formatNumber(Number(value)), "Kunjungan"]}
+                  />
+                  <Bar dataKey="visits" fill="#1B3A6B" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-52 flex items-center justify-center text-[#C4A8AD] text-sm">
-                Belum ada data kunjungan per stasiun
-              </div>
+              <ChartEmpty message="Belum ada data kunjungan per stasiun" />
             )}
           </CardContent>
         </Card>
 
-        {/* Event breakdown */}
-        <Card className={PANEL_CLASS}>
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-white">Aktivitas Pengguna</CardTitle>
+            <CardTitle className="text-base">Aktivitas Pengguna</CardTitle>
+            <CardDescription>Breakdown event analitik</CardDescription>
           </CardHeader>
           <CardContent>
             {hasError("eventsByType") ? (
-              <div className="h-52 flex items-center justify-center text-amber-200 text-sm">
-                Data aktivitas gagal dimuat
-              </div>
+              <ChartEmpty message="Data aktivitas gagal dimuat" />
             ) : eventsByType.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={eventsByType.map((e) => ({ ...e, label: EVENT_TYPE_LABELS[e.type] ?? e.type }))}>
+                <BarChart
+                  data={eventsByType.map((event) => ({
+                    ...event,
+                    label: EVENT_TYPE_LABELS[event.type] ?? event.type,
+                  }))}
+                >
                   <CartesianGrid stroke={GRID_COLOR} vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: AXIS_COLOR }} axisLine={false} tickLine={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10, fill: AXIS_COLOR }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <YAxis tick={{ fontSize: 11, fill: AXIS_COLOR }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [formatNumber(Number(v)), "Event"]} />
+                  <Tooltip
+                    contentStyle={TOOLTIP_STYLE}
+                    formatter={(value) => [formatNumber(Number(value)), "Event"]}
+                  />
                   <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                    {eventsByType.map((_, i) => (
-                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                    {eventsByType.map((_, index) => (
+                      <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-52 flex items-center justify-center text-[#C4A8AD] text-sm">
-                Belum ada data aktivitas
-              </div>
+              <ChartEmpty message="Belum ada data aktivitas" />
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Lead Pipeline */}
-      <Card className={PANEL_CLASS}>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base text-white">Pipeline Lead Tenant</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportCSV(recentLeads)}
-              className="flex items-center gap-1.5 border-white/15 bg-white/5 text-[#F8ECEE] hover:bg-white/10"
-            >
-              <Download className="h-4 w-4" />
-              Export CSV
-            </Button>
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1.5">
+            <CardTitle className="text-base">Journey Lead Tenant</CardTitle>
+            <CardDescription>
+              {hasError("leadsByStatus")
+                ? "Ringkasan tahap gagal dimuat"
+                : `${formatNumber(journey.inJourney)} pengajuan aktif di enam tahap proses sewa`}
+            </CardDescription>
           </div>
-          {/* Status summary */}
-          <div className="flex flex-wrap gap-2 mt-3">
-            {hasError("leadsByStatus") ? (
-              <span className="text-sm text-amber-200">Ringkasan status gagal dimuat</span>
-            ) : leadsByStatus.map((l) => {
-              const cfg = LEAD_STATUS_CONFIG[l.status];
-              return (
-                <span key={l.status} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${cfg?.color ?? "border-white/10 bg-white/5 text-[#F8ECEE]"}`}>
-                  {cfg?.icon}
-                  {cfg?.label ?? LEAD_STATUS_LABELS[l.status as CommercialLeadStatus] ?? l.status}: {l.count}
-                </span>
-              );
-            })}
-          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/cms/leads" prefetch={false}>
+              Lihat pengajuan
+              <ArrowRight className="size-3.5" />
+            </Link>
+          </Button>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/10">
-                  {["Perusahaan", "Kontak", "Jenis Usaha", "Unit", "Stasiun", "Status", "Tanggal"].map((h) => (
-                    <th key={h} className="text-left py-2.5 px-3 text-xs font-semibold text-[#C4A8AD] uppercase tracking-wider whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/8">
-                {hasError("recentLeads") ? (
-                  <tr>
-                    <td colSpan={7} className="py-10 text-center text-amber-200 text-sm">
-                      Data lead terbaru gagal dimuat
-                    </td>
-                  </tr>
-                ) : recentLeads.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-10 text-center text-[#C4A8AD] text-sm">
-                      Belum ada lead masuk
-                    </td>
-                  </tr>
-                ) : (
-                  recentLeads.map((lead) => {
-                    const cfg = LEAD_STATUS_CONFIG[lead.status];
-                    return (
-                      <tr key={lead.id} className="transition-colors hover:bg-white/[0.04]">
-                        <td className="py-3 px-3 font-semibold text-white">{lead.companyName}</td>
-                        <td className="py-3 px-3 text-[#F8ECEE]">
-                          <div>{lead.contactName}</div>
-                          <div className="text-xs text-[#C4A8AD]">{lead.phone}</div>
-                        </td>
-                        <td className="py-3 px-3 text-[#F8ECEE]">{lead.businessType}</td>
-                        <td className="py-3 px-3 text-[#F8ECEE] font-mono text-xs">{lead.spaceName}</td>
-                        <td className="py-3 px-3 text-[#F8ECEE]">{lead.stationName}</td>
-                        <td className="py-3 px-3">
-                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${cfg?.color ?? "border-white/10 bg-white/5 text-[#F8ECEE]"}`}>
-                            {cfg?.icon}
-                            {cfg?.label ?? LEAD_STATUS_LABELS[lead.status as CommercialLeadStatus] ?? lead.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-[#C4A8AD] text-xs whitespace-nowrap">
-                          {new Date(lead.createdAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+          {hasError("leadsByStatus") ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-8 text-center text-sm text-amber-900">
+              Data journey gagal dimuat
+            </div>
+          ) : journey.inJourney === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">
+              Belum ada pengajuan di pipeline
+            </div>
+          ) : (
+            <ol className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+              {journey.steps.map((step, index) => {
+                const hasLeads = step.count > 0;
+                const width = `${Math.max(8, Math.round((step.count / journey.peak) * 100))}%`;
+                return (
+                  <li key={step.key} className="relative min-w-0">
+                    {index < journey.steps.length - 1 ? (
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute top-5 left-[calc(50%+1.25rem)] hidden h-px w-[calc(100%-1.5rem)] bg-slate-200 xl:block"
+                      />
+                    ) : null}
+                    <div
+                      className={cn(
+                        "relative flex h-full flex-col rounded-xl border px-3 py-4",
+                        hasLeads
+                          ? "border-slate-200 bg-white"
+                          : "border-dashed border-slate-200 bg-slate-50/70"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "inline-flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                            hasLeads
+                              ? "bg-[#E31E2D] text-white"
+                              : "border border-slate-200 bg-white text-slate-500"
+                          )}
+                          aria-hidden
+                        >
+                          {hasLeads && index === journey.steps.length - 1 ? (
+                            <Check className="size-3.5" />
+                          ) : (
+                            index + 1
+                          )}
+                        </span>
+                        <p className="min-w-0 text-sm font-semibold text-slate-900" title={step.fullTitle}>
+                          {step.title}
+                        </p>
+                      </div>
+                      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+                        {formatNumber(step.count)}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">pengajuan di tahap ini</p>
+                      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-[width]",
+                            hasLeads ? "bg-[#1B3A6B]" : "bg-transparent"
+                          )}
+                          style={{ width: hasLeads ? width : "0%" }}
+                        />
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
         </CardContent>
       </Card>
     </div>

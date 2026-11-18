@@ -8,12 +8,14 @@ type Props = {
   stationName?: string;
   /** Override posisi (mis. fixed di homepage) */
   className?: string;
+  compact?: boolean;
 };
 
 export default function ContactPersonFab({
   phone,
   stationName,
   className = "absolute bottom-6 right-3 sm:bottom-8 sm:right-5",
+  compact = false,
 }: Props) {
   const profile = useCommercialProfile();
   const resolvedPhone = phone || profile.whatsappNumber;
@@ -29,9 +31,9 @@ export default function ContactPersonFab({
       rel="noopener noreferrer"
       aria-label={`Hubungi ${profile.teamName}`}
       title={`Hubungi ${profile.teamName}`}
-      className={`group pointer-events-auto z-[70] flex items-end gap-2.5 ${className}`}
+      className={`group pointer-events-auto z-[70] flex gap-2.5 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${compact ? "items-center" : "items-end"} ${className}`}
     >
-      <span className="relative z-10 flex size-[45px] shrink-0 items-center justify-center rounded-full bg-[#D81435] shadow-[0_8px_24px_rgba(216,20,53,0.45)] transition group-hover:scale-105 group-hover:brightness-110">
+      <span className={`relative z-10 flex shrink-0 items-center justify-center rounded-full bg-[#D81435] transition group-hover:brightness-110 ${compact ? "size-11" : "size-[45px] shadow-[0_8px_24px_rgba(216,20,53,0.45)] group-hover:scale-105"}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/brand/tour-contact/phone.svg"
@@ -42,7 +44,7 @@ export default function ContactPersonFab({
         />
       </span>
 
-      <span className="relative mb-0.5 h-[38px] w-[41px] shrink-0 transition group-hover:-translate-y-0.5">
+      <span className={`relative mb-0.5 h-[38px] w-[41px] shrink-0 transition group-hover:-translate-y-0.5 ${compact ? "hidden lg:block" : ""}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/brand/tour-contact/mascot-head.png"

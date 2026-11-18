@@ -4,23 +4,26 @@ import { useState } from "react";
 import TrainFormationMap from "@/components/tour/TrainFormationMap";
 import { DEFAULT_TRAIN_CARS } from "@/lib/train-tour-defaults";
 import {
-  TRAINSET_OPTIONS,
   isAllTrainsets,
   parseCarTrainsetMap,
   type CarTrainsetMap,
 } from "@/lib/train-rental-sales";
 
+/** Sementara: daftar TS bawaan sampai picker menerima fleet dari DB. */
+const FALLBACK_TRAINSETS = Array.from({ length: 31 }, (_, index) => `TS${String(index + 1).padStart(2, "0")}`);
+
 type Props = {
   value: CarTrainsetMap;
   onChange: (next: CarTrainsetMap) => void;
+  trainsets?: string[];
 };
 
-export default function TrainCarTrainsetPicker({ value, onChange }: Props) {
+export default function TrainCarTrainsetPicker({ value, onChange, trainsets = FALLBACK_TRAINSETS }: Props) {
   const map = parseCarTrainsetMap(value);
   const [activeSlug, setActiveSlug] = useState(DEFAULT_TRAIN_CARS[0].slug);
   const activeCar = DEFAULT_TRAIN_CARS.find((car) => car.slug === activeSlug) ?? DEFAULT_TRAIN_CARS[0];
   const current = map[activeCar.slug] ?? [];
-  const allSelected = isAllTrainsets(current);
+  const allSelected = isAllTrainsets(current, trainsets);
 
   function setCarTrainsets(slug: string, next: string[]) {
     onChange({ ...map, [slug]: next });
@@ -60,7 +63,7 @@ export default function TrainCarTrainsetPicker({ value, onChange }: Props) {
               >
                 <span className="block text-[10px] font-semibold leading-tight">{car.label.replace("Gerbong ", "G")}</span>
                 <span className={`block text-[9px] leading-tight ${selected ? "text-white/80" : "text-slate-500"}`}>
-                  {count === 0 ? "—" : isAllTrainsets(map[car.slug] ?? []) ? "Semua" : `${count} TS`}
+                  {count === 0 ? "—" : isAllTrainsets(map[car.slug] ?? [], trainsets) ? "Semua" : `${count} TS`}
                 </span>
               </button>
             );
@@ -89,7 +92,7 @@ export default function TrainCarTrainsetPicker({ value, onChange }: Props) {
               type="button"
               className="text-xs font-medium text-red-300 hover:text-red-200"
               onClick={() =>
-                setCarTrainsets(activeCar.slug, allSelected ? [] : [...TRAINSET_OPTIONS])
+                setCarTrainsets(activeCar.slug, allSelected ? [] : [...trainsets])
               }
             >
               {allSelected ? "Hapus semua" : "Pilih semua TS"}
@@ -98,7 +101,7 @@ export default function TrainCarTrainsetPicker({ value, onChange }: Props) {
         </div>
         <div className="mt-1.5 max-h-36 overflow-y-auto rounded-lg border border-slate-700 bg-slate-800 p-2">
           <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
-            {TRAINSET_OPTIONS.map((trainset) => {
+            {trainsets.map((trainset) => {
               const checked = current.includes(trainset);
               return (
                 <label

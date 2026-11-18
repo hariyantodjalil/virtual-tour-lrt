@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateS3Key, uploadToS3 } from "@/lib/s3";
-import { uploadPanoramaTiles } from "@/lib/panorama-tile-upload";
+import { uploadAdaptivePanoramaTiles } from "@/lib/panorama-tile-upload";import { withoutHdPanoramaProfiles } from "@/lib/panorama-profile";
+
 import { processPanorama, generatePanoramaThumbnail, formatBytes } from "@/lib/image-processor";
 import { resetPrivacyBlurForNewPanorama } from "@/lib/privacy-blur-normalize";
 import { Prisma } from "@prisma/client";
@@ -178,10 +179,15 @@ export async function POST(request: NextRequest, { params }: Params) {
     where: { trainId_sceneId: { trainId, sceneId } },
     select: { canvasData: true },
   });
-  const canvasData = {
+  // Profil adaptif dibuat dari panorama display; sumber asli yang belum diblur
+  // tidak boleh langsung menjadi panorama publik. Bake blur meregenerasi dari master.
+  const multiResProfiles = await uploadAdaptivePanoramaTiles(panoramaResult.buffer, trainSlug, sceneId);
+  const canvasData = withoutHdPanoramaProfiles({
     ...resetPrivacyBlurForNewPanorama(existing?.canvasData, panoramaUrl),
-    multiRes: await uploadPanoramaTiles(panoramaResult.buffer, trainSlug, sceneId),
-  } as Prisma.InputJsonValue;
+    // Legacy reader (image rollback) memakai mobile: profil detail terendah yang aman.
+    multiRes: multiResProfiles.mobile,
+    multiResProfiles,
+  }) as Prisma.InputJsonValue;
 
   const scene = await prisma.trainTourScene.update({
     where: { trainId_sceneId: { trainId, sceneId } },

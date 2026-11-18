@@ -1,5 +1,8 @@
 # Spatial Hotspot — perbaikan dan verifikasi lokal, 28 Oktober 2026
 
+> Pembaruan 15 November 2026: Spatial sekarang fitur bawaan yang selalu aktif di CMS, API, dan public viewer. Konfigurasi feature flag di bawah merupakan catatan historis dan tidak lagi diperlukan.
+
+
 Pilihan **Unit → Pin / Spatial** dipertahankan. Keduanya menggunakan master CommercialSpace dan detail unit existing. Jumlah unit Coverage tidak digandakan; daftar placement tetap dapat memuat pin dan beberapa area pada scene berbeda.
 
 ## Perubahan kontrak
