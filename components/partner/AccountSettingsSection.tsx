@@ -91,7 +91,7 @@ export default function AccountSettingsSection({
   }, [query]);
 
   function handleItemClick(item: SettingItem) {
-    if (item.kind === "danger") {
+    if (item.kind === "danger" || item.id === "logout") {
       onLogout();
       return;
     }
