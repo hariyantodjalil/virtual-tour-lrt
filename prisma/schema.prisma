@@ -185,7 +185,7 @@ model CommercialSpace {
   type            SpaceType    @default(KIOS)
   status          SpaceStatus  @default(TERSEDIA)
   area            Float
-  monthlyRent     Float
+  monthlyRent     Float?
   deposit         Float        @default(0)
   floor           String       @default("G")
   location        String
@@ -193,6 +193,8 @@ model CommercialSpace {
   nearbyFacilities String[]      @default([])
   exposure        Int          @default(0)
   powerSupply     String?
+  /** Preferensi peruntukan unit untuk modal publik (mis. F&B, Retail). Kosong = tampil as-is. */
+  preferredUses   String[]     @default([])
   waterAccess     Boolean      @default(false)
   airConditioning Boolean      @default(false)
   description     String?
@@ -274,6 +276,10 @@ model TenantLead {
   status           LeadStatus       @default(NEW)
   notes            String?
   followUpAt       DateTime?
+  leaseStartAt     DateTime?        @db.Date
+  leaseEndAt       DateTime?        @db.Date
+  paymentVerifiedAt DateTime?
+  paymentVerifiedByAdmin String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
@@ -281,6 +287,7 @@ model TenantLead {
   @@index([userId, createdAt])
   @@index([status])
   @@index([createdAt])
+  @@index([leaseEndAt])
   @@map("tenant_leads")
 }
 
@@ -326,6 +333,13 @@ model InquiryMedia {
   mediaTitle       String
   documentNumber   String?
   mediaLink        String
+  documentType     String     @default("OTHER")
+  storageKey       String?
+  fileName         String?
+  mimeType         String?
+  sizeBytes        Int?
+  verifiedAt       DateTime?
+  verifiedByAdmin  String?
   isVisibleToMitra Boolean    @default(false)
   uploadedByAdmin  String
   createdAt        DateTime   @default(now())
@@ -580,6 +594,14 @@ model TrainInquiry {
   mediaCode             String
   mediaTitle            String
   mode                  TrainInquiryMode
+  applicantStatusId     String?
+  applicantStatus       AdvertisingFormOption? @relation("ApplicantStatus", fields: [applicantStatusId], references: [id], onDelete: Restrict)
+  applicantStatusLabel  String?
+  representedBrand      String?
+  businessCategoryId    String?
+  businessCategory      AdvertisingFormOption? @relation("BusinessCategory", fields: [businessCategoryId], references: [id], onDelete: Restrict)
+  businessCategoryLabel String?
+  businessCategoryOther String?
   requestedTrainsetCount Int?
   campaignStart         DateTime?        @db.Date
   campaignEnd           DateTime?        @db.Date
@@ -590,6 +612,23 @@ model TrainInquiry {
 
   @@index([mediaId])
   @@map("train_inquiries")
+}
+
+model AdvertisingFormOption {
+  id                     String @id @default(cuid())
+  kind                   String
+  label                  String
+  allowsRepresentedBrand Boolean @default(false)
+  requiresDetail         Boolean @default(false)
+  isActive               Boolean @default(true)
+  order                  Int @default(0)
+  updatedAt              DateTime @updatedAt
+  applicantInquiries     TrainInquiry[] @relation("ApplicantStatus")
+  categoryInquiries      TrainInquiry[] @relation("BusinessCategory")
+
+  @@unique([kind, label])
+  @@index([kind, isActive, order])
+  @@map("advertising_form_options")
 }
 
 model TrainInquiryCar {
