@@ -24,7 +24,7 @@ function normalizeType(raw: unknown): HotspotType | undefined {
 export function normalizeHotspots(raw: unknown): Hotspot[] {
   if (!Array.isArray(raw)) return [];
 
-  return raw.map((item) => {
+  return raw.map((item, index) => {
     const h = item as Record<string, unknown>;
     const pitch = Number(h.pitch ?? 0);
     const yaw = Number(h.yaw ?? 0);
@@ -48,6 +48,7 @@ export function normalizeHotspots(raw: unknown): Hotspot[] {
     const targetView = type === "scene" ? sceneEntryViewSchema.safeParse(h.targetView) : null;
 
     return {
+      ...(type === "space" ? { pinId: typeof h.pinId === "string" && h.pinId ? h.pinId : `legacy-${index}` } : {}),
       pitch,
       yaw,
       type,

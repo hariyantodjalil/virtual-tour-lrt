@@ -1,4 +1,5 @@
 import type { Hotspot, PanoramaScene, SceneInitialView } from "@/lib/tour-types";
+import type { SpaceHotspotTarget } from "@/lib/space-hotspot-locate";
 import { resolveSceneEntryView } from "./scene-entry-view";
 import { getS3ProxyUrl } from "@/lib/s3-utils";
 import { setupHotspotElement, resolveSceneHotspotTitle, type SpaceHotspotMarker } from "@/lib/pannellum-hotspot";
@@ -12,6 +13,7 @@ import type { PanoramaQuality } from "./panorama-quality";
 import { panoramaIntentUrls, panoramaViewport, type PanoramaViewport } from "./panorama-intent";
 
 export type AdHotspotPayload = {
+  target?: Extract<SpaceHotspotTarget, { yaw: number }>;
   spaceCode?: string;
   text: string;
   creativeUrl?: string;
@@ -22,7 +24,7 @@ type SceneHandlers = {
   spaceMarker?: SpaceHotspotMarker;
   onSceneHotspot: (targetSceneId: string, pitch: number, yaw: number, entryView: SceneInitialView) => void;
   onScenePreload?: (targetSceneId: string, view: SceneInitialView) => void;
-  onSpaceClick: (spaceCode: string) => void;
+  onSpaceClick: (spaceCode: string, target?: SpaceHotspotTarget) => void;
   onAdClick?: (payload: AdHotspotPayload) => void;
   onInfoClick: (title: string, description: string) => void;
   getSpaceStatus?: (spaceCode: string) => SpaceAvailabilityStatus | undefined;
@@ -45,9 +47,10 @@ function buildHotSpots(scene: PanoramaScene, allScenes: PanoramaScene[], handler
       onClick = () => handlers.onSceneHotspot(sceneId, pitch, yaw, entryView);
     } else if (h.type === "space" && h.spaceCode) {
       const code = h.spaceCode;
-      onClick = () => handlers.onSpaceClick(code);
+      onClick = () => handlers.onSpaceClick(code, { sceneId: scene.id, yaw: h.yaw, pitch: h.pitch });
     } else if (h.type === "ad") {
       const payload: AdHotspotPayload = {
+        target: { sceneId: scene.id, yaw: h.yaw, pitch: h.pitch },
         spaceCode: h.spaceCode,
         text: h.text,
         creativeUrl: h.creativeUrl,
@@ -87,6 +90,9 @@ function buildHotSpots(scene: PanoramaScene, allScenes: PanoramaScene[], handler
               : undefined,
           direction: h.type === "scene" ? h.direction : undefined,
         });
+
+        const sceneLabel = div.querySelector<HTMLElement>(".lrt-scene-nav");
+        if (sceneLabel) sceneLabel.dataset.tourText = sceneLabel.getAttribute("aria-label") ?? "";
 
         if (h.type === "scene" && h.sceneId && handlers.onScenePreload) {
           const targetId = h.sceneId;

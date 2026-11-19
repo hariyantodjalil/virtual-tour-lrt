@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useSyncExternalStore } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
+import { add, angularDiffDeg, dirToSpherical, sphericalToDir } from "@/lib/spatial/geometry/spherical";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { EditorNotice, useEditorNotice } from "@/components/cms/EditorNotice";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +20,6 @@ import {
   ArrowRightLeft,
   Store,
   AlertCircle,
-  CheckCircle2,
   Package,
   Link2,
   Unlink,
@@ -28,6 +29,7 @@ import {
   Check,
   Copy,
   Sparkles,
+  Star,
   RotateCcw,
 } from "lucide-react";
 import { hotspotColor, hotspotLabel, HOTSPOT_SCALE_MIN, HOTSPOT_SCALE_MAX, HOTSPOT_SCALE_DEFAULT, DIRECTION_COMPASS, DIRECTION_LABELS, DIRECTION_ROTATE_DEG, type HotspotDirection } from "@/lib/hotspot-types";
@@ -37,6 +39,7 @@ import {
   type SpaceAvailabilityStatus,
 } from "@/lib/space-availability";
 import { normalizeHotspots } from "@/lib/hotspot-normalize";
+import { parsePrimaryUnitHotspot, type PrimaryUnitHotspot } from "@/lib/primary-unit-hotspot";
 import {
   BLUR_HEIGHT_DEFAULT,
   BLUR_INTENSITY_DEFAULT,
@@ -96,7 +99,10 @@ import { ManageLevelsDialog } from "./ManageLevelsDialog";
 import { ManageAreaDialog, type AreaDialogState } from "./ManageAreaDialog";
 import { SceneTargetPicker } from "./SceneTargetPicker";
 import { SceneEntryViewDialog, type SceneEntryViewSelection } from "./SceneEntryViewDialog";
+import { IncomingSceneViews } from "./IncomingSceneViews";
 import { EditorToolbar } from "./EditorToolbar";
+import StationMinimapCalibration, { type MinimapCalibration } from "@/components/cms/StationMinimapCalibration";
+import StationFloorplanEditor from "@/components/cms/StationFloorplanEditor";
 import { SpatialAreaInspector } from "./SpatialAreaInspector";
 import { BakePrivacyBlurDialog } from "@/components/cms/BakePrivacyBlurDialog";
 import type { PrivacyBlurBakeTarget } from "@/components/cms/BakePrivacyBlurDialog";
@@ -139,6 +145,7 @@ type Station = {
 
 type CommercialSpace = {
   id: string;
+  primaryHotspot?: PrimaryUnitHotspot | null;
   code: string;
   name: string;
   type: string;
@@ -277,12 +284,19 @@ function subscribeCompactViewport(listener: () => void) {
 
 export default function VirtualTourEditorPage() {
   const { stationId } = useParams<{ stationId: string }>();
+  const query = useSearchParams();
+  const linkedSceneId = query.get("scene");
+  const unitCode = query.get("unit")?.trim().toUpperCase();
+  const linkedSpatialId = query.get("spatial");
+  const linkedYaw = query.get("yaw");
+  const linkedPitch = query.get("pitch");
 
   const [station, setStation] = useState<Station | null>(null);
   const [levels, setLevels] = useState<TourLevel[]>([]);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const { confirmDialog, confirmElement } = useConfirmDialog();
   const [stationSpaces, setStationSpaces] = useState<CommercialSpace[]>([]);
+  const [savingPrimaryHotspot, setSavingPrimaryHotspot] = useState(false);
   const [selectedSceneIndex, setSelectedSceneIndex] = useState(0);
   const [hotspots, setHotspots] = useState<HotspotItem[]>([]);
   const [privacyBlurs, setPrivacyBlurs] = useState<PrivacyBlurItem[]>([]);
@@ -292,6 +306,7 @@ export default function VirtualTourEditorPage() {
   const [isPreview, setIsPreview] = useState(false);
   const [entryViewSelection, setEntryViewSelection] = useState<SceneEntryViewSelection | null>(null);
   const [previewEntryView, setPreviewEntryView] = useState<{ sceneId: string; view: SceneInitialView } | null>(null);
+  const [linkedView, setLinkedView] = useState<{ sceneId: string; view: SceneInitialView } | null>(null);
   const [hasUnsaved, setHasUnsaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const compactViewport = useSyncExternalStore(subscribeCompactViewport,
@@ -314,7 +329,7 @@ export default function VirtualTourEditorPage() {
   } | null>(null);
   const [draftSpatialVertices, setDraftSpatialVertices] = useState<SphericalPoint[]>([]);
   const [selectedSpatialId, setSelectedSpatialId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+  const { notice, showToast } = useEditorNotice();
   const [uploading, setUploading] = useState(false);
   const [bakingPrivacyBlur, setBakingPrivacyBlur] = useState(false);
   const [bakePrivacyProgress, setBakePrivacyProgress] = useState<{
@@ -363,6 +378,8 @@ export default function VirtualTourEditorPage() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [showConnectionMap, setShowConnectionMap] = useState(false);
+  const [minimapCalibration, setMinimapCalibration] = useState<MinimapCalibration | null>(null);
+  const [floorplanOpen, setFloorplanOpen] = useState(false);
   const [uploadingCreative, setUploadingCreative] = useState(false);
 
   // ─── Derived ─────────────────────────────────────────────────────────────
@@ -569,13 +586,9 @@ export default function VirtualTourEditorPage() {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
-  function showToast(type: "ok" | "err", msg: string) {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3500);
-  }
 
   // ─── Load data ───────────────────────────────────────────────────────────
-  async function load(keepIndex?: number) {
+  async function load(keepIndex?: number, openLinkedScene = false) {
     const timestamp = Date.now();
     const [stRes, structRes, spRes] = await Promise.all([
       cmsFetch(`/api/cms/stations/${stationId}?_t=${timestamp}`),
@@ -605,10 +618,39 @@ export default function VirtualTourEditorPage() {
       setBulkDefaultAreaId(lvData[0].areas[0].id);
     }
     if (scData.length > 0) {
-      const idx = keepIndex !== undefined && keepIndex < scData.length ? keepIndex : 0;
+      const linkedIndex = openLinkedScene && linkedSceneId
+        ? scData.findIndex(scene => scene.sceneId === linkedSceneId) : -1;
+      const idx = linkedIndex >= 0 ? linkedIndex
+        : keepIndex !== undefined && keepIndex < scData.length ? keepIndex : 0;
       setSelectedSceneIndex(idx);
-      rememberSavedScene(scData[idx]);
-      restoreSceneState(scData[idx]);
+      const scene = scData[idx];
+      rememberSavedScene(scene);
+      restoreSceneState(scene);
+      if (openLinkedScene) {
+        setLinkedView(null);
+        if (linkedIndex >= 0 && unitCode) {
+          if (linkedSpatialId) {
+            const spatial = normalizeSpatialEntities(scene.spatialEntities, scene.sceneId).find(entity =>
+              entity.id === linkedSpatialId && entity.action.type === "unit_detail"
+              && entity.spaceCode?.trim().toUpperCase() === unitCode
+            );
+            if (spatial?.geometry.type === "spherical_polygon" && spatial.geometry.vertices.length > 0) {
+              const direction = spatial.geometry.vertices.map(sphericalToDir).reduce(add, { x: 0, y: 0, z: 0 });
+              setLinkedView({ sceneId: scene.sceneId, view: dirToSpherical(direction) });
+              setSelectedSpatialId(spatial.id);
+            }
+          } else {
+            const pins = sceneToHotspots(scene).filter(h => h.type === "space" && h.spaceCode?.trim().toUpperCase() === unitCode);
+            const pin = linkedYaw !== null && linkedPitch !== null
+              ? pins.find(h => Math.abs(angularDiffDeg(h.yaw, Number(linkedYaw))) < 0.0001 && Math.abs(h.pitch - Number(linkedPitch)) < 0.0001)
+              : pins.length === 1 ? pins[0] : undefined;
+            if (pin) {
+              setLinkedView({ sceneId: scene.sceneId, view: { yaw: pin.yaw, pitch: pin.pitch } });
+              setSelectedHotspotId(pin._id);
+            }
+          }
+        }
+      }
     } else {
       rememberSavedScene(null);
       setHotspots([]);
@@ -622,10 +664,10 @@ export default function VirtualTourEditorPage() {
   }
 
   useEffect(() => {
-    const timer = window.setTimeout(() => { void load(); }, 0);
+    const timer = window.setTimeout(() => { void load(undefined, true); }, 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stationId]);
+  }, [stationId, linkedSceneId, unitCode, linkedSpatialId, linkedYaw, linkedPitch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -755,6 +797,7 @@ export default function VirtualTourEditorPage() {
               : "info";
       const newH: HotspotItem = {
         _id: tempId(),
+        ...(type === "space" ? { pinId: tempId() } : {}),
         yaw,
         pitch,
         type,
@@ -1101,6 +1144,10 @@ export default function VirtualTourEditorPage() {
         setHasUnsaved(false);
         rememberSavedScene(saved);
         setScenes((current) => current.map((scene) => scene.sceneId === saved.sceneId ? saved : scene));
+        if (saved.hotspots.length !== hotspots.length) {
+          setHotspots(sceneToHotspots(saved));
+          setSelectedHotspotId(null);
+        }
         setSpatialEntities(normalizeSpatialEntities(saved.spatialEntities, saved.sceneId));
         return true;
       } else {
@@ -1597,7 +1644,7 @@ export default function VirtualTourEditorPage() {
   async function deleteScene(scene: Scene) {
     const confirmed = await confirmDialog({
       title: `Hapus scene "${scene.title}"?`,
-      description: "Semua hotspot yang menautkan ke scene ini juga perlu diperbarui.",
+      description: "Panah yang menuju scene ini ikut dihapus.",
       confirmLabel: "Ya, Hapus",
       destructive: true,
     });
@@ -1609,7 +1656,9 @@ export default function VirtualTourEditorPage() {
       showToast("ok", "Scene dihapus");
       const deletedIdx = scenes.findIndex((s) => s.sceneId === scene.sceneId);
       const nextIdx = deletedIdx <= selectedSceneIndex ? Math.max(0, selectedSceneIndex - 1) : selectedSceneIndex;
-      load(nextIdx);
+      await load(nextIdx);
+    } else {
+      showToast("err", "Gagal menghapus scene.");
     }
   }
 
@@ -1631,6 +1680,7 @@ export default function VirtualTourEditorPage() {
             delete next.creativeUrl;
             delete next.creativeTitle;
           } else if (newType === "space") {
+            if (h.type !== "space") next.pinId = tempId();
             delete next.sceneId;
             delete next.direction;
             delete next.description;
@@ -1717,6 +1767,7 @@ export default function VirtualTourEditorPage() {
       const clone: HotspotItem = {
         ...selectedHotspot,
         _id: tempId(),
+        ...(selectedHotspot.type === "space" ? { pinId: tempId() } : {}),
         yaw: wrapYaw(selectedHotspot.yaw + 8),
       };
       setHotspots((prev) => [...prev, clone]);
@@ -1989,6 +2040,63 @@ export default function VirtualTourEditorPage() {
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────
+  async function savePrimaryHotspot(spaceId: string, target: PrimaryUnitHotspot, selected: boolean) {
+    if (savingPrimaryHotspot) return;
+    setSavingPrimaryHotspot(true);
+    try {
+      const response = await cmsFetch(`/api/cms/spaces/station/${encodeURIComponent(stationId)}/primary-hotspot`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spaceId, target, selected }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        showToast("err", result?.error ?? "Gagal menyimpan tujuan utama.");
+        return;
+      }
+      const primaryHotspot = parsePrimaryUnitHotspot(result?.primaryHotspot);
+      setStationSpaces(previous => previous.map(space => space.id === spaceId ? { ...space, primaryHotspot } : space));
+      showToast("ok", selected ? "Tujuan utama disimpan."
+        : primaryHotspot ? "Tujuan utama sudah dipindah ke hotspot lain." : "Pilihan tujuan utama dilepas.");
+    } catch {
+      showToast("err", "Koneksi terputus saat menyimpan tujuan utama.");
+    } finally {
+      setSavingPrimaryHotspot(false);
+    }
+  }
+
+  function primaryHotspotControl(kind: PrimaryUnitHotspot["kind"], spaceCode?: string | null, hotspotId?: string) {
+    if (!currentScene || !spaceCode || !hotspotId) return null;
+    const space = stationSpaces.find(unit => unit.code === spaceCode);
+    if (!space) return null;
+    const target = { sceneId: currentScene.sceneId, kind, hotspotId };
+    const primary = space.primaryHotspot;
+    const selected = primary?.sceneId === target.sceneId && primary.kind === kind && primary.hotspotId === hotspotId;
+    return (
+      <Button type="button" size="sm" variant="outline" aria-pressed={selected}
+        title={selected ? "Lepas pilihan tujuan utama" : undefined}
+        disabled={saving || savingPrimaryHotspot} className="mt-2 h-8 w-full text-xs"
+        onClick={() => void savePrimaryHotspot(space.id, target, !selected)}>
+        <Star className={selected ? "size-3.5 fill-current text-amber-500" : "size-3.5"} />
+        {selected ? "Tujuan utama" : "Jadikan tujuan utama"}
+      </Button>
+    );
+  }
+
+  function openMinimap() {
+    if (!currentScene?.levelId) {
+      showToast("err", "Simpan penempatan scene pada lantai terlebih dahulu.");
+      return;
+    }
+    const view = editorRef.current?.getView();
+    setMinimapCalibration({
+      sceneId: currentScene.sceneId,
+      levelId: currentScene.levelId,
+      sceneTitle: currentScene.title,
+      yaw: view && Number.isFinite(view.yaw) ? view.yaw : null,
+    });
+  }
+
   return (
     <div className="cms-vt-editor flex h-full min-h-0 w-full flex-col overflow-hidden">
       <EditorToolbar
@@ -2017,6 +2125,9 @@ export default function VirtualTourEditorPage() {
         onUndo={undo}
         onRedo={redo}
         onOpenConnectionMap={() => setShowConnectionMap(true)}
+        onOpenFloorplan={!isPreview && station ? () => setFloorplanOpen(true) : undefined}
+        onOpenMinimap={!isPreview && currentScene?.panoramaUrl && station
+          ? openMinimap : undefined}
         onTogglePreview={() => {
           setPreviewEntryView(null);
           setIsPreview((p) => !p);
@@ -2139,7 +2250,7 @@ export default function VirtualTourEditorPage() {
                 onBlurDelete={handleBlurDelete}
                 spaces={stationSpaces.map((s) => ({ code: s.code, status: s.status }))}
                 scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
-                initialView={extractInitialViewFromCanvasData(currentScene.canvasData) ?? null}
+                initialView={linkedView?.sceneId === currentScene.sceneId ? linkedView.view : extractInitialViewFromCanvasData(currentScene.canvasData) ?? null}
                 privacyBlurGuideOnly={privacyBlurGuideOnly}
                 spatialEntities={spatialEnabled ? spatialEntities : []}
                 draftSpatialVertices={spatialEnabled ? draftSpatialVertices : []}
@@ -2273,6 +2384,9 @@ export default function VirtualTourEditorPage() {
                 </div>
                 <SpatialAreaInspector
                   entity={selectedSpatial}
+                  primaryHotspotControl={selectedSpatial?.action.type === "unit_detail"
+                    ? primaryHotspotControl("spatial", selectedSpatial.spaceCode, selectedSpatial.id)
+                    : undefined}
                   draftVertexCount={draftSpatialVertices.length}
                   draftWarning={draftSpatialWarning}
                   pendingSiblingUnitCode={pendingSpatialUnitLink?.spaceCode ?? null}
@@ -2381,11 +2495,18 @@ export default function VirtualTourEditorPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs text-[var(--work-text)]">Arah kamera awal scene</Label>
+                    <Label className="text-xs text-[var(--work-text)]">Arah bawaan scene</Label>
                     <Button type="button" variant="outline" size="sm" disabled={isPreview} onClick={handleSetInitialView} className="w-full text-xs">
                       Gunakan arah kamera saat ini
                     </Button>
                   </div>
+
+                  <IncomingSceneViews key={currentScene.sceneId} destination={currentScene} scenes={scenes} outgoingHotspots={hotspots}
+                    endpoint={`/api/cms/virtual-tour/${encodeURIComponent(stationId)}/arrival-views`} disabled={isPreview || saving}
+                    onSaved={(sourceId, savedHotspots, hasOverride) => {
+                      setScenes(previous => previous.map(scene => scene.sceneId === sourceId ? { ...scene, hotspots: savedHotspots } : scene));
+                      showToast("ok", hasOverride ? "Arah tiba disimpan." : "Koneksi kembali memakai arah bawaan.");
+                    }} />
 
                   {/* Connection info */}
                   <div className="bg-[var(--work-surface)]/60 rounded-lg px-3 py-2 text-xs text-[var(--work-muted)] space-y-1">
@@ -2401,18 +2522,18 @@ export default function VirtualTourEditorPage() {
                     })()}
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <ArrowRightLeft className="h-3 w-3" /> Mengarah ke
+                        <ArrowRightLeft className="h-3 w-3" /> Panah keluar
                       </span>
                       <span className="text-[var(--work-muted)]">
-                        {hotspots.filter((h) => h.type === "scene").length} scene
+                        {hotspots.filter((h) => h.type === "scene").length}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <Link2 className="h-3 w-3" /> Ditautkan dari
+                        <Link2 className="h-3 w-3" /> Panah masuk
                       </span>
                       <span className="text-[var(--work-muted)]">
-                        {incomingMap.get(currentScene.sceneId) ?? 0} scene
+                        {incomingMap.get(currentScene.sceneId) ?? 0}
                       </span>
                     </div>
                   </div>
@@ -3043,6 +3164,7 @@ export default function VirtualTourEditorPage() {
                         placeholder="Cari unit retail…"
                         onChange={(code, space) => assignHotspotSpace(code, space.name)}
                       />
+                      {primaryHotspotControl("pin", selectedHotspot.spaceCode, selectedHotspot.pinId)}
                       {selectedHotspot.spaceCode &&
                         !stationSpaces.some((s) => s.code === selectedHotspot.spaceCode) && (
                           <p className="mt-2 flex items-center gap-1 text-xs text-amber-400">
@@ -3814,11 +3936,29 @@ export default function VirtualTourEditorPage() {
         onDelete={deleteLevel}
       />
 
-      {entryViewSelection && <SceneEntryViewDialog selection={entryViewSelection} onClose={() => setEntryViewSelection(null)} onApply={(view) => {
-        setHotspotEntryView(entryViewSelection.hotspotId, entryViewSelection.sceneId, view);
-        setEntryViewSelection(null);
-        showToast("ok", "Arah tiba diterapkan. Klik Simpan untuk menyimpan koneksi.");
-      }} />}
+      {entryViewSelection && <SceneEntryViewDialog
+        selection={entryViewSelection}
+        onClose={() => setEntryViewSelection(null)}
+        onApply={(view) => {
+          setHotspotEntryView(entryViewSelection.hotspotId, entryViewSelection.sceneId, view);
+          setEntryViewSelection(null);
+          showToast("ok", "Arah tiba diterapkan. Klik Simpan untuk menyimpan koneksi.");
+        }}
+      />}
+      {minimapCalibration && (
+        <StationMinimapCalibration stationId={stationId} selection={minimapCalibration}
+          onClose={() => setMinimapCalibration(null)} onSave={() => {
+            setMinimapCalibration(null);
+            showToast("ok", "Minimap disimpan.");
+          }} />
+      )}
+      {floorplanOpen && (
+        <StationFloorplanEditor
+          stationId={stationId}
+          open={floorplanOpen}
+          onClose={() => setFloorplanOpen(false)}
+        />
+      )}
       <ConnectionMapDialog
         open={showConnectionMap}
         onClose={() => setShowConnectionMap(false)}
@@ -3837,22 +3977,7 @@ export default function VirtualTourEditorPage() {
       />
 
       {/* ── Toast ───────────────────────────────────────────────────────── */}
-      {toast && (
-        <div
-          className={`fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 rounded-xl shadow-2xl border text-sm font-medium z-[100] transition-all ${
-            toast.type === "ok"
-              ? "bg-emerald-900 border-emerald-700 text-[var(--work-success)]"
-              : "bg-red-900 border-red-700 text-red-200"
-          }`}
-        >
-          {toast.type === "ok" ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-          ) : (
-            <AlertCircle className="h-4 w-4 shrink-0" />
-          )}
-          {toast.msg}
-        </div>
-      )}
+      <EditorNotice notice={notice} />
       {confirmElement}
     </div>
   );

@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   LogOut,
   Map,
+  Globe2,
   Store,
   Users,
   UserCircle,
@@ -86,6 +87,7 @@ const navGroups: NavGroup[] = [
         adminOnly: true,
       },
       { href: "/cms/users", label: "Users", icon: Users, adminOnly: true },
+      { href: "/cms/tour-translations", label: "Terjemahan Tur", icon: Globe2, adminOnly: true },
       { href: "/cms/settings", label: "Pengaturan Sistem", icon: Sliders, adminOnly: true },
     ],
   },
@@ -372,7 +374,7 @@ export default function CmsShell({
       </aside>
 
       <main className="cms-light relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="relative z-20 border-b border-slate-200 bg-white">
+        <header className="@container relative z-20 border-b border-slate-200 bg-white">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
             <button
               type="button"

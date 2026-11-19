@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,8 +30,15 @@ export type ConfirmDialogOptions = {
 export function useConfirmDialog() {
   const [options, setOptions] = useState<ConfirmDialogOptions | null>(null);
   const resolver = useRef<((value: boolean) => void) | null>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => () => {
+    resolver.current?.(false);
+    resolver.current = null;
+  }, []);
 
   const confirmDialog = useCallback((next: ConfirmDialogOptions) => {
+    resolver.current?.(false);
     setOptions(next);
     return new Promise<boolean>((resolve) => {
       resolver.current = resolve;
@@ -51,15 +58,21 @@ export function useConfirmDialog() {
         if (!open) settle(false);
       }}
     >
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{options?.title}</DialogTitle>
+      <DialogContent role="alertdialog" overlayClassName="z-[110]" className="z-[111] max-w-md gap-5 border border-slate-200 bg-white p-5 text-slate-900 sm:p-6"
+        {...(!options?.description ? { "aria-describedby": undefined } : {})}
+        onOpenAutoFocus={event => {
+          event.preventDefault();
+          cancelButton.current?.focus();
+        }}
+        onPointerDownOutside={event => event.preventDefault()}>
+        <DialogHeader className="gap-2 space-y-0 text-left">
+          <DialogTitle className="pr-9 text-base leading-snug text-slate-900 sm:text-lg">{options?.title}</DialogTitle>
           {options?.description && (
-            <DialogDescription>{options.description}</DialogDescription>
+            <DialogDescription className="leading-relaxed text-slate-600">{options.description}</DialogDescription>
           )}
         </DialogHeader>
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => settle(false)}>
+        <DialogFooter className="flex-row flex-wrap justify-end gap-2 sm:space-x-0">
+          <Button ref={cancelButton} type="button" variant="ghost" className="px-3 sm:px-4" onClick={() => settle(false)}>
             {options?.cancelLabel ?? "Batal"}
           </Button>
           <Button

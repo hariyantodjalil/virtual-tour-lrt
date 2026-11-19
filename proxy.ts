@@ -68,7 +68,7 @@ export function proxy(request: NextRequest) {
   if (pathname.startsWith("/cms")) {
     if (!cookiePayload) {
       const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("redirect", pathname);
+      loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
       const response = NextResponse.redirect(loginUrl);
       if (cookieToken) response.cookies.delete("cms-token");
       return response;
@@ -83,7 +83,7 @@ export function proxy(request: NextRequest) {
   if (pathname.startsWith("/partner")) {
     if (!cookiePayload) {
       const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("redirect", pathname);
+      loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
       const response = NextResponse.redirect(loginUrl);
       if (cookieToken) response.cookies.delete("cms-token");
       return response;

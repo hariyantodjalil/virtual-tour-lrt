@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell, UserCircle, X } from "lucide-react";
 
@@ -47,6 +47,12 @@ function timeAgo(iso: string) {
  */
 export default function CmsNotifications() {
   const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  function close() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
   const [leads, setLeads] = useState<LeadNotif[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(loadReadIds);
   const [loaded, setLoaded] = useState(false);
@@ -101,13 +107,15 @@ export default function CmsNotifications() {
   };
 
   return (
-    <div className="relative">
+    <div className="relative" onKeyDown={event => { if (open && event.key === "Escape") close(); }}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--work-line)] bg-[var(--work-surface)] text-[var(--work-text)] transition hover:border-[#E31E2D]/40 hover:bg-[#E31E2D] hover:text-white"
         aria-label="Notifikasi"
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
@@ -122,17 +130,18 @@ export default function CmsNotifications() {
           <button
             type="button"
             className="fixed inset-0 z-40 cursor-default"
-            aria-label="Tutup notifikasi"
-            onClick={() => setOpen(false)}
+            tabIndex={-1}
+            aria-hidden="true"
+            onClick={close}
           />
-          <div className="absolute top-full right-0 z-50 mt-2 w-[min(100vw-2rem,22rem)] overflow-hidden rounded-2xl border border-[var(--work-line)] bg-[var(--work-subtle)] shadow-2xl shadow-black/50">
-            <div className="flex items-center justify-between border-b border-[var(--work-line)] px-4 py-3">
+          <section id={panelId} aria-label="Notifikasi" className="absolute top-full right-0 z-50 mt-2 flex max-h-[calc(100dvh-5.5rem)] w-[min(calc(100cqw-2rem),22rem)] flex-col overflow-hidden rounded-xl border border-[var(--work-line)] bg-[var(--work-surface)] shadow-xl shadow-slate-900/15">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-1 border-b border-[var(--work-line)] px-3 py-2">
               <div>
                 <p className="text-sm font-bold text-[var(--work-text)]">Notifikasi</p>
-                <p className="text-[11px] text-[var(--work-muted)]">
+                <p className="text-xs text-[var(--work-muted)]">
                   {loaded
                     ? unreadCount > 0
-                      ? `${unreadCount} lead baru belum dibaca`
+                      ? `${unreadCount} belum dibaca`
                       : "Tidak ada lead baru"
                     : "Memuat..."}
                 </p>
@@ -142,15 +151,15 @@ export default function CmsNotifications() {
                   <button
                     type="button"
                     onClick={markAllRead}
-                    className="rounded-lg px-2 py-1 text-[11px] font-semibold text-[var(--work-accent)] transition hover:bg-[var(--work-subtle)]"
+                    className="min-h-9 rounded-lg px-2 text-xs font-semibold text-[var(--work-accent)] transition hover:bg-[var(--work-subtle)]"
                   >
                     Tandai dibaca
                   </button>
                 )}
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-lg p-1.5 text-[var(--work-muted)] transition hover:bg-[var(--work-subtle)] hover:text-[var(--work-text)]"
+                  onClick={close}
+                  className="grid size-9 place-items-center rounded-lg text-[var(--work-muted)] transition hover:bg-[var(--work-subtle)] hover:text-[var(--work-text)]"
                   aria-label="Tutup"
                 >
                   <X className="h-4 w-4" />
@@ -158,7 +167,7 @@ export default function CmsNotifications() {
               </div>
             </div>
 
-            <ul className="max-h-[min(60vh,22rem)] overflow-y-auto">
+            <ul className="min-h-0 max-h-[22rem] overflow-y-auto overscroll-contain">
               {leads.length === 0 && loaded && (
                 <li className="px-4 py-10 text-center text-sm text-[var(--work-muted)]">
                   Belum ada notifikasi lead baru.
@@ -177,7 +186,7 @@ export default function CmsNotifications() {
                         setOpen(false);
                       }}
                       className={`flex gap-3 px-4 py-3 transition hover:bg-[var(--work-subtle)] ${
-                        isUnread ? "bg-[#E31E2D]/[0.08]" : ""
+                        isUnread ? "bg-red-50/60" : ""
                       }`}
                     >
                       <span
@@ -217,7 +226,7 @@ export default function CmsNotifications() {
               })}
             </ul>
 
-            <div className="border-t border-[var(--work-line)] p-2">
+            <div className="shrink-0 border-t border-[var(--work-line)] p-2">
               <Link
                 href="/cms/leads"
                 onClick={() => setOpen(false)}
@@ -226,7 +235,7 @@ export default function CmsNotifications() {
                 Buka semua leads
               </Link>
             </div>
-          </div>
+          </section>
         </>
       )}
     </div>

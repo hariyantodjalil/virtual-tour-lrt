@@ -21,6 +21,7 @@ type SpaceOpt = {
 
 type Props = {
   entity: SpatialEntity | null;
+  primaryHotspotControl?: ReactNode;
   draftVertexCount: number;
   draftWarning?: string | null;
   /** Info draft “sisi lain” yang sedang digambar untuk unit yang sama. */
@@ -63,6 +64,7 @@ function Section({
 
 export function SpatialAreaInspector({
   entity,
+  primaryHotspotControl,
   draftVertexCount,
   draftWarning = null,
   pendingSiblingUnitCode = null,
@@ -226,6 +228,7 @@ export function SpatialAreaInspector({
               });
             }}
           />
+          {primaryHotspotControl}
           {spaceCode && siblingFaceCount > 0 && (
             <p className="text-[10px] text-[var(--work-success)]/90">
               {siblingFaceCount} sisi
