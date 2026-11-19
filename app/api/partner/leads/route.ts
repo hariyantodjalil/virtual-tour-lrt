@@ -10,6 +10,7 @@ import { z } from "zod";
 import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/rate-limit";
 import { trainLeadRequirement } from "@/lib/train-rental-spaces";
 import { inquiryCreationData, partnerInquiryInclude, toPartnerInquiry } from "@/lib/partner-inquiries";
+import { publishInquiryEvent } from "@/lib/realtime-events";
 
 const partnerLeadSchema = z
   .object({
@@ -157,5 +158,10 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  void publishInquiryEvent({
+    kind: "lead-created",
+    leadId: lead.id,
+    userId: lead.userId,
+  });
   return NextResponse.json(lead, { status: 201, headers: rateLimitHeaders(rateLimit) });
 }

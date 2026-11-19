@@ -1,7 +1,7 @@
 "use client";
 
 import { TourLanguageToggle, useTourLanguage } from "@/components/tour/TourLanguageProvider";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -38,6 +38,8 @@ import {
   type FavoriteSpace,
 } from "@/lib/favorite-spaces";
 import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
+import { PARTNER_LEADS_UPDATED_EVENT } from "@/lib/inquiry-sync-events";
+import { useInquiryRealtimeSync } from "@/components/realtime/useInquiryRealtimeSync";
 
 type User = {
   id: string;
@@ -88,6 +90,27 @@ export default function PartnerPage() {
       window.removeEventListener("storage", refreshFavorites);
     };
   }, []);
+
+  const refreshLeadsAndTenancies = useCallback(async () => {
+    try {
+      const [leadsRes, tenanciesRes] = await Promise.all([
+        fetch("/api/partner/leads", { cache: "no-store" }),
+        fetch("/api/partner/tenancies", { cache: "no-store" }),
+      ]);
+      if (leadsRes.ok) setLeads(await leadsRes.json());
+      if (tenanciesRes.ok) setTenancies(await tenanciesRes.json());
+    } catch {
+      // Pertahankan state sebelumnya.
+    }
+  }, []);
+
+  useInquiryRealtimeSync({
+    enabled: true,
+    localEvents: [PARTNER_LEADS_UPDATED_EVENT],
+    onSync: async () => {
+      await refreshLeadsAndTenancies();
+    },
+  });
 
   useEffect(() => {
     async function load() {
@@ -198,13 +221,13 @@ export default function PartnerPage() {
         </Link>
 
         <div className="flex items-center gap-2 md:gap-3">
-          <TourLanguageToggle />
+          <TourLanguageToggle tone="brand" />
           <Link
             href="/"
             target="_blank"
             rel="noopener noreferrer"
             aria-label={t("Beranda")}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:px-3 sm:text-sm"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:px-3 sm:text-sm"
           >
             <Home className="size-3.5 shrink-0" aria-hidden />
             <span className="hidden sm:inline">{t("Beranda")}</span>
@@ -215,7 +238,7 @@ export default function PartnerPage() {
             onClick={openStationPicker}
             aria-label={t("Buka Virtual Tour")}
             disabled={pickerStations.length === 0}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-60 sm:px-3 sm:text-sm"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-60 sm:px-3 sm:text-sm"
           >
             <Glasses className="size-3.5 shrink-0" aria-hidden />
             <span className="hidden sm:inline">Virtual Tour</span>
@@ -307,14 +330,14 @@ export default function PartnerPage() {
 
             <div className="flex items-center justify-center gap-3 px-1 pb-1">
               <Image
-                src="/brand/landing/logo-kai-nav.png"
+                src="/brand/landing/logo-kai-footer.png"
                 alt="KAI"
                 width={72}
                 height={28}
                 className="h-7 w-auto object-contain"
               />
               <Image
-                src="/brand/landing/logo-lrt-nav.png"
+                src="/brand/landing/logo-lrt-footer.png"
                 alt="LRT Jabodebek"
                 width={80}
                 height={28}

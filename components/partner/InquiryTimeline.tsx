@@ -11,6 +11,7 @@ import {
   SITE_VISIT_STATUS_LABELS,
   type CommercialSiteVisitStatus,
 } from "@/lib/commercial-pipeline";
+import { notifyCmsLeadsUpdated, notifyPartnerLeadsUpdated } from "@/lib/inquiry-sync-events";
 
 /** Always render the six public milestones, never historical CMS workflow steps. */
 export default function InquiryTimeline({ status, compact = false }: { status: string; compact?: boolean }) {
@@ -129,22 +130,97 @@ export function InquirySiteVisit({ id, status, siteVisitStatus, scheduledAt, pre
     try {
       const response = await fetch(`/api/partner/inquiries/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ surveyPreference: value.trim() }) });
       if (!response.ok) { const data = await response.json().catch(() => null); throw new Error(data?.error || "Permintaan belum terkirim. Silakan coba lagi."); }
-      setSubmitted(true); router.refresh();
+      setSubmitted(true);
+      notifyPartnerLeadsUpdated();
+      notifyCmsLeadsUpdated();
+      router.refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Permintaan belum terkirim. Silakan coba lagi."); }
     finally { setPending(false); }
   }
-  return <section className="rounded-2xl border border-slate-200 bg-white p-5">
-    <h2 className="flex items-center gap-2 font-semibold"><CalendarDays aria-hidden="true" className="size-5 text-[#c41230]" />{t("Site visit · Negosiasi")}</h2>
-    <p className="mt-2 text-sm leading-relaxed text-slate-600">{t("Kunjungan lokasi merupakan bagian dari negosiasi, bukan tahapan terpisah.")}</p>
-    {(siteVisitStatus !== "NONE" || submitted) && <p role="status" className="mt-3 text-sm font-medium">{submitted ? t("Permintaan site visit terkirim") : t(SITE_VISIT_STATUS_LABELS[siteVisitStatus as CommercialSiteVisitStatus] ?? siteVisitStatus)}</p>}
-    {scheduledAt && <p className="mt-2 text-sm">{new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(new Date(scheduledAt))} {t("WIB")}</p>}
-    {preference && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-600">{t("Preferensi:")} {preference}</p>}
-    {canRequest && <form onSubmit={submit} className="mt-4">
-      <label htmlFor="survey-preference" className="block text-sm font-medium">{t("Preferensi waktu kunjungan")}</label>
-      <textarea id="survey-preference" required minLength={3} maxLength={500} rows={3} value={value} onChange={event => setValue(event.target.value)} placeholder={t("Tuliskan hari, waktu, dan kebutuhan kunjungan Anda")} className="mt-2 w-full rounded-lg border border-slate-300 p-3 text-sm focus-visible:outline-2 focus-visible:outline-[#c41230]" />
-      <p className="mt-1 text-xs text-slate-600">{t("Tim komersial akan mengonfirmasi jadwal kunjungan.")}</p>
-      {error && <p role="alert" className="mt-3 text-sm text-red-700">{t(error)}</p>}
-      <button type="submit" disabled={pending || value.trim().length < 3} className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#c41230] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a80f29] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230] disabled:opacity-50">{pending && <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />}{pending ? t("Mengirim…") : t("Ajukan site visit")}</button>
-    </form>}
-  </section>;
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 text-[#101828] md:p-5">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-[#101828]">
+        <CalendarDays aria-hidden="true" className="size-4 shrink-0 text-[#c41230]" />
+        {t("Site visit · Negosiasi")}
+      </h2>
+      <p className="mt-2 text-sm leading-relaxed text-slate-600">
+        {t("Kunjungan lokasi merupakan bagian dari negosiasi, bukan tahapan terpisah.")}
+      </p>
+
+      {(siteVisitStatus !== "NONE" || submitted) && (
+        <p role="status" className="mt-3 text-sm font-medium text-[#101828]">
+          {submitted
+            ? t("Permintaan site visit terkirim")
+            : t(
+                SITE_VISIT_STATUS_LABELS[
+                  siteVisitStatus as CommercialSiteVisitStatus
+                ] ?? siteVisitStatus
+              )}
+        </p>
+      )}
+      {scheduledAt && (
+        <p className="mt-2 text-sm tabular-nums text-slate-700">
+          {new Intl.DateTimeFormat(locale, {
+            dateStyle: "long",
+            timeStyle: "short",
+            timeZone: "Asia/Jakarta",
+          }).format(new Date(scheduledAt))}{" "}
+          {t("WIB")}
+        </p>
+      )}
+      {preference && (
+        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-700">
+          <span className="font-medium text-[#101828]">{t("Preferensi:")}</span>{" "}
+          {preference}
+        </p>
+      )}
+
+      {canRequest && (
+        <form onSubmit={submit} className="mt-4 space-y-3">
+          <div>
+            <label
+              htmlFor="survey-preference"
+              className="mb-1.5 block text-sm font-medium text-[#101828]"
+            >
+              {t("Preferensi waktu kunjungan")}
+            </label>
+            <textarea
+              id="survey-preference"
+              required
+              minLength={3}
+              maxLength={500}
+              rows={3}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              placeholder={t(
+                "Tuliskan hari, waktu, dan kebutuhan kunjungan Anda"
+              )}
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#101828] shadow-sm placeholder:text-slate-400 focus-visible:border-[#c41230] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c41230]/25"
+            />
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+              {t("Tim komersial akan mengonfirmasi jadwal kunjungan.")}
+            </p>
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-red-700">
+              {t(error)}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={pending || value.trim().length < 3}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#c41230] px-4 text-sm font-medium text-white hover:bg-[#a80f29] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c41230]/25 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {pending && (
+              <LoaderCircle
+                aria-hidden="true"
+                className="size-4 animate-spin motion-reduce:animate-none"
+              />
+            )}
+            {pending ? t("Mengirim…") : t("Ajukan site visit")}
+          </button>
+        </form>
+      )}
+    </section>
+  );
 }

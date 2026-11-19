@@ -6,6 +6,7 @@ import { consumeRateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { partnerInquiryInclude, toPartnerInquiry } from "@/lib/partner-inquiries";
+import { publishInquiryEvent } from "@/lib/realtime-events";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireRole(request, ["MITRA"]);
@@ -40,6 +41,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return { ok: true };
     }, { isolationLevel: "Serializable" });
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+    void publishInquiryEvent({
+      kind: "lead-updated",
+      leadId: id,
+      userId: auth.user.userId,
+    });
     return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") return NextResponse.json({ error: "Pengajuan sedang diperbarui. Muat ulang lalu coba lagi." }, { status: 409 });

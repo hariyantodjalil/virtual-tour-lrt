@@ -12,6 +12,7 @@ import { requireRole } from "@/lib/auth";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/rate-limit";
 import { trainLeadRequirement } from "@/lib/train-rental-spaces";
+import { publishInquiryEvent } from "@/lib/realtime-events";
 
 const leadSchema = z.object({
   spaceId: z.string().trim().min(1).max(128).optional(),
@@ -140,6 +141,11 @@ export async function POST(req: NextRequest) {
         spaceId: commercialSpaceId, eventType: "FORM_SUBMIT", sessionId: getClientIdentifier(req),
       } });
     }
+    void publishInquiryEvent({
+      kind: "lead-created",
+      leadId: lead.id,
+      userId: lead.userId,
+    });
     return NextResponse.json(lead, { status: 201, headers: rateLimitHeaders(rateLimit) });
   } catch (error) {
     console.error("[api/leads POST]", error);
