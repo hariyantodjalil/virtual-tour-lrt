@@ -8,6 +8,8 @@ type AliasIndex = { map: Map<string, string>; builtAt: number };
 
 let index: AliasIndex | undefined;
 let building: Promise<AliasIndex> | undefined;
+/** Pyramid yang baru diunggah di proses ini, sebelum canvasData-nya tersimpan ke DB. */
+const registered = new Map<string, string>();
 
 function collectBasePaths(node: unknown, out: Set<string>) {
   if (!node || typeof node !== "object") return;
@@ -42,8 +44,15 @@ function rebuild(): Promise<AliasIndex> {
   return building;
 }
 
+export function registerTileAlias(basePath: string) {
+  const normalized = normalizeTileBasePath(basePath);
+  registered.set(tileAliasId(normalized), normalized);
+}
+
 /** Resolve alias id → basePath tile di S3, dari canvasData scene stasiun & kereta. */
 export async function resolveTileAlias(id: string): Promise<string | undefined> {
+  const fresh = registered.get(id);
+  if (fresh) return fresh;
   const now = Date.now();
   if (!index) await rebuild();
   else if (now - index.builtAt > FRESH_MS) void rebuild().catch(() => undefined);

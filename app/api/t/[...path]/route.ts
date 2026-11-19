@@ -4,7 +4,7 @@ import { getBucketName, getS3Client } from "@/lib/s3";
 import { resolveTileAlias } from "@/lib/panorama-tile-alias";
 import { TILE_ALIAS_ID_PATTERN } from "@/lib/panorama-tile-path";
 
-const TILE_KEY_PREFIXES = ["virtual-tour/panorama-tiles/", "virtual-tour/pt/"];
+const TILE_KEY_PREFIX = "virtual-tour/panorama-tiles/";
 
 function notFound() {
   return new NextResponse("Resource not found", { status: 404 });
@@ -29,7 +29,7 @@ export async function GET(
     const basePath = await resolveTileAlias(id);
     if (!basePath) return notFound();
     const key = `${basePath.replace(/^\//, "")}/${level}/${file}`;
-    if (!TILE_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) return notFound();
+    if (!key.startsWith(TILE_KEY_PREFIX)) return notFound();
 
     const object = await getS3Client().send(new GetObjectCommand({ Bucket: getBucketName(), Key: key }));
     const stream = object.Body?.transformToWebStream();

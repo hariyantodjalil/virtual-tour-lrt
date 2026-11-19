@@ -78,7 +78,6 @@ export function isPanoramaTileUrl(url: string): boolean {
     const parsed = new URL(url, location.href);
     return parsed.origin === location.origin && (
       parsed.pathname.startsWith("/api/s3-proxy/virtual-tour/panorama-tiles/") ||
-      parsed.pathname.startsWith("/api/s3-proxy/virtual-tour/pt/") ||
       parsed.pathname.startsWith("/api/t/")
     );
   } catch { return false; }

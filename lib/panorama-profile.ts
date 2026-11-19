@@ -1,5 +1,3 @@
-import { isProdWafSafeTileBasePath } from "./panorama-tile-path";
-
 /** Browser-safe metadata shared by the uploader and public viewer. */
 export type PannellumMultiRes = {
   basePath: string;
@@ -36,11 +34,6 @@ export function extractMultiResProfilesFromCanvasData(value: unknown): PanoramaM
       isPannellumMultiRes(p.mobile) && p.desktop.tileResolution === 1024 && p.mobile.tileResolution === 512) {
     return p as PanoramaMultiResProfiles;
   }
-}
-
-/** Path tile yang lolos WAF VIP prod: panjang sample face key ≤ 86. */
-export function isWafSafePanoramaBasePath(basePath: string | undefined): boolean {
-  return isProdWafSafeTileBasePath(basePath);
 }
 
 export function selectSceneMultiRes(

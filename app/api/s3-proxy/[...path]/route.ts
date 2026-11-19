@@ -57,7 +57,6 @@ function validateS3Key(pathSegments: string[]): string | null {
 const PUBLIC_PREFIXES = [
   "virtual-tour/panoramas/",
   "virtual-tour/panorama-tiles/",
-  "virtual-tour/pt/", // short multires tiles (WAF path-length safe)
   "virtual-tour/thumbnails/",
   "virtual-tour/floorplans/",
   "virtual-tour/ad-creatives/",
