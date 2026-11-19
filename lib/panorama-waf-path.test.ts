@@ -3,9 +3,9 @@ import { describe, it } from "node:test";
 import {
   isPanoramaMultiresBlockedByEdge,
   isWafSafePanoramaBasePath,
-  newPanoramaTileRevisionId,
   selectSceneMultiRes,
 } from "./panorama-profile";
+import { newPanoramaTileRevisionId } from "./panorama-tile-revision";
 
 const base = {
   path: "/%l/%s%y_%x" as const,

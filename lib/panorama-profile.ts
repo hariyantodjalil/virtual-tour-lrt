@@ -1,5 +1,3 @@
-import { randomBytes } from "node:crypto";
-
 /** Browser-safe metadata shared by the uploader and public viewer. */
 export type PannellumMultiRes = {
   basePath: string;
@@ -60,25 +58,6 @@ export function isWafSafePanoramaBasePath(basePath: string | undefined): boolean
   if (!basePath || UUID_IN_PATH.test(basePath)) return false;
   if (isPanoramaMultiresBlockedByEdge()) return false;
   return true;
-}
-
-/**
- * Segment revisi di S3 untuk pyramid tile — dipakai lokal/DEV/prod.
- * Sengaja tanpa pola UUID bertanda hubung agar lolos WAF VIP publik prod.
- * Contoh: `tk1abc2def34` atau `hdtk1abc2def34`.
- */
-export function newPanoramaTileRevisionId(
-  kind: "economy" | "hd" = "economy",
-  now = Date.now(),
-  entropy: Uint8Array = randomBytes(5),
-): string {
-  const hex = Buffer.from(entropy).toString("hex");
-  const body = `t${now.toString(36)}${hex}`;
-  const id = kind === "hd" ? `hd${body}` : body;
-  if (!isWafSafePanoramaBasePath(`/${id}`) || !/^[a-z0-9]+$/i.test(id)) {
-    throw new Error("generated panorama tile revision id is not WAF-safe");
-  }
-  return id;
 }
 
 export function selectSceneMultiRes(

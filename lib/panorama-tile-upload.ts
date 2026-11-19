@@ -1,10 +1,7 @@
 import { uploadToS3 } from "@/lib/s3";
 import { buildPanoramaTiles, multiResConfig, type PannellumMultiRes } from "@/lib/panorama-multires";
-import {
-  newPanoramaTileRevisionId,
-  type PanoramaMultiResProfiles,
-  type PanoramaMultiResProfilesHd,
-} from "./panorama-profile";
+import type { PanoramaMultiResProfiles, PanoramaMultiResProfilesHd } from "./panorama-profile";
+import { newPanoramaTileRevisionId } from "./panorama-tile-revision";
 import sharp from "sharp";
 
 function safeSegment(value: string) {
