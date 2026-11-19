@@ -288,7 +288,7 @@ export default function PartnerPage() {
 
       <div className="flex min-h-screen pt-14">
         {/* Sidebar */}
-        <aside className="fixed top-14 bottom-0 left-0 z-30 hidden w-[240px] flex-col border-r border-slate-200 bg-white md:flex">
+        <aside className="fixed top-14 bottom-0 left-0 z-30 hidden w-[240px] flex-col border-r border-slate-200 bg-white lg:flex">
           <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4" aria-label={t("Menu mitra")}>
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
@@ -314,9 +314,6 @@ export default function PartnerPage() {
           <div className="space-y-4 border-t border-slate-100 p-4">
             <div className="rounded-xl bg-[#c41230]/[0.06] p-3.5">
               <p className="text-sm font-semibold text-[#101828]">{t("Butuh Bantuan?")}</p>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                {t("Tim komersial siap membantu proses sewa Anda.")}
-              </p>
               <a
                 href={contactWhatsAppUrl}
                 target="_blank"
@@ -348,7 +345,7 @@ export default function PartnerPage() {
         </aside>
 
         {/* Main */}
-        <main className="min-w-0 flex-1 md:ml-[240px]">
+        <main className="min-w-0 flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:ml-[240px] lg:pb-0">
           <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
             {activeNav === "pengajuan" ? (
               <ApplicationsSection
@@ -380,14 +377,7 @@ export default function PartnerPage() {
                 onUserUpdated={setUser}
               />
             ) : activeNav === "bantuan" ? (
-              <HelpSection
-                displayName={displayName}
-                contactWhatsAppUrl={contactWhatsAppUrl}
-                teamName={commercialProfile.teamName}
-                onOpenPengajuan={() => setActiveNav("pengajuan")}
-                onOpenTour={openStationPicker}
-                tourReady={pickerStations.length > 0}
-              />
+              <HelpSection contactWhatsAppUrl={contactWhatsAppUrl} teamName={commercialProfile.teamName} />
             ) : null}
           </div>
         </main>
@@ -395,10 +385,10 @@ export default function PartnerPage() {
 
       {/* Mobile bottom nav */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white px-2 py-2 md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden"
         aria-label={t("Menu mitra mobile")}
       >
-        {NAV_ITEMS.slice(0, 4).map((item) => {
+        {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = activeNav === item.id;
           return (
@@ -406,7 +396,8 @@ export default function PartnerPage() {
               key={item.id}
               type="button"
               onClick={() => onNavClick(item.id)}
-              className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 text-[10px] font-medium ${
+              aria-current={active ? "page" : undefined}
+              className={`flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-[10px] font-medium ${
                 active ? "text-[#c41230]" : "text-slate-500"
               }`}
             >
@@ -444,9 +435,6 @@ function FavoritesSection({
           <h1 className="text-2xl font-bold tracking-tight text-[#101828] md:text-[28px]">
             {t("Unit Favorit")}
           </h1>
-          <p className="mt-1 max-w-xl text-sm text-slate-500">
-            {t("Unit yang Anda simpan dari virtual tour akan muncul di sini.")}
-          </p>
         </div>
         <button
           type="button"
@@ -461,25 +449,11 @@ function FavoritesSection({
 
       <section className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {favorites.length === 0 ? (
-          <div className="grid items-center gap-6 p-6 md:grid-cols-[minmax(0,280px)_1fr] md:gap-10 md:p-8">
-            <div className="relative mx-auto flex aspect-[4/3] w-full max-w-[280px] items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-[#c41230]/10 to-slate-100">
-              <Heart className="size-16 text-[#c41230]/35" />
-            </div>
-            <div className="text-center md:text-left">
-              <h2 className="text-xl font-bold text-[#101828]">{t("Belum ada favorit.")}</h2>
-              <p className="mt-2 mx-auto max-w-md text-sm leading-relaxed text-slate-500 md:mx-0">
-                {t("Saat menjelajah virtual tour, ketuk tombol")} <strong>{t("Favorit")}</strong> {t("pada detail unit untuk menyimpannya di sini.")}
-              </p>
-              <button
-                type="button"
-                onClick={onExplore}
-                disabled={!pickerReady}
-                className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-[#c41230] px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
-              >
-                <Glasses className="size-4" />
-                {t("Cari Unit di Virtual Tour")}
-              </button>
-            </div>
+          <div className="px-5 py-8 text-center">
+            <h2 className="font-semibold text-[#101828]">{t("Belum ada favorit.")}</h2>
+            <p className="mx-auto mt-1 max-w-md text-sm leading-relaxed text-slate-600">
+              {t("Saat menjelajah virtual tour, ketuk tombol")} <strong>{t("Favorit")}</strong> {t("pada detail unit untuk menyimpannya di sini.")}
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">

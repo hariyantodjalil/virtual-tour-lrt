@@ -2,18 +2,16 @@
 
 import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useEffect, useMemo, useState } from "react";
+import { SegmentedControl, SegmentedControlItem } from "@ui-sdk/react/segmented-control";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { trainCampaignPeriod, type PublicTrainInquiry } from "@/lib/train-advertising-shared";
 import {
-  Building2,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
   Clock3,
   FileText,
-  Glasses,
   MapPin,
   Plus,
   XCircle,
@@ -125,7 +123,6 @@ export default function ApplicationsSection({
   pickerReady,
 }: Props) {
   const { t, locale, content } = useTourLanguage();
-  const router = useRouter();
   const [filter, setFilter] = useState<FilterTab>("semua");
   const [recommendations, setRecommendations] = useState<RecommendedSpace[]>([]);
   const [showAll, setShowAll] = useState(false);
@@ -181,9 +178,6 @@ export default function ApplicationsSection({
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#101828] md:text-3xl">
             {t("Pengajuan Sewa")}
           </h1>
-          <p className="mt-1 max-w-xl text-sm text-slate-500">
-            {t("Pantau progres, site visit, dan tindak lanjut pengajuan Anda.")}
-          </p>
         </div>
         <button
           type="button"
@@ -215,49 +209,28 @@ export default function ApplicationsSection({
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-[#101828]">{t("Pengajuan Saya")}</h2>
-            <p className="mt-0.5 text-sm text-slate-500">
-              {filtered.length} {t("pengajuan pada filter ini")}
-            </p>
-          </div>
-          <div
-            role="tablist"
+          <h2 className="text-lg font-bold text-[#101828]">{t("Pengajuan Saya")}</h2>
+          <SegmentedControl<FilterTab>
+            value={filter}
+            onValueChange={(next) => {
+              if (next === null) return;
+              setFilter(next);
+              setShowAll(false);
+            }}
             aria-label={t("Filter pengajuan")}
-            className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1"
+            className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 min-[480px]:grid-cols-4"
           >
-            {tabs.map((tab) => {
-              const active = filter === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => {
-                    setFilter(tab.id);
-                    setShowAll(false);
-                  }}
-                  className={cn(
-                    "inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230]",
-                    active
-                      ? "bg-white text-[#101828] shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                  )}
-                >
-                  {t(tab.label)}
-                  <span
-                    className={cn(
-                      "rounded-md px-1.5 py-0.5 text-xs tabular-nums",
-                      active ? "bg-slate-100 text-slate-700" : "bg-transparent text-slate-400"
-                    )}
-                  >
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+            {tabs.map((tab) => (
+              <SegmentedControlItem
+                key={tab.id}
+                value={tab.id}
+                className="flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-center text-xs font-semibold text-slate-600 hover:text-slate-900 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-[#c41230] data-checked:bg-white data-checked:text-slate-900 data-checked:shadow-sm"
+              >
+                {t(tab.label)}
+                <span className="tabular-nums text-slate-500">{tab.count}</span>
+              </SegmentedControlItem>
+            ))}
+          </SegmentedControl>
         </div>
 
         <div className="mt-5 space-y-3">
@@ -266,14 +239,10 @@ export default function ApplicationsSection({
               {t("Memuat pengajuan…")}
             </div>
           ) : visibleLeads.length === 0 ? (
-            <EmptyApplications onExplore={onExplore} pickerReady={pickerReady} filter={filter} />
+            <EmptyApplications filter={filter} />
           ) : (
             visibleLeads.map((lead) => (
-              <ApplicationCard
-                key={lead.id}
-                lead={lead}
-                onDetail={() => router.push(`/partner/inquiries/${encodeURIComponent(lead.id)}`)}
-              />
+              <ApplicationCard key={lead.id} lead={lead} />
             ))
           )}
         </div>
@@ -292,10 +261,9 @@ export default function ApplicationsSection({
         ) : null}
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+        <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="text-base font-bold text-[#101828]">{t("Rekomendasi untuk Anda")}</h3>
-          <p className="mt-0.5 text-sm text-slate-500">{t("Unit tersedia yang cocok untuk dijelajahi.")}</p>
           <div className="mt-4 space-y-3">
             {recommendations.slice(0, 3).map((space) => {
               const image = coverUrl(space.panoramaUrl);
@@ -304,8 +272,8 @@ export default function ApplicationsSection({
                   key={space.id}
                   className="flex gap-3 rounded-xl border border-slate-200 p-3"
                 >
-                  <div className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-slate-100">
-                    {image ? (
+                  {image ? (
+                    <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-slate-100 sm:size-16">
                       <Image
                         src={image}
                         alt={content(space.name)}
@@ -314,15 +282,11 @@ export default function ApplicationsSection({
                         className="object-cover"
                         unoptimized={image.startsWith("/api/")}
                       />
-                    ) : (
-                      <span className="flex h-full items-center justify-center text-slate-300">
-                        <Building2 className="size-5" aria-hidden />
-                      </span>
-                    )}
-                  </div>
+                    </div>
+                  ) : null}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-[#101828]">
-                      {space.code} — {content(space.name)}
+                    <p className="text-sm leading-snug font-semibold break-words text-[#101828]">
+                      {content(space.name)}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-slate-500">
                       {space.station.name} · {space.area} m²
@@ -348,9 +312,8 @@ export default function ApplicationsSection({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="text-base font-bold text-[#101828]">{t("Site Visit")}</h3>
-          <p className="mt-0.5 text-sm text-slate-500">{t("Jadwal dan status kunjungan lokasi.")}</p>
           {siteVisits.length > 0 ? (
             <ul className="mt-4 space-y-3">
               {siteVisits.slice(0, 4).map((lead) => (
@@ -379,9 +342,6 @@ export default function ApplicationsSection({
             <div className="mt-6 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
               <CalendarDays className="mx-auto size-8 text-slate-300" aria-hidden />
               <p className="mt-3 text-sm font-medium text-slate-600">{t("Belum ada permintaan site visit")}</p>
-              <p className="mt-1 text-xs text-slate-400">
-                {t("Preferensi kunjungan akan dijadwalkan admin setelah diajukan.")}
-              </p>
             </div>
           )}
         </section>
@@ -412,13 +372,7 @@ function SummaryStat({
   );
 }
 
-function ApplicationCard({
-  lead,
-  onDetail,
-}: {
-  lead: PartnerLead;
-  onDetail: () => void;
-}) {
+function ApplicationCard({ lead }: { lead: PartnerLead }) {
   const { t, locale, content } = useTourLanguage();
   const space = lead.space;
   const cover = coverUrl(lead.trainInquiry?.media?.imageUrl ?? space?.panoramaUrl);
@@ -438,9 +392,9 @@ function ApplicationCard({
 
   return (
     <article className="overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-slate-300">
-      <div className="flex flex-col md:flex-row">
-        <div className="relative h-36 shrink-0 bg-slate-100 md:h-auto md:w-28 lg:w-32">
-          {cover ? (
+      <div className="flex flex-col sm:flex-row">
+        {cover ? (
+          <div className="relative h-36 shrink-0 bg-slate-100 sm:h-auto sm:w-28 lg:w-32">
             <Image
               src={cover}
               alt={name}
@@ -449,12 +403,8 @@ function ApplicationCard({
               className="object-cover"
               unoptimized={cover.startsWith("/api/")}
             />
-          ) : (
-            <div className="flex h-full min-h-[9rem] items-center justify-center text-slate-300 md:min-h-full">
-              <Building2 className="size-7" aria-hidden />
-            </div>
-          )}
-        </div>
+          </div>
+        ) : null}
 
         <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-stretch lg:gap-0">
           <div className="min-w-0 flex-1 lg:pr-5">
@@ -476,17 +426,10 @@ function ApplicationCard({
               </time>
             </div>
 
-            <h3 className="mt-2 text-base font-bold leading-snug text-[#101828]">
-              {code ? (
-                <>
-                  <span className="font-semibold text-slate-500">{code}</span>
-                  <span className="mx-1.5 text-slate-300" aria-hidden>
-                    ·
-                  </span>
-                </>
-              ) : null}
-              {name}
-            </h3>
+            <h3 className="mt-2 text-base font-bold leading-snug break-words text-[#101828]">{name}</h3>
+            {code && code.toLowerCase() !== name.toLowerCase() ? (
+              <p className="mt-0.5 text-xs break-words text-slate-500">{code}</p>
+            ) : null}
 
             <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500">
               <span className="inline-flex items-center gap-1">
@@ -530,14 +473,13 @@ function ApplicationCard({
                 <InquiryTimeline status={lead.status} compact />
               )}
             </div>
-            <button
-              type="button"
-              onClick={onDetail}
+            <Link
+              href={`/partner/inquiries/${encodeURIComponent(lead.id)}`}
               className="inline-flex min-h-10 w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230]"
             >
               {t("Lihat detail")}
               <ChevronRight className="size-4 text-slate-400" aria-hidden />
-            </button>
+            </Link>
           </div>
         </div>
       </div>
@@ -545,44 +487,17 @@ function ApplicationCard({
   );
 }
 
-function EmptyApplications({
-  onExplore,
-  pickerReady,
-  filter,
-}: {
-  onExplore: () => void;
-  pickerReady: boolean;
-  filter: FilterTab;
-}) {
+function EmptyApplications({ filter }: { filter: FilterTab }) {
   const { t } = useTourLanguage();
-  const copy =
-    filter === "semua"
-      ? {
-          title: "Belum ada pengajuan",
-          detail: "Jelajahi virtual tour, pilih unit, lalu ajukan minat sewa.",
-          cta: true,
-        }
-      : {
-          title: "Tidak ada pengajuan pada filter ini",
-          detail: "Coba pilih filter lain atau ajukan unit baru dari virtual tour.",
-          cta: filter !== "ditolak",
-        };
+  const empty = filter === "semua";
 
   return (
-    <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-200 px-4 py-14 text-center">
-      <FileText className="size-10 text-slate-300" aria-hidden />
-      <h3 className="mt-3 text-lg font-bold text-[#101828]">{t(copy.title)}</h3>
-      <p className="mt-1 max-w-sm text-sm text-slate-500">{t(copy.detail)}</p>
-      {copy.cta ? (
-        <button
-          type="button"
-          onClick={onExplore}
-          disabled={!pickerReady}
-          className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#c41230] px-5 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Glasses className="size-4" aria-hidden />
-          {t("Jelajahi Virtual Tour")}
-        </button>
+    <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center">
+      <h3 className="text-sm font-semibold text-slate-800">
+        {t(empty ? "Belum ada pengajuan" : "Tidak ada pengajuan pada filter ini")}
+      </h3>
+      {empty ? (
+        <p className="mt-1 text-sm text-slate-500">{t("Jelajahi virtual tour, pilih unit, lalu ajukan minat sewa.")}</p>
       ) : null}
     </div>
   );
