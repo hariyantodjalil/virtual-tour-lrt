@@ -17,7 +17,7 @@ export function selectQualityMultiRes(
 ): PannellumMultiRes | undefined {
   const hd = scene.multiResProfilesHd?.[width >= 1024 ? "desktop" : "mobile"];
   const economy = selectSceneMultiRes(scene, width);
-  // Jangan pilih HD ber-UUID — WAF prod memblok path itu (tour hitam).
+  // HD hanya jika basePath pendek (lolos batas panjang WAF prod).
   if (
     quality === "hd" &&
     hd &&

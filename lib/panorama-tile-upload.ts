@@ -1,16 +1,13 @@
 import { uploadToS3 } from "@/lib/s3";
 import { buildPanoramaTiles, multiResConfig, type PannellumMultiRes } from "@/lib/panorama-multires";
 import type { PanoramaMultiResProfiles, PanoramaMultiResProfilesHd } from "./panorama-profile";
-import { newPanoramaTileRevisionId } from "./panorama-tile-revision";
+import { profileFolder } from "./panorama-tile-path";
+import {
+  newPanoramaTileRevisionId,
+  shortTileBasePath,
+  shortTilePrefix,
+} from "./panorama-tile-revision";
 import sharp from "sharp";
-
-function safeSegment(value: string) {
-  return value.replace(/[^a-z0-9-]/gi, "-").toLowerCase() || "scene";
-}
-
-function tilePrefix(ownerSlug: string, sceneId: string, kind: "economy" | "hd" = "economy") {
-  return `virtual-tour/panorama-tiles/${safeSegment(ownerSlug)}/${safeSegment(sceneId)}/${newPanoramaTileRevisionId(kind)}`;
-}
 
 async function mapPool<T>(items: T[], limit: number, task: (item: T) => Promise<void>) {
   let index = 0;
@@ -30,15 +27,17 @@ export async function uploadPanoramaTiles(
   ownerSlug: string,
   sceneId: string
 ): Promise<PannellumMultiRes> {
-  const prefix = tilePrefix(ownerSlug, sceneId);
+  const revision = newPanoramaTileRevisionId();
+  const prefix = shortTilePrefix(ownerSlug, sceneId, revision);
+  const folder = profileFolder("economy", "mobile");
   const tiles = await buildPanoramaTiles(panorama);
   await mapPool(tiles, 3, async (tile) => {
-    await uploadToS3(tile.buffer, `${prefix}/${tile.name}`, "image/jpeg", {
+    await uploadToS3(tile.buffer, `${prefix}/${folder}/${tile.name}`, "image/jpeg", {
       "scene-id": sceneId,
       "storage-mode": "pannellum-multires",
     });
   });
-  return multiResConfig(`/${prefix}`);
+  return multiResConfig(shortTileBasePath(ownerSlug, sceneId, revision, "economy", "mobile"));
 }
 
 /** Two immutable pyramids from the same privacy-safe full-resolution source. */
@@ -47,19 +46,25 @@ export async function uploadAdaptivePanoramaTiles(
 ): Promise<PanoramaMultiResProfiles> {
   const metadata = await sharp(panorama).metadata();
   const cubeResolution = (metadata.width ?? 0) > 6400 ? 4096 : 2048;
-  const prefix = tilePrefix(ownerSlug, sceneId);
+  const revision = newPanoramaTileRevisionId();
+  const prefix = shortTilePrefix(ownerSlug, sceneId, revision);
   const profiles = {} as Pick<PanoramaMultiResProfiles, "desktop" | "mobile">;
   // Sequential generation limits peak memory; publish metadata only after both uploads finish.
   for (const [name, tileResolution] of [["mobile", 512], ["desktop", 1024]] as const) {
+    const folder = profileFolder("economy", name);
     const tiles = await buildPanoramaTiles(panorama, {
       sourceWidth: null, cubeResolution, tileResolution, jpegQuality: 85,
     });
     await mapPool(tiles, 4, async (tile) => {
-      await uploadToS3(tile.buffer, `${prefix}/${name}/${tile.name}`, "image/jpeg", {
+      await uploadToS3(tile.buffer, `${prefix}/${folder}/${tile.name}`, "image/jpeg", {
         "scene-id": sceneId, "storage-mode": "pannellum-multires-jpeg85-v1", "profile": name,
       });
     });
-    profiles[name] = multiResConfig(`/${prefix}/${name}`, tileResolution, cubeResolution);
+    profiles[name] = multiResConfig(
+      shortTileBasePath(ownerSlug, sceneId, revision, "economy", name),
+      tileResolution,
+      cubeResolution,
+    );
   }
   return { version: "jpeg85-v1", ...profiles };
 }
@@ -71,20 +76,26 @@ export async function uploadHdPanoramaTiles(
 ): Promise<Pick<PanoramaMultiResProfilesHd, "desktop" | "mobile">> {
   const metadata = await sharp(panorama, { limitInputPixels: false }).metadata();
   const cubeResolution = (metadata.width ?? 0) > 6400 ? 4096 : 2048;
-  const prefix = tilePrefix(ownerSlug, sceneId, "hd");
+  const revision = newPanoramaTileRevisionId("hd");
+  const prefix = shortTilePrefix(ownerSlug, sceneId, revision);
   const profiles = {} as Pick<PanoramaMultiResProfilesHd, "desktop" | "mobile">;
   // Sequential generation limits peak memory at native resolution.
   for (const [name, tileResolution] of [["mobile", 512], ["desktop", 1024]] as const) {
+    const folder = profileFolder("hd", name);
     const tiles = await buildPanoramaTiles(panorama, {
       sourceWidth: null, cubeResolution, tileResolution, jpegQuality: 85,
     });
     await mapPool(tiles, 4, async (tile) => {
-      await uploadToS3(tile.buffer, `${prefix}/${name}/${tile.name}`, "image/jpeg", {
+      await uploadToS3(tile.buffer, `${prefix}/${folder}/${tile.name}`, "image/jpeg", {
         "scene-id": sceneId, "storage-mode": "pannellum-multires-hd-jpeg85-v1",
         "profile": name, "quality": "hd",
       });
     });
-    profiles[name] = multiResConfig(`/${prefix}/${name}`, tileResolution, cubeResolution);
+    profiles[name] = multiResConfig(
+      shortTileBasePath(ownerSlug, sceneId, revision, "hd", name),
+      tileResolution,
+      cubeResolution,
+    );
   }
   return profiles;
 }

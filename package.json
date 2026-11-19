@@ -19,7 +19,8 @@
     "db:studio": "node scripts/bin.mjs prisma studio",
     "panorama:backfill-adaptive": "node scripts/bin.mjs tsx scripts/backfill-adaptive-panorama-tiles.ts",
     "panorama:backfill-hd": "node scripts/bin.mjs tsx scripts/backfill-hd-panorama-tiles.ts",
-    "panorama:rename-waf-safe": "node scripts/bin.mjs tsx scripts/rename-panorama-tile-uuid-prefixes.ts"
+    "panorama:rename-waf-safe": "node scripts/bin.mjs tsx scripts/rename-panorama-tile-uuid-prefixes.ts",
+    "panorama:migrate-short-path": "node scripts/bin.mjs tsx scripts/migrate-panorama-tiles-short-path.ts"
   },
   "overrides": {
     "sharp": "$sharp",

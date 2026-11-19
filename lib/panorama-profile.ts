@@ -1,3 +1,5 @@
+import { isProdWafSafeTileBasePath } from "./panorama-tile-path";
+
 /** Browser-safe metadata shared by the uploader and public viewer. */
 export type PannellumMultiRes = {
   basePath: string;
@@ -36,28 +38,9 @@ export function extractMultiResProfilesFromCanvasData(value: unknown): PanoramaM
   }
 }
 
-/** F5/WAF sering menolak path tile yang berisi UUID → HTML "Request Rejected". */
-const UUID_IN_PATH =
-  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-
-/**
- * VIP publik prod (`virtualtour-lrtjabodebek.kai.id`) menolak SELURUH pohon
- * `/api/s3-proxy/.../panorama-tiles/` (bukan hanya UUID). DEV hostname dan akses
- * IP:3000 tetap meloloskan tile. Override: NEXT_PUBLIC_PANORAMA_BLOCK_MULTIRES=1.
- */
-export function isPanoramaMultiresBlockedByEdge(): boolean {
-  if (process.env.NEXT_PUBLIC_PANORAMA_BLOCK_MULTIRES === "1") return true;
-  if (process.env.NEXT_PUBLIC_PANORAMA_BLOCK_MULTIRES === "0") return false;
-  if (typeof window !== "undefined") {
-    return window.location.hostname === "virtualtour-lrtjabodebek.kai.id";
-  }
-  return false;
-}
-
+/** Path tile yang lolos WAF VIP prod: panjang sample face key ≤ 86. */
 export function isWafSafePanoramaBasePath(basePath: string | undefined): boolean {
-  if (!basePath || UUID_IN_PATH.test(basePath)) return false;
-  if (isPanoramaMultiresBlockedByEdge()) return false;
-  return true;
+  return isProdWafSafeTileBasePath(basePath);
 }
 
 export function selectSceneMultiRes(
@@ -65,8 +48,7 @@ export function selectSceneMultiRes(
   viewportWidth: number,
 ): PannellumMultiRes | undefined {
   const profile = scene.multiResProfiles?.[viewportWidth >= 1024 ? "desktop" : "mobile"];
-  // Hanya path tanpa UUID. Path ber-UUID ditolak F5/WAF prod ("Request Rejected")
-  // → viewer harus jatuh ke equirectangular WebP, bukan preload tile yang pasti gagal.
+  // Semua env pakai tile. Hanya terima basePath pendek (skema virtual-tour/pt/...).
   if (scene.multiRes && isWafSafePanoramaBasePath(scene.multiRes.basePath)) {
     return scene.multiRes;
   }
