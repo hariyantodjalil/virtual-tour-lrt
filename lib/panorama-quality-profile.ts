@@ -1,5 +1,4 @@
 import {
-  isWafSafePanoramaBasePath,
   selectSceneMultiRes,
   type PanoramaMultiResProfiles,
   type PannellumMultiRes,
@@ -17,14 +16,7 @@ export function selectQualityMultiRes(
 ): PannellumMultiRes | undefined {
   const hd = scene.multiResProfilesHd?.[width >= 1024 ? "desktop" : "mobile"];
   const economy = selectSceneMultiRes(scene, width);
-  // HD hanya jika basePath pendek (lolos batas panjang WAF prod).
-  if (
-    quality === "hd" &&
-    hd &&
-    economy &&
-    hd.cubeResolution > economy.cubeResolution &&
-    isWafSafePanoramaBasePath(hd.basePath)
-  ) {
+  if (quality === "hd" && hd && economy && hd.cubeResolution > economy.cubeResolution) {
     return hd;
   }
   return economy;

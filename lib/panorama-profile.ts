@@ -48,14 +48,7 @@ export function selectSceneMultiRes(
   viewportWidth: number,
 ): PannellumMultiRes | undefined {
   const profile = scene.multiResProfiles?.[viewportWidth >= 1024 ? "desktop" : "mobile"];
-  // Semua env pakai tile. Hanya terima basePath pendek (skema virtual-tour/pt/...).
-  if (scene.multiRes && isWafSafePanoramaBasePath(scene.multiRes.basePath)) {
-    return scene.multiRes;
-  }
-  if (profile && isWafSafePanoramaBasePath(profile.basePath)) {
-    return profile;
-  }
-  return undefined;
+  return scene.multiRes ?? profile;
 }
 
 // ── Profil HD (aset asli/native) ──────────────────────────────────────────────

@@ -11,6 +11,7 @@ import type { PannellumMultiRes } from "@/lib/panorama-multires";
 import { selectQualityMultiRes } from "./panorama-quality-profile";
 import type { PanoramaQuality } from "./panorama-quality";
 import { panoramaIntentUrls, panoramaViewport, type PanoramaViewport } from "./panorama-intent";
+import { panoramaTileUrlBase } from "./panorama-tile-path";
 
 export type AdHotspotPayload = {
   target?: Extract<SpaceHotspotTarget, { yaw: number }>;
@@ -117,10 +118,7 @@ export function panoramaUrlForScene(scenes: PanoramaScene[], sceneId: string) {
 const PREVIEW_FACES = ["f", "r", "b", "l", "u", "d"];
 
 function proxyMultiRes(multiRes: PannellumMultiRes) {
-  return {
-    ...multiRes,
-    basePath: getS3ProxyUrl(multiRes.basePath).replace(/\/$/, ""),
-  };
+  return { ...multiRes, basePath: panoramaTileUrlBase(multiRes.basePath) };
 }
 
 /** Tile tingkat rendah saja. Scene tanpa tile tetap memakai WebP utuh. */

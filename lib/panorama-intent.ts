@@ -1,6 +1,6 @@
 import type { PanoramaScene, SceneInitialView } from "./tour-types";
 import { selectQualityMultiRes as selectSceneMultiRes } from "./panorama-quality-profile";
-import { getS3ProxyUrl } from "./s3-utils";
+import { panoramaTileUrlBase } from "./panorama-tile-path";
 
 export type PanoramaViewport = { width: number; height: number; pixelRatio?: number; profileWidth?: number };
 export function panoramaViewport(): PanoramaViewport {
@@ -27,7 +27,7 @@ export function panoramaIntentUrls(scene: PanoramaScene, view: SceneInitialView,
     config.tileResolution * 2 ** (level - 1) * Math.tan(hfov / 2) * .707) level++;
   const size = config.cubeResolution * 2 ** (level - config.maxLevel), across = Math.ceil(size / config.tileResolution);
   const index = (n: number) => Math.max(0, Math.min(across - 1, Math.floor((n + 1) / 2 * size / config.tileResolution)));
-  const base = getS3ProxyUrl(config.basePath).replace(/\/$/, "");
+  const base = panoramaTileUrlBase(config.basePath);
   return [...new Set([`${base}/1/${side}0_0.jpg`, `${base}/${level}/${side}${index(ny)}_${index(nx)}.jpg`])];
 }
 

@@ -28,6 +28,7 @@ import { PANNELLUM_HFOV } from "@/lib/pannellum-viewer-defaults";
 import { SpatialOverlay } from "@/components/tour/spatial/SpatialOverlay";
 import type { SpatialEntity, SphericalPoint } from "@/lib/spatial/types";
 import type { PannellumMultiRes } from "@/lib/panorama-profile";
+import { panoramaTileUrlBase } from "@/lib/panorama-tile-path";
 import {
   EditorPanoramaPreviewToggle,
   type EditorPanoramaPreviewMode,
@@ -189,10 +190,7 @@ interface Props {
 }
 
 function proxyMultiRes(multiRes: PannellumMultiRes) {
-  return {
-    ...multiRes,
-    basePath: getS3ProxyUrl(multiRes.basePath).replace(/\/$/, ""),
-  };
+  return { ...multiRes, basePath: panoramaTileUrlBase(multiRes.basePath) };
 }
 
 export type PannellumEditorHandle = {
