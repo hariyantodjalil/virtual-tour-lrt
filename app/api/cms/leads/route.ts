@@ -6,8 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { leadUpdateSchema } from "@/lib/api-schemas";
 import { recordInquiryStatus } from "@/lib/partner-inquiries";
-import { ACTIVE_LEAD_STATUSES, canonicalLeadStatus, completedLeadStageIndex, isCommercialOperation, SPACE_HOLD_STATUSES } from "@/lib/commercial-pipeline";
+import { ACTIVE_LEAD_STATUSES, canonicalLeadStatus, completedLeadStageIndex, isCommercialOperation, publicLeadStageIndex, SPACE_HOLD_STATUSES } from "@/lib/commercial-pipeline";
 import { inquiryTransitionError } from "@/lib/inquiry-workflow";
+import { publishInquiryEvent } from "@/lib/realtime-events";
 
 const include = { trainInquiry: { select: cmsTrainInquirySelect }, space: { include: { station: true } } } satisfies Prisma.TenantLeadInclude;
 class WorkflowError extends Error {
@@ -32,6 +33,54 @@ export async function PATCH(request: NextRequest) {
       await tx.$executeRaw`SELECT id FROM tenant_leads WHERE id = ${input.id} FOR UPDATE`;
       const existing = await tx.tenantLead.findUnique({ where: { id: input.id }, include: { mediaAttachments: true, trainInquiry: true } });
       if (!existing) throw new WorkflowError("Pengajuan tidak ditemukan.", 404);
+
+      let nextWorkflowVersionId = existing.workflowVersionId;
+      let nextStepOrder = existing.currentStepOrder;
+      let workflowReassigned:
+        | { fromId: string | null; toId: string; toTitle: string; toVersion: number | null; firstStepId: string }
+        | null = null;
+
+      if (input.workflowVersionId !== undefined && input.workflowVersionId !== existing.workflowVersionId) {
+        if (existing.status !== "NEW") {
+          throw new WorkflowError(
+            "Alur hanya bisa diganti saat pengajuan masih di tahap 1 (status Pengajuan Diterima)."
+          );
+        }
+        if (input.status && canonicalLeadStatus(input.status) !== "NEW") {
+          throw new WorkflowError("Ganti alur dulu, baru lanjutkan ke tahap berikutnya.");
+        }
+        const version = await tx.pipelineWorkflowVersion.findUnique({
+          where: { id: input.workflowVersionId },
+          select: {
+            id: true,
+            title: true,
+            version: true,
+            status: true,
+            steps: {
+              orderBy: { stepOrder: "asc" },
+              select: { id: true, stepOrder: true, leadStatus: true },
+            },
+          },
+        });
+        if (!version || version.status !== "ACTIVE") {
+          throw new WorkflowError("Pilih versi alur yang berstatus Aktif.", 400);
+        }
+        const first =
+          version.steps.find((step) => step.leadStatus === "NEW") ?? version.steps[0];
+        if (!first) {
+          throw new WorkflowError("Versi alur yang dipilih belum punya tahap awal.", 400);
+        }
+        nextWorkflowVersionId = version.id;
+        nextStepOrder = first.stepOrder;
+        workflowReassigned = {
+          fromId: existing.workflowVersionId,
+          toId: version.id,
+          toTitle: version.title,
+          toVersion: version.version,
+          firstStepId: first.id,
+        };
+      }
+
       const target = input.status ? canonicalLeadStatus(input.status) : existing.status;
       const changedStatus = target !== existing.status;
       const active = isCommercialOperation(existing.status);
@@ -95,6 +144,10 @@ export async function PATCH(request: NextRequest) {
       }
       const updated = await tx.tenantLead.update({ where: { id: input.id }, data: {
         ...(changedStatus && { status: target }),
+        ...(workflowReassigned && {
+          workflowVersionId: nextWorkflowVersionId,
+          currentStepOrder: nextStepOrder,
+        }),
         ...(input.notes !== undefined && { notes: input.notes }),
         ...(input.followUpAt !== undefined && { followUpAt: input.followUpAt ? new Date(input.followUpAt) : null }),
         ...(input.siteVisitStatus !== undefined || input.siteVisitScheduledAt !== undefined ? { siteVisitStatus: visit, siteVisitScheduledAt: scheduledAt } : {}),
@@ -106,10 +159,68 @@ export async function PATCH(request: NextRequest) {
         ...(input.rejectionReason !== undefined && { rejectionReason: input.rejectionReason?.trim() || null }),
         ...(changedStatus && target !== "CLOSED_LOST" && { rejectionReason: null }),
       }, include });
-      if (changedStatus) await recordInquiryStatus(tx, { id: input.id, workflowVersionId: existing.workflowVersionId, fromStatus: existing.status, status: target, rejectionReason: input.rejectionReason ?? existing.rejectionReason, actor: auth.user.userId });
+      if (workflowReassigned) {
+        const versionLabel =
+          typeof workflowReassigned.toVersion === "number"
+            ? `v${workflowReassigned.toVersion}`
+            : "versi aktif";
+        await tx.inquiryStepLog.create({
+          data: {
+            tenantLeadId: input.id,
+            pipelineStepId: workflowReassigned.firstStepId,
+            stepOrder: nextStepOrder,
+            status: "NEW",
+            fromStatus: "NEW",
+            action: "WORKFLOW_REASSIGNED",
+            notes: `Alur diganti ke ${versionLabel} — ${workflowReassigned.toTitle}.`,
+            performedBy: auth.user.userId,
+          },
+        });
+      }
+      if (changedStatus) {
+        await recordInquiryStatus(tx, {
+          id: input.id,
+          workflowVersionId: nextWorkflowVersionId,
+          fromStatus: existing.status,
+          status: target,
+          rejectionReason: input.rejectionReason ?? existing.rejectionReason,
+          partnerMessage: input.partnerMessage,
+          actor: auth.user.userId,
+        });
+      } else if (input.partnerMessage !== undefined) {
+        const partnerMessage = input.partnerMessage?.trim();
+        if (partnerMessage) {
+          const leadStatus = isCommercialOperation(existing.status)
+            ? "COMMERCIAL_OPERATION"
+            : existing.status;
+          const step = existing.workflowVersionId
+            ? await tx.pipelineStep.findFirst({
+                where: { workflowVersionId: existing.workflowVersionId, leadStatus },
+              })
+            : null;
+          const publicOrder = Math.max(1, publicLeadStageIndex(leadStatus) + 1);
+          await tx.inquiryStepLog.create({
+            data: {
+              tenantLeadId: input.id,
+              pipelineStepId: step?.id,
+              stepOrder: publicOrder,
+              status: existing.status,
+              fromStatus: existing.status,
+              action: "PARTNER_NOTE",
+              notes: partnerMessage,
+              performedBy: auth.user.userId,
+            },
+          });
+        }
+      }
       if (input.paymentVerified !== undefined && Boolean(existing.paymentVerifiedAt) !== input.paymentVerified) await tx.inquiryStepLog.create({ data: { tenantLeadId: input.id, stepOrder: 6, status: target, action: input.paymentVerified ? "PAYMENT_VERIFIED" : "PAYMENT_VERIFICATION_REVOKED", notes: input.paymentVerified ? "Pembayaran telah diverifikasi tim komersial." : "Verifikasi pembayaran diperbarui tim komersial.", performedBy: auth.user.userId } });
       return updated;
     }, { isolationLevel: "Serializable", timeout: 15000 });
+    void publishInquiryEvent({
+      kind: "lead-updated",
+      leadId: lead.id,
+      userId: lead.userId,
+    });
     return NextResponse.json(lead, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof WorkflowError) return NextResponse.json({ error: error.message }, { status: error.status });

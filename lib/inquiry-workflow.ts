@@ -1,4 +1,9 @@
-import { canonicalLeadStatus, completedLeadStageIndex, type CommercialLeadStatus } from "./commercial-pipeline";
+import {
+  canonicalLeadStatus,
+  completedLeadStageIndex,
+  publicLeadStageIndex,
+  type CommercialLeadStatus,
+} from "./commercial-pipeline";
 
 export const NEGOTIATION_DOCUMENTS = ["LOI", "NEGOTIATION_LETTER", "NEGOTIATION_MINUTES"] as const;
 export const REQUIRED_INQUIRY_DOCUMENTS = [
@@ -36,23 +41,57 @@ export function inquiryTransitionError(current: CommercialLeadStatus, next: Comm
   const sequence: CommercialLeadStatus[] = ["NEW", "CONTACTED", "NEGOTIATING", "BA_SIGNED", "DESIGN_REVIEW", "PKS", "COMMERCIAL_OPERATION"];
   const fromIndex = sequence.indexOf(from);
   const toIndex = sequence.indexOf(target);
-  // CONTACTED may complete negotiations immediately when all evidence is already verified.
+  // CONTACTED may jump to BA_SIGNED in the 6-step verified alur (negosiasi digabung jadi satu tahap).
   if (toIndex < fromIndex) return "Tahap yang telah dikonfirmasi tidak dapat dimundurkan.";
-  if (toIndex > fromIndex + 1 && !(from === "CONTACTED" && target === "BA_SIGNED")) return "Konfirmasikan tahap sebelumnya terlebih dahulu.";
-  const completed = completedLeadStageIndex(target);
-  const required = REQUIRED_INQUIRY_DOCUMENTS.filter(document => document.milestone <= completed + 1);
-  const missing = required.filter(document => !hasVerifiedDocument(state.mediaAttachments, document.type));
-  if (missing.length) return `Unggah dan verifikasi dokumen terlebih dahulu: ${missing.map(document => document.title).join(", ")}.`;
-  if (completed >= 2 && ["REQUESTED", "SCHEDULED"].includes(state.siteVisitStatus)) return "Selesaikan atau batalkan site visit yang masih terbuka sebelum menyelesaikan negosiasi.";
-  if (completed >= 4) {
-    if (!state.leaseStartAt || !state.leaseEndAt) return "Tanggal mulai dan berakhir masa sewa wajib diisi.";
-    if (new Date(state.leaseEndAt) < new Date(state.leaseStartAt)) return "Tanggal berakhir sewa tidak boleh sebelum tanggal mulai.";
+  if (toIndex > fromIndex + 1 && !(from === "CONTACTED" && target === "BA_SIGNED")) {
+    return "Konfirmasikan tahap sebelumnya terlebih dahulu.";
   }
+
+  // Dokumen wajib saat meninggalkan tahap pemiliknya — bukan saat baru masuk tahap itu.
+  // Contoh: LOI/surat/BA diisi di tahap Negosiasi (BA_SIGNED), dicek saat lanjut ke Desain.
+  const fromPublic = publicLeadStageIndex(from);
+  const targetPublic = publicLeadStageIndex(target);
+  const required = REQUIRED_INQUIRY_DOCUMENTS.filter(
+    (document) => document.milestone <= fromPublic + 1
+  );
+  const missing = required.filter(
+    (document) => !hasVerifiedDocument(state.mediaAttachments, document.type)
+  );
+  if (missing.length) {
+    return `Unggah dan verifikasi dokumen terlebih dahulu: ${missing.map((document) => document.title).join(", ")}.`;
+  }
+
+  // Site visit terbuka harus ditutup sebelum meninggalkan milestone negosiasi.
+  if (
+    fromPublic >= 2 &&
+    targetPublic > 2 &&
+    ["REQUESTED", "SCHEDULED"].includes(state.siteVisitStatus)
+  ) {
+    return "Selesaikan atau batalkan site visit yang masih terbuka sebelum menyelesaikan negosiasi.";
+  }
+
+  // Tanggal sewa diisi di tahap PKS; wajib saat meninggalkan PKS / aktivasi.
+  if (fromPublic >= 4) {
+    if (!state.leaseStartAt || !state.leaseEndAt) {
+      return "Tanggal mulai dan berakhir masa sewa wajib diisi.";
+    }
+    if (new Date(state.leaseEndAt) < new Date(state.leaseStartAt)) {
+      return "Tanggal berakhir sewa tidak boleh sebelum tanggal mulai.";
+    }
+  }
+
+  const completed = completedLeadStageIndex(target);
   if (completed >= 5) {
-    if (!state.paymentVerifiedAt) return "Admin harus memverifikasi pembayaran sebelum mengaktifkan sewa.";
+    if (!state.paymentVerifiedAt) {
+      return "Admin harus memverifikasi pembayaran sebelum mengaktifkan sewa.";
+    }
     const today = jakartaDate(now);
-    if (jakartaDate(state.leaseStartAt!) > today) return "Sewa belum memasuki tanggal efektif (Asia/Jakarta).";
-    if (jakartaDate(state.leaseEndAt!) < today) return "Masa sewa telah berakhir. Periksa tanggal PKS.";
+    if (jakartaDate(state.leaseStartAt!) > today) {
+      return "Sewa belum memasuki tanggal efektif (Asia/Jakarta).";
+    }
+    if (jakartaDate(state.leaseEndAt!) < today) {
+      return "Masa sewa telah berakhir. Periksa tanggal PKS.";
+    }
   }
   return null;
 }

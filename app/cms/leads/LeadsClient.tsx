@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  CalendarClock,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
-  RotateCcw,
   Search,
 } from "lucide-react";
 import { cmsFetch } from "@/lib/cms-fetch";
@@ -18,26 +18,46 @@ import {
   canonicalLeadStatus,
   LEAD_STATUS_LABELS,
   SITE_VISIT_STATUS_LABELS,
-  SITE_VISIT_STATUS_VALUES,
   type CommercialLeadStatus,
   type CommercialSiteVisitStatus,
 } from "@/lib/commercial-pipeline";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CMS_LEADS_UPDATED_EVENT } from "@/lib/inquiry-sync-events";
+import { useInquiryRealtimeSync } from "@/components/realtime/useInquiryRealtimeSync";
 
 export type { LeadItem } from "@/lib/cms-leads-shared";
 
 const PAGE_SIZES = [10, 25, 50];
 
+type StatusTab = "ALL" | "INITIAL" | "IN_PROGRESS" | "WON" | "LOST";
+type SortOption = "NEWEST" | "UPDATED_DESC" | "UPDATED_ASC";
+
 function unitLabel(lead: LeadItem) {
   if (lead.space) return `${lead.space.code} · ${lead.space.station.name}`;
   if (lead.trainInquiry?.mediaTitle) return lead.trainInquiry.mediaTitle;
   return "Tanpa unit spesifik";
+}
+
+function isWonStatus(status: string) {
+  const canonical = canonicalLeadStatus(status as CommercialLeadStatus);
+  return canonical === "COMMERCIAL_OPERATION";
+}
+
+function isLostStatus(status: string) {
+  return canonicalLeadStatus(status as CommercialLeadStatus) === "CLOSED_LOST";
+}
+
+function isInitialStatus(status: string) {
+  return canonicalLeadStatus(status as CommercialLeadStatus) === "NEW";
+}
+
+function isActiveSiteVisit(status: string) {
+  return status === "REQUESTED" || status === "SCHEDULED";
 }
 
 export default function LeadsClient({
@@ -53,8 +73,11 @@ export default function LeadsClient({
   const [loadError, setLoadError] = useState(initialLoadError);
   const [isLoading, setIsLoading] = useState(false);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [siteVisitFilter, setSiteVisitFilter] = useState("ALL");
+  const [statusTab, setStatusTab] = useState<StatusTab>("ALL");
+  const [stageFilter, setStageFilter] = useState("ALL");
+  const [stationFilter, setStationFilter] = useState("ALL");
+  const [siteVisitOnly, setSiteVisitOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>("NEWEST");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -95,38 +118,126 @@ export default function LeadsClient({
     };
   }, []);
 
+  const kpiStats = useMemo(() => {
+    let initialCount = 0;
+    let inProgressCount = 0;
+    let wonCount = 0;
+    let lostCount = 0;
+    let activeSiteVisits = 0;
+
+    for (const lead of leads) {
+      if (isWonStatus(lead.status)) {
+        wonCount += 1;
+      } else if (isLostStatus(lead.status)) {
+        lostCount += 1;
+      } else if (isInitialStatus(lead.status)) {
+        initialCount += 1;
+      } else {
+        inProgressCount += 1;
+      }
+      if (
+        !isWonStatus(lead.status) &&
+        !isLostStatus(lead.status) &&
+        isActiveSiteVisit(lead.siteVisitStatus)
+      ) {
+        activeSiteVisits += 1;
+      }
+    }
+
+    return {
+      total: leads.length,
+      initialCount,
+      inProgressCount,
+      wonCount,
+      lostCount,
+      activeSiteVisits,
+    };
+  }, [leads]);
+
+  const stationOptions = useMemo(() => {
+    const names = new Set<string>();
+    let hasNonUnit = false;
+    for (const lead of leads) {
+      if (lead.space?.station.name) names.add(lead.space.station.name);
+      else hasNonUnit = true;
+    }
+    return {
+      stations: [...names].sort((a, b) => a.localeCompare(b, "id")),
+      hasNonUnit,
+    };
+  }, [leads]);
+
   const filteredLeads = useMemo(() => {
     const text = query.trim().toLowerCase();
-    return leads.filter(
-      (lead) =>
-        (statusFilter === "ALL" ||
-          canonicalLeadStatus(lead.status as CommercialLeadStatus) === statusFilter) &&
-        (siteVisitFilter === "ALL" || lead.siteVisitStatus === siteVisitFilter) &&
-        (!text ||
-          [
-            lead.inquiryCode,
-            lead.companyName,
-            lead.contactName,
-            lead.phone,
-            lead.email,
-            lead.businessType,
-            lead.space?.code,
-            lead.space?.name,
-            lead.space?.station.name,
-            lead.trainInquiry?.mediaTitle,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase()
-            .includes(text))
-    );
-  }, [leads, query, statusFilter, siteVisitFilter]);
+    const list = leads.filter((lead) => {
+      const canonical = canonicalLeadStatus(lead.status as CommercialLeadStatus);
+
+      if (statusTab === "INITIAL") {
+        if (!isInitialStatus(lead.status)) return false;
+      } else if (statusTab === "IN_PROGRESS") {
+        if (isInitialStatus(lead.status) || isWonStatus(lead.status) || isLostStatus(lead.status)) {
+          return false;
+        }
+      } else if (statusTab === "WON") {
+        if (!isWonStatus(lead.status)) return false;
+      } else if (statusTab === "LOST") {
+        if (!isLostStatus(lead.status)) return false;
+      }
+
+      if (stageFilter !== "ALL" && canonical !== stageFilter) return false;
+
+      if (stationFilter === "NON_UNIT") {
+        if (lead.space) return false;
+      } else if (stationFilter !== "ALL" && lead.space?.station.name !== stationFilter) {
+        return false;
+      }
+
+      if (
+        siteVisitOnly &&
+        (isWonStatus(lead.status) ||
+          isLostStatus(lead.status) ||
+          !isActiveSiteVisit(lead.siteVisitStatus))
+      ) {
+        return false;
+      }
+
+      if (!text) return true;
+      return [
+        lead.inquiryCode,
+        lead.companyName,
+        lead.contactName,
+        lead.phone,
+        lead.email,
+        lead.businessType,
+        lead.space?.code,
+        lead.space?.name,
+        lead.space?.station.name,
+        lead.trainInquiry?.mediaTitle,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(text);
+    });
+
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      if (sortBy === "UPDATED_ASC") {
+        return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      }
+      if (sortBy === "UPDATED_DESC") {
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+    return sorted;
+  }, [leads, query, statusTab, stageFilter, stationFilter, siteVisitOnly, sortBy]);
 
   const reminders = leads
     .flatMap((lead) => {
-    if (!["COMMERCIAL_OPERATION", "CLOSED_WON"].includes(lead.status)) return [];
-    const reminder = leaseExpiryReminder(lead.leaseEndAt);
-    return reminder ? [{ lead, reminder }] : [];
+      if (!["COMMERCIAL_OPERATION", "CLOSED_WON"].includes(lead.status)) return [];
+      const reminder = leaseExpiryReminder(lead.leaseEndAt);
+      return reminder ? [{ lead, reminder }] : [];
     })
     .sort((a, b) => a.reminder.remainingDays - b.reminder.remainingDays);
 
@@ -136,18 +247,26 @@ export default function LeadsClient({
   const from = filteredLeads.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const to = Math.min(currentPage * pageSize, filteredLeads.length);
   const filtersActive =
-    Boolean(query.trim()) || statusFilter !== "ALL" || siteVisitFilter !== "ALL";
+    Boolean(query.trim()) ||
+    statusTab !== "ALL" ||
+    stageFilter !== "ALL" ||
+    stationFilter !== "ALL" ||
+    siteVisitOnly ||
+    sortBy !== "NEWEST";
 
   function resetFilters() {
     setQuery("");
-    setStatusFilter("ALL");
-    setSiteVisitFilter("ALL");
+    setStatusTab("ALL");
+    setStageFilter("ALL");
+    setStationFilter("ALL");
+    setSiteVisitOnly(false);
+    setSortBy("NEWEST");
     setPage(1);
   }
 
-  async function load() {
-    setIsLoading(true);
-    setLoadError(null);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setIsLoading(true);
+    if (!opts?.silent) setLoadError(null);
     try {
       const response = await cmsFetch("/api/cms/leads", { cache: "no-store" });
       const data: unknown = await response.json().catch(() => null);
@@ -155,16 +274,28 @@ export default function LeadsClient({
         throw new Error("Data pengajuan gagal dimuat. Silakan coba lagi.");
       }
       setLeads(data as LeadItem[]);
+      setLoadError(null);
     } catch (cause) {
-      setLoadError(
-        cause instanceof Error
-          ? cause.message
-          : "Tidak dapat terhubung ke layanan pengajuan."
-      );
+      if (!opts?.silent) {
+        setLoadError(
+          cause instanceof Error
+            ? cause.message
+            : "Tidak dapat terhubung ke layanan pengajuan."
+        );
+      }
     } finally {
-      setIsLoading(false);
+      if (!opts?.silent) setIsLoading(false);
     }
-  }
+  }, []);
+
+  useInquiryRealtimeSync({
+    enabled: true,
+    localEvents: [CMS_LEADS_UPDATED_EVENT],
+    fallbackIntervalMs: 60_000,
+    onSync: async () => {
+      await load({ silent: true });
+    },
+  });
 
   return (
     <div className="space-y-5">
@@ -232,6 +363,195 @@ export default function LeadsClient({
         </div>
       )}
 
+      {/* Filter, pencarian & pengurutan — Operate chrome CMS */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Kelompok status pengajuan">
+              {(
+                [
+                  { id: "ALL", label: "Semua", count: kpiStats.total },
+                  { id: "INITIAL", label: "Menunggu Awal", count: kpiStats.initialCount },
+                  { id: "IN_PROGRESS", label: "Proses Berjalan", count: kpiStats.inProgressCount },
+                  { id: "WON", label: "Selesai", count: kpiStats.wonCount },
+                  { id: "LOST", label: "Dihentikan", count: kpiStats.lostCount },
+                ] as const
+              ).map((tab) => {
+                const active = statusTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => {
+                      setStatusTab(tab.id);
+                      setPage(1);
+                    }}
+                    className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230] ${
+                      active
+                        ? "bg-[#c41230] text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-[#101828]"
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span
+                      className={`rounded-md px-1.5 py-0.5 text-xs tabular-nums ${
+                        active ? "bg-white/20 text-white" : "bg-white text-slate-600"
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSiteVisitOnly((prev) => !prev);
+                setPage(1);
+              }}
+              aria-pressed={siteVisitOnly}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230] ${
+                siteVisitOnly
+                  ? "border-[#c41230] bg-rose-50 text-[#c41230]"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <CalendarClock
+                className={`size-3.5 ${siteVisitOnly ? "text-[#c41230]" : "text-slate-400"}`}
+                strokeWidth={1.5}
+                aria-hidden
+              />
+              <span>Site Visit Aktif</span>
+              <span
+                className={`rounded-md px-1.5 py-0.5 text-xs tabular-nums ${
+                  siteVisitOnly ? "bg-[#c41230] text-white" : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {kpiStats.activeSiteVisits}
+              </span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_200px_185px_195px]">
+            <div className="relative min-w-0">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
+                strokeWidth={1.5}
+                aria-hidden
+              />
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Cari kode, mitra, PIC, telp, unit, atau stasiun"
+                aria-label="Cari pengajuan"
+                className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-3 pl-9 text-xs text-[#101828] placeholder:text-slate-400 transition-colors focus:border-[#c41230] focus:outline-none"
+              />
+            </div>
+
+            <Select
+              value={stageFilter}
+              onValueChange={(value) => {
+                setStageFilter(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger
+                aria-label="Filter tahapan"
+                className="h-9 w-full rounded-lg border-slate-200 bg-white px-3 text-xs font-medium text-[#101828] focus:border-[#c41230] focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-[#c41230]/25"
+              >
+                <SelectValue placeholder="Semua Tahapan" />
+              </SelectTrigger>
+              <SelectContent className="border-slate-200 bg-white">
+                <SelectItem value="ALL" className="text-xs">
+                  Semua Tahapan
+                </SelectItem>
+                {ADMIN_LEAD_STATUSES.map((status) => (
+                  <SelectItem key={status} value={status} className="text-xs">
+                    {LEAD_STATUS_LABELS[status]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={stationFilter}
+              onValueChange={(value) => {
+                setStationFilter(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger
+                aria-label="Filter stasiun"
+                className="h-9 w-full rounded-lg border-slate-200 bg-white px-3 text-xs font-medium text-[#101828] focus:border-[#c41230] focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-[#c41230]/25"
+              >
+                <SelectValue placeholder="Semua Stasiun" />
+              </SelectTrigger>
+              <SelectContent className="border-slate-200 bg-white">
+                <SelectItem value="ALL" className="text-xs">
+                  Semua Stasiun
+                </SelectItem>
+                {stationOptions.stations.map((name) => (
+                  <SelectItem key={name} value={name} className="text-xs">
+                    {name}
+                  </SelectItem>
+                ))}
+                {stationOptions.hasNonUnit && (
+                  <SelectItem value="NON_UNIT" className="text-xs">
+                    Non-Unit Stasiun
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={sortBy}
+              onValueChange={(value) => {
+                setSortBy(value as SortOption);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger
+                aria-label="Urutkan antrean"
+                className="h-9 w-full rounded-lg border-slate-200 bg-white px-3 text-xs font-medium text-[#101828] focus:border-[#c41230] focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-[#c41230]/25"
+              >
+                <SelectValue placeholder="Urutkan" />
+              </SelectTrigger>
+              <SelectContent className="border-slate-200 bg-white">
+                <SelectItem value="NEWEST" className="text-xs">
+                  Urut: Terbaru Masuk
+                </SelectItem>
+                <SelectItem value="UPDATED_DESC" className="text-xs">
+                  Urut: Terbaru Diperbarui
+                </SelectItem>
+                <SelectItem value="UPDATED_ASC" className="text-xs">
+                  Urut: Terlama Mengendap
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {filtersActive && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex h-8 items-center rounded-lg px-2.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#101828] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230]"
+              >
+                Reset filter
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       <Card>
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1.5">
@@ -242,72 +562,6 @@ export default function LeadsClient({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="relative min-w-0 flex-1 sm:max-w-sm">
-              <Search
-                aria-hidden="true"
-                className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
-              />
-              <Input
-                type="search"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setPage(1);
-                }}
-                placeholder="Cari nomor, brand, PIC, unit…"
-                aria-label="Cari pengajuan"
-                className="pl-9"
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => {
-                  setStatusFilter(value);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger className="w-44" aria-label="Filter tahap proses">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Semua tahap</SelectItem>
-                  {ADMIN_LEAD_STATUSES.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {LEAD_STATUS_LABELS[status]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={siteVisitFilter}
-                onValueChange={(value) => {
-                  setSiteVisitFilter(value);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger className="w-44" aria-label="Filter status site visit">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Semua site visit</SelectItem>
-                  {SITE_VISIT_STATUS_VALUES.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {SITE_VISIT_STATUS_LABELS[status]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {filtersActive && (
-                <Button type="button" size="sm" variant="ghost" onClick={resetFilters}>
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Reset
-                </Button>
-              )}
-            </div>
-          </div>
-
           <div className="rounded-lg border border-slate-200">
             <Table>
               <TableHeader>

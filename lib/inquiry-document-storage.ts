@@ -1,34 +1,80 @@
 import { randomUUID } from "node:crypto";
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getBucketName, getS3Client, INQUIRY_DOCUMENTS_ROOT } from "@/lib/s3";
 import { inquiryDocumentTypeSchema, type InquiryDocumentType } from "./inquiry-media";
 
 export const MAX_INQUIRY_DOCUMENT_BYTES = 10 * 1024 * 1024;
 export const MAX_INQUIRY_MULTIPART_BYTES = MAX_INQUIRY_DOCUMENT_BYTES + 64 * 1024;
 const UUID_PDF = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.pdf$/i;
 
-// S3_BUCKET can be the existing vtour root itself. Do not add vtour twice.
-export function inquiryDocumentPrefix(bucket = process.env.S3_BUCKET ?? "", endpoint = process.env.S3_ENDPOINT ?? "") {
-  const root = bucket.replace(/\/+$/, "").split("/").pop();
-  let endpointRoot = "";
-  try { endpointRoot = new URL(endpoint).pathname.replace(/\/+$/, "").split("/").pop() ?? ""; } catch { /* checked by S3 config */ }
-  return root === "vtour" || endpointRoot === "vtour" ? "inquiries" : "vtour/inquiries";
-}
+/** Root kanonis di bucket `virtual-tour-lrt` untuk bukti PDF pengajuan. */
+export const INQUIRY_DOCUMENT_STORAGE_ROOT = INQUIRY_DOCUMENTS_ROOT;
+
+/**
+ * Prefix lama yang masih diterima saat verifikasi/unduh/hapus
+ * (objek yang sudah tersimpan sebelum penataan folder).
+ */
+export const LEGACY_INQUIRY_DOCUMENT_ROOTS = [
+  "vtour/inquiries",
+  "inquiries",
+] as const;
 
 function safeLeadId(leadId: string) {
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(leadId)) throw new Error("Invalid inquiry id");
   return leadId;
 }
 
-export function generateInquiryDocumentKey(leadId: string, type: InquiryDocumentType, uuid: string = randomUUID(), prefix = inquiryDocumentPrefix()) {
-  if (!UUID_PDF.test(`${uuid}.pdf`)) throw new Error("Invalid document id");
-  return `${prefix}/${safeLeadId(leadId)}/${inquiryDocumentTypeSchema.parse(type)}/${uuid}.pdf`;
+/** @deprecated Gunakan INQUIRY_DOCUMENT_STORAGE_ROOT; dipertahankan untuk tes/compat. */
+export function inquiryDocumentPrefix() {
+  return INQUIRY_DOCUMENT_STORAGE_ROOT;
 }
 
-export function isInquiryDocumentKey(key: string, leadId: string, type: string, prefix = inquiryDocumentPrefix()) {
-  if (!inquiryDocumentTypeSchema.safeParse(type).success || !/^[a-zA-Z0-9_-]{1,128}$/.test(leadId)) return false;
-  const expected = `${prefix}/${leadId}/${type}/`;
-  return key.startsWith(expected) && UUID_PDF.test(key.slice(expected.length));
+/**
+ * Key S3 baru:
+ *   inquiries/documents/{leadId}/{DOCUMENT_TYPE}/{uuid}.pdf
+ */
+export function generateInquiryDocumentKey(
+  leadId: string,
+  type: InquiryDocumentType,
+  uuid: string = randomUUID(),
+  root: string = INQUIRY_DOCUMENT_STORAGE_ROOT
+) {
+  if (!UUID_PDF.test(`${uuid}.pdf`)) throw new Error("Invalid document id");
+  return `${root}/${safeLeadId(leadId)}/${inquiryDocumentTypeSchema.parse(type)}/${uuid}.pdf`;
+}
+
+function allowedRootsForKey(preferredRoot?: string) {
+  const roots = new Set<string>([
+    INQUIRY_DOCUMENT_STORAGE_ROOT,
+    ...LEGACY_INQUIRY_DOCUMENT_ROOTS,
+  ]);
+  if (preferredRoot) roots.add(preferredRoot);
+  return [...roots];
+}
+
+export function isInquiryDocumentKey(
+  key: string,
+  leadId: string,
+  type: string,
+  preferredRoot?: string
+) {
+  if (!inquiryDocumentTypeSchema.safeParse(type).success) return false;
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(leadId)) return false;
+  if (key.includes("..") || key.startsWith("/") || key.length > 500) return false;
+
+  for (const root of allowedRootsForKey(preferredRoot)) {
+    // Hindari false-positive: root lama "inquiries" tidak boleh match
+    // key baru "inquiries/documents/…" sebagai `{root}/{leadId}/…` palsu.
+    if (root === "inquiries" && key.startsWith(`${INQUIRY_DOCUMENT_STORAGE_ROOT}/`)) {
+      continue;
+    }
+    const expected = `${root}/${leadId}/${type}/`;
+    if (key.startsWith(expected) && UUID_PDF.test(key.slice(expected.length))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function safeInquiryDocumentFilename(name: string) {
@@ -37,8 +83,11 @@ export function safeInquiryDocumentFilename(name: string) {
   return `${stem || "document"}.pdf`;
 }
 
-export function inquiryDocumentDisposition(name: string) {
-  return `attachment; filename="${safeInquiryDocumentFilename(name)}"`;
+export function inquiryDocumentDisposition(
+  name: string,
+  mode: "inline" | "attachment" = "inline"
+) {
+  return `${mode}; filename="${safeInquiryDocumentFilename(name)}"`;
 }
 
 export function validateInquiryPdf(bytes: Uint8Array, filename: string, mimeType: string) {
@@ -70,36 +119,59 @@ export async function readInquiryMultipart(request: Request): Promise<FormData> 
       }
       chunks.push(value);
     }
-  } finally { reader.releaseLock(); }
-  return new Response(Buffer.concat(chunks), { headers: { "content-type": request.headers.get("content-type")! } }).formData();
+  } finally {
+    reader.releaseLock();
+  }
+  return new Response(Buffer.concat(chunks), {
+    headers: { "content-type": request.headers.get("content-type")! },
+  }).formData();
 }
 
-// Match lib/s3.ts configuration, but deliberately never generate a public URL or
-// use the public asset uploader/proxy for private inquiry evidence.
-function storageConfig() {
-  const endpoint = process.env.S3_ENDPOINT;
-  const bucket = process.env.S3_BUCKET;
-  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
-  if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) throw new Error("S3 configuration is missing");
-  return {
-    bucket,
-    client: new S3Client({ endpoint, region: process.env.S3_REGION || "us-east-1", credentials: { accessKeyId, secretAccessKey }, forcePathStyle: true }),
-  };
-}
-
+/**
+ * Upload privat ke S3 bucket proyek.
+ * Tidak memakai URL publik / s3-proxy — unduhan hanya lewat API dokumen pengajuan.
+ */
 export async function storeInquiryDocument(bytes: Buffer, key: string) {
-  const { client, bucket } = storageConfig();
-  await client.send(new PutObjectCommand({
-    Bucket: bucket, Key: key, Body: bytes, ContentType: "application/pdf",
-    ACL: "private", CacheControl: "private, no-store",
-  }));
+  const client = getS3Client();
+  const bucket = getBucketName();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: bytes,
+      ContentType: "application/pdf",
+      ACL: "private",
+      CacheControl: "private, no-store",
+      Metadata: {
+        purpose: "inquiry-document",
+        namespace: INQUIRY_DOCUMENT_STORAGE_ROOT,
+      },
+    })
+  );
 }
 
-export async function signInquiryDocumentDownload(key: string, filename: string) {
-  const { client, bucket } = storageConfig();
-  return getSignedUrl(client, new GetObjectCommand({
-    Bucket: bucket, Key: key, ResponseContentType: "application/pdf",
-    ResponseContentDisposition: inquiryDocumentDisposition(filename), ResponseCacheControl: "private, no-store",
-  }), { expiresIn: 60 });
+export async function signInquiryDocumentDownload(
+  key: string,
+  filename: string,
+  mode: "inline" | "attachment" = "inline"
+) {
+  const client = getS3Client();
+  const bucket = getBucketName();
+  return getSignedUrl(
+    client,
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ResponseContentType: "application/pdf",
+      ResponseContentDisposition: inquiryDocumentDisposition(filename, mode),
+      ResponseCacheControl: "private, no-store",
+    }),
+    { expiresIn: 60 }
+  );
+}
+
+export async function deleteInquiryDocument(key: string) {
+  const client = getS3Client();
+  const bucket = getBucketName();
+  await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 }

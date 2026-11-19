@@ -24,7 +24,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return errorResponse("Dokumen tidak ditemukan.", 404);
   }
   try {
-    const signedUrl = await signInquiryDocumentDownload(media.storageKey, media.fileName || "document.pdf");
+    const mode =
+      request.nextUrl.searchParams.get("download") === "1" ? "attachment" : "inline";
+    const signedUrl = await signInquiryDocumentDownload(
+      media.storageKey,
+      media.fileName || "document.pdf",
+      mode
+    );
     return new NextResponse(null, { status: 307, headers: { ...headers, Location: signedUrl } });
   } catch {
     return errorResponse("Unduhan tidak tersedia. Coba lagi nanti.", 503);

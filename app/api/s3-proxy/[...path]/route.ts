@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { requireAuth } from "@/lib/auth";
+import { S3_PRIVATE_BLOCKED_PREFIXES } from "@/lib/s3";
 
 function getS3Client() {
   return new S3Client({
@@ -72,6 +73,10 @@ function isPublicKey(key: string): boolean {
   return PUBLIC_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
+function isPrivateBlockedKey(key: string): boolean {
+  return S3_PRIVATE_BLOCKED_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
 function toWebStream(body: {
   transformToWebStream?: () => ReadableStream;
 }): ReadableStream | null {
@@ -89,6 +94,11 @@ export async function GET(
     const { path } = await params;
     const s3Key = validateS3Key(path);
     if (!s3Key) {
+      return new NextResponse("Resource not found", { status: 404 });
+    }
+
+    // Bukti dokumen pengajuan hanya lewat /api/inquiries/.../documents/...
+    if (isPrivateBlockedKey(s3Key)) {
       return new NextResponse("Resource not found", { status: 404 });
     }
 
