@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,6 +74,7 @@ type TrainEditorSpace = TrainRentalPickerItem & {
 
 type Props = {
   currentScene: Scene;
+  incomingSceneViews: ReactNode;
   levels: TourLevel[];
   scenes: Scene[];
   hotspots: HotspotItem[];
@@ -118,6 +120,7 @@ type Props = {
 
 export function TrainTourEditorSidebar({
   currentScene,
+  incomingSceneViews,
   levels,
   scenes,
   hotspots,
@@ -168,6 +171,7 @@ export function TrainTourEditorSidebar({
             Scene
           </h3>
           <div className="space-y-3">
+            {incomingSceneViews}
             <div>
               <Label className="mb-1.5 block text-xs text-[var(--work-muted)]">Judul</Label>
               <Input

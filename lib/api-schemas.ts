@@ -83,7 +83,15 @@ export const spaceMutationSchema = z.object({
   tenantId: id.nullable().optional(),
 }).strict();
 
+export const trainMediaSpecificationsSchema = z.object({
+  mediaType: z.string().trim().max(120).optional(),
+  placement: z.string().trim().max(300).optional(),
+  dimensions: z.string().trim().max(200).optional(),
+  technicalNote: z.string().trim().max(500).optional(),
+}).strict();
+
 export const trainRentalSpaceMutationSchema = z.object({
+  specifications: trainMediaSpecificationsSchema.optional(),
   displayNumber: z.string().trim().min(1).max(8).regex(/^\d{2}$/, "Nomor tampilan harus 2 digit, mis. 01"),
   title: shortText,
   description: optionalText(5_000),

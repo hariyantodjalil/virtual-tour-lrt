@@ -1,3 +1,4 @@
+import { trainMediaSpecificationsSchema } from "@/lib/api-schemas";
 import { cache } from "react";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -118,6 +119,7 @@ export async function findTrainRentalSpaceForLead(idOrNumber: string) {
 }
 
 function toPublicSpace(space: {
+  specifications?: unknown;
   inquiryMode?: "MEDIA" | "FULL_BRANDING";
   train?: { name: string; slug: string; advertisingCapacity: number | null; cars?: { slug: string; label: string }[] };
   id: string;
@@ -138,6 +140,7 @@ function toPublicSpace(space: {
     displayNumber: space.displayNumber,
     title: space.title,
     description: space.description,
+    specifications: trainMediaSpecificationsSchema.safeParse(space.specifications).data,
     image: space.imageUrl?.trim() ? resolvePublicAssetUrl(space.imageUrl.trim()) : "",
     objectPosition: space.objectPosition || "50% 50%",
     inquiryMode: space.inquiryMode,

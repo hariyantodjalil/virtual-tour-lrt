@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
         title: parsed.data.title,
         ...(parsed.data.inquiryMode ? { inquiryMode: parsed.data.inquiryMode } : {}),
         description: parsed.data.description ?? null,
+        specifications: parsed.data.specifications ?? {},
         imageUrl: parsed.data.imageUrl ?? null,
         objectPosition: parsed.data.objectPosition ?? "50% 50%",
         order: parsed.data.order ?? 0,

@@ -38,7 +38,7 @@ import {
   extractInitialViewFromCanvasData,
   mergeInitialViewIntoCanvasData,
 } from "@/lib/scene-initial-view";
-import type { TourLevelPublic } from "@/lib/tour-types";
+import type { SceneInitialView, TourLevelPublic } from "@/lib/tour-types";
 import {
   ArrowLeft,
   Save,
@@ -70,8 +70,10 @@ import {
 import { PannellumPreview } from "../virtual-tour/[stationId]/PannellumPreview";
 import { TourStructureSidebar } from "../virtual-tour/[stationId]/TourStructureSidebar";
 import { ConnectionMapDialog } from "../virtual-tour/[stationId]/ConnectionMapDialog";
+import { IncomingSceneViews } from "../virtual-tour/[stationId]/IncomingSceneViews";
 import { TrainTourEditorSidebar } from "./TrainTourEditorSidebar";
 import { BakePrivacyBlurDialog } from "@/components/cms/BakePrivacyBlurDialog";
+import { EditorNotice, useEditorNotice } from "@/components/cms/EditorNotice";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { PrivacyBlurBakeTarget } from "@/components/cms/BakePrivacyBlurDialog";
 import { extractMultiResProfilesFromCanvasData } from "@/lib/panorama-profile";
@@ -107,7 +109,10 @@ type BulkRow = {
   error?: string;
 };
 
+export type TrainEditorTarget = { sceneId: string; code: string; kind: "space" | "ad"; yaw: number; pitch: number };
+
 type Props = {
+  initialTarget?: TrainEditorTarget;
   trainId: string;
   trainName: string;
   trainSlug: string;
@@ -289,7 +294,7 @@ function toPreviewLevels(cars: TrainTourCar[]): TourLevelPublic[] {
     }));
 }
 
-export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props) {
+export default function TrainTourEditor({ trainId, trainName, trainSlug, initialTarget }: Props) {
   const editorRef = useRef<PannellumEditorHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const creativeInputRef = useRef<HTMLInputElement>(null);
@@ -326,7 +331,9 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     useState<EditorPanoramaPreviewMode>("display");
   const [blurSizeLinked, setBlurSizeLinked] = useState(true);
   const [isPreview, setIsPreview] = useState(false);
-  const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+  const [linkedMediaView, setLinkedMediaView] = useState<{ sceneId: string; view: SceneInitialView } | null>(null);
+  const [previewEntryView, setPreviewEntryView] = useState<{ sceneId: string; view: SceneInitialView } | null>(null);
+  const { notice, showToast } = useEditorNotice();
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [showConnectionMap, setShowConnectionMap] = useState(false);
@@ -382,10 +389,6 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     return map;
   }, [scenes]);
 
-  function showToast(type: "ok" | "err", msg: string) {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3500);
-  }
 
   function rememberSavedScene(scene: Scene | null) {
     savedSceneRef.current = scene ? (JSON.parse(JSON.stringify(scene)) as Scene) : null;
@@ -470,7 +473,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
   }
 
   const load = useCallback(
-    async (keepIndex?: number) => {
+    async (keepIndex?: number, openLinkedTarget = false) => {
       const [structRes, spaces] = await Promise.all([
         cmsFetch(`/api/cms/virtual-train/${trainId}/structure`),
         loadTrainRentalSpaces(),
@@ -490,14 +493,30 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
         setBulkDefaultAreaId(carData[0].zones[0].id);
       }
       if (sc.length > 0) {
-        const idx =
+        const linkedIndex = openLinkedTarget && initialTarget ? sc.findIndex(scene => scene.sceneId === initialTarget.sceneId) : -1;
+        if (openLinkedTarget && initialTarget && linkedIndex < 0) {
+          showToast("err", "Scene untuk pinpoint ini tidak ditemukan.");
+        }
+        const idx = linkedIndex >= 0 ? linkedIndex :
           keepIndex !== undefined && keepIndex < sc.length
             ? keepIndex
             : Math.min(selectedSceneIndex, Math.max(0, sc.length - 1));
         setSelectedSceneIndex(idx);
         rememberSavedScene(sc[idx]);
-        setHotspots(sceneToHotspots(sc[idx]));
+        const sceneHotspots = sceneToHotspots(sc[idx]);
+        setHotspots(sceneHotspots);
         setPrivacyBlurs(sceneToPrivacyBlurs(sc[idx]));
+        if (linkedIndex >= 0 && initialTarget) {
+          const pins = sceneHotspots.filter(hotspot => hotspot.type === initialTarget.kind && hotspot.spaceCode === initialTarget.code);
+          const selected = pins.find(pin => pin.yaw === initialTarget.yaw && pin.pitch === initialTarget.pitch)
+            ?? (pins.length === 1 ? pins[0] : undefined);
+          if (selected) {
+            setSelectedHotspotId(selected._id);
+            setLinkedMediaView({ sceneId: initialTarget.sceneId, view: { yaw: selected.yaw, pitch: selected.pitch } });
+          } else {
+            showToast("err", "Pinpoint media tidak ditemukan di scene ini.");
+          }
+        }
       } else {
         rememberSavedScene(null);
         setHotspots([]);
@@ -505,24 +524,16 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
       }
       setHasUnsaved(false);
     },
-    [trainId, bulkDefaultAreaId, selectedSceneIndex]
+    [trainId, bulkDefaultAreaId, selectedSceneIndex, initialTarget]
   );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void load();
+      void load(undefined, true);
     }, 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trainId]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void load();
-    }, 0);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trainId]);
+  }, [trainId, initialTarget]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -557,6 +568,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     const next = scenes[index];
     if (!next) return;
     setSelectedSceneIndex(index);
+    setLinkedMediaView(null);
     setEditorPreviewMode("display");
     rememberSavedScene(next);
     restoreSceneState(next);
@@ -614,6 +626,10 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
       const updated = mapSceneRow(await res.json());
       rememberSavedScene(updated);
       setScenes((prev) => prev.map((s, i) => (i === selectedSceneIndex ? { ...s, ...updated } : s)));
+      if (updated.hotspots.length !== hotspots.length) {
+        setHotspots(sceneToHotspots(updated));
+        setSelectedHotspotId(null);
+      }
       setHasUnsaved(false);
       showToast("ok", "Scene disimpan");
     } catch {
@@ -755,7 +771,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
   async function deleteScene(scene: Scene) {
     const confirmed = await confirmDialog({
       title: `Hapus scene "${scene.title}"?`,
-      description: "Scene akan dihapus dari tur kereta ini.",
+      description: "Panah yang menuju scene ini ikut dihapus.",
       confirmLabel: "Ya, Hapus",
       destructive: true,
     });
@@ -1018,6 +1034,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
         prev.map((h) => {
           if (h._id !== selectedHotspotId) return h;
           const next: HotspotItem = { ...h, type: newType };
+          if (newType !== "scene") delete next.targetView;
           if (newType === "scene") {
             delete next.spaceCode;
             delete next.description;
@@ -1062,7 +1079,9 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
       );
     } else {
       setHotspots((prev) =>
-        prev.map((h) => (h._id === selectedHotspotId ? { ...h, [field]: value } : h))
+        prev.map((h) => h._id === selectedHotspotId
+          ? { ...h, [field]: value, ...(field === "sceneId" && h.sceneId !== value ? { targetView: undefined } : {}) }
+          : h)
       );
     }
     setHasUnsaved(true);
@@ -1243,7 +1262,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     setHasUnsaved(true);
   }
 
-  function previewNavigateScene(sceneId: string) {
+  function previewNavigateScene(sceneId: string, entryView?: SceneInitialView) {
     const updatedScenes = scenes.map((s, i) =>
       i === selectedSceneIndex
         ? {
@@ -1255,6 +1274,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     );
     const idx = updatedScenes.findIndex((s) => s.sceneId === sceneId);
     if (idx < 0) return;
+    setPreviewEntryView(entryView ? { sceneId, view: entryView } : null);
     setScenes(updatedScenes);
     setSelectedSceneIndex(idx);
     setHotspots(sceneToHotspots(updatedScenes[idx]));
@@ -1385,7 +1405,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
             className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--work-muted)] hover:text-[var(--work-text)] disabled:pointer-events-none disabled:opacity-30"
             onClick={handleSetInitialView}
             disabled={!currentScene || isPreview}
-            title="Set view awal dari posisi kamera"
+            title="Set arah bawaan scene dari kamera saat ini"
           >
             <Crosshair className="h-3.5 w-3.5" />
           </button>
@@ -1412,6 +1432,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
               : "border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-muted)] hover:border-purple-500 hover:text-purple-300"
           }`}
           onClick={() => {
+            setPreviewEntryView(null);
             setIsPreview((p) => !p);
             setAddMode("none");
           }}
@@ -1451,13 +1472,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
         </Button>
       </div>
 
-      {toast && (
-        <div
-          className={`shrink-0 px-4 py-2 text-sm ${toast.type === "ok" ? "bg-emerald-900/50 text-[var(--work-success)]" : "bg-red-900/50 text-red-200"}`}
-        >
-          {toast.msg}
-        </div>
-      )}
+      <EditorNotice notice={notice} />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <TourStructureSidebar
@@ -1494,11 +1509,11 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                 privacyBlurs={privacyBlurs}
                 sceneId={currentScene.sceneId}
                 sceneName={currentScene.title}
-                scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
+                scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title, initialView: extractInitialViewFromCanvasData(s.canvasData) }))}
                 levels={toPreviewLevels(cars)}
                 stationName={trainName}
                 onSceneNavigate={previewNavigateScene}
-                initialView={extractInitialViewFromCanvasData(currentScene.canvasData)}
+                initialView={previewEntryView?.sceneId === currentScene.sceneId ? previewEntryView.view : extractInitialViewFromCanvasData(currentScene.canvasData)}
               />
             ) : (
               <PannellumEditor
@@ -1526,7 +1541,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                 onBlurDelete={handleBlurDelete}
                 spaces={rentalSpaces.map((s) => ({ code: s.code, status: s.status }))}
                 scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
-                initialView={extractInitialViewFromCanvasData(currentScene.canvasData) ?? null}
+                initialView={linkedMediaView?.sceneId === currentScene.sceneId ? linkedMediaView.view : extractInitialViewFromCanvasData(currentScene.canvasData) ?? null}
                 privacyBlurGuideOnly={privacyBlurGuideOnly}
               />
             )
@@ -1543,6 +1558,12 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
         {currentScene ? (
           <TrainTourEditorSidebar
             currentScene={currentScene}
+            incomingSceneViews={<IncomingSceneViews key={currentScene.sceneId} destination={currentScene} scenes={scenes} outgoingHotspots={hotspots}
+              endpoint={`/api/cms/virtual-train/${encodeURIComponent(trainId)}/arrival-views`} disabled={isPreview || saving}
+              onSaved={(sourceId, savedHotspots, hasOverride) => {
+                setScenes(previous => previous.map(scene => scene.sceneId === sourceId ? { ...scene, hotspots: savedHotspots } : scene));
+                showToast("ok", hasOverride ? "Arah tiba disimpan." : "Koneksi kembali memakai arah bawaan.");
+              }} />}
             levels={levels}
             scenes={scenes}
             hotspots={hotspots}

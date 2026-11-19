@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { cmsFetch } from "@/lib/cms-fetch";
 import { cmsUi } from "@/lib/cms-ui";
+import { TRAIN_MEDIA_SPEC_FIELDS, type TrainMediaSpecifications } from "@/lib/train-rental-spaces-shared";
 import { resolvePublicAssetUrl, shouldUnoptimizeImage } from "@/lib/s3-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ type TrainSpace = {
   displayNumber: string;
   title: string;
   description: string | null;
+  specifications?: TrainMediaSpecifications;
   imageUrl: string | null;
   objectPosition: string;
   availableTrainsets: string[];
@@ -52,6 +54,7 @@ function createDraft(order: number): TrainSpace {
     displayNumber: nextNumber,
     title: "",
     description: "",
+    specifications: {},
     imageUrl: "",
     objectPosition: "50% 50%",
     availableTrainsets: [],
@@ -72,6 +75,7 @@ function toPayload(space: TrainSpace) {
     title: space.title.trim(),
     inquiryMode: space.inquiryMode ?? "MEDIA",
     description: space.description?.trim() || null,
+    specifications: space.specifications ?? {},
     imageUrl: space.imageUrl?.trim() || null,
     objectPosition: space.objectPosition.trim() || "50% 50%",
     availableTrainsets: unionCarTrainsets(availableByCar),
@@ -442,6 +446,20 @@ export default function TrainSpacesClient() {
                   className="mt-1.5 border-[var(--work-line)] bg-[var(--work-subtle)]"
                 />
               </div>
+
+              <fieldset className="grid gap-3 rounded-lg border border-[var(--work-line)] p-3 sm:grid-cols-2">
+                <legend className="px-1 text-sm font-semibold">Spesifikasi Media</legend>
+                {[...TRAIN_MEDIA_SPEC_FIELDS, { key: "technicalNote", label: "Catatan teknis" } as const].map(({ key, label }) => (
+                  <label key={key} className="grid gap-1.5 text-sm text-[var(--work-muted)]">
+                    {label}
+                    <Input value={editing.specifications?.[key] ?? ""}
+                      onChange={event => setEditing(current => current ? {
+                        ...current, specifications: { ...current.specifications, [key]: event.target.value },
+                      } : current)}
+                      className="border-[var(--work-line)] bg-[var(--work-subtle)]" />
+                  </label>
+                ))}
+              </fieldset>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>

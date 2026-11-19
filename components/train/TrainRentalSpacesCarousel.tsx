@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -47,6 +48,7 @@ function RentalCard({
   space: SlideItem;
   href: string;
 }) {
+  const { t, content } = useTourLanguage();
   return (
     <article
       data-rental-card
@@ -56,11 +58,11 @@ function RentalCard({
       <Link
         href={href}
         className="absolute inset-0 text-left"
-        aria-label={`Buka virtual tour ${space.title}`}
+        aria-label={t("Buka virtual tour {space}", { space: content(space.title) })}
       >
         {space.image && <Image
           src={resolvePublicAssetUrl(space.image)}
-          alt={space.title}
+          alt={content(space.title)}
           fill
           sizes="(max-width: 640px) 72vw, (max-width: 1024px) 40vw, 24vw"
           className="pointer-events-none object-cover select-none"
@@ -75,7 +77,7 @@ function RentalCard({
         </span>
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 px-4 pb-4">
-          <p className="text-sm font-semibold text-white">{space.title}</p>
+          <p className="text-sm font-semibold text-white">{content(space.title)}</p>
           <p className="text-sm font-medium text-white/90">{space.displayNumber}</p>
         </div>
       </Link>
@@ -90,6 +92,7 @@ export default function TrainRentalSpacesCarousel({
   spaces?: TrainRentalSpacePublic[];
   tourHref?: string;
 }) {
+  const { t } = useTourLanguage();
   const rentalSpaces = spaces;
 
   const loopSlides = useMemo<SlideItem[]>(
@@ -272,18 +275,17 @@ export default function TrainRentalSpacesCarousel({
     [pageCount, realCount, scrollToSlideIndex, startIndex, visibleCount]
   );
 
-  if (realCount === 0) return <p className="p-6 text-sm text-slate-600">Belum ada media iklan kereta.</p>;
+  if (realCount === 0) return <p className="p-6 text-sm text-slate-600">{t("Belum ada media iklan kereta.")}</p>;
 
   return (
     <section id="ruang-sewa" className="scroll-mt-28 bg-white py-14 md:py-20">
       <div className="mx-auto max-w-7xl px-5 md:px-10">
         <div className="text-center">
           <h2 className="font-display text-2xl font-bold text-black md:text-[32px] md:leading-tight">
-            Apa yang Ingin Anda Sewa?
+            {t("Apa yang Ingin Anda Sewa?")}
           </h2>
           <p className="mx-auto mt-3 max-w-3xl text-sm leading-relaxed text-black/75 md:text-[15px]">
-            Pilih berbagai ruang dan fitur interior kereta untuk menempatkan brand Anda di tempat
-            yang tepat.
+            {t("Pilih berbagai ruang dan fitur interior kereta untuk menempatkan brand Anda di tempat yang tepat.")}
           </p>
         </div>
 
@@ -292,7 +294,7 @@ export default function TrainRentalSpacesCarousel({
             <button
               type="button"
               onClick={() => slideBy(-1)}
-              aria-label="Ruangan sebelumnya"
+              aria-label={t("Ruangan sebelumnya")}
               className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-black shadow-md transition hover:border-[#d32f2f] hover:text-[#d32f2f] sm:size-10"
             >
               <ChevronLeft className="size-5" strokeWidth={2.25} />
@@ -316,7 +318,7 @@ export default function TrainRentalSpacesCarousel({
             <button
               type="button"
               onClick={() => slideBy(1)}
-              aria-label="Ruangan berikutnya"
+              aria-label={t("Ruangan berikutnya")}
               className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-black shadow-md transition hover:border-[#d32f2f] hover:text-[#d32f2f] sm:size-10"
             >
               <ChevronRight className="size-5" strokeWidth={2.25} />

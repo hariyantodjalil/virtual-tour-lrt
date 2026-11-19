@@ -1,5 +1,16 @@
 
+export const TRAIN_MEDIA_SPEC_FIELDS = [
+  { key: "mediaType", label: "Jenis Media" },
+  { key: "placement", label: "Penempatan" },
+  { key: "dimensions", label: "Dimensi" },
+] as const;
+
+export type TrainMediaSpecifications = Partial<Record<
+  (typeof TRAIN_MEDIA_SPEC_FIELDS)[number]["key"] | "technicalNote", string
+>>;
+
 export type TrainRentalSpacePublic = {
+  specifications?: TrainMediaSpecifications;
   inquiryMode?: "MEDIA" | "FULL_BRANDING";
   train?: { name: string; slug: string; advertisingCapacity: number | null; cars?: { slug: string; label: string }[] };
   id: string;

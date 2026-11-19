@@ -1,3 +1,4 @@
+import { getTourTranslator } from "@/lib/tour-translated-content";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -10,11 +11,10 @@ import { HomeReveal, HomeShell } from "@/components/home/HomeMotion";
 import { getDefaultTrainTourHref } from "@/lib/train-tour-entry";
 import { getTrainRentalSpaces } from "@/lib/train-rental-spaces";
 
-export const metadata = {
-  title: "Train Virtual Tour - LRT Jabodebek",
-  description:
-    "Jelajahi interior kereta LRT Jabodebek secara virtual 360° — gerbong, fasilitas penumpang, dan pengalaman perjalanan.",
-};
+export async function generateMetadata() {
+  const t = await getTourTranslator();
+  return { title: t("Train Virtual Tour - LRT Jabodebek"), description: t("Jelajahi interior kereta LRT Jabodebek secara virtual 360° — gerbong, fasilitas penumpang, dan pengalaman perjalanan.") };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -45,23 +45,23 @@ const FOOTER_LINKS = [
 
 
 async function VirtualTourSection({ tourHref }: { tourHref: string }) {
+  const t = await getTourTranslator();
 
   return (
     <section id="virtual-tour" className="scroll-mt-28 bg-[#d32f2f] py-16 md:py-20">
       <div className="mx-auto flex max-w-5xl flex-col items-center px-5 text-center md:px-10">
         <HomeReveal>
           <h2 id="rasakan-kereta" className="scroll-mt-28 font-display text-3xl font-bold text-white md:text-[36px]">
-            Rasakan Pengalaman di Dalam Kereta
+            {t("Rasakan Pengalaman di Dalam Kereta")}
           </h2>
           <p className="mx-auto mt-4 max-w-3xl text-base leading-relaxed text-white md:text-[20px] md:tracking-tight">
-            Masuki interior kereta LRT Jabodebek melalui Virtual Tour 360°. Jelajahi gerbong, fasilitas
-            penumpang, dan setiap detail perjalanan sebelum Anda naik kereta.
+            {t("Masuki interior kereta LRT Jabodebek melalui Virtual Tour 360°. Jelajahi gerbong, fasilitas penumpang, dan setiap detail perjalanan sebelum Anda naik kereta.")}
           </p>
           <Link
             href={tourHref}
             className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-white underline underline-offset-4"
           >
-            Mulai Train Virtual Tour
+            {t("Mulai Train Virtual Tour")}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/brand/landing/icons/click.svg"
@@ -80,7 +80,7 @@ async function VirtualTourSection({ tourHref }: { tourHref: string }) {
           >
             <Image
               src="/brand/landing/hero-train-station.jpg"
-              alt="Preview train virtual tour 360 LRT Jabodebek"
+              alt={t("Preview train virtual tour 360 LRT Jabodebek")}
               fill
               sizes="(max-width: 1024px) 100vw, 1017px"
               className="object-cover transition duration-500 group-hover:scale-[1.02]"
@@ -99,6 +99,7 @@ async function VirtualTourSection({ tourHref }: { tourHref: string }) {
 }
 
 export default async function TrainVirtualTourLandingPage() {
+  const t = await getTourTranslator();
   const [rentalSpaces, tourHref] = await Promise.all([
     getTrainRentalSpaces(),
     getDefaultTrainTourHref(),
@@ -128,14 +129,13 @@ export default async function TrainVirtualTourLandingPage() {
               LRT Jabodebek
             </p>
             <h1 className="mt-3 font-display text-2xl font-bold leading-tight text-white sm:text-3xl md:text-[40px]">
-              Jelajahi Interior Kereta{" "}
+              {t("Jelajahi Interior Kereta")}{" "}
               <span className="text-[#ff6b6b]">LRT Jabodebek</span>
             </h1>
           </HomeReveal>
           <HomeReveal delayMs={100}>
             <p className="mx-auto mt-4 max-w-3xl text-sm leading-relaxed text-white/90 md:text-base">
-              Masuki kabin kereta LRT Jabodebek melalui Virtual Tour 360°. Lihat gerbong, fasilitas
-              penumpang, dan pengalaman perjalanan secara interaktif sebelum Anda berangkat.
+              {t("Masuki kabin kereta LRT Jabodebek melalui Virtual Tour 360°. Lihat gerbong, fasilitas penumpang, dan pengalaman perjalanan secara interaktif sebelum Anda berangkat.")}
             </p>
           </HomeReveal>
           <HomeReveal delayMs={180}>
@@ -144,7 +144,7 @@ export default async function TrainVirtualTourLandingPage() {
                 href="#rasakan-kereta"
                 className="inline-flex h-12 min-w-[180px] items-center justify-center gap-2 rounded-full bg-[#E31E2D] px-6 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(227,30,45,0.45)] transition hover:brightness-110"
               >
-                Jelajahi Sekarang
+                {t("Jelajahi Sekarang")}
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </a>
             </div>
@@ -164,19 +164,17 @@ export default async function TrainVirtualTourLandingPage() {
                 </p>
               </div>
               <h2 className="mt-5 font-display text-2xl font-bold text-black md:text-[32px] md:leading-snug">
-                Kenali Kereta Sebelum Anda Naik
+                {t("Kenali Kereta Sebelum Anda Naik")}
               </h2>
               <p className="mt-5 text-base leading-relaxed text-black/85 md:text-[20px] md:tracking-tight">
-                LRT Jabodebek menghadirkan pengalaman perjalanan yang modern dan nyaman. Melalui train
-                virtual tour, Anda dapat melihat interior kereta, memahami tata letak gerbong, dan
-                mengetahui fasilitas penumpang tanpa harus berada di stasiun.
+                {t("LRT Jabodebek menghadirkan pengalaman perjalanan yang modern dan nyaman. Melalui train virtual tour, Anda dapat melihat interior kereta, memahami tata letak gerbong, dan mengetahui fasilitas penumpang tanpa harus berada di stasiun.")}
               </p>
             </HomeReveal>
             <HomeReveal delayMs={120}>
               <div className="relative aspect-[595/422] overflow-hidden rounded-none lg:rounded-l-none">
                 <Image
                   src="/brand/landing/train-intro-interior.jpg"
-                  alt="Interior gerbong LRT Jabodebek"
+                  alt={t("Interior gerbong LRT Jabodebek")}
                   fill
                   sizes="(max-width: 1024px) 100vw, 50vw"
                   className="object-cover object-[center_45%]"
@@ -199,8 +197,8 @@ export default async function TrainVirtualTourLandingPage() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={card.icon} alt="" width={28} height={28} className="size-7" />
                   </div>
-                  <h3 className="mt-4 text-sm font-bold text-black">{card.title}</h3>
-                  <p className="mt-2 text-xs leading-relaxed text-black/80">{card.body}</p>
+                  <h3 className="mt-4 text-sm font-bold text-black">{t(card.title)}</h3>
+                  <p className="mt-2 text-xs leading-relaxed text-black/80">{t(card.body)}</p>
                 </div>
               </HomeReveal>
             ))}
@@ -245,7 +243,7 @@ export default async function TrainVirtualTourLandingPage() {
               </span>
             </div>
             <p className="mt-4 text-xs leading-relaxed text-black md:text-[12px]">
-              KAI Divisi LRT Jabodebek
+              {t("KAI Divisi LRT Jabodebek")}
               <br />
               Jatimulya, Bekasi Timur, Bekasi Regency, West Java
             </p>
@@ -262,11 +260,10 @@ export default async function TrainVirtualTourLandingPage() {
 
           <div className="text-center md:px-4">
             <p className="font-display text-lg font-bold text-black md:text-xl">
-              Transportasi Cerdas, Mobilitas Tanpa Batas
+              {t("Transportasi Cerdas, Mobilitas Tanpa Batas")}
             </p>
             <p className="mt-3 text-sm leading-relaxed text-black/70">
-              Jelajahi interior kereta LRT Jabodebek melalui Train Virtual Tour 360° untuk melihat
-              gerbong, fasilitas penumpang, dan pengalaman perjalanan secara interaktif.
+              {t("Jelajahi interior kereta LRT Jabodebek melalui Train Virtual Tour 360° untuk melihat gerbong, fasilitas penumpang, dan pengalaman perjalanan secara interaktif.")}
             </p>
             <SocialIconLinks />
           </div>
@@ -276,7 +273,7 @@ export default async function TrainVirtualTourLandingPage() {
               {FOOTER_LINKS.map((link) => (
                 <li key={link.label}>
                   <a href={link.href} className="transition hover:text-[#d32f2f]">
-                    {link.label}
+                    {t(link.label)}
                   </a>
                 </li>
               ))}

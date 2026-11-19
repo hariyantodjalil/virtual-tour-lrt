@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ensureDefaultTrain } from "@/lib/default-train";
 import { cmsUi } from "@/lib/cms-ui";
-import TrainTourEditor from "./TrainTourEditor";
+import TrainTourEditor, { type TrainEditorTarget } from "./TrainTourEditor";
 import TrainBootstrap from "./TrainBootstrap";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,11 +24,18 @@ async function loadDefaultTrain() {
   }
 }
 
-export default async function CmsVirtualTrainPage() {
-  const { train, error } = await loadDefaultTrain();
+export default async function CmsVirtualTrainPage({ searchParams }: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [{ train, error }, { scene, media, kind, yaw, pitch }] = await Promise.all([loadDefaultTrain(), searchParams]);
+  const initialTarget: TrainEditorTarget | undefined = typeof scene === "string" && typeof media === "string" &&
+    (kind === "ad" || kind === "space") && typeof yaw === "string" && typeof pitch === "string" &&
+    yaw.trim() && pitch.trim() && Number.isFinite(Number(yaw)) && Number.isFinite(Number(pitch))
+    ? { sceneId: scene, code: media, kind, yaw: Number(yaw), pitch: Number(pitch) }
+    : undefined;
 
   if (train) {
-    return <TrainTourEditor trainId={train.id} trainName={train.name} trainSlug={train.slug} />;
+    return <TrainTourEditor trainId={train.id} trainName={train.name} trainSlug={train.slug} initialTarget={initialTarget} />;
   }
 
   return (
