@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Building2, CalendarClock, Check, ChevronDown, ChevronRight, FileText, GitBranch, LockKeyhole, MessageSquareText, NotebookPen } from "lucide-react";
 import { PUBLIC_LEAD_PROCESS_STEPS, canonicalLeadStatus, completedLeadStageIndex, SITE_VISIT_STATUS_LABELS, SITE_VISIT_STATUS_VALUES, type CommercialLeadStatus } from "@/lib/commercial-pipeline";
-import { leaseExpiryReminder } from "@/lib/inquiry-workflow";
-import { documentsForLeadStatus } from "@/lib/inquiry-media";
+import { inquirySiteVisitStep, leaseExpiryReminder } from "@/lib/inquiry-workflow";
+import { inquiryDocumentTypesForStep } from "@/lib/inquiry-media";
 import { cmsFetch } from "@/lib/cms-fetch";
 import InquiryDocuments from "./InquiryDocuments";
 import LeadUnitSummary from "./LeadUnitSummary";
@@ -87,8 +87,7 @@ export default function LeadWorkflowPanel({ lead, saving, canManage, onSave, onR
   const [showStopDialog, setShowStopDialog] = useState(false);
   const [stopReason, setStopReason] = useState("");
   const [stopError, setStopError] = useState("");
-  // Gate hanya status NEW: currentStepOrder kadang > 1 pada data lama / alur kustom.
-  const canChangeWorkflow = canManage && lead.status === "NEW";
+  const canChangeWorkflow = canManage && lead.status === "NEW" && (lead.currentStepOrder ?? 1) === 1;
   const status = canonicalLeadStatus(lead.status as CommercialLeadStatus);
   const stopped = status === "CLOSED_LOST";
   const active = status === "COMMERCIAL_OPERATION";
@@ -135,37 +134,30 @@ export default function LeadWorkflowPanel({ lead, saving, canManage, onSave, onR
   const reminder = active ? leaseExpiryReminder(lead.leaseEndAt) : null;
   const documentTypes =
     view === "stages" && selectedStep
-      ? documentsForLeadStatus(selectedStep.leadStatus)
+      ? inquiryDocumentTypesForStep(selectedStep)
       : undefined;
   // Hanya tampilkan slot dokumen yang memang dipetakan ke status tahap ini.
   // Jangan pakai mediaRequirement OPTIONAL sebagai alasan menampilkan semua tipe.
   const showDocuments =
     view === "documents" || (view === "stages" && Boolean(documentTypes));
-  const showSiteVisit =
-    view === "stages" &&
-    Boolean(
-      selectedStep &&
-        (selectedStep.stepType === "SITE_VISIT" ||
-          ["SITE_CHECK", "NEGOTIATING", "BA_SIGNED"].includes(selectedStep.leadStatus))
-    );
+  const showSiteVisit = view === "stages" && Boolean(selectedStep && selectedStep.stepOrder === inquirySiteVisitStep(steps)?.stepOrder);
+  const canActivateNext = selectedIsCurrent && nextStep?.spaceEffect === "ACTIVATE_TENANT";
+  const canVerifyPayment = canActivateNext || completedLeadStageIndex(lead.status) >= 4;
   const showLeaseDates =
     view === "stages" &&
-    Boolean(selectedStep && ["PKS", "BILLING", "FIT_OUT_HANDOVER"].includes(selectedStep.leadStatus));
+    Boolean(selectedStep && (["PKS", "BILLING", "FIT_OUT_HANDOVER"].includes(selectedStep.leadStatus) || canActivateNext));
   const showPayment =
     view === "stages" &&
     Boolean(
       selectedStep &&
-        (selectedStep.spaceEffect === "ACTIVATE_TENANT" ||
+        (canActivateNext || selectedStep.spaceEffect === "ACTIVATE_TENANT" ||
           selectedStep.leadStatus === "COMMERCIAL_OPERATION" ||
           selectedStep.stepOrder === totalSteps)
     );
-  const stageDraftDirty = showSiteVisit
-    ? changes.visit !== undefined || changes.scheduled !== undefined
-    : showLeaseDates
-      ? changes.start !== undefined || changes.end !== undefined
-      : showPayment
-        ? changes.payment !== undefined
-        : false;
+  const stageDraftDirty =
+    (showSiteVisit && (changes.visit !== undefined || changes.scheduled !== undefined)) ||
+    (showLeaseDates && (changes.start !== undefined || changes.end !== undefined)) ||
+    (showPayment && changes.payment !== undefined);
 
   const latestPartnerNote = useMemo(() => {
     if (!selectedStep) return null;
@@ -173,7 +165,7 @@ export default function LeadWorkflowPanel({ lead, saving, canManage, onSave, onR
       .filter(
         (log) =>
           log.notes?.trim() &&
-          (log.stepOrder === selectedStep.stepOrder || log.status === selectedStep.leadStatus)
+          log.stepOrder === selectedStep.stepOrder
       )
       .at(-1);
     return matching?.notes?.trim() || null;
@@ -204,11 +196,7 @@ export default function LeadWorkflowPanel({ lead, saving, canManage, onSave, onR
     if (typeof window === "undefined") return;
     if (window.location.hash !== "#site-visit") return;
     setView("stages");
-    const visitStep =
-      steps.find((step) => step.stepType === "SITE_VISIT") ??
-      steps.find((step) =>
-        ["SITE_CHECK", "NEGOTIATING", "BA_SIGNED"].includes(step.leadStatus)
-      );
+    const visitStep = inquirySiteVisitStep(steps);
     if (visitStep) setSelectedOrder(visitStep.stepOrder);
     requestAnimationFrame(() => {
       document.getElementById("site-visit")?.scrollIntoView({
@@ -581,6 +569,8 @@ export default function LeadWorkflowPanel({ lead, saving, canManage, onSave, onR
             key={`${view}-${selectedOrder}-${lead.workflowVersion?.id ?? "none"}`}
             leadId={lead.id}
             documentTypes={documentTypes}
+            stepId={view === "stages" && lead.workflowVersion ? selectedStep?.id : undefined}
+            stepOrder={view === "stages" && lead.workflowVersion ? selectedStep?.stepOrder : undefined}
             parentSaving={saving}
             leadStatus={lead.status}
             onChange={() => {
@@ -720,7 +710,7 @@ export default function LeadWorkflowPanel({ lead, saving, canManage, onSave, onR
                 <dd className="mt-1">{dateLabel(lead.leaseEndAt)}</dd>
               </div>
             </dl>
-            <fieldset disabled={disabled || active || stopped || completedLeadStageIndex(lead.status) < 4} className="space-y-3 border-t border-[var(--work-line)] pt-4">
+            <fieldset disabled={disabled || active || stopped || !canVerifyPayment} className="space-y-3 border-t border-[var(--work-line)] pt-4">
               <legend className="sr-only">Verifikasi pembayaran</legend>
               <label className="flex min-h-11 items-center gap-3 text-sm">
                 <input type="checkbox" className="size-4 accent-[#E31E2D]" checked={draft.payment} onChange={(event) => change("payment", event.target.checked)} />
@@ -730,7 +720,7 @@ export default function LeadWorkflowPanel({ lead, saving, canManage, onSave, onR
                 Simpan verifikasi pembayaran
               </button>
             </fieldset>
-            {completedLeadStageIndex(lead.status) < 4 && (
+            {!canVerifyPayment && (
               <p className="text-xs text-[var(--work-muted)]">Verifikasi pembayaran tersedia setelah PKS dikonfirmasi.</p>
             )}
             {lead.paymentVerifiedAt && (
@@ -873,7 +863,7 @@ export default function LeadWorkflowPanel({ lead, saving, canManage, onSave, onR
                   disabled={disabled || uploadDirty || stageDraftDirty || !partnerMessage.trim()}
                   onClick={() =>
                     void save({
-                      status: nextStep.leadStatus,
+                      ...(lead.workflowVersion ? { advance: { fromStepId: currentStep.id, toStepId: nextStep.id } } : { status: nextStep.leadStatus }),
                       partnerMessage: partnerMessage.trim(),
                     })
                   }

@@ -32,6 +32,7 @@ const responseSchema = z.object({
     z.object({
       id: z.string(),
       stepOrder: z.number().int(),
+      verificationLocked: z.boolean().optional(),
       mediaTitle: z.string(),
       documentType: z.string(),
       documentNumber: z.string().nullable(),
@@ -92,6 +93,8 @@ type Props = {
   leadId: string;
   onChange?: () => void;
   documentTypes?: readonly InquiryDocumentType[];
+  stepId?: string;
+  stepOrder?: number;
   onDraftChange?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
   parentSaving?: boolean;
@@ -102,6 +105,8 @@ export default function InquiryDocuments({
   leadId,
   onChange,
   documentTypes,
+  stepId,
+  stepOrder,
   onDraftChange,
   onBusyChange,
   parentSaving = false,
@@ -254,6 +259,7 @@ export default function InquiryDocuments({
       if (addMode === "FILE" && file) {
         const body = new FormData();
         body.set("documentType", documentType);
+        if (stepId) body.set("stepId", stepId);
         body.set("mediaTitle", title);
         if (documentNumber.trim()) body.set("documentNumber", documentNumber.trim());
         body.set("isVisibleToMitra", visibleToMitra ? "true" : "false");
@@ -265,6 +271,7 @@ export default function InquiryDocuments({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             documentType,
+            stepId,
             mediaTitle: title,
             documentNumber: documentNumber.trim() || null,
             mediaLink: mediaLink.trim(),
@@ -547,10 +554,10 @@ export default function InquiryDocuments({
                 <button
                   type="button"
                   className={chipClass}
-                  disabled={busy || (!!media.verifiedAt && verificationLocked)}
+                  disabled={busy || (!!media.verifiedAt && (media.verificationLocked ?? (media.verificationLocked ?? verificationLocked)))}
                   title={
                     media.verifiedAt
-                      ? verificationLocked
+                      ? (media.verificationLocked ?? verificationLocked)
                         ? "Verifikasi terkunci"
                         : "Batalkan verifikasi"
                       : "Tandai PDF terverifikasi"
@@ -562,7 +569,7 @@ export default function InquiryDocuments({
                     aria-hidden
                   />
                   {media.verifiedAt
-                    ? verificationLocked
+                    ? (media.verificationLocked ?? verificationLocked)
                       ? "Terverifikasi"
                       : "Batalkan verifikasi"
                     : "Verifikasi"}
@@ -602,7 +609,7 @@ export default function InquiryDocuments({
                 <button
                   type="button"
                   className="inline-flex h-8 items-center rounded-lg border border-rose-200 bg-rose-50/70 px-2.5 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-50"
-                  disabled={busy || (!!media.verifiedAt && verificationLocked)}
+                  disabled={busy || (!!media.verifiedAt && (media.verificationLocked ?? (media.verificationLocked ?? verificationLocked)))}
                   aria-label={`Hapus ${media.mediaTitle}`}
                   onClick={() => setConfirmDeleteId(media.id)}
                 >
@@ -677,10 +684,10 @@ export default function InquiryDocuments({
           <div className="space-y-5">
             {types.map((type) => {
               const documents = data.media.filter(
-                (media) => media.isStored && media.documentType === type
+                (media) => media.isStored && media.documentType === type && (stepOrder === undefined || media.stepOrder === stepOrder)
               );
               const linked = data.media.filter(
-                (media) => !media.isStored && media.documentType === type
+                (media) => !media.isStored && media.documentType === type && (stepOrder === undefined || media.stepOrder === stepOrder)
               );
               const items = [...documents, ...linked];
               return (

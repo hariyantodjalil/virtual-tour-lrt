@@ -1,3 +1,4 @@
+import { inquiryDocumentTypesForStep } from "./inquiry-media";
 import {
   canonicalLeadStatus,
   completedLeadStageIndex,
@@ -14,13 +15,14 @@ export const REQUIRED_INQUIRY_DOCUMENTS = [
   { type: "PKS_FINAL", title: "PKS final", milestone: 5 },
 ] as const;
 
-type Document = { documentType: string; storageKey: string | null; verifiedAt: Date | string | null };
+type Document = { documentType: string; storageKey: string | null; verifiedAt: Date | string | null; stepOrder?: number; documentNumber?: string | null };
 type WorkflowState = {
   status: CommercialLeadStatus;
   leaseStartAt: Date | string | null;
   leaseEndAt: Date | string | null;
   paymentVerifiedAt: Date | string | null;
   siteVisitStatus: string;
+  siteVisitStepOrder?: number;
   mediaAttachments: readonly Document[];
 };
 
@@ -30,6 +32,48 @@ export function hasVerifiedDocument(documents: readonly Document[], type: string
 
 export function jakartaDate(value: Date | string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value));
+}
+
+export function resolveInquiryAdvance<T extends { id: string; stepOrder: number }>(steps: readonly T[], currentOrder: number, input: { fromStepId: string; toStepId: string }) {
+  const current = steps.find(step => step.stepOrder === currentOrder);
+  const next = steps.find(step => step.stepOrder === currentOrder + 1);
+  return current?.id === input.fromStepId && next?.id === input.toStepId ? { current, next } : null;
+}
+
+export function inquirySiteVisitStep<T extends { stepType?: string; leadStatus?: string | null }>(steps: readonly T[]) {
+  return steps.find(step => step.stepType === "SITE_VISIT")
+    ?? steps.find(step => step.leadStatus === "SITE_CHECK")
+    ?? steps.find(step => step.leadStatus === "BA_SIGNED");
+}
+
+type WorkflowStep = { stepOrder: number; leadStatus: string; stepType: string; mediaRequirement: string; requiresMedia: boolean; spaceEffect: string };
+
+export function pinnedInquiryTransitionError(current: WorkflowStep, next: WorkflowStep, state: WorkflowState, now = new Date()): string | null {
+  if (current.mediaRequirement === "REQUIRED" || current.requiresMedia) {
+    const types = inquiryDocumentTypesForStep(current) ?? ["OTHER"];
+    const media = state.mediaAttachments.filter(document => document.stepOrder === current.stepOrder);
+    if (types.some(type => !hasVerifiedDocument(media, type))) return "Unggah dan verifikasi dokumen wajib untuk tahap ini sebelum melanjutkan.";
+  }
+  const ownsSiteVisit = state.siteVisitStepOrder === undefined
+    ? Boolean(inquirySiteVisitStep([current]))
+    : current.stepOrder === state.siteVisitStepOrder;
+  if (ownsSiteVisit && ["REQUESTED", "SCHEDULED"].includes(state.siteVisitStatus)) {
+    return "Selesaikan atau batalkan site visit sebelum melanjutkan.";
+  }
+  if (next.spaceEffect === "ACTIVATE_TENANT" || next.leadStatus === "COMMERCIAL_OPERATION") {
+    return activationError(state, now);
+  }
+  return null;
+}
+
+function activationError(state: WorkflowState, now: Date): string | null {
+  if (!state.leaseStartAt || !state.leaseEndAt) return "Tanggal mulai dan berakhir masa sewa wajib diisi.";
+  if (new Date(state.leaseEndAt) < new Date(state.leaseStartAt)) return "Tanggal berakhir sewa tidak boleh sebelum tanggal mulai.";
+  if (!state.paymentVerifiedAt) return "Admin harus memverifikasi pembayaran sebelum mengaktifkan sewa.";
+  const today = jakartaDate(now);
+  if (jakartaDate(state.leaseStartAt) > today) return "Sewa belum memasuki tanggal efektif (Asia/Jakarta).";
+  if (jakartaDate(state.leaseEndAt) < today) return "Masa sewa telah berakhir. Periksa tanggal PKS.";
+  return null;
 }
 
 /** Pure server-side gate; all checks run again after locking the inquiry row. */
@@ -80,20 +124,7 @@ export function inquiryTransitionError(current: CommercialLeadStatus, next: Comm
     }
   }
 
-  const completed = completedLeadStageIndex(target);
-  if (completed >= 5) {
-    if (!state.paymentVerifiedAt) {
-      return "Admin harus memverifikasi pembayaran sebelum mengaktifkan sewa.";
-    }
-    const today = jakartaDate(now);
-    if (jakartaDate(state.leaseStartAt!) > today) {
-      return "Sewa belum memasuki tanggal efektif (Asia/Jakarta).";
-    }
-    if (jakartaDate(state.leaseEndAt!) < today) {
-      return "Masa sewa telah berakhir. Periksa tanggal PKS.";
-    }
-  }
-  return null;
+  return completedLeadStageIndex(target) >= 5 ? activationError(state, now) : null;
 }
 
 /** In-app internal reminders; no external scheduler, email, or push is assumed. */

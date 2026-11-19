@@ -115,14 +115,14 @@ export default function InquiryTimeline({ status, compact = false }: { status: s
   );
 }
 
-export function InquirySiteVisit({ id, status, siteVisitStatus, scheduledAt, preference }: { id: string; status: string; siteVisitStatus: string; scheduledAt: string | null; preference: string | null }) {
+export function InquirySiteVisit({ id, status, siteVisitStatus, scheduledAt, preference, eligible }: { id: string; status: string; siteVisitStatus: string; scheduledAt: string | null; preference: string | null; eligible?: boolean }) {
   const { t, locale } = useTourLanguage();
   const router = useRouter();
   const [value, setValue] = useState(preference ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const canRequest = ["NEW", "CONTACTED", "RDS_OFFER", "NEGOTIATING", "SITE_CHECK"].includes(status) && ["NONE", "CANCELLED"].includes(siteVisitStatus) && !submitted;
+  const canRequest = (eligible ?? ["NEW", "CONTACTED", "RDS_OFFER", "NEGOTIATING", "SITE_CHECK"].includes(status)) && ["NONE", "CANCELLED"].includes(siteVisitStatus) && !submitted;
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
@@ -141,11 +141,8 @@ export function InquirySiteVisit({ id, status, siteVisitStatus, scheduledAt, pre
     <section className="rounded-xl border border-slate-200 bg-white p-4 text-[#101828] md:p-5">
       <h2 className="flex items-center gap-2 text-sm font-semibold text-[#101828]">
         <CalendarDays aria-hidden="true" className="size-4 shrink-0 text-[#c41230]" />
-        {t("Site visit · Negosiasi")}
+        {t("Site visit")}
       </h2>
-      <p className="mt-2 text-sm leading-relaxed text-slate-600">
-        {t("Kunjungan lokasi merupakan bagian dari negosiasi, bukan tahapan terpisah.")}
-      </p>
 
       {(siteVisitStatus !== "NONE" || submitted) && (
         <p role="status" className="mt-3 text-sm font-medium text-[#101828]">

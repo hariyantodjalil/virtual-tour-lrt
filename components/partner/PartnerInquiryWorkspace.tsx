@@ -29,6 +29,7 @@ import PartnerStepCard, {
 } from "@/components/partner/PartnerStepCard";
 import DocumentPreviewModal from "@/components/pipeline/DocumentPreviewModal";
 import { InquirySiteVisit } from "@/components/partner/InquiryTimeline";
+import { inquirySiteVisitStep } from "@/lib/inquiry-workflow";
 import { resolveDocumentPreview } from "@/lib/document-preview";
 import { getFacilityIcon, isFacilityIconId } from "@/lib/facility-icons";
 import {
@@ -276,6 +277,7 @@ export default function PartnerInquiryWorkspace({
   const historyTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const step = steps[selected] ?? steps[0];
+  const visitStep = inquirySiteVisitStep(steps);
   const stepOrder = step?.stepOrder ?? selected + 1;
   const isPast = isCompleted || stepOrder < currentStepOrder;
   const isCurrent = !isCompleted && stepOrder === currentStepOrder;
@@ -570,13 +572,14 @@ export default function PartnerInquiryWorkspace({
                   ) : null}
                 </div>
 
-                {selected === 2 ? (
+                {visitStep && step?.stepOrder === visitStep.stepOrder ? (
                   <InquirySiteVisit
                     id={inquiry.id}
                     status={inquiry.status}
                     siteVisitStatus={inquiry.siteVisitStatus ?? "NONE"}
                     scheduledAt={inquiry.siteVisitScheduledAt ?? null}
                     preference={inquiry.surveyPreference ?? null}
+                    eligible={!isCompleted && !isRejected && currentStepOrder <= visitStep.stepOrder}
                   />
                 ) : null}
 

@@ -7,8 +7,19 @@ import { parseJsonRequest } from "@/lib/api-validation";
 import { leadUpdateSchema } from "@/lib/api-schemas";
 import { recordInquiryStatus } from "@/lib/partner-inquiries";
 import { ACTIVE_LEAD_STATUSES, canonicalLeadStatus, completedLeadStageIndex, isCommercialOperation, publicLeadStageIndex, SPACE_HOLD_STATUSES } from "@/lib/commercial-pipeline";
-import { inquiryTransitionError } from "@/lib/inquiry-workflow";
+import { inquirySiteVisitStep, inquiryTransitionError, pinnedInquiryTransitionError, resolveInquiryAdvance } from "@/lib/inquiry-workflow";
 import { publishInquiryEvent } from "@/lib/realtime-events";
+
+function holdsForStatus(status: Parameters<typeof canonicalLeadStatus>[0]) {
+  return SPACE_HOLD_STATUSES.includes(status) || status === "FIT_OUT_HANDOVER";
+}
+
+function pinnedSpaceHold(steps: readonly { stepOrder: number; spaceEffect: string }[], order: number) {
+  return steps.reduce<{ stepOrder: number; spaceEffect: string } | undefined>((last, step) => {
+    if (step.stepOrder > order || !["RESERVE_SPACE", "FIT_OUT_SPACE"].includes(step.spaceEffect)) return last;
+    return !last || step.stepOrder > last.stepOrder ? step : last;
+  }, undefined)?.spaceEffect;
+}
 
 const include = { trainInquiry: { select: cmsTrainInquirySelect }, space: { include: { station: true } } } satisfies Prisma.TenantLeadInclude;
 class WorkflowError extends Error {
@@ -31,7 +42,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const lead = await prisma.$transaction(async tx => {
       await tx.$executeRaw`SELECT id FROM tenant_leads WHERE id = ${input.id} FOR UPDATE`;
-      const existing = await tx.tenantLead.findUnique({ where: { id: input.id }, include: { mediaAttachments: true, trainInquiry: true } });
+      const existing = await tx.tenantLead.findUnique({ where: { id: input.id }, include: { mediaAttachments: true, trainInquiry: true, workflowVersion: { include: { steps: { orderBy: { stepOrder: "asc" } } } } } });
       if (!existing) throw new WorkflowError("Pengajuan tidak ditemukan.", 404);
 
       let nextWorkflowVersionId = existing.workflowVersionId;
@@ -41,7 +52,7 @@ export async function PATCH(request: NextRequest) {
         | null = null;
 
       if (input.workflowVersionId !== undefined && input.workflowVersionId !== existing.workflowVersionId) {
-        if (existing.status !== "NEW") {
+        if (existing.status !== "NEW" || existing.currentStepOrder !== 1) {
           throw new WorkflowError(
             "Alur hanya bisa diganti saat pengajuan masih di tahap 1 (status Pengajuan Diterima)."
           );
@@ -81,8 +92,19 @@ export async function PATCH(request: NextRequest) {
         };
       }
 
-      const target = input.status ? canonicalLeadStatus(input.status) : existing.status;
+      const steps = existing.workflowVersion?.steps ?? [];
+      const currentStep = steps.find(step => step.stepOrder === existing.currentStepOrder);
+      const advance = input.advance ? resolveInquiryAdvance(steps, existing.currentStepOrder, input.advance) : null;
+      if (input.advance && (input.status || workflowReassigned || !advance || existing.status === "CLOSED_LOST")) {
+        throw new WorkflowError("Tahap sudah berubah. Muat ulang pengajuan sebelum melanjutkan.");
+      }
+      const target = advance?.next.leadStatus ?? (input.status ? canonicalLeadStatus(input.status) : existing.status);
       const changedStatus = target !== existing.status;
+      if (steps.length && changedStatus && !advance && target !== "CLOSED_LOST") {
+        throw new WorkflowError("Lanjutkan dari tahap aktif pada alur pengajuan.");
+      }
+      const transitioned = changedStatus || Boolean(advance);
+      const canActivateNext = steps.some(step => step.stepOrder === existing.currentStepOrder + 1 && step.spaceEffect === "ACTIVATE_TENANT");
       const active = isCommercialOperation(existing.status);
       if (active && (changedStatus || input.leaseStartAt !== undefined || input.leaseEndAt !== undefined || input.paymentVerified === false)) {
         throw new WorkflowError("Sewa sudah aktif. Perubahan kontrak atau penghentian dikelola melalui Penyewa Aktif.");
@@ -93,34 +115,42 @@ export async function PATCH(request: NextRequest) {
       const visit = input.siteVisitStatus ?? (input.siteVisitScheduledAt ? "SCHEDULED" : existing.siteVisitStatus);
       const scheduledAt = input.siteVisitScheduledAt === undefined ? existing.siteVisitScheduledAt : input.siteVisitScheduledAt ? new Date(input.siteVisitScheduledAt) : null;
       if (visit === "SCHEDULED" && !scheduledAt) throw new WorkflowError("Tanggal dan waktu site visit wajib diisi.", 400);
-      if ((input.siteVisitStatus !== undefined || input.siteVisitScheduledAt !== undefined) && completedLeadStageIndex(existing.status) >= 2) {
+      const visitStep = inquirySiteVisitStep(steps);
+      if ((input.siteVisitStatus !== undefined || input.siteVisitScheduledAt !== undefined) && (visitStep ? existing.currentStepOrder > visitStep.stepOrder : completedLeadStageIndex(existing.status) >= 2)) {
         throw new WorkflowError("Site visit dikelola selama negosiasi, sebelum negosiasi dinyatakan selesai.");
       }
-      if (input.paymentVerified === true && completedLeadStageIndex(target) < 4) throw new WorkflowError("Verifikasi pembayaran dilakukan setelah PKS ditandatangani.");
+      if (input.paymentVerified === true && !canActivateNext && completedLeadStageIndex(target) < 4) throw new WorkflowError("Verifikasi pembayaran dilakukan setelah PKS ditandatangani.");
       const paymentVerifiedAt = input.paymentVerified === undefined ? existing.paymentVerifiedAt : input.paymentVerified ? existing.paymentVerifiedAt ?? new Date() : null;
-      const state = { status: target, leaseStartAt, leaseEndAt, paymentVerifiedAt, siteVisitStatus: visit, mediaAttachments: existing.mediaAttachments };
-      // Revalidate dates/payment at an already-reached gate too; metadata-only edits preserve legacy history.
-      if (changedStatus || ((input.leaseStartAt !== undefined || input.leaseEndAt !== undefined || input.paymentVerified !== undefined) && completedLeadStageIndex(target) >= 4)) {
-        const error = inquiryTransitionError(existing.status, target, state);
+      const state = { status: target, leaseStartAt, leaseEndAt, paymentVerifiedAt, siteVisitStatus: visit, siteVisitStepOrder: visitStep?.stepOrder, mediaAttachments: existing.mediaAttachments };
+      // Run the gate on the current pinned step before recording a transition.
+      if (advance || changedStatus) {
+        const error = advance ? pinnedInquiryTransitionError(advance.current, advance.next, state) : inquiryTransitionError(existing.status, target, state);
         if (error) throw new WorkflowError(error);
       }
       if (target === "CLOSED_LOST" && changedStatus && !(input.rejectionReason ?? existing.rejectionReason)?.trim()) throw new WorkflowError("Isi alasan penghentian agar mitra mengetahui hasil pengajuannya.", 400);
 
       const spaceId = existing.spaceId;
-      if (spaceId && changedStatus) await tx.$executeRaw`SELECT id FROM commercial_spaces WHERE id = ${spaceId} FOR UPDATE`;
+      if (spaceId && transitioned) await tx.$executeRaw`SELECT id FROM commercial_spaces WHERE id = ${spaceId} FOR UPDATE`;
       const space = spaceId ? await tx.commercialSpace.findUnique({ where: { id: spaceId }, include: { occupancy: { include: { tenant: true } } } }) : null;
-      const holds = SPACE_HOLD_STATUSES.includes(target) || target === "FIT_OUT_HANDOVER";
-      if (changedStatus && !existing.trainInquiry && (holds || isCommercialOperation(target))) {
+      const stepHold = advance ? pinnedSpaceHold(steps, advance.next.stepOrder) : undefined;
+      const holds = advance ? Boolean(stepHold) || (existing.workflowVersionId === "gitdev-leasing-v1" && holdsForStatus(target)) : holdsForStatus(target);
+      const otherLeads = space && transitioned ? await tx.tenantLead.findMany({
+        where: { spaceId, id: { not: input.id }, status: { in: [...ACTIVE_LEAD_STATUSES, "COMMERCIAL_OPERATION", "CLOSED_WON"] } },
+        select: { id: true, status: true, workflowVersionId: true, currentStepOrder: true, workflowVersion: { select: { steps: { select: { stepOrder: true, spaceEffect: true } } } } },
+      }) : [];
+      const otherHold = otherLeads.some(other => isCommercialOperation(other.status)
+        || Boolean(pinnedSpaceHold(other.workflowVersion?.steps ?? [], other.currentStepOrder))
+        || ((!other.workflowVersionId || other.workflowVersionId === "gitdev-leasing-v1") && holdsForStatus(other.status))
+        || (other.workflowVersionId === "verified-leasing-20261117" && space && ["RESERVED", "FIT_OUT"].includes(space.status) && holdsForStatus(other.status)));
+      if (transitioned && !existing.trainInquiry && (holds || isCommercialOperation(target))) {
         if (!spaceId || !space) throw new WorkflowError("Tahap ini memerlukan unit komersial yang terhubung.", 400);
         if (space.status === "MAINTENANCE" || (space.status === "TERISI" && !space.occupancy)) throw new WorkflowError("Unit sedang maintenance atau terisi. Perbarui ketersediaan unit terlebih dahulu.");
         if (space.occupancy && (holds || space.occupancy.tenant.userId !== existing.userId)) throw new WorkflowError("Unit sudah ditempati penyewa lain.");
-        const competing = await tx.tenantLead.findFirst({ where: { spaceId, id: { not: input.id }, status: { in: [...SPACE_HOLD_STATUSES, "FIT_OUT_HANDOVER", "COMMERCIAL_OPERATION", "CLOSED_WON"] } }, select: { id: true } });
-        if (competing) throw new WorkflowError("Unit sudah direservasi oleh pengajuan lain.");
-        await tx.commercialSpace.update({ where: { id: spaceId }, data: { status: isCommercialOperation(target) ? "TERISI" : "RESERVED" } });
-        const affected = await tx.tenantLead.findMany({ where: { spaceId, id: { not: input.id }, status: { in: ACTIVE_LEAD_STATUSES } }, select: { id: true, status: true, workflowVersionId: true } });
-        for (const other of affected) {
+        if (otherHold) throw new WorkflowError("Unit sudah direservasi oleh pengajuan lain.");
+        await tx.commercialSpace.update({ where: { id: spaceId }, data: { status: isCommercialOperation(target) ? "TERISI" : stepHold === "FIT_OUT_SPACE" || target === "FIT_OUT_HANDOVER" ? "FIT_OUT" : "RESERVED" } });
+        for (const other of otherLeads.filter(other => ACTIVE_LEAD_STATUSES.includes(other.status))) {
           await tx.tenantLead.update({ where: { id: other.id }, data: { status: "CLOSED_LOST", rejectionReason: "Unit sudah dialokasikan untuk pengajuan lain." } });
-          await recordInquiryStatus(tx, { id: other.id, workflowVersionId: other.workflowVersionId, fromStatus: other.status, status: "CLOSED_LOST", rejectionReason: "Unit sudah dialokasikan untuk pengajuan lain.", actor: auth.user.userId });
+          await recordInquiryStatus(tx, { id: other.id, workflowVersionId: other.workflowVersionId, stepOrder: other.currentStepOrder, fromStatus: other.status, status: "CLOSED_LOST", rejectionReason: "Unit sudah dialokasikan untuk pengajuan lain.", actor: auth.user.userId });
         }
         if (isCommercialOperation(target)) {
           if (!existing.userId) throw new WorkflowError("Hubungkan akun mitra sebelum mengaktifkan sewa.");
@@ -138,12 +168,14 @@ export async function PATCH(request: NextRequest) {
         if (count !== inquiry.allocatedTrainsets.length) throw new WorkflowError("Alokasi harus menggunakan trainset aktif.");
         if (inquiry.requestedTrainsetCount !== null && inquiry.allocatedTrainsets.length !== inquiry.requestedTrainsetCount) throw new WorkflowError("Jumlah alokasi trainset harus sesuai permintaan pengajuan.");
       }
-      if (changedStatus && !holds && !isCommercialOperation(target) && space && !space.occupancy && ["RESERVED", "FIT_OUT"].includes(space.status)) {
-        const otherHold = await tx.tenantLead.findFirst({ where: { spaceId, id: { not: input.id }, status: { in: [...SPACE_HOLD_STATUSES, "FIT_OUT_HANDOVER"] } }, select: { id: true } });
+      const previouslyHeld = Boolean(pinnedSpaceHold(steps, existing.currentStepOrder)) ||
+        ((!existing.workflowVersionId || ["gitdev-leasing-v1", "verified-leasing-20261117"].includes(existing.workflowVersionId)) && holdsForStatus(existing.status));
+      if (changedStatus && target === "CLOSED_LOST" && previouslyHeld && space && !space.occupancy && ["RESERVED", "FIT_OUT"].includes(space.status)) {
         if (!otherHold) await tx.commercialSpace.update({ where: { id: space.id }, data: { status: "TERSEDIA" } });
       }
       const updated = await tx.tenantLead.update({ where: { id: input.id }, data: {
         ...(changedStatus && { status: target }),
+        ...(advance && { currentStepOrder: advance.next.stepOrder }),
         ...(workflowReassigned && {
           workflowVersionId: nextWorkflowVersionId,
           currentStepOrder: nextStepOrder,
@@ -177,10 +209,11 @@ export async function PATCH(request: NextRequest) {
           },
         });
       }
-      if (changedStatus) {
+      if (transitioned) {
         await recordInquiryStatus(tx, {
           id: input.id,
           workflowVersionId: nextWorkflowVersionId,
+          stepOrder: advance?.next.stepOrder ?? currentStep?.stepOrder,
           fromStatus: existing.status,
           status: target,
           rejectionReason: input.rejectionReason ?? existing.rejectionReason,
@@ -193,9 +226,9 @@ export async function PATCH(request: NextRequest) {
           const leadStatus = isCommercialOperation(existing.status)
             ? "COMMERCIAL_OPERATION"
             : existing.status;
-          const step = existing.workflowVersionId
+          const step = nextWorkflowVersionId
             ? await tx.pipelineStep.findFirst({
-                where: { workflowVersionId: existing.workflowVersionId, leadStatus },
+                where: { workflowVersionId: nextWorkflowVersionId, stepOrder: workflowReassigned ? nextStepOrder : existing.currentStepOrder },
               })
             : null;
           const publicOrder = Math.max(1, publicLeadStageIndex(leadStatus) + 1);
@@ -203,7 +236,7 @@ export async function PATCH(request: NextRequest) {
             data: {
               tenantLeadId: input.id,
               pipelineStepId: step?.id,
-              stepOrder: publicOrder,
+              stepOrder: step?.stepOrder ?? publicOrder,
               status: existing.status,
               fromStatus: existing.status,
               action: "PARTNER_NOTE",
@@ -213,7 +246,7 @@ export async function PATCH(request: NextRequest) {
           });
         }
       }
-      if (input.paymentVerified !== undefined && Boolean(existing.paymentVerifiedAt) !== input.paymentVerified) await tx.inquiryStepLog.create({ data: { tenantLeadId: input.id, stepOrder: 6, status: target, action: input.paymentVerified ? "PAYMENT_VERIFIED" : "PAYMENT_VERIFICATION_REVOKED", notes: input.paymentVerified ? "Pembayaran telah diverifikasi tim komersial." : "Verifikasi pembayaran diperbarui tim komersial.", performedBy: auth.user.userId } });
+      if (input.paymentVerified !== undefined && Boolean(existing.paymentVerifiedAt) !== input.paymentVerified) await tx.inquiryStepLog.create({ data: { tenantLeadId: input.id, stepOrder: advance?.next.stepOrder ?? existing.currentStepOrder, status: target, action: input.paymentVerified ? "PAYMENT_VERIFIED" : "PAYMENT_VERIFICATION_REVOKED", notes: input.paymentVerified ? "Pembayaran telah diverifikasi tim komersial." : "Verifikasi pembayaran diperbarui tim komersial.", performedBy: auth.user.userId } });
       return updated;
     }, { isolationLevel: "Serializable", timeout: 15000 });
     void publishInquiryEvent({

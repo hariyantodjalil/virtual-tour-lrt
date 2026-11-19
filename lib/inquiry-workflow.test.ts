@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PUBLIC_LEAD_PROCESS_STEPS, publicLeadStageIndex, completedLeadStageIndex } from "./commercial-pipeline";
-import { hasVerifiedDocument, inquiryTransitionError, jakartaDate, leaseExpiryReminder, REQUIRED_INQUIRY_DOCUMENTS } from "./inquiry-workflow";
+import { hasVerifiedDocument, inquirySiteVisitStep, inquiryTransitionError, jakartaDate, leaseExpiryReminder, pinnedInquiryTransitionError, resolveInquiryAdvance, REQUIRED_INQUIRY_DOCUMENTS } from "./inquiry-workflow";
 
 const now = new Date("2026-11-17T03:00:00Z");
 const documents = REQUIRED_INQUIRY_DOCUMENTS.map(document => ({ documentType: document.type, storageKey: `private/${document.type}`, verifiedAt: now }));
@@ -156,4 +156,28 @@ test("internal lease reminders use H90/H60/H30 Jakarta calendar thresholds", () 
     assert.equal(reminder.label, `Pengingat H-${threshold}`);
   }
   assert.equal(leaseExpiryReminder(end(-1), baseline)?.label, "Masa sewa berakhir");
+});
+
+test("same-status stages advance by ID without letting stale or skipped transitions through", () => {
+  const steps = [
+    { id: "received", stepOrder: 1, leadStatus: "NEW" },
+    { id: "contact", stepOrder: 2, leadStatus: "CONTACTED" },
+    { id: "review", stepOrder: 3, leadStatus: "CONTACTED" },
+  ];
+  assert.equal(resolveInquiryAdvance(steps, 2, { fromStepId: "contact", toStepId: "review" })?.next.id, "review");
+  assert.equal(resolveInquiryAdvance(steps, 1, { fromStepId: "received", toStepId: "review" }), null);
+  assert.equal(resolveInquiryAdvance(steps, 3, { fromStepId: "contact", toStepId: "review" }), null);
+});
+
+test("the pinned workflow owns its document and site-visit gates", () => {
+  const check = { id: "check", leadStatus: "CONTACTED", stepOrder: 3, stepType: "STANDARD", mediaRequirement: "REQUIRED", requiresMedia: true, spaceEffect: "NONE" };
+  const visit = { ...check, id: "visit", stepOrder: 4, leadStatus: "SITE_CHECK", stepType: "SITE_VISIT", mediaRequirement: "NONE", requiresMedia: false };
+  const active = { ...check, stepOrder: 5, leadStatus: "COMMERCIAL_OPERATION", spaceEffect: "ACTIVATE_TENANT" };
+  const document = { documentType: "OTHER", storageKey: "proof", verifiedAt: now };
+  assert.equal(inquirySiteVisitStep([check, visit])?.id, "visit");
+  assert.ok(pinnedInquiryTransitionError(check, visit, { ...state, mediaAttachments: [{ ...document, stepOrder: 2 }] }, now));
+  assert.equal(pinnedInquiryTransitionError(check, visit, { ...state, mediaAttachments: [{ ...document, stepOrder: 3 }] }, now), null);
+  assert.ok(pinnedInquiryTransitionError(visit, active, { ...state, siteVisitStatus: "SCHEDULED" }, now));
+  assert.ok(pinnedInquiryTransitionError(visit, active, { ...state, paymentVerifiedAt: null }, now));
+  assert.equal(pinnedInquiryTransitionError(visit, active, { ...state, siteVisitStatus: "COMPLETED", mediaAttachments: [] }, now), null);
 });

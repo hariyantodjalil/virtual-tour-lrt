@@ -41,8 +41,11 @@ function fallbackPublicSteps() {
 function partnerStepOrderForDocument(
   documentType: string | null | undefined,
   steps: Array<{ stepOrder: number; leadStatus: string }>,
-  leadStatus: string
+  leadStatus: string,
+  storedOrder: number
 ) {
+  const stored = steps.find(step => step.stepOrder === storedOrder);
+  if (stored) return stored.stepOrder;
   if (documentType) {
     const owning = steps.find((step) =>
       documentsForLeadStatus(step.leadStatus)?.includes(
@@ -207,8 +210,8 @@ export function toPartnerInquiry(lead: InquiryRow) {
           (log.pipelineStep
             ? stepsByOrder.get(log.pipelineStep.stepOrder)
             : undefined) ??
-          stepsByStatus.get(log.status) ??
-          stepsByOrder.get(log.stepOrder);
+          stepsByOrder.get(log.stepOrder) ??
+          stepsByStatus.get(log.status);
         const fallbackIndex = publicLeadStageIndex(log.status);
         const fallback = PUBLIC_LEAD_PROCESS_STEPS[fallbackIndex >= 0 ? fallbackIndex : 0];
         const stepOrder =
@@ -261,7 +264,8 @@ export function toPartnerInquiry(lead: InquiryRow) {
               stepOrder: partnerStepOrderForDocument(
                 media.documentType,
                 pinnedSteps,
-                lead.status
+                lead.status,
+                media.stepOrder
               ),
               mediaTitle: media.mediaTitle,
               documentNumber: media.documentNumber,
@@ -284,6 +288,7 @@ export async function recordInquiryStatus(
   input: {
     id: string;
     workflowVersionId: string | null;
+    stepOrder?: number;
     fromStatus: LeadStatus;
     status: LeadStatus;
     rejectionReason?: string | null;
@@ -295,30 +300,30 @@ export async function recordInquiryStatus(
   const effective = input.status === "CLOSED_LOST" ? input.fromStatus : input.status;
   const leadStatus = isCommercialOperation(effective) ? "COMMERCIAL_OPERATION" : effective;
   const canonicalStatus = PUBLIC_LEAD_PROCESS_STEPS[publicLeadStageIndex(leadStatus)]?.status;
-  const exactStep = input.workflowVersionId ? await tx.pipelineStep.findFirst({ where: { workflowVersionId: input.workflowVersionId, leadStatus } }) : null;
+  const exactStep = input.workflowVersionId ? await tx.pipelineStep.findFirst({ where: { workflowVersionId: input.workflowVersionId, ...(input.stepOrder ? { stepOrder: input.stepOrder } : { leadStatus }) } }) : null;
   const step = exactStep ?? (input.workflowVersionId && canonicalStatus ? await tx.pipelineStep.findFirst({ where: { workflowVersionId: input.workflowVersionId, leadStatus: canonicalStatus } }) : null);
-  if (!input.workflowVersionId || !step) throw new Error("INQUIRY_STAGE_MISSING");
+  if (!step && input.status !== "CLOSED_LOST") throw new Error("INQUIRY_STAGE_MISSING");
   const partnerMessage = input.partnerMessage?.trim();
   // Pin progres ke stepOrder versi lead — publish alur baru tidak menggeser pointer ini.
-  if (input.status !== "CLOSED_LOST") {
+  if (step && input.status !== "CLOSED_LOST" && !input.stepOrder) {
     await tx.tenantLead.update({
       where: { id: input.id },
       data: { currentStepOrder: step.stepOrder },
     });
   }
   await tx.inquiryStepLog.create({ data: {
-    tenantLeadId: input.id, pipelineStepId: step.id, stepOrder: step.stepOrder,
+    tenantLeadId: input.id, pipelineStepId: step?.id, stepOrder: step?.stepOrder ?? input.stepOrder ?? Math.max(1, publicLeadStageIndex(effective) + 1),
     status: input.status, fromStatus: input.fromStatus,
     action: input.status === "CLOSED_LOST" ? "REJECTED" : isCommercialOperation(input.status) ? "COMPLETED" : "STATUS_CHANGED",
     notes:
       input.status === "CLOSED_LOST"
         ? input.rejectionReason || "Pengajuan tidak dilanjutkan."
-        : partnerMessage || step.publicMessage,
+        : partnerMessage || step?.publicMessage,
     performedBy: input.actor,
   } });
 }
 
-export async function inquiryCreationData(userId: string) {
+export async function getWorkflowForNewInquiry() {
   const workflow = await prisma.pipelineWorkflowVersion.findFirst({
     where: { status: "ACTIVE" },
     orderBy: { version: "desc" },
@@ -326,7 +331,11 @@ export async function inquiryCreationData(userId: string) {
   });
   const first =
     workflow?.steps.find((step) => step.leadStatus === "NEW") ?? workflow?.steps[0];
-  if (!workflow || !first) throw new Error("Active inquiry workflow is missing initial stage");
+  return workflow && first ? { id: workflow.id, first } : null;
+}
+
+export function inquiryCreationData(userId: string, workflow: NonNullable<Awaited<ReturnType<typeof getWorkflowForNewInquiry>>>) {
+  const { first } = workflow;
   return {
     workflowVersionId: workflow.id,
     currentStepOrder: first.stepOrder,

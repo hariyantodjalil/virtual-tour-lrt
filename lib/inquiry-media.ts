@@ -64,6 +64,11 @@ export function documentsForLeadStatus(
   return undefined;
 }
 
+export function inquiryDocumentTypesForStep(step: { leadStatus: string; mediaRequirement?: string; requiresMedia?: boolean }): readonly InquiryDocumentType[] | undefined {
+  if (step.mediaRequirement === "NONE" && !step.requiresMedia) return undefined;
+  return documentsForLeadStatus(step.leadStatus) ?? (step.mediaRequirement === "REQUIRED" || step.requiresMedia ? ["OTHER"] : undefined);
+}
+
 // Legacy HTTPS entries remain readable, but are not verified evidence.
 export const inquiryMediaSchema = z.object({
   stepOrder: z.number().int().min(1).max(100),
@@ -84,6 +89,7 @@ const httpsDocumentLink = z
   }, "Gunakan tautan HTTPS tanpa kredensial.");
 
 export const inquiryDocumentUploadSchema = z.object({
+  stepId: z.string().min(1).max(160).optional(),
   documentType: inquiryDocumentTypeSchema,
   mediaTitle: z.string().trim().min(2).max(160).optional(),
   documentNumber: z.string().trim().max(160).optional(),
@@ -92,6 +98,7 @@ export const inquiryDocumentUploadSchema = z.object({
 
 /** Tautan eksternal (Drive, dll.) — terbaca mitra, tetapi bukan bukti PDF terverifikasi. */
 export const inquiryDocumentLinkSchema = z.object({
+  stepId: z.string().min(1).max(160).optional(),
   documentType: inquiryDocumentTypeSchema,
   mediaTitle: z.string().trim().min(2).max(160),
   documentNumber: z.string().trim().max(160).nullable().optional(),
@@ -121,6 +128,12 @@ export const inquiryDocumentPatchSchema = z
 
 export function isInquiryDocumentLocked(status: string) {
   return ["BA_SIGNED", "DESIGN_REVIEW", "PKS", "BILLING", "FIT_OUT_HANDOVER", "COMMERCIAL_OPERATION", "CLOSED_WON"].includes(status);
+}
+
+export function isInquiryStepDocumentLocked(lead: { status: string; workflowVersionId?: string | null; currentStepOrder: number }, stepOrder: number) {
+  return lead.workflowVersionId
+    ? stepOrder < lead.currentStepOrder || ["CLOSED_LOST", "COMMERCIAL_OPERATION", "CLOSED_WON"].includes(lead.status)
+    : isInquiryDocumentLocked(lead.status);
 }
 
 export function isInquiryImage(link: string) {

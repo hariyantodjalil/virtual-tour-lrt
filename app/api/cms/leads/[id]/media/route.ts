@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseJsonRequest } from "@/lib/api-validation";
-import { INQUIRY_DOCUMENT_LABELS, inquiryDocumentLinkSchema, inquiryDocumentPatchSchema, inquiryDocumentUploadSchema, isInquiryDocumentLocked, publicStepOrderForDocumentType } from "@/lib/inquiry-media";
+import { INQUIRY_DOCUMENT_LABELS, inquiryDocumentLinkSchema, inquiryDocumentPatchSchema, inquiryDocumentUploadSchema, inquiryDocumentTypesForStep, isInquiryDocumentLocked, isInquiryStepDocumentLocked } from "@/lib/inquiry-media";
 import { deleteInquiryDocument, generateInquiryDocumentKey, isInquiryDocumentKey, readInquiryMultipart, safeInquiryDocumentFilename, storeInquiryDocument, validateInquiryPdf } from "@/lib/inquiry-document-storage";
 import { publicWorkflowSelect } from "@/lib/partner-inquiries";
 import { publishInquiryEvent } from "@/lib/realtime-events";
@@ -29,12 +29,13 @@ export async function GET(request: NextRequest, { params }: Context) {
   const auth = await requireRole(request, ["ADMIN", "EDITOR"]);
   if ("error" in auth) return fail(auth.error, auth.status);
   const { id } = await params;
-  const lead = await prisma.tenantLead.findUnique({ where: { id }, select: { status: true, workflowVersion: { select: publicWorkflowSelect }, mediaAttachments: { orderBy: { createdAt: "desc" } } } });
+  const lead = await prisma.tenantLead.findUnique({ where: { id }, select: { status: true, workflowVersionId: true, currentStepOrder: true, workflowVersion: { select: publicWorkflowSelect }, mediaAttachments: { orderBy: { createdAt: "desc" } } } });
   if (!lead) return fail("Pengajuan tidak ditemukan.", 404);
   return NextResponse.json({
     steps: lead.workflowVersion?.steps ?? [], canWrite: auth.user.role === "ADMIN", verificationLocked: isInquiryDocumentLocked(lead.status),
     media: lead.mediaAttachments.map(media => ({
       id: media.id, stepOrder: media.stepOrder, mediaTitle: media.mediaTitle,
+      verificationLocked: isInquiryStepDocumentLocked(lead, media.stepOrder),
       documentType: media.documentType, documentNumber: media.documentNumber,
       mediaLink: media.storageKey ? `/api/inquiries/${encodeURIComponent(id)}/documents/${encodeURIComponent(media.id)}` : media.mediaLink,
       isStored: !!media.storageKey, fileName: media.fileName, sizeBytes: media.sizeBytes,
@@ -48,16 +49,27 @@ export async function POST(request: NextRequest, { params }: Context) {
   const auth = await requireRole(request, ["ADMIN"]);
   if ("error" in auth) return fail(auth.error, auth.status);
   const { id } = await params;
-  const lead = await prisma.tenantLead.findUnique({ where: { id }, select: { status: true, workflowVersion: { select: publicWorkflowSelect } } });
+  const lead = await prisma.tenantLead.findUnique({ where: { id }, select: { status: true, currentStepOrder: true, workflowVersion: { select: publicWorkflowSelect } } });
   if (!lead) return fail("Pengajuan tidak ditemukan.", 404);
   const steps = lead.workflowVersion?.steps ?? [];
   if (!steps.length) return fail("Alur pengajuan tidak tersedia.", 400);
+
+  const currentStepOrder = lead.currentStepOrder;
+  function resolveStep(stepId: string | undefined, documentType: import("@/lib/inquiry-media").InquiryDocumentType) {
+    const eligible = steps.filter(step => step.stepOrder <= currentStepOrder);
+    if (stepId) return eligible.find(step => step.id === stepId && step.mediaRequirement !== "NONE");
+    return eligible.find(step => step.stepOrder === currentStepOrder && inquiryDocumentTypesForStep(step)?.includes(documentType))
+      ?? eligible.find(step => inquiryDocumentTypesForStep(step)?.includes(documentType))
+      ?? eligible.find(step => step.stepOrder === currentStepOrder && step.mediaRequirement !== "NONE");
+  }
 
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
     const parsed = await parseJsonRequest(request, inquiryDocumentLinkSchema);
     if (!parsed.success) return parsed.response;
-    const stepOrder = publicStepOrderForDocumentType(parsed.data.documentType, lead.status);
+    const step = resolveStep(parsed.data.stepId, parsed.data.documentType);
+    if (!step) return fail("Tahap dokumen belum tersedia untuk pengajuan ini.", 400);
+    const stepOrder = step.stepOrder;
     const media = await prisma.inquiryMedia.create({
       data: {
         tenantLeadId: id,
@@ -77,19 +89,22 @@ export async function POST(request: NextRequest, { params }: Context) {
   let form: FormData;
   try { form = await readInquiryMultipart(request); }
   catch { return fail("Unggah satu PDF maksimal 10 MB menggunakan multipart/form-data.", 400); }
-  const allowedFields = new Set(["file", "documentType", "mediaTitle", "documentNumber", "isVisibleToMitra"]);
+  const allowedFields = new Set(["file", "stepId", "documentType", "mediaTitle", "documentNumber", "isVisibleToMitra"]);
   for (const key of form.keys()) {
     if (!allowedFields.has(key) || form.getAll(key).length !== 1) return fail("Kolom unggahan tidak valid atau berulang.", 400);
   }
   const mediaTitleRaw = form.get("mediaTitle");
   const parsed = inquiryDocumentUploadSchema.safeParse({
+    stepId: form.get("stepId") ?? undefined,
     documentType: form.get("documentType"),
     mediaTitle: typeof mediaTitleRaw === "string" && mediaTitleRaw.trim() ? mediaTitleRaw : undefined,
     documentNumber: form.get("documentNumber") ?? undefined,
     isVisibleToMitra: form.get("isVisibleToMitra") ?? undefined,
   });
   if (!parsed.success) return fail("Jenis, nomor, atau visibilitas dokumen tidak valid.", 400);
-  const stepOrder = publicStepOrderForDocumentType(parsed.data.documentType, lead.status);
+  const step = resolveStep(parsed.data.stepId, parsed.data.documentType);
+  if (!step) return fail("Tahap dokumen belum tersedia untuk pengajuan ini.", 400);
+  const stepOrder = step.stepOrder;
   const file = form.get("file");
   if (!(file instanceof File)) return fail("Berkas PDF wajib diunggah.", 400);
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -128,13 +143,14 @@ export async function PATCH(request: NextRequest, { params }: Context) {
   const { id } = await params;
   try {
     const result = await prisma.$transaction(async tx => {
-      const lead = await tx.tenantLead.findUnique({ where: { id }, select: { status: true } });
+      await tx.$executeRaw`SELECT id FROM tenant_leads WHERE id = ${id} FOR UPDATE`;
+      const lead = await tx.tenantLead.findUnique({ where: { id }, select: { status: true, workflowVersionId: true, currentStepOrder: true } });
       const media = await tx.inquiryMedia.findFirst({ where: { id: parsed.data.id, tenantLeadId: id } });
       if (!lead || !media) return { error: "Dokumen tidak ditemukan.", status: 404 };
       if (parsed.data.verified === true && (!media.storageKey || !isInquiryDocumentKey(media.storageKey, id, media.documentType))) {
         return { error: "Tautan eksternal tidak dapat diverifikasi. Unggah PDF sebagai dokumen baru.", status: 400 };
       }
-      if (parsed.data.verified === false && media.verifiedAt && isInquiryDocumentLocked(lead.status)) {
+      if (parsed.data.verified === false && media.verifiedAt && isInquiryStepDocumentLocked(lead, media.stepOrder)) {
         return { error: "Verifikasi terkunci karena pengajuan telah melewati gerbang dokumen.", status: 409 };
       }
       if (parsed.data.mediaLink !== undefined && media.storageKey) {
@@ -167,15 +183,18 @@ export async function DELETE(request: NextRequest, { params }: Context) {
   const mediaId = request.nextUrl.searchParams.get("mediaId")?.trim();
   if (!mediaId) return fail("Parameter mediaId wajib diisi.", 400);
 
-  const lead = await prisma.tenantLead.findUnique({ where: { id }, select: { status: true } });
-  if (!lead) return fail("Pengajuan tidak ditemukan.", 404);
-  const media = await prisma.inquiryMedia.findFirst({ where: { id: mediaId, tenantLeadId: id } });
-  if (!media) return fail("Dokumen tidak ditemukan.", 404);
-  if (media.verifiedAt && isInquiryDocumentLocked(lead.status)) {
-    return fail("Dokumen terverifikasi terkunci dan tidak dapat dihapus.", 409);
-  }
-
-  await prisma.inquiryMedia.delete({ where: { id: media.id } });
+  const removed = await prisma.$transaction(async tx => {
+    await tx.$executeRaw`SELECT id FROM tenant_leads WHERE id = ${id} FOR UPDATE`;
+    const lead = await tx.tenantLead.findUnique({ where: { id }, select: { status: true, workflowVersionId: true, currentStepOrder: true } });
+    const media = await tx.inquiryMedia.findFirst({ where: { id: mediaId, tenantLeadId: id } });
+    if (!lead || !media) return { error: "Dokumen tidak ditemukan.", status: 404 };
+    if (media.verifiedAt && isInquiryStepDocumentLocked(lead, media.stepOrder)) {
+      return { error: "Dokumen terverifikasi terkunci dan tidak dapat dihapus.", status: 409 };
+    }
+    return { media: await tx.inquiryMedia.delete({ where: { id: media.id } }) };
+  });
+  if ("error" in removed) return fail(removed.error!, removed.status!);
+  const { media } = removed;
   if (media.storageKey) {
     try {
       await deleteInquiryDocument(media.storageKey);

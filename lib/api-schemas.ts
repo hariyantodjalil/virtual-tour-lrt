@@ -158,6 +158,7 @@ export const occupancySchema = z.object({
 
 export const leadUpdateSchema = z.object({
   id,
+  advance: z.object({ fromStepId: id, toStepId: id }).strict().optional(),
   status: z.enum([
     "NEW",
     "CONTACTED",
