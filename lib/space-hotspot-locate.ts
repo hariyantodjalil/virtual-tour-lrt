@@ -1,48 +1,79 @@
-import type { PanoramaScene } from "@/lib/tour-types";
+import { add, dirToSpherical, sphericalToDir } from "./spatial/geometry/spherical";
+import type { PrimaryUnitHotspot } from "./primary-unit-hotspot";
+import type { Hotspot, PanoramaScene } from "./tour-types";
 
 export type SpaceHotspotPlacement = {
   sceneId: string;
   yaw: number;
   pitch: number;
+  spatialId?: string;
 };
 
-/** Cari scene + koordinat hotspot unit berdasarkan kode ruang komersial. */
+export type SpaceHotspotTarget = { sceneId: string } & (
+  { spatialId: string } | { yaw: number; pitch: number }
+);
+
+type SceneHotspots = Pick<PanoramaScene, "id" | "hotspots" | "spatialEntities">;
+
+export function findUnitPinIndex(hotspots: Hotspot[], spaceCode: string, pinId?: string): number {
+  const code = spaceCode.trim().toUpperCase();
+  return hotspots.findIndex(hotspot => hotspot.type === "space" &&
+    hotspot.spaceCode?.trim().toUpperCase() === code &&
+    (pinId === undefined || hotspot.pinId === pinId));
+}
+
+function findPin(scene: SceneHotspots, code: string, pinId?: string): SpaceHotspotPlacement | null {
+  const pin = scene.hotspots[findUnitPinIndex(scene.hotspots, code, pinId)];
+  return pin && Number.isFinite(pin.yaw) && Number.isFinite(pin.pitch)
+    ? { sceneId: scene.id, yaw: pin.yaw, pitch: pin.pitch }
+    : null;
+}
+
+function findSpatial(scene: SceneHotspots, code: string, spatialId?: string): SpaceHotspotPlacement | null {
+  const area = scene.spatialEntities?.find(entity =>
+    entity.enabled && entity.action.type === "unit_detail" &&
+    entity.spaceCode?.trim().toUpperCase() === code &&
+    (spatialId === undefined || entity.id === spatialId) &&
+    entity.geometry.type === "spherical_polygon" && entity.geometry.vertices.length >= 3
+  );
+  if (area?.geometry.type !== "spherical_polygon") return null;
+  const direction = area.geometry.vertices.map(sphericalToDir).reduce(add, { x: 0, y: 0, z: 0 });
+  return { sceneId: scene.id, ...dirToSpherical(direction), spatialId: area.id };
+}
+
+export function resolvePrimaryUnitHotspot(
+  scene: SceneHotspots,
+  spaceCode: string,
+  target: PrimaryUnitHotspot,
+): SpaceHotspotPlacement | null {
+  if (scene.id !== target.sceneId) return null;
+  const code = spaceCode.trim().toUpperCase();
+  return target.kind === "pin"
+    ? findPin(scene, code, target.hotspotId)
+    : findSpatial(scene, code, target.hotspotId);
+}
+
 export function findSpaceHotspotPlacement(
   scenes: PanoramaScene[],
-  spaceCode: string
+  spaceCode: string,
+  primary?: PrimaryUnitHotspot | null,
 ): SpaceHotspotPlacement | null {
   const code = spaceCode.trim().toUpperCase();
   if (!code) return null;
 
-  for (const scene of scenes) {
-    const hotspot = scene.hotspots.find(
-      (h) =>
-        h.type === "space" &&
-        h.spaceCode?.trim().toUpperCase() === code
-    );
-    if (hotspot) {
-      return { sceneId: scene.id, yaw: hotspot.yaw, pitch: hotspot.pitch };
-    }
+  if (primary) {
+    const scene = scenes.find(item => item.id === primary.sceneId);
+    const placement = scene && resolvePrimaryUnitHotspot(scene, code, primary);
+    if (placement) return placement;
   }
 
-  // Fallback: centroid Spatial Area yang taut ke spaceCode
   for (const scene of scenes) {
-    const entity = (scene.spatialEntities ?? []).find(
-      (e) =>
-        e.enabled &&
-        e.action.type === "unit_detail" &&
-        e.spaceCode?.trim().toUpperCase() === code &&
-        e.geometry.type === "spherical_polygon" &&
-        e.geometry.vertices.length >= 3
-    );
-    if (entity && entity.geometry.type === "spherical_polygon") {
-      const verts = entity.geometry.vertices;
-      const yaw =
-        verts.reduce((s, v) => s + v.yaw, 0) / verts.length;
-      const pitch =
-        verts.reduce((s, v) => s + v.pitch, 0) / verts.length;
-      return { sceneId: scene.id, yaw, pitch };
-    }
+    const placement = findPin(scene, code);
+    if (placement) return placement;
+  }
+  for (const scene of scenes) {
+    const placement = findSpatial(scene, code);
+    if (placement) return placement;
   }
   return null;
 }
