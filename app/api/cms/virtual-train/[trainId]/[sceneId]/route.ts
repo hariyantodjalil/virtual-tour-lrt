@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { deleteSceneAndLinks, lockTourSceneLinks, validSceneHotspots } from "@/lib/tour-scene-links";
 import { generateS3Key, uploadToS3 } from "@/lib/s3";
 import { uploadAdaptivePanoramaTiles } from "@/lib/panorama-tile-upload";import { withoutHdPanoramaProfiles } from "@/lib/panorama-profile";
 
@@ -59,7 +60,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (body.title !== undefined) updateData.title = body.title;
   if (body.level !== undefined) updateData.car = body.level;
   if (body.order !== undefined) updateData.order = body.order;
-  if (body.hotspots !== undefined) updateData.hotspots = body.hotspots as Prisma.InputJsonValue;
   if (body.isActive !== undefined) updateData.isActive = body.isActive;
 
   if (body.areaId !== undefined) {
@@ -105,10 +105,16 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (body.thumbnailUrl !== undefined) updateData.thumbnailUrl = body.thumbnailUrl;
   if (body.canvasData !== undefined) updateData.canvasData = body.canvasData as Prisma.InputJsonValue;
 
-  const scene = await prisma.trainTourScene.update({
-    where: { trainId_sceneId: { trainId, sceneId } },
-    data: updateData,
-    select: sceneSelect,
+  const scene = await prisma.$transaction(async tx => {
+    if (body.hotspots !== undefined) {
+      await lockTourSceneLinks(tx, { trainId });
+      updateData.hotspots = await validSceneHotspots(tx, { trainId }, body.hotspots);
+    }
+    return tx.trainTourScene.update({
+      where: { trainId_sceneId: { trainId, sceneId } },
+      data: updateData,
+      select: sceneSelect,
+    });
   });
 
   return NextResponse.json(scene);
@@ -119,9 +125,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { trainId, sceneId } = await params;
-  await prisma.trainTourScene.delete({
-    where: { trainId_sceneId: { trainId, sceneId } },
-  });
+  if (!(await deleteSceneAndLinks({ trainId }, sceneId))) {
+    return NextResponse.json({ error: "Scene tidak ditemukan" }, { status: 404 });
+  }
   return NextResponse.json({ message: "Scene dihapus" });
 }
 
