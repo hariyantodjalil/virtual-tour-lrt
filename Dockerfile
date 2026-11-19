@@ -1,15 +1,10 @@
-FROM node:22-alpine AS deps
-WORKDIR /app
-RUN apk add --no-cache libc6-compat openssl
-
-COPY package.json package-lock.json ./
-RUN npm ci
-
 FROM node:22-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 
-COPY --from=deps /app/node_modules ./node_modules
+# npm ci di stage builder (hindari COPY --from=deps yang rentan cache BuildKit corrupt)
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
