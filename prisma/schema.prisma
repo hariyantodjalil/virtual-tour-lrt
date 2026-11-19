@@ -318,8 +318,9 @@ model TenantLead {
   message          String?
   rdsOfferNo       String?
   baNegotiationNo  String?
-  status           LeadStatus       @default(NEW)
-  notes            String?
+  status               LeadStatus       @default(NEW)
+  currentStepOrder     Int              @default(1)
+  notes                String?
   followUpAt       DateTime?
   leaseStartAt     DateTime?        @db.Date
   leaseEndAt       DateTime?        @db.Date
@@ -338,7 +339,7 @@ model TenantLead {
 
 model PipelineWorkflowVersion {
   id          String       @id @default(cuid())
-  version     Int          @unique
+  version     Int?         @unique
   title       String
   description String?
   status      String       @default("DRAFT")
@@ -353,20 +354,25 @@ model PipelineWorkflowVersion {
 }
 
 model PipelineStep {
-  id                String                  @id @default(cuid())
-  workflowVersionId String
-  workflowVersion   PipelineWorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
-  stepOrder         Int
-  leadStatus        LeadStatus
-  title             String
-  description       String?
-  publicMessage     String                  @db.Text
-  requiresMedia     Boolean                 @default(false)
-  showInSummary     Boolean                 @default(false)
-  stepLogs          InquiryStepLog[]
+  id                  String                  @id @default(cuid())
+  workflowVersionId   String
+  workflowVersion     PipelineWorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  stepOrder           Int
+  leadStatus          LeadStatus              @default(CONTACTED)
+  stepType            PipelineStepType        @default(STANDARD)
+  documentNumberLabel String?
+  slaHours            Int?
+  mediaRequirement    StepMediaRequirement    @default(OPTIONAL)
+  requiresMedia       Boolean                 @default(false)
+  spaceEffect         StepSpaceEffect         @default(NONE)
+  title               String
+  description         String?
+  publicMessage       String                  @db.Text
+  showInSummary       Boolean                 @default(false)
+  stepLogs            InquiryStepLog[]
 
   @@unique([workflowVersionId, stepOrder])
-  @@unique([workflowVersionId, leadStatus])
+  @@index([workflowVersionId, leadStatus])
   @@map("pipeline_steps")
 }
 
@@ -404,10 +410,14 @@ model InquiryStepLog {
   fromStatus     LeadStatus?
   action         String
   notes          String?       @db.Text
+  documentNumber String?
+  visitStatus    SiteVisitStatus?
+  scheduledAt    DateTime?
   performedBy    String
   createdAt      DateTime      @default(now())
 
   @@index([tenantLeadId, createdAt])
+  @@index([tenantLeadId, stepOrder])
   @@map("inquiry_step_logs")
 }
 
@@ -472,6 +482,25 @@ enum SiteVisitStatus {
   SCHEDULED
   COMPLETED
   CANCELLED
+}
+
+enum PipelineStepType {
+  STANDARD
+  DOCUMENT_ISSUANCE
+  SITE_VISIT
+}
+
+enum StepMediaRequirement {
+  NONE
+  OPTIONAL
+  REQUIRED
+}
+
+enum StepSpaceEffect {
+  NONE
+  RESERVE_SPACE
+  FIT_OUT_SPACE
+  ACTIVATE_TENANT
 }
 
 enum EventType {
