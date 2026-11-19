@@ -187,3 +187,128 @@ export function spaceStatusBadgeClass(status: string): string {
 export function isCommercialOperation(status: string) {
   return status === "COMMERCIAL_OPERATION" || status === "CLOSED_WON";
 }
+
+export function isInquiryFullyCompleted(status: string) {
+  return isCommercialOperation(status);
+}
+
+export const SPACE_TYPE_LABELS: Record<string, string> = {
+  KIOS: "Kios",
+  RUKO: "Ruko",
+  ATM: "ATM",
+  VENDING: "Vending Machine",
+  MEDIA_IKLAN: "Media Iklan",
+  AREA_PROMOSI: "Area Promosi",
+};
+
+export const STANDARD_LEASING_MODEL =
+  "Space-Only Leasing (Sewa Ruang Kosong)";
+export const STANDARD_FIT_OUT_TERMS =
+  "Fit-Out oleh Mitra (Wajib Persetujuan Desain Teknis KAI · Dilarang Menggunakan Tabung Gas LPG di Area Stasiun Layang)";
+
+export type PipelineStepTypeValue = "STANDARD" | "DOCUMENT_ISSUANCE" | "SITE_VISIT";
+export type StepMediaRequirementValue = "NONE" | "OPTIONAL" | "REQUIRED";
+export type StepSpaceEffectValue =
+  | "NONE"
+  | "RESERVE_SPACE"
+  | "FIT_OUT_SPACE"
+  | "ACTIVATE_TENANT";
+
+/**
+ * Menurunkan nilai enum legacy `LeadStatus` secara otomatis di balik layar
+ * dari posisi tahap, Tipe Proses, dan Efek Unit agar UI tidak perlu
+ * menampilkan pilihan kategori status yang membingungkan.
+ */
+export function deriveStepLeadStatus(input: {
+  index: number;
+  totalSteps: number;
+  stepType: PipelineStepTypeValue;
+  spaceEffect: StepSpaceEffectValue;
+  title?: string | null;
+  existingLeadStatus?: string | null;
+}): Exclude<CommercialLeadStatus, "CLOSED_WON" | "CLOSED_LOST"> {
+  const { index, totalSteps, stepType, spaceEffect, title, existingLeadStatus } =
+    input;
+  if (index <= 0) return "NEW";
+  if (index >= totalSteps - 1) return "COMMERCIAL_OPERATION";
+
+  if (stepType === "SITE_VISIT") return "SITE_CHECK";
+  if (stepType === "DOCUMENT_ISSUANCE") {
+    if (spaceEffect === "RESERVE_SPACE") {
+      return /pks|perjanjian/i.test(title ?? "") ? "PKS" : "BA_SIGNED";
+    }
+    if (spaceEffect === "FIT_OUT_SPACE") return "FIT_OUT_HANDOVER";
+    return "RDS_OFFER";
+  }
+
+  if (spaceEffect === "FIT_OUT_SPACE") return "FIT_OUT_HANDOVER";
+  if (spaceEffect === "RESERVE_SPACE") {
+    if (existingLeadStatus === "PKS" || existingLeadStatus === "BILLING") {
+      return existingLeadStatus;
+    }
+    if (/tagihan|billing|invoice/i.test(title ?? "")) return "BILLING";
+    if (/pks|perjanjian/i.test(title ?? "")) return "PKS";
+    return "DESIGN_REVIEW";
+  }
+
+  if (existingLeadStatus === "CONTACTED" || existingLeadStatus === "NEGOTIATING") {
+    return existingLeadStatus;
+  }
+  if (
+    existingLeadStatus === "BA_SIGNED" ||
+    existingLeadStatus === "DESIGN_REVIEW" ||
+    existingLeadStatus === "PKS"
+  ) {
+    return existingLeadStatus;
+  }
+  return index < Math.ceil(totalSteps / 2) ? "CONTACTED" : "NEGOTIATING";
+}
+
+export function formatSpaceRequirementLabel(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("TRAIN:")) {
+    const parts = trimmed
+      .slice("TRAIN:".length)
+      .split("|")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (parts.length >= 2) return `Media Kereta · ${parts.slice(1).join(" — ")}`;
+    return "Media Iklan Kereta";
+  }
+  return trimmed;
+}
+
+export const STEP_TYPE_LABELS: Record<PipelineStepTypeValue, string> = {
+  STANDARD: "Administrasi / Diskusi Standar",
+  DOCUMENT_ISSUANCE: "Penerbitan Nomor Surat Resmi",
+  SITE_VISIT: "Penjadwalan & Verifikasi Lokasi",
+};
+
+export const STEP_MEDIA_REQUIREMENT_LABELS: Record<StepMediaRequirementValue, string> = {
+  NONE: "Tidak Memerlukan Dokumen",
+  OPTIONAL: "Dokumen Opsional",
+  REQUIRED: "Wajib Unggah Dokumen",
+};
+
+export const STEP_SPACE_EFFECT_LABELS: Record<StepSpaceEffectValue, string> = {
+  NONE: "Tidak Mengubah Status Unit",
+  RESERVE_SPACE: "Kunci Unit menjadi RESERVED",
+  FIT_OUT_SPACE: "Ubah Unit menjadi FIT_OUT",
+  ACTIVATE_TENANT: "Ubah Unit menjadi TERISI & Aktifkan Penyewa",
+};
+
+export type StepSlaHealth = "SAFE" | "WARNING" | "BREACHED" | "MET" | "MISSED";
+
+export interface StepSlaInfo {
+  slaHours: number;
+  startedAt: string;
+  dueAt: string;
+  completedAt: string | null;
+  elapsedMs: number;
+  remainingMs: number;
+  health: StepSlaHealth;
+  isRunning: boolean;
+  label: string;
+}
