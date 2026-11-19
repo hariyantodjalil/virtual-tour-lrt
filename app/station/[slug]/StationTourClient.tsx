@@ -1,8 +1,8 @@
 /*
   THESIS: Chrome tour sebagai cockpit maroon LRT — panorama memimpin, UI brand-coherent; tolak HUD hitam generik.
   OWN-WORLD: void #1C0A0E, panel #3A161C, signal #E31E2D, glass hairline hangat, Chakra Petch.
-  STORY: Mitra jelajah 360°, putar rute otomatis, cek unit, hubungi tim.
-  FIRST VIEWPORT: Panorama full-bleed; chip stasiun; rail tool; nav / guided autopilot bar bawah.
+  STORY: Mitra jelajah 360°, cek unit, hubungi tim.
+  FIRST VIEWPORT: Panorama full-bleed; chip stasiun; rail tool; nav bawah.
   FORM: Perluasan Void Portal (Experience) — bukan dunia visual baru.
 */
 "use client";
@@ -21,8 +21,6 @@ import {
   Map,
   MapPin,
   MapPinned,
-  Play,
-  Route,
   TrainFront,
   X,
 } from "lucide-react";
@@ -37,9 +35,7 @@ import ContactPersonFab from "@/components/tour/ContactPersonFab";
 import FacilityLegend from "@/components/tour/FacilityLegend";
 import TourLeftPanel from "@/components/tour/TourLeftPanel";
 import TourUnitsPanel from "@/components/tour/TourUnitsPanel";
-import { GuidedRouteBar } from "@/components/tour/GuidedRouteBar";
 import MobileTourPanels, { type MobileTourPanel, type TourUnitListView } from "@/components/tour/MobileTourPanels";
-import TourRouteStopPicker from "@/components/tour/TourRouteStopPicker";
 import { useMobileTour } from "@/lib/use-mobile-tour";
 import FloorPlanMap from "@/components/tour/FloorPlanMap";
 import StationMinimap from "@/components/tour/StationMinimap";
@@ -54,17 +50,6 @@ import {
   findScenePlacement,
   firstSceneIdInLevel,
 } from "@/lib/public-tour-structure";
-import {
-  ROUTE_ORIGIN_CURRENT,
-  buildTourRoute,
-  collapseRouteToWaypoints,
-  currentPositionStop,
-  defaultRouteDestination,
-  isRouteOriginCurrent,
-  isWaypointActive,
-  listRouteStops,
-  resolveRouteStopAnchor,
-} from "@/lib/tour-route-waypoints";
 import { findSpaceHotspotPlacement, type SpaceHotspotTarget } from "@/lib/space-hotspot-locate";
 import type { PrimaryUnitHotspot } from "@/lib/primary-unit-hotspot";
 import { findFacilityHotspotPlacement } from "@/lib/facility-hotspot-locate";
@@ -207,24 +192,12 @@ export default function StationTourClient({
   const [activeAreaId, setActiveAreaId] = useState<string | null>(
     initialPlacement?.area?.id ?? firstLevel?.areas[0]?.id ?? null
   );
-  const routeStops = listRouteStops(stationInfo.levels);
-  const [routeFrom, setRouteFrom] = useState(ROUTE_ORIGIN_CURRENT);
-  const [routeTo, setRouteTo] = useState(() => {
-    const stops = listRouteStops(stationInfo.levels);
-    const destination =
-      defaultRouteDestination(stationInfo.scenes, stationInfo.levels, stops, firstScene) ??
-      lastScene;
-    return resolveRouteStopAnchor(destination, stationInfo.levels, stops);
-  });
 
   const [infoOpen, setInfoOpen] = useState(false);
   const [unitsOpen, setUnitsOpen] = useState(false);
-  const [routeOpen, setRouteOpen] = useState(false);
   const [facilityOpen, setFacilityOpen] = useState(false);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [uiCleared, setUiCleared] = useState(false);
-  const [guidedActive, setGuidedActive] = useState(false);
-  const [routeAutoplay, setRouteAutoplay] = useState(false);
   const [openedFromUnitsList, setOpenedFromUnitsList] = useState(false);
   const [cameraFocus, setCameraFocus] = useState<{
     yaw: number;
@@ -233,10 +206,7 @@ export default function StationTourClient({
   } | null>(null);
   const [focusToken, setFocusToken] = useState(0);
   const [activeFacilityId, setActiveFacilityId] = useState<FacilityIconId | null>(null);
-  const mobilePanel: MobileTourPanel | null = unitsOpen ? "units" : infoOpen ? "info" : routeOpen ? "route" : null;
-  const routeFromStops = [currentPositionStop(activeSceneId, stationInfo.levels), ...routeStops];
-  const routeOriginExact = isRouteOriginCurrent(routeFrom);
-  const routeOriginSceneId = routeOriginExact ? activeSceneId : routeFrom;
+  const mobilePanel: MobileTourPanel | null = unitsOpen ? "units" : infoOpen ? "info" : null;
 
   const availableCount = spaces.filter((s) => s.status === "TERSEDIA").length;
   const occupiedCount = spaces.filter((s) => s.status === "TERISI").length;
@@ -253,7 +223,7 @@ export default function StationTourClient({
   const minimapLevelId = minimapLevel?.id ?? activeScene?.levelId;
   const activeMinimap = minimapLevelId ? minimaps[minimapLevelId] : undefined;
   const showMinimap = minimapOpen && !uiCleared && !mapOpen && !pickerOpen
-    && !selectedSpace && !selectedAd && !infoPopup && !infoOpen && !unitsOpen && !routeOpen;
+    && !selectedSpace && !selectedAd && !infoPopup && !infoOpen && !unitsOpen;
 
   const updateMinimapYaw = useCallback((yaw: number, sceneId: string) => {
     const map = minimapRef.current;
@@ -273,95 +243,11 @@ export default function StationTourClient({
     setFocusToken(0);
   }
 
-  const selectedRoute = buildTourRoute(
-    stationInfo.scenes,
-    stationInfo.levels,
-    routeOriginSceneId,
-    routeTo,
-    { originExact: routeOriginExact }
-  );
-  const routeWaypoints = collapseRouteToWaypoints(selectedRoute, stationInfo.levels);
-  const routeIdx = selectedRoute.indexOf(activeSceneId);
-  const safeRouteIdx = routeIdx >= 0 ? routeIdx : 0;
-  const nextStep = routeIdx >= 0 ? selectedRoute[routeIdx + 1] : undefined;
-  const prevStep = routeIdx > 0 ? selectedRoute[routeIdx - 1] : undefined;
-  const routeFinished = guidedActive && routeIdx >= 0 && routeIdx >= selectedRoute.length - 1;
-  const routeFromStop = routeFromStops.find((stop) => stop.sceneId === routeFrom);
-  const routeToStop = routeStops.find((stop) => stop.sceneId === routeTo);
-  const routeFromTitle = routeOriginExact
-    ? "Posisi saat ini"
-    : routeFromStop?.label
-      ?? stationInfo.scenes.find((s) => s.id === routeFrom)?.title
-      ?? "Awal";
-  const routeToTitle = routeToStop?.label
-    ?? stationInfo.scenes.find((s) => s.id === routeTo)?.title
-    ?? "Tujuan";
-  const canOfferRoute = routeStops.length > 1;
-  const popupBlocksAutoplay = Boolean(selectedSpace || selectedAd || infoPopup || (isMobile && (mobilePanel || facilityOpen)));
 
   function handleSceneChange(sceneId: string) {
     clearCameraFocus();
     activateScene(sceneId);
   }
-
-  function startGuidedRoute(opts?: { autoplay?: boolean }) {
-    setGuidedActive(true);
-    setRouteAutoplay(Boolean(opts?.autoplay));
-    setRouteOpen(false);
-    setInfoOpen(false);
-    setUnitsOpen(false);
-    setFacilityOpen(false);
-    setSelectedSpace(null);
-    setSelectedAd(null);
-    // Dari posisi sekarang: lanjut dari scene aktif jika sudah di jalur; selain itu lompat ke awal jalur.
-    if (routeOriginExact && selectedRoute.includes(activeSceneId)) return;
-    handleSceneChange(selectedRoute[0] ?? routeOriginSceneId);
-  }
-
-  function exitGuidedRoute() {
-    setGuidedActive(false);
-    setRouteAutoplay(false);
-  }
-
-  function toggleRouteAutoplay() {
-    if (routeFinished) {
-      handleSceneChange(selectedRoute[0] ?? routeOriginSceneId);
-      setRouteAutoplay(true);
-      return;
-    }
-    setRouteAutoplay((v) => !v);
-  }
-
-  useEffect(() => {
-    if (!guidedActive || !routeAutoplay || popupBlocksAutoplay || !nextStep) {
-      if (guidedActive && routeAutoplay && !popupBlocksAutoplay && !nextStep) {
-        const timer = window.setTimeout(() => {
-          setRouteAutoplay(false);
-        }, 0);
-        return () => window.clearTimeout(timer);
-      }
-      return;
-    }
-
-    const targetId = nextStep;
-    const timer = window.setTimeout(() => {
-      clearCameraFocus();
-      activateScene(targetId);
-    }, 4500);
-
-    return () => window.clearTimeout(timer);
-    // Intentionally omit activateScene/clearCameraFocus — recreated each render
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [guidedActive, routeAutoplay, nextStep, activeSceneId, popupBlocksAutoplay]);
-
-  useEffect(() => {
-    if (popupBlocksAutoplay) {
-      const timer = window.setTimeout(() => {
-        setRouteAutoplay((playing) => (playing ? false : playing));
-      }, 0);
-      return () => window.clearTimeout(timer);
-    }
-  }, [popupBlocksAutoplay]);
 
   const focusOnSpaceHotspot = useCallback((space: Space) => {
     const placement = findSpaceHotspotPlacement(stationInfo.scenes, space.code, space.primaryHotspot);
@@ -390,7 +276,6 @@ export default function StationTourClient({
     setSelectedSpace(null);
     setSelectedAd(null);
     setUnitsOpen(false);
-    setRouteOpen(false);
     setInfoOpen(false);
     setFacilityOpen(false);
 
@@ -409,7 +294,6 @@ export default function StationTourClient({
     setOpenedFromUnitsList(true);
     setSelectedSpace(space);
     setInfoOpen(false);
-    setRouteOpen(false);
     setUnitsOpen(false);
   }, [focusOnSpaceHotspot]);
 
@@ -466,10 +350,9 @@ export default function StationTourClient({
 
   const closeSidePanels = useCallback(() => {
     setInfoOpen(false);
-    setRouteOpen(false);
     setUnitsOpen(false);
     setFacilityOpen(false);
-  }, [setInfoOpen, setRouteOpen, setUnitsOpen, setFacilityOpen]);
+  }, [setInfoOpen, setUnitsOpen, setFacilityOpen]);
 
   function closeStationPicker() {
     setPickerOpen(false);
@@ -520,22 +403,6 @@ export default function StationTourClient({
           mapRef={minimapRef} onClose={() => setMinimapOpen(false)} />
       )}
 
-      {guidedActive && showTourNav && (
-        <GuidedRouteBar
-          fromTitle={routeFromTitle}
-          toTitle={routeToTitle}
-          stepIndex={safeRouteIdx}
-          stepTotal={selectedRoute.length}
-          autoplay={routeAutoplay}
-          canPrev={Boolean(prevStep)}
-          canNext={Boolean(nextStep)}
-          finished={routeFinished}
-          onToggleAutoplay={toggleRouteAutoplay}
-          onPrev={() => prevStep && handleSceneChange(prevStep)}
-          onNext={() => nextStep && handleSceneChange(nextStep)}
-          onExit={exitGuidedRoute}
-        />
-      )}
 
       {/* Vignette legibility — tinted maroon, not pure black */}
       {!uiCleared && (
@@ -586,7 +453,6 @@ export default function StationTourClient({
                 type="button"
                 onClick={() => {
                   setInfoOpen(false);
-                  setRouteOpen(false);
                   setUnitsOpen(false);
                   setFacilityOpen(false);
                   setUiCleared(true);
@@ -611,7 +477,6 @@ export default function StationTourClient({
                 onClick={() => {
                   setUnitsOpen((v) => !v);
                   setInfoOpen(false);
-                  setRouteOpen(false);
                   setFacilityOpen(false);
                   if (unitsOpen) {
                     setSelectedSpace(null);
@@ -629,7 +494,6 @@ export default function StationTourClient({
                 delayMs={90}
                 onClick={() => {
                   setInfoOpen((v) => !v);
-                  setRouteOpen(false);
                   setUnitsOpen(false);
                   setFacilityOpen(false);
                 }}
@@ -637,30 +501,6 @@ export default function StationTourClient({
                 <Info className="h-5 w-5" />
               </ToolButton>
 
-              {canOfferRoute && (
-                <ToolButton
-                  active={routeOpen || guidedActive}
-                  label={t("Rute")}
-                  title={t("Rute tur")}
-                  delayMs={140}
-                  onClick={() => {
-                    if (guidedActive) {
-                      exitGuidedRoute();
-                      setRouteOpen(true);
-                      setInfoOpen(false);
-                      setUnitsOpen(false);
-                      setFacilityOpen(false);
-                      return;
-                    }
-                    setRouteOpen((v) => !v);
-                    setInfoOpen(false);
-                    setUnitsOpen(false);
-                    setFacilityOpen(false);
-                  }}
-                >
-                  <Route className="h-5 w-5" />
-                </ToolButton>
-              )}
 
               <ToolButton
                 active={facilityOpen}
@@ -670,7 +510,6 @@ export default function StationTourClient({
                 onClick={() => {
                   setFacilityOpen((v) => !v);
                   setInfoOpen(false);
-                  setRouteOpen(false);
                   setUnitsOpen(false);
                 }}
               >
@@ -706,7 +545,7 @@ export default function StationTourClient({
       )}
 
       {/* Backdrop soft close for side panels */}
-      {(!isMobile || facilityOpen) && !uiCleared && (infoOpen || routeOpen || facilityOpen) && !selectedSpace && (
+      {(!isMobile || facilityOpen) && !uiCleared && (infoOpen || facilityOpen) && !selectedSpace && (
         <button
           type="button"
           aria-label={t("Tutup panel")}
@@ -791,114 +630,14 @@ export default function StationTourClient({
         </aside>
       )}
 
-      {/* ROUTE PANEL — tujuan area/level, bukan daftar tiap scene */}
-      {!isMobile && !uiCleared && routeOpen && !selectedSpace && canOfferRoute && (
-        <aside
-          className={`tour-glass-panel tour-panel-in pointer-events-auto absolute top-1/2 z-[65] w-[min(18.5rem,calc(100vw-5.5rem))] -translate-y-1/2 overflow-visible rounded-2xl text-ink ${
-            leftPanelOpen
-              ? "left-14 sm:left-16"
-              : "left-4 sm:left-5"
-          }`}
-        >
-          <div className="flex items-center justify-between rounded-t-2xl border-b px-4 py-3" style={{ borderColor: "var(--hairline)" }}>
-            <div className="flex items-center gap-2">
-              <Route className="h-4 w-4 text-signal" />
-              <p className="font-display text-sm font-semibold">{t("Rute Tur")}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setRouteOpen(false)}
-              aria-label={t("Tutup rute")}
-              className="rounded-full p-1.5 transition-colors hover:bg-white/10"
-            >
-              <X className="h-4 w-4 text-ink/60" />
-            </button>
-          </div>
-          <div className="space-y-4 p-4">
-            <p className="text-xs leading-relaxed text-fog">
-              {t("Navigasi mengikuti pinpoint antar panorama — dari posisi sekarang atau titik ke titik.")}
-            </p>
-            <div className="space-y-3">
-              <TourRouteStopPicker
-                id="desktop-route-from"
-                label={t("Dari")}
-                value={routeFrom}
-                stops={routeFromStops}
-                levels={stationInfo.levels}
-                onChange={setRouteFrom}
-              />
-              <TourRouteStopPicker
-                id="desktop-route-to"
-                label={t("Ke")}
-                value={routeTo}
-                stops={routeStops}
-                levels={stationInfo.levels}
-                onChange={setRouteTo}
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 font-display text-[11px] font-semibold tracking-wide text-fog">{t("Jalur")}</p>
-              <ol className="space-y-0">
-                {routeWaypoints.map((point, index) => {
-                  const isCurrent = isWaypointActive(point, activeSceneId, stationInfo.levels);
-                  return (
-                    <li key={`${point.key}-${index}`} className="relative flex gap-3">
-                      <div className="flex w-5 flex-col items-center">
-                        <span className={`mt-1 size-2.5 shrink-0 rounded-full ${isCurrent ? "bg-signal" : "bg-fog/50"}`} />
-                        {index < routeWaypoints.length - 1 && (
-                          <span className="mt-1 w-px flex-1 bg-[color:rgb(255_214_218_/_0.22)]" aria-hidden="true" />
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleSceneChange(point.sceneId)}
-                        className={`mb-3 min-w-0 flex-1 rounded-lg px-2 py-1 text-left text-sm transition hover:bg-panel/80 focus-visible:outline-2 focus-visible:outline-signal ${
-                          isCurrent ? "font-semibold text-ink" : "text-ink/80"
-                        }`}
-                      >
-                        {content(point.label)}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ol>
-              <p className="text-[11px] text-fog">
-                {routeWaypoints.length} {t("tujuan ·")} {selectedRoute.length} {t("panorama di jalur")}
-              </p>
-            </div>
-
-            <div className="space-y-2 pt-1">
-              <button
-                type="button"
-                onClick={() => startGuidedRoute({ autoplay: true })}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-signal font-display text-sm font-bold text-white shadow-[0_12px_28px_rgba(227,30,45,0.3)] transition hover:bg-signal-deep"
-              >
-                <Play className="h-4 w-4 fill-current" />
-                {t("Putar otomatis")}
-              </button>
-              <button
-                type="button"
-                onClick={() => startGuidedRoute({ autoplay: false })}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-full border bg-void/45 font-display text-sm font-bold text-ink transition hover:bg-void/70"
-                style={{ borderColor: "var(--hairline-strong)" }}
-              >
-                <Route className="h-4 w-4" />
-                {t("Jelajah manual")}
-              </button>
-            </div>
-          </div>
-        </aside>
-      )}
 
       {/* UNITS LEFT DRAWER — muncul dari "Lihat semua Tenant" */}
       {isMobile && mobilePanel && !uiCleared && !selectedSpace && !selectedAd && (
         <MobileTourPanels key={mobilePanel} panel={mobilePanel} station={stationInfo} spaces={spaces}
-          typeLabels={TYPE_LABELS} contactUrl={stationWaUrl ?? ""} activeSceneId={activeSceneId}
+          typeLabels={TYPE_LABELS} contactUrl={stationWaUrl ?? ""}
           unitListView={unitListView} onUnitListViewChange={setUnitListView} onClose={closeSidePanels}
           onSelectUnit={unit => { const full = spaces.find(space => space.id === unit.id); if (full) openSpaceFromList(full); }}
           onViewMap={() => { setUnitsOpen(false); setMapOpen(true); }}
-          route={{ from: routeFrom, to: routeTo, onFromChange: setRouteFrom, onToChange: setRouteTo, fromStops: routeFromStops, stops: routeStops, waypoints: routeWaypoints, sceneCount: selectedRoute.length, onSelectScene: handleSceneChange, onStart: autoplay => startGuidedRoute({ autoplay }) }}
         />
       )}
 
@@ -977,7 +716,7 @@ export default function StationTourClient({
         />
       )}
 
-      {!uiCleared && !(isMobile && (mobilePanel || facilityOpen || guidedActive || selectedSpace || selectedAd || pickerOpen)) && (
+      {!uiCleared && !(isMobile && (mobilePanel || facilityOpen || selectedSpace || selectedAd || pickerOpen)) && (
         <ContactPersonFab
           phone={commercialContactPhone}
           stationName={stationInfo.name}
@@ -992,7 +731,6 @@ export default function StationTourClient({
             setUiCleared((v) => {
               if (!v) {
                 setInfoOpen(false);
-                setRouteOpen(false);
                 setUnitsOpen(false);
                 setFacilityOpen(false);
               }
