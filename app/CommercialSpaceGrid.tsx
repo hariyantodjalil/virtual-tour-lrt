@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import CommercialSpaceCard from "@/components/commercial/CommercialSpaceCard";
@@ -79,6 +80,7 @@ export default function CommercialSpaceGrid({
   totalSpaces: number;
   totalStations: number;
 }) {
+  const { t } = useTourLanguage();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["value"]>("all");
   const [stationFilter, setStationFilter] = useState("all");
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
@@ -129,11 +131,10 @@ export default function CommercialSpaceGrid({
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-10">
         <div className="min-w-0 max-w-xl flex-1">
           <h2 className="font-display text-2xl font-bold leading-tight text-white md:text-[24px]">
-            Temukan Area Komersial yang Sesuai dengan Kebutuhan Anda
+            {t("Temukan Area Komersial yang Sesuai dengan Kebutuhan Anda")}
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-white/90 md:mt-4 md:text-[15px]">
-            Jelajahi berbagai pilihan area komersial dan media promosi yang tersedia di stasiun LRT
-            Jabodebek. Temukan lokasi yang tepat untuk mendukung kebutuhan bisnis dan promosi Anda.
+            {t("Jelajahi berbagai pilihan area komersial dan media promosi yang tersedia di stasiun LRT Jabodebek. Temukan lokasi yang tepat untuk mendukung kebutuhan bisnis dan promosi Anda.")}
           </p>
         </div>
 
@@ -148,7 +149,7 @@ export default function CommercialSpaceGrid({
               />
             </span>
             <p className="min-w-0 text-sm leading-snug font-semibold text-[#101828] sm:text-[15px]">
-              <span className="text-[#d32f2f]">{totalSpaces}+</span> Area Komersial yang tersedia
+              <span className="text-[#d32f2f]">{totalSpaces}+</span> {t("Area Komersial yang tersedia")}
             </p>
           </div>
 
@@ -164,7 +165,7 @@ export default function CommercialSpaceGrid({
               />
             </span>
             <p className="min-w-0 text-sm leading-snug font-semibold text-[#101828] sm:text-[15px]">
-              <span className="text-[#d32f2f]">{totalStations}</span> Stasiun LRT Jabodebek
+              <span className="text-[#d32f2f]">{totalStations}</span> {t("Stasiun LRT Jabodebek")}
             </p>
           </div>
         </div>
@@ -173,7 +174,7 @@ export default function CommercialSpaceGrid({
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="relative w-full sm:w-auto sm:min-w-[220px]">
           <label htmlFor="station-filter" className="sr-only">
-            Filter stasiun
+            {t("Filter stasiun")}
           </label>
           <select
             id="station-filter"
@@ -181,7 +182,7 @@ export default function CommercialSpaceGrid({
             onChange={(e) => setStationFilter(e.target.value)}
             className="h-9 w-full appearance-none rounded-full border border-white/80 bg-white py-0 pr-9 pl-4 text-xs font-medium text-[#d32f2f] shadow-sm transition hover:bg-white/95 focus:outline-none focus:ring-2 focus:ring-white/50"
           >
-            <option value="all">Semua Stasiun</option>
+            <option value="all">{t("Semua Stasiun")}</option>
             {stations.map((st) => (
               <option key={st.slug} value={st.slug}>
                 {st.name}
@@ -208,7 +209,7 @@ export default function CommercialSpaceGrid({
                     : "border border-white/80 bg-white text-[#d32f2f] hover:bg-white/95"
                 }`}
               >
-                {item.label}
+                {t(item.label)}
               </button>
             );
           })}
@@ -235,14 +236,14 @@ export default function CommercialSpaceGrid({
                 onClick={() => setBrowseOpen(true)}
                 className="inline-flex h-11 items-center rounded-full border border-white/80 bg-white px-6 text-sm font-semibold text-[#d32f2f] shadow-sm transition hover:bg-white/95"
               >
-                Lihat semua area komersial
+                {t("Lihat semua area komersial")}
               </button>
             </div>
           )}
         </>
       ) : (
         <p className="mt-8 rounded-2xl border border-dashed border-white/30 px-6 py-10 text-center text-sm text-white/80">
-          Tidak ada unit untuk filter ini
+          {t("Tidak ada unit untuk filter ini")}
           {stationFilter !== "all"
             ? ` di ${stations.find((s) => s.slug === stationFilter)?.name ?? "stasiun terpilih"}`
             : ""}

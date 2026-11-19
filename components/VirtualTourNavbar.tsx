@@ -1,5 +1,6 @@
 "use client";
 
+import { TourLanguageToggle, useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -7,28 +8,37 @@ import { usePathname } from "next/navigation";
 import { Home, User } from "lucide-react";
 import LoginModal from "@/components/LoginModal";
 import RegisterModal from "@/components/RegisterModal";
+import PublicAccountMenu, {
+  type PublicAuthUser,
+} from "@/components/auth/PublicAccountMenu";
 import { VIRTUAL_TOUR_LANDING } from "@/lib/tour-nav";
-
-type AuthUser = {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-};
+import { subscribeAuthSessionChanged } from "@/lib/auth-client";
 
 export default function VirtualTourNavbar() {
+  const { t } = useTourLanguage();
   const pathname = usePathname();
   const isTourLanding = pathname === "/" || pathname === "/virtual-tour";
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<PublicAuthUser | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const [authView, setAuthView] = useState<"login" | "register" | null>(null);
-  const panelHref = user?.role === "MITRA" ? "/partner" : "/cms/dashboard";
 
   useEffect(() => {
-    fetch("/api/auth/verify")
+    let active = true;
+    fetch("/api/auth/verify", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setUser(data?.authenticated ? data.user : null))
-      .catch(() => setUser(null));
+      .then((data) => {
+        if (active) setUser(data?.authenticated ? data.user : null);
+      })
+      .catch(() => {
+        if (active) setUser(null);
+      });
+    const unsubscribe = subscribeAuthSessionChanged((nextUser) => {
+      setUser(nextUser);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -50,17 +60,18 @@ export default function VirtualTourNavbar() {
         }`}
       >
         <div
-          className={`relative mx-auto w-full max-w-7xl items-center gap-3 px-4 sm:gap-4 sm:px-6 md:px-10 ${
-            isTourLanding ? "flex justify-between" : "grid grid-cols-[1fr_auto_1fr]"
+          className={`relative mx-auto w-full max-w-7xl items-center gap-2 px-2 sm:gap-4 sm:px-6 md:px-10 ${
+            isTourLanding ? "flex justify-between" : "flex justify-between sm:grid sm:grid-cols-[1fr_auto_1fr]"
           }`}
         >
           {!isTourLanding && (
             <Link
               href={VIRTUAL_TOUR_LANDING}
-              className="relative z-10 inline-flex h-10 w-max items-center justify-center gap-2 rounded-full border border-white/70 bg-transparent px-4 text-xs font-semibold tracking-wide text-white transition hover:bg-white/10 sm:h-11 sm:px-5"
+              aria-label={t("Beranda")}
+              className="relative z-10 inline-flex h-10 w-max items-center justify-center gap-2 rounded-full border border-white/70 bg-transparent px-3 text-xs font-semibold tracking-wide text-white transition hover:bg-white/10 sm:h-11 sm:px-5"
             >
               <Home className="h-4 w-4 shrink-0" aria-hidden />
-              Beranda
+              <span className="hidden md:inline">{t("Beranda")}</span>
             </Link>
           )}
 
@@ -69,9 +80,9 @@ export default function VirtualTourNavbar() {
             className={`relative z-10 flex shrink-0 items-center gap-2 sm:gap-3 ${
               isTourLanding ? "" : "justify-center"
             }`}
-            aria-label="Beranda LRT Jabodebek"
+            aria-label={t("Beranda LRT Jabodebek")}
           >
-            <span className="relative h-6 w-[52px] sm:h-7 sm:w-[70px]">
+            <span className="relative h-6 w-11 sm:h-7 sm:w-[70px]">
               <Image
                 src="/brand/landing/logo-kai-nav.png"
                 alt="KAI"
@@ -81,7 +92,7 @@ export default function VirtualTourNavbar() {
                 priority
               />
             </span>
-            <span className="relative h-7 w-[58px] sm:h-8 sm:w-[78px]">
+            <span className="relative h-7 w-12 sm:h-8 sm:w-[78px]">
               <Image
                 src="/brand/landing/logo-lrt-nav.png"
                 alt="LRT Jabodebek"
@@ -93,26 +104,24 @@ export default function VirtualTourNavbar() {
             </span>
           </Link>
 
-          <div className="relative z-10 flex shrink-0 items-center justify-end">
+          <div className="relative z-10 flex shrink-0 items-center justify-end gap-1.5 sm:gap-2">
+            <TourLanguageToggle refresh />
             {user ? (
-              <Link
-                href={panelHref}
-                title={user.name}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-full px-4 text-xs font-semibold text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110 sm:h-11 sm:px-5"
-                style={{ backgroundImage: "linear-gradient(155deg, #d32f2f 0%, #b71c1c 100%)" }}
-              >
-                <User className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="max-w-[120px] truncate">{user.name || "Akun"}</span>
-              </Link>
+              <PublicAccountMenu
+                user={user}
+                variant="pill"
+                onLoggedOut={() => setUser(null)}
+              />
             ) : (
               <button
                 type="button"
                 onClick={() => setAuthView("login")}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-full px-4 text-xs font-semibold text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110 sm:h-11 sm:px-5"
+                aria-label={t("Login")}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full px-3 text-xs font-semibold text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110 sm:h-11 sm:px-5"
                 style={{ backgroundImage: "linear-gradient(155deg, #d32f2f 0%, #b71c1c 100%)" }}
               >
                 <User className="h-4 w-4 shrink-0" aria-hidden />
-                Login
+                <span className="hidden sm:inline">{t("Login")}</span>
               </button>
             )}
           </div>

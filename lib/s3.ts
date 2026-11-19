@@ -14,12 +14,26 @@ export type S3AssetType =
   | "train-rental-spaces"
   | "thumbnails"      // virtual-tour/thumbnails/{station-slug}/
   | "ad-creatives"    // virtual-tour/ad-creatives/{station-slug}/
-  | "train-rental-spaces" // spaces/train-rental/
   | "misc";           // misc/
+
+/**
+ * Root privat untuk bukti dokumen pengajuan sewa.
+ * Jangan masukkan ke PUBLIC_PREFIXES / s3-proxy publik.
+ *
+ *   inquiries/documents/{leadId}/{DOCUMENT_TYPE}/{uuid}.pdf
+ */
+export const INQUIRY_DOCUMENTS_ROOT = "inquiries/documents";
+
+/** Prefix yang tidak boleh dilayani lewat /api/s3-proxy. */
+export const S3_PRIVATE_BLOCKED_PREFIXES = [
+  `${INQUIRY_DOCUMENTS_ROOT}/`,
+  "inquiries/",
+  "vtour/inquiries/",
+] as const;
 
 let s3Client: S3Client | undefined;
 
-function getS3Client() {
+export function getS3Client() {
   if (s3Client) return s3Client;
   if (!process.env.S3_ENDPOINT || !process.env.S3_ACCESS_KEY_ID || !process.env.S3_SECRET_ACCESS_KEY) {
     throw new Error("S3 configuration is missing");
@@ -36,7 +50,7 @@ function getS3Client() {
   return s3Client;
 }
 
-function getBucketName() {
+export function getBucketName() {
   const bucket = process.env.S3_BUCKET;
   if (!bucket) throw new Error("S3_BUCKET is not configured");
   return bucket;
@@ -51,17 +65,18 @@ export interface UploadResult {
 /**
  * Generate S3 key dengan struktur folder terorganisir per kategori.
  *
- * Struktur bucket:
+ * Struktur bucket (publik / media tour):
  *   virtual-tour/
- *     panoramas/{station-slug}/panorama_xxx.jpg   ← panorama 360°
- *     floorplans/{station-slug}/floorplan_xxx.jpg ← denah lantai
- *     thumbnails/{station-slug}/thumb_xxx.jpg      ← thumbnail scene
- *   stations/
- *     covers/station_xxx.jpg                       ← foto cover stasiun
- *   spaces/
- *     photos/space_xxx.jpg                         ← foto unit komersial
- *   misc/
- *     misc_xxx.jpg
+ *     panoramas/{station-slug}/…
+ *     floorplans/{station-slug}/…
+ *     thumbnails/{station-slug}/…
+ *     ad-creatives/{station-slug}/…
+ *   stations/covers/…
+ *   spaces/photos/…
+ *   misc/…
+ *
+ * Struktur bucket (privat — hanya via API dokumen pengajuan):
+ *   inquiries/documents/{leadId}/{DOCUMENT_TYPE}/{uuid}.pdf
  */
 export function generateS3Key(
   type: S3AssetType,
@@ -90,7 +105,6 @@ export function generateS3Key(
     case "stations":
       return `stations/covers/station_${timestamp}_${randomId}.${extension}`;
     case "spaces":
-    case "train-rental-spaces":
       return `spaces/photos/space_${timestamp}_${randomId}.${extension}`;
     case "train-rental-spaces":
       return `spaces/train-rental/train-space_${timestamp}_${randomId}.${extension}`;

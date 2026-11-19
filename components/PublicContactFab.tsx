@@ -4,9 +4,10 @@ import { usePathname } from "next/navigation";
 import ContactPersonFab from "@/components/tour/ContactPersonFab";
 
 /** FAB contact di halaman publik (bukan CMS / partner / login). */
-export default function PublicContactFab() {
+export default function PublicContactFab({ localized = false }: { localized?: boolean } = {}) {
   const pathname = usePathname();
   if (
+    (!localized && (pathname === "/" || pathname.startsWith("/virtual-tour") || pathname.startsWith("/komersial"))) ||
     pathname.startsWith("/cms") ||
     pathname.startsWith("/partner") ||
     pathname.startsWith("/login") ||

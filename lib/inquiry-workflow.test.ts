@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PUBLIC_LEAD_PROCESS_STEPS, publicLeadStageIndex, completedLeadStageIndex } from "./commercial-pipeline";
-import { hasVerifiedDocument, inquiryTransitionError, jakartaDate, leaseExpiryReminder, REQUIRED_INQUIRY_DOCUMENTS } from "./inquiry-workflow";
+import { hasVerifiedDocument, inquirySiteVisitStep, inquiryTransitionError, jakartaDate, leaseExpiryReminder, pinnedInquiryTransitionError, resolveInquiryAdvance, REQUIRED_INQUIRY_DOCUMENTS } from "./inquiry-workflow";
 
 const now = new Date("2026-11-17T03:00:00Z");
 const documents = REQUIRED_INQUIRY_DOCUMENTS.map(document => ({ documentType: document.type, storageKey: `private/${document.type}`, verifiedAt: now }));
@@ -31,37 +31,101 @@ test("contact confirmation cannot be skipped and confirmed milestones cannot reg
   assert.ok(inquiryTransitionError("NEW", "BA_SIGNED", state, now));
   assert.ok(inquiryTransitionError("CONTACTED", "DESIGN_REVIEW", state, now));
   assert.ok(inquiryTransitionError("PKS", "DESIGN_REVIEW", state, now));
-  assert.equal(inquiryTransitionError("CONTACTED", "BA_SIGNED", state, now), null);
+  // Masuk tahap negosiasi (BA_SIGNED) tanpa dokumen — dokumen diisi di tahap itu.
+  assert.equal(
+    inquiryTransitionError("CONTACTED", "BA_SIGNED", { ...state, mediaAttachments: [] }, now),
+    null
+  );
 });
 
-test("negotiation requires every verified storage-backed evidence type", () => {
-  const negotiation = documents.filter(document => ["LOI", "NEGOTIATION_LETTER", "NEGOTIATION_MINUTES"].includes(document.documentType));
-  assert.equal(inquiryTransitionError("NEGOTIATING", "BA_SIGNED", { ...state, mediaAttachments: negotiation }, now), null);
+test("negotiation documents are required when leaving negotiation, not when entering it", () => {
+  const negotiation = documents.filter((document) =>
+    ["LOI", "NEGOTIATION_LETTER", "NEGOTIATION_MINUTES"].includes(document.documentType)
+  );
+  assert.equal(
+    inquiryTransitionError("CONTACTED", "BA_SIGNED", { ...state, mediaAttachments: [] }, now),
+    null
+  );
+  assert.equal(
+    inquiryTransitionError("BA_SIGNED", "DESIGN_REVIEW", { ...state, mediaAttachments: negotiation }, now),
+    null
+  );
   for (const missing of negotiation) {
-    assert.match(inquiryTransitionError("NEGOTIATING", "BA_SIGNED", { ...state, mediaAttachments: negotiation.filter(document => document !== missing) }, now)!, /dokumen/i);
+    assert.match(
+      inquiryTransitionError("BA_SIGNED", "DESIGN_REVIEW", {
+        ...state,
+        mediaAttachments: negotiation.filter((document) => document !== missing),
+      }, now)!,
+      /dokumen/i
+    );
     assert.equal(hasVerifiedDocument([{ ...missing, storageKey: null }], missing.documentType), false);
     assert.equal(hasVerifiedDocument([{ ...missing, verifiedAt: null }], missing.documentType), false);
   }
 });
 
-test("open site visits block negotiation completion but not contact confirmation", () => {
+test("open site visits block leaving negotiation but not contact confirmation", () => {
   for (const siteVisitStatus of ["REQUESTED", "SCHEDULED"]) {
-    assert.match(inquiryTransitionError("NEGOTIATING", "BA_SIGNED", { ...state, siteVisitStatus }, now)!, /site visit/i);
+    assert.match(
+      inquiryTransitionError("BA_SIGNED", "DESIGN_REVIEW", { ...state, siteVisitStatus }, now)!,
+      /site visit/i
+    );
+    assert.equal(
+      inquiryTransitionError("CONTACTED", "BA_SIGNED", { ...state, siteVisitStatus, mediaAttachments: [] }, now),
+      null
+    );
     assert.equal(inquiryTransitionError("NEW", "CONTACTED", { ...state, siteVisitStatus }, now), null);
   }
-  for (const siteVisitStatus of ["NONE", "COMPLETED", "CANCELLED"]) assert.equal(inquiryTransitionError("NEGOTIATING", "BA_SIGNED", { ...state, siteVisitStatus }, now), null);
+  for (const siteVisitStatus of ["NONE", "COMPLETED", "CANCELLED"]) {
+    assert.equal(
+      inquiryTransitionError("BA_SIGNED", "DESIGN_REVIEW", { ...state, siteVisitStatus, mediaAttachments: documents.filter((d) => d.documentType !== "DESIGN_APPROVAL" && d.documentType !== "PKS_FINAL") }, now),
+      null
+    );
+  }
 });
 
-test("design and final PKS require their own verified documents", () => {
-  assert.ok(inquiryTransitionError("BA_SIGNED", "DESIGN_REVIEW", { ...state, mediaAttachments: documents.filter(document => document.documentType !== "DESIGN_APPROVAL") }, now));
-  assert.ok(inquiryTransitionError("DESIGN_REVIEW", "PKS", { ...state, mediaAttachments: documents.filter(document => document.documentType !== "PKS_FINAL") }, now));
-  assert.equal(inquiryTransitionError("DESIGN_REVIEW", "PKS", state, now), null);
+test("design and final PKS require their own verified documents when leaving their stages", () => {
+  const throughDesign = documents.filter((document) => document.documentType !== "PKS_FINAL");
+  assert.equal(
+    inquiryTransitionError("BA_SIGNED", "DESIGN_REVIEW", {
+      ...state,
+      mediaAttachments: documents.filter((document) =>
+        ["LOI", "NEGOTIATION_LETTER", "NEGOTIATION_MINUTES"].includes(document.documentType)
+      ),
+    }, now),
+    null
+  );
+  assert.ok(
+    inquiryTransitionError("DESIGN_REVIEW", "PKS", {
+      ...state,
+      mediaAttachments: documents.filter((document) => document.documentType !== "DESIGN_APPROVAL"),
+    }, now)
+  );
+  assert.equal(
+    inquiryTransitionError("DESIGN_REVIEW", "PKS", { ...state, mediaAttachments: throughDesign }, now),
+    null
+  );
+  assert.ok(
+    inquiryTransitionError("PKS", "COMMERCIAL_OPERATION", {
+      ...state,
+      mediaAttachments: throughDesign,
+    }, now)
+  );
+  assert.equal(inquiryTransitionError("PKS", "COMMERCIAL_OPERATION", state, now), null);
 });
 
-test("PKS requires both lease dates in chronological order", () => {
-  assert.ok(inquiryTransitionError("DESIGN_REVIEW", "PKS", { ...state, leaseStartAt: null }, now));
-  assert.ok(inquiryTransitionError("DESIGN_REVIEW", "PKS", { ...state, leaseEndAt: null }, now));
-  assert.ok(inquiryTransitionError("DESIGN_REVIEW", "PKS", { ...state, leaseEndAt: "2026-01-01" }, now));
+test("PKS requires both lease dates in chronological order when leaving PKS", () => {
+  assert.ok(inquiryTransitionError("PKS", "COMMERCIAL_OPERATION", { ...state, leaseStartAt: null }, now));
+  assert.ok(inquiryTransitionError("PKS", "COMMERCIAL_OPERATION", { ...state, leaseEndAt: null }, now));
+  assert.ok(inquiryTransitionError("PKS", "COMMERCIAL_OPERATION", { ...state, leaseEndAt: "2026-01-01" }, now));
+  assert.equal(
+    inquiryTransitionError("DESIGN_REVIEW", "PKS", {
+      ...state,
+      leaseStartAt: null,
+      leaseEndAt: null,
+      mediaAttachments: documents.filter((document) => document.documentType !== "PKS_FINAL"),
+    }, now),
+    null
+  );
 });
 
 test("activation requires verified payment and an effective Jakarta lease date", () => {
@@ -92,4 +156,28 @@ test("internal lease reminders use H90/H60/H30 Jakarta calendar thresholds", () 
     assert.equal(reminder.label, `Pengingat H-${threshold}`);
   }
   assert.equal(leaseExpiryReminder(end(-1), baseline)?.label, "Masa sewa berakhir");
+});
+
+test("same-status stages advance by ID without letting stale or skipped transitions through", () => {
+  const steps = [
+    { id: "received", stepOrder: 1, leadStatus: "NEW" },
+    { id: "contact", stepOrder: 2, leadStatus: "CONTACTED" },
+    { id: "review", stepOrder: 3, leadStatus: "CONTACTED" },
+  ];
+  assert.equal(resolveInquiryAdvance(steps, 2, { fromStepId: "contact", toStepId: "review" })?.next.id, "review");
+  assert.equal(resolveInquiryAdvance(steps, 1, { fromStepId: "received", toStepId: "review" }), null);
+  assert.equal(resolveInquiryAdvance(steps, 3, { fromStepId: "contact", toStepId: "review" }), null);
+});
+
+test("the pinned workflow owns its document and site-visit gates", () => {
+  const check = { id: "check", leadStatus: "CONTACTED", stepOrder: 3, stepType: "STANDARD", mediaRequirement: "REQUIRED", requiresMedia: true, spaceEffect: "NONE" };
+  const visit = { ...check, id: "visit", stepOrder: 4, leadStatus: "SITE_CHECK", stepType: "SITE_VISIT", mediaRequirement: "NONE", requiresMedia: false };
+  const active = { ...check, stepOrder: 5, leadStatus: "COMMERCIAL_OPERATION", spaceEffect: "ACTIVATE_TENANT" };
+  const document = { documentType: "OTHER", storageKey: "proof", verifiedAt: now };
+  assert.equal(inquirySiteVisitStep([check, visit])?.id, "visit");
+  assert.ok(pinnedInquiryTransitionError(check, visit, { ...state, mediaAttachments: [{ ...document, stepOrder: 2 }] }, now));
+  assert.equal(pinnedInquiryTransitionError(check, visit, { ...state, mediaAttachments: [{ ...document, stepOrder: 3 }] }, now), null);
+  assert.ok(pinnedInquiryTransitionError(visit, active, { ...state, siteVisitStatus: "SCHEDULED" }, now));
+  assert.ok(pinnedInquiryTransitionError(visit, active, { ...state, paymentVerifiedAt: null }, now));
+  assert.equal(pinnedInquiryTransitionError(visit, active, { ...state, siteVisitStatus: "COMPLETED", mediaAttachments: [] }, now), null);
 });

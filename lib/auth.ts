@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { NextRequest } from "next/server";
+import { authCookieName } from "@/lib/auth-cookie";
 
 export type UserRole = "ADMIN" | "EDITOR" | "MITRA";
 
@@ -48,7 +49,7 @@ export function getTokenFromRequest(request: NextRequest): string | null {
   if (authHeader?.startsWith("Bearer ")) {
     return authHeader.replace("Bearer ", "");
   }
-  const cookieToken = request.cookies.get("cms-token")?.value;
+  const cookieToken = request.cookies.get(authCookieName())?.value;
   if (cookieToken) return cookieToken;
   return request.headers.get("x-token");
 }

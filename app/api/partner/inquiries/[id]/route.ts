@@ -6,6 +6,9 @@ import { consumeRateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { partnerInquiryInclude, toPartnerInquiry } from "@/lib/partner-inquiries";
+import { inquirySiteVisitStep } from "@/lib/inquiry-workflow";
+import { isInquiryFullyCompleted } from "@/lib/commercial-pipeline";
+import { publishInquiryEvent } from "@/lib/realtime-events";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireRole(request, ["MITRA"]);
@@ -31,15 +34,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const result = await prisma.$transaction(async tx => {
       // Ownership-scoped lock: another account cannot inspect or modify this inquiry.
       await tx.$executeRaw`SELECT id FROM tenant_leads WHERE id = ${id} AND "userId" = ${auth.user.userId} FOR UPDATE`;
-      const lead = await tx.tenantLead.findFirst({ where: { id, userId: auth.user.userId } });
+      const lead = await tx.tenantLead.findFirst({ where: { id, userId: auth.user.userId }, include: { workflowVersion: { include: { steps: { orderBy: { stepOrder: "asc" } } } } } });
       if (!lead) return { error: "Pengajuan tidak ditemukan.", status: 404 };
-      if (!(negotiationStatuses as readonly string[]).includes(lead.status)) return { error: "Site visit dapat diajukan sebelum negosiasi selesai.", status: 409 };
+      const steps = lead.workflowVersion?.steps ?? [];
+      const visitStep = inquirySiteVisitStep(steps);
+      const eligible = steps.length ? visitStep && lead.currentStepOrder <= visitStep.stepOrder && lead.status !== "CLOSED_LOST" && !isInquiryFullyCompleted(lead.status) : (negotiationStatuses as readonly string[]).includes(lead.status);
+      if (!eligible) return { error: "Tahap pengajuan saat ini tidak menerima site visit.", status: 409 };
       if (["REQUESTED", "SCHEDULED", "COMPLETED"].includes(lead.siteVisitStatus)) return { error: "Site visit sudah diajukan atau ditangani tim. Hubungi tim untuk perubahan jadwal.", status: 409 };
       await tx.tenantLead.update({ where: { id }, data: { surveyPreference: parsed.data.surveyPreference, siteVisitStatus: "REQUESTED" } });
-      await tx.inquiryStepLog.create({ data: { tenantLeadId: id, stepOrder: 3, status: lead.status, action: "SITE_VISIT_REQUESTED", notes: "Mitra mengajukan site visit sebagai bagian negosiasi.", performedBy: auth.user.userId } });
+      await tx.inquiryStepLog.create({ data: { tenantLeadId: id, pipelineStepId: visitStep?.id, stepOrder: visitStep?.stepOrder ?? 3, status: lead.status, action: "SITE_VISIT_REQUESTED", notes: "Mitra mengajukan kunjungan lokasi.", performedBy: auth.user.userId } });
       return { ok: true };
     }, { isolationLevel: "Serializable" });
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+    void publishInquiryEvent({
+      kind: "lead-updated",
+      leadId: id,
+      userId: auth.user.userId,
+    });
     return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") return NextResponse.json({ error: "Pengajuan sedang diperbarui. Muat ulang lalu coba lagi." }, { status: 409 });

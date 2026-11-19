@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import type { KeyboardEvent } from "react";
 
 type CarItem = {
@@ -33,10 +34,11 @@ export default function TrainFormationMap({
   svgClassName,
   touchTargets = false,
 }: Props) {
+  const { t } = useTourLanguage();
   if (cars.length === 0) return null;
 
   if (touchTargets) return (
-    <div role="group" aria-label="Peta formasi gerbong" className={`pointer-events-auto flex max-w-full gap-0.5 overflow-x-auto overscroll-x-contain ${className}`}>
+    <div role="group" aria-label={t("Peta formasi gerbong")} className={`pointer-events-auto flex max-w-full gap-0.5 overflow-x-auto overscroll-x-contain ${className}`}>
       {cars.map((car, index) => <button key={car.id} type="button" title={car.label} aria-label={car.label} aria-pressed={car.id === activeCarId}
         onClick={() => onSelectCar(car.id)} className="flex h-11 min-w-6 flex-1 items-center justify-center rounded-lg px-0.5 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white md:min-w-11">
         <svg viewBox="0 0 240 111" className="h-6 w-full" aria-hidden="true" fill={car.id === activeCarId ? ACTIVE : IDLE}>
@@ -70,7 +72,7 @@ export default function TrainFormationMap({
     <div
       className={`pointer-events-auto inline-flex items-center ${className}`}
       role="group"
-      aria-label="Peta formasi gerbong"
+      aria-label={t("Peta formasi gerbong")}
     >
       <svg
         viewBox={`0 0 ${cars.length * 258 - 18} 111`}

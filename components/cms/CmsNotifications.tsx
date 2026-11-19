@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, UserCircle, X } from "lucide-react";
+import { Bell, CalendarDays, UserCircle, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { CMS_LEADS_UPDATED_EVENT } from "@/lib/inquiry-sync-events";
+import { useInquiryRealtimeSync } from "@/components/realtime/useInquiryRealtimeSync";
+import { cn } from "@/lib/utils";
 
 type LeadNotif = {
   id: string;
@@ -10,8 +15,19 @@ type LeadNotif = {
   contactName: string;
   businessType: string;
   status: string;
+  siteVisitStatus?: string | null;
+  siteVisitScheduledAt?: string | null;
+  surveyPreference?: string | null;
   createdAt: string;
+  updatedAt?: string;
   space?: { code: string; name: string; station?: { name: string } } | null;
+};
+
+type NotifKind = "NEW_LEAD" | "SITE_VISIT";
+
+type NotifItem = LeadNotif & {
+  kind: NotifKind;
+  sortAt: string;
 };
 
 const READ_KEY = "cms-notif-read-ids";
@@ -31,6 +47,24 @@ function saveReadIds(ids: Set<string>) {
   localStorage.setItem(READ_KEY, JSON.stringify([...ids]));
 }
 
+function notifKey(item: Pick<NotifItem, "kind" | "id">) {
+  return `${item.kind}:${item.id}`;
+}
+
+/** Baca: key baru `kind:id`, plus legacy github `id` untuk pengajuan baru. */
+function isUnread(readIds: Set<string>, item: NotifItem) {
+  if (readIds.has(notifKey(item))) return false;
+  if (item.kind === "NEW_LEAD" && readIds.has(item.id)) return false;
+  return true;
+}
+
+function markItemRead(readIds: Set<string>, item: NotifItem) {
+  const next = new Set(readIds);
+  next.add(notifKey(item));
+  if (item.kind === "NEW_LEAD") next.add(item.id);
+  return next;
+}
+
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
@@ -42,173 +76,293 @@ function timeAgo(iso: string) {
   return `${days} hari lalu`;
 }
 
+function visitScheduleLabel(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return (
+    date.toLocaleString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Jakarta",
+    }) + " WIB"
+  );
+}
+
 /**
- * Lonceng notifikasi CMS — lead baru (status NEW) di header.
+ * Antrean lonceng CMS:
+ * - NEW → pengajuan baru
+ * - siteVisitStatus REQUESTED → site visit menunggu jadwal admin
+ * Item hilang otomatis saat status berubah (NEW diproses / visit dijadwalkan).
  */
+function buildNotifications(list: LeadNotif[]): NotifItem[] {
+  const items: NotifItem[] = [];
+  for (const lead of list) {
+    if (lead.status === "NEW") {
+      items.push({
+        ...lead,
+        kind: "NEW_LEAD",
+        sortAt: lead.createdAt,
+      });
+      continue;
+    }
+    if (lead.siteVisitStatus === "REQUESTED") {
+      items.push({
+        ...lead,
+        kind: "SITE_VISIT",
+        sortAt: lead.updatedAt || lead.createdAt,
+      });
+    }
+  }
+  return items
+    .sort(
+      (a, b) => new Date(b.sortAt).getTime() - new Date(a.sortAt).getTime()
+    )
+    .slice(0, 16);
+}
+
+async function fetchLeadNotifications(): Promise<NotifItem[] | null> {
+  try {
+    const res = await fetch("/api/cms/leads", { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const list = Array.isArray(data) ? (data as LeadNotif[]) : [];
+    return buildNotifications(list);
+  } catch {
+    return null;
+  }
+}
+
+function itemHref(item: NotifItem) {
+  const base = `/cms/leads/${encodeURIComponent(item.id)}`;
+  return item.kind === "SITE_VISIT" ? `${base}#site-visit` : base;
+}
+
 export default function CmsNotifications() {
   const [open, setOpen] = useState(false);
-  const [leads, setLeads] = useState<LeadNotif[]>([]);
+  const panelId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [items, setItems] = useState<NotifItem[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(loadReadIds);
   const [loaded, setLoaded] = useState(false);
 
+  function close() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  const loadItems = useCallback(async () => {
+    const fresh = await fetchLeadNotifications();
+    if (fresh) setItems(fresh);
+    setLoaded(true);
+  }, []);
+
   useEffect(() => {
     let active = true;
-    async function load() {
-      try {
-        const res = await fetch("/api/cms/leads");
-        if (!res.ok || !active) return;
-        const data = await res.json();
-        if (!active) return;
-        const list = Array.isArray(data) ? data : [];
-        const fresh = list
-          .filter((l: LeadNotif) => l.status === "NEW")
-          .sort(
-            (a: LeadNotif, b: LeadNotif) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          )
-          .slice(0, 12);
-        setLeads(fresh);
-      } catch {
-        /* ignore */
-      } finally {
-        if (active) setLoaded(true);
-      }
+    async function init() {
+      const fresh = await fetchLeadNotifications();
+      if (!active) return;
+      if (fresh) setItems(fresh);
+      setLoaded(true);
     }
-
-    void load();
-    const id = window.setInterval(() => void load(), 60_000);
+    void init();
     return () => {
       active = false;
-      window.clearInterval(id);
     };
   }, []);
 
-  const unread = leads.filter((l) => !readIds.has(l.id));
+  useInquiryRealtimeSync({
+    enabled: true,
+    localEvents: [CMS_LEADS_UPDATED_EVENT],
+    fallbackIntervalMs: 60_000,
+    onSync: loadItems,
+  });
+
+  const unread = items.filter((item) => isUnread(readIds, item));
   const unreadCount = unread.length;
 
   const markAllRead = () => {
-    const next = new Set(readIds);
-    for (const l of leads) next.add(l.id);
+    let next = readIds;
+    for (const item of items) next = markItemRead(next, item);
     setReadIds(next);
     saveReadIds(next);
   };
 
-  const markRead = (id: string) => {
-    const next = new Set(readIds);
-    next.add(id);
+  const markRead = (item: NotifItem) => {
+    const next = markItemRead(readIds, item);
     setReadIds(next);
     saveReadIds(next);
   };
 
   return (
-    <div className="relative">
-      <button
+    <div
+      className="relative"
+      onKeyDown={(event) => {
+        if (open && event.key === "Escape") close();
+      }}
+    >
+      <Button
+        ref={triggerRef}
         type="button"
+        variant="outline"
+        size="icon"
         onClick={() => setOpen((v) => !v)}
-        className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--work-line)] bg-[var(--work-surface)] text-[var(--work-text)] transition hover:border-[#E31E2D]/40 hover:bg-[#E31E2D] hover:text-white"
+        className="relative border-slate-200 bg-white text-slate-700 hover:border-[#E31E2D]/40 hover:bg-[#E31E2D] hover:text-white"
         aria-label="Notifikasi"
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#E31E2D] px-1 text-[10px] font-bold text-white">
+          <Badge
+            variant="default"
+            className="absolute -top-1.5 -right-1.5 h-4 min-w-4 justify-center rounded-full px-1 text-xs leading-none"
+          >
             {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
+          </Badge>
         )}
-      </button>
+      </Button>
 
       {open && (
         <>
           <button
             type="button"
             className="fixed inset-0 z-40 cursor-default"
-            aria-label="Tutup notifikasi"
-            onClick={() => setOpen(false)}
+            tabIndex={-1}
+            aria-hidden="true"
+            onClick={close}
           />
-          <div className="absolute top-full right-0 z-50 mt-2 w-[min(100vw-2rem,22rem)] overflow-hidden rounded-2xl border border-[var(--work-line)] bg-[var(--work-subtle)] shadow-2xl shadow-black/50">
-            <div className="flex items-center justify-between border-b border-[var(--work-line)] px-4 py-3">
+          <section
+            id={panelId}
+            aria-label="Notifikasi"
+            className="absolute top-full right-0 z-50 mt-2 flex max-h-[calc(100dvh-5.5rem)] w-[min(calc(100cqw-2rem),22rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20"
+          >
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
               <div>
-                <p className="text-sm font-bold text-[var(--work-text)]">Notifikasi</p>
-                <p className="text-[11px] text-[var(--work-muted)]">
+                <p className="text-sm font-bold text-slate-900">Notifikasi</p>
+                <p className="text-xs text-slate-600">
                   {loaded
                     ? unreadCount > 0
-                      ? `${unreadCount} lead baru belum dibaca`
-                      : "Tidak ada lead baru"
+                      ? `${unreadCount} belum dibaca`
+                      : "Tidak ada notifikasi baru"
                     : "Memuat..."}
                 </p>
               </div>
               <div className="flex items-center gap-1">
                 {unreadCount > 0 && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={markAllRead}
-                    className="rounded-lg px-2 py-1 text-[11px] font-semibold text-[var(--work-accent)] transition hover:bg-[var(--work-subtle)]"
+                    className="h-8 px-2 text-xs text-[#C41926] hover:bg-slate-50 hover:text-[#C41926]"
                   >
                     Tandai dibaca
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-lg p-1.5 text-[var(--work-muted)] transition hover:bg-[var(--work-subtle)] hover:text-[var(--work-text)]"
+                  variant="ghost"
+                  size="icon"
+                  onClick={close}
+                  className="h-8 w-8 text-slate-500 hover:text-slate-900"
                   aria-label="Tutup"
                 >
                   <X className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             </div>
 
-            <ul className="max-h-[min(60vh,22rem)] overflow-y-auto">
-              {leads.length === 0 && loaded && (
-                <li className="px-4 py-10 text-center text-sm text-[var(--work-muted)]">
-                  Belum ada notifikasi lead baru.
+            <ul className="min-h-0 max-h-[min(60vh,22rem)] overflow-y-auto overscroll-contain">
+              {items.length === 0 && loaded && (
+                <li className="px-4 py-10 text-center text-sm text-slate-500">
+                  Belum ada notifikasi.
                 </li>
               )}
-              {leads.map((lead) => {
-                const isUnread = !readIds.has(lead.id);
-                const station = lead.space?.station?.name;
-                const unit = lead.space ? `${lead.space.code} · ${lead.space.name}` : null;
+              {items.map((item) => {
+                const key = notifKey(item);
+                const unreadItem = isUnread(readIds, item);
+                const station = item.space?.station?.name;
+                const unit = item.space
+                  ? `${item.space.code} · ${item.space.name}`
+                  : null;
+                const Icon =
+                  item.kind === "SITE_VISIT" ? CalendarDays : UserCircle;
+                const schedule = visitScheduleLabel(item.siteVisitScheduledAt);
+                const preference = item.surveyPreference?.trim() || null;
+
                 return (
-                  <li key={lead.id} className="border-b border-[var(--work-line)] last:border-0">
+                  <li
+                    key={key}
+                    className="border-b border-slate-200 last:border-0"
+                  >
                     <Link
-                      href="/cms/leads"
+                      href={itemHref(item)}
                       onClick={() => {
-                        markRead(lead.id);
+                        markRead(item);
                         setOpen(false);
                       }}
-                      className={`flex gap-3 px-4 py-3 transition hover:bg-[var(--work-subtle)] ${
-                        isUnread ? "bg-[#E31E2D]/[0.08]" : ""
-                      }`}
+                      className={cn(
+                        "flex gap-3 px-4 py-3 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#D81435]",
+                        unreadItem && "bg-[#c41230]/[0.08]"
+                      )}
                     >
                       <span
-                        className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full ${
-                          isUnread
-                            ? "bg-[#E31E2D]/20 text-[var(--work-accent)]"
-                            : "bg-[var(--work-surface)] text-[var(--work-muted)]"
-                        }`}
+                        className={cn(
+                          "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full",
+                          unreadItem
+                            ? "bg-[#c41230]/20 text-[#c41230]"
+                            : "bg-slate-100 text-slate-500"
+                        )}
                       >
-                        <UserCircle className="size-4" />
+                        <Icon className="size-4" aria-hidden />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-start justify-between gap-2">
-                          <span className="truncate text-sm font-semibold text-[var(--work-text)]">
-                            {lead.companyName || lead.contactName}
+                          <span className="truncate text-sm font-semibold text-slate-900">
+                            {item.companyName || item.contactName}
                           </span>
-                          {isUnread && (
-                            <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[#E31E2D]" />
+                          {unreadItem && (
+                            <span
+                              className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[#c41230]"
+                              aria-hidden
+                            />
                           )}
                         </span>
-                        <span className="mt-0.5 block truncate text-xs text-[var(--work-muted)]">
-                          {lead.contactName}
-                          {lead.businessType ? ` · ${lead.businessType}` : ""}
-                        </span>
+
+                        {item.kind === "SITE_VISIT" ? (
+                          <>
+                            <Badge
+                              variant="outline"
+                              className="mt-1 border-[#E31E2D]/30 bg-white px-1.5 py-0 text-xs font-semibold text-[#C41926]"
+                            >
+                              Site visit diajukan
+                            </Badge>
+                            <span className="mt-1 block truncate text-xs font-medium text-slate-800">
+                              {schedule
+                                ? `Jadwal: ${schedule}`
+                                : preference
+                                  ? preference
+                                  : "Menunggu jadwal dari admin"}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="mt-0.5 block truncate text-xs text-slate-600">
+                            {item.contactName}
+                            {item.businessType ? ` · ${item.businessType}` : ""}
+                          </span>
+                        )}
+
                         {(unit || station) && (
-                          <span className="mt-0.5 block truncate text-[11px] text-[var(--work-muted)]">
+                          <span className="mt-0.5 block truncate text-xs text-slate-500">
                             {[unit, station].filter(Boolean).join(" · ")}
                           </span>
                         )}
-                        <span className="mt-1 block text-[10px] text-[var(--work-muted)]">
-                          {timeAgo(lead.createdAt)}
+                        <span className="mt-1 block text-xs text-slate-500">
+                          {timeAgo(item.sortAt)}
                         </span>
                       </span>
                     </Link>
@@ -217,16 +371,18 @@ export default function CmsNotifications() {
               })}
             </ul>
 
-            <div className="border-t border-[var(--work-line)] p-2">
-              <Link
-                href="/cms/leads"
-                onClick={() => setOpen(false)}
-                className="flex h-9 w-full items-center justify-center rounded-xl text-xs font-semibold text-[var(--work-accent)] transition hover:bg-[var(--work-subtle)]"
+            <div className="shrink-0 border-t border-slate-200 p-2">
+              <Button
+                asChild
+                variant="ghost"
+                className="h-9 w-full text-xs font-semibold text-[#C41926] hover:bg-slate-50 hover:text-[#C41926]"
               >
-                Buka semua leads
-              </Link>
+                <Link href="/cms/leads" onClick={close}>
+                  Buka semua leads
+                </Link>
+              </Button>
             </div>
-          </div>
+          </section>
         </>
       )}
     </div>

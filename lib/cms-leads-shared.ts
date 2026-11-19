@@ -27,7 +27,60 @@ export type LeadItem = {
   paymentVerifiedAt: string | null;
   updatedAt: string;
   createdAt: string;
-  space: { id: string; code: string; name: string; status: string; station: { name: string } } | null;
+  currentStepOrder: number;
+  workflowVersion: {
+    id: string;
+    version: number | null;
+    title: string;
+    status: string;
+    stepCount: number;
+    steps: Array<{
+      id: string;
+      stepOrder: number;
+      leadStatus: string;
+      stepType: "STANDARD" | "DOCUMENT_ISSUANCE" | "SITE_VISIT";
+      documentNumberLabel: string | null;
+      slaHours: number | null;
+      mediaRequirement: "NONE" | "OPTIONAL" | "REQUIRED";
+      requiresMedia: boolean;
+      spaceEffect: "NONE" | "RESERVE_SPACE" | "FIT_OUT_SPACE" | "ACTIVATE_TENANT";
+      title: string;
+      description: string | null;
+      publicMessage: string;
+      showInSummary: boolean;
+    }>;
+  } | null;
+  space: {
+    id: string;
+    code: string;
+    name: string;
+    status: string;
+    type: string;
+    area: number;
+    floor: string;
+    location: string;
+    nearestExit: string | null;
+    powerSupply: string | null;
+    waterAccess: boolean;
+    airConditioning: boolean;
+    panoramaUrl: string | null;
+    station: {
+      name: string;
+      code: string | null;
+      slug: string;
+      line: string;
+      imageUrl: string | null;
+    };
+  } | null;
+  /** Riwayat catatan publik ke mitra (dari inquiry_step_logs). */
+  stepLogs: Array<{
+    id: string;
+    stepOrder: number;
+    status: string;
+    action: string;
+    notes: string | null;
+    createdAt: string;
+  }>;
 };
 
 export function cmsLeadDetailHref(id: string) {

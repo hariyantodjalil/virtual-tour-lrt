@@ -1,5 +1,7 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
+
 import { useEffect, useRef, useState, useCallback } from "react";
 
 declare global {
@@ -124,6 +126,7 @@ export default function GoogleSignInButton({
   label = "Masuk dengan Google",
   disabled = false,
 }: Props) {
+  const { language, t } = useTourLanguage();
   const [loading, setLoading] = useState(false);
   const [clientId, setClientId] = useState<string>(() => cachedClientId);
   const [scriptLoaded, setScriptLoaded] = useState(() => {
@@ -213,13 +216,13 @@ export default function GoogleSignInButton({
           theme: "outline",
           size: "large",
           width: 250,
-          locale: "id",
+          locale: language,
         });
       }
     } catch (e) {
       console.warn("GSI init error:", e);
     }
-  }, [scriptLoaded, clientId]);
+  }, [scriptLoaded, clientId, language]);
 
   async function handleClick() {
     if (disabled || loading) return;
@@ -281,7 +284,7 @@ export default function GoogleSignInButton({
         }
       >
         <GoogleIcon className="size-3.5 shrink-0" />
-        <span>{loading ? "Menghubungkan..." : label}</span>
+        <span>{loading ? t("Menghubungkan...") : t(label)}</span>
       </button>
 
       {/* Hidden container for official Google GSI button trigger */}

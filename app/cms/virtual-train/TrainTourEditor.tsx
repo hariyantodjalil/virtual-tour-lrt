@@ -38,7 +38,7 @@ import {
   extractInitialViewFromCanvasData,
   mergeInitialViewIntoCanvasData,
 } from "@/lib/scene-initial-view";
-import type { TourLevelPublic } from "@/lib/tour-types";
+import type { SceneInitialView, TourLevelPublic } from "@/lib/tour-types";
 import {
   ArrowLeft,
   Save,
@@ -70,8 +70,11 @@ import {
 import { PannellumPreview } from "../virtual-tour/[stationId]/PannellumPreview";
 import { TourStructureSidebar } from "../virtual-tour/[stationId]/TourStructureSidebar";
 import { ConnectionMapDialog } from "../virtual-tour/[stationId]/ConnectionMapDialog";
+import { IncomingSceneViews } from "../virtual-tour/[stationId]/IncomingSceneViews";
 import { TrainTourEditorSidebar } from "./TrainTourEditorSidebar";
 import { BakePrivacyBlurDialog } from "@/components/cms/BakePrivacyBlurDialog";
+import { useCompactCmsViewport } from "@/components/cms/useCompactCmsViewport";
+import { EditorNotice, useEditorNotice } from "@/components/cms/EditorNotice";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { PrivacyBlurBakeTarget } from "@/components/cms/BakePrivacyBlurDialog";
 import { extractMultiResProfilesFromCanvasData } from "@/lib/panorama-profile";
@@ -107,7 +110,10 @@ type BulkRow = {
   error?: string;
 };
 
+export type TrainEditorTarget = { sceneId: string; code: string; kind: "space" | "ad"; yaw: number; pitch: number };
+
 type Props = {
+  initialTarget?: TrainEditorTarget;
   trainId: string;
   trainName: string;
   trainSlug: string;
@@ -289,7 +295,7 @@ function toPreviewLevels(cars: TrainTourCar[]): TourLevelPublic[] {
     }));
 }
 
-export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props) {
+export default function TrainTourEditor({ trainId, trainName, trainSlug, initialTarget }: Props) {
   const editorRef = useRef<PannellumEditorHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const creativeInputRef = useRef<HTMLInputElement>(null);
@@ -326,7 +332,13 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     useState<EditorPanoramaPreviewMode>("display");
   const [blurSizeLinked, setBlurSizeLinked] = useState(true);
   const [isPreview, setIsPreview] = useState(false);
-  const [toast, setToast] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+  const compactViewport = useCompactCmsViewport();
+  const [explorerPreference, setExplorerCollapsed] = useState<boolean | null>(null);
+  const explorerCollapsed = explorerPreference ?? compactViewport;
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [linkedMediaView, setLinkedMediaView] = useState<{ sceneId: string; view: SceneInitialView } | null>(null);
+  const [previewEntryView, setPreviewEntryView] = useState<{ sceneId: string; view: SceneInitialView } | null>(null);
+  const { notice, showToast } = useEditorNotice();
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [showConnectionMap, setShowConnectionMap] = useState(false);
@@ -382,10 +394,6 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     return map;
   }, [scenes]);
 
-  function showToast(type: "ok" | "err", msg: string) {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3500);
-  }
 
   function rememberSavedScene(scene: Scene | null) {
     savedSceneRef.current = scene ? (JSON.parse(JSON.stringify(scene)) as Scene) : null;
@@ -470,7 +478,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
   }
 
   const load = useCallback(
-    async (keepIndex?: number) => {
+    async (keepIndex?: number, openLinkedTarget = false) => {
       const [structRes, spaces] = await Promise.all([
         cmsFetch(`/api/cms/virtual-train/${trainId}/structure`),
         loadTrainRentalSpaces(),
@@ -490,14 +498,30 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
         setBulkDefaultAreaId(carData[0].zones[0].id);
       }
       if (sc.length > 0) {
-        const idx =
+        const linkedIndex = openLinkedTarget && initialTarget ? sc.findIndex(scene => scene.sceneId === initialTarget.sceneId) : -1;
+        if (openLinkedTarget && initialTarget && linkedIndex < 0) {
+          showToast("err", "Scene untuk pinpoint ini tidak ditemukan.");
+        }
+        const idx = linkedIndex >= 0 ? linkedIndex :
           keepIndex !== undefined && keepIndex < sc.length
             ? keepIndex
             : Math.min(selectedSceneIndex, Math.max(0, sc.length - 1));
         setSelectedSceneIndex(idx);
         rememberSavedScene(sc[idx]);
-        setHotspots(sceneToHotspots(sc[idx]));
+        const sceneHotspots = sceneToHotspots(sc[idx]);
+        setHotspots(sceneHotspots);
         setPrivacyBlurs(sceneToPrivacyBlurs(sc[idx]));
+        if (linkedIndex >= 0 && initialTarget) {
+          const pins = sceneHotspots.filter(hotspot => hotspot.type === initialTarget.kind && hotspot.spaceCode === initialTarget.code);
+          const selected = pins.find(pin => pin.yaw === initialTarget.yaw && pin.pitch === initialTarget.pitch)
+            ?? (pins.length === 1 ? pins[0] : undefined);
+          if (selected) {
+            setSelectedHotspotId(selected._id);
+            setLinkedMediaView({ sceneId: initialTarget.sceneId, view: { yaw: selected.yaw, pitch: selected.pitch } });
+          } else {
+            showToast("err", "Pinpoint media tidak ditemukan di scene ini.");
+          }
+        }
       } else {
         rememberSavedScene(null);
         setHotspots([]);
@@ -505,24 +529,16 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
       }
       setHasUnsaved(false);
     },
-    [trainId, bulkDefaultAreaId, selectedSceneIndex]
+    [trainId, bulkDefaultAreaId, selectedSceneIndex, initialTarget]
   );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void load();
+      void load(undefined, true);
     }, 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trainId]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void load();
-    }, 0);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trainId]);
+  }, [trainId, initialTarget]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -557,6 +573,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     const next = scenes[index];
     if (!next) return;
     setSelectedSceneIndex(index);
+    setLinkedMediaView(null);
     setEditorPreviewMode("display");
     rememberSavedScene(next);
     restoreSceneState(next);
@@ -614,6 +631,10 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
       const updated = mapSceneRow(await res.json());
       rememberSavedScene(updated);
       setScenes((prev) => prev.map((s, i) => (i === selectedSceneIndex ? { ...s, ...updated } : s)));
+      if (updated.hotspots.length !== hotspots.length) {
+        setHotspots(sceneToHotspots(updated));
+        setSelectedHotspotId(null);
+      }
       setHasUnsaved(false);
       showToast("ok", "Scene disimpan");
     } catch {
@@ -755,7 +776,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
   async function deleteScene(scene: Scene) {
     const confirmed = await confirmDialog({
       title: `Hapus scene "${scene.title}"?`,
-      description: "Scene akan dihapus dari tur kereta ini.",
+      description: "Panah yang menuju scene ini ikut dihapus.",
       confirmLabel: "Ya, Hapus",
       destructive: true,
     });
@@ -1018,6 +1039,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
         prev.map((h) => {
           if (h._id !== selectedHotspotId) return h;
           const next: HotspotItem = { ...h, type: newType };
+          if (newType !== "scene") delete next.targetView;
           if (newType === "scene") {
             delete next.spaceCode;
             delete next.description;
@@ -1062,7 +1084,9 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
       );
     } else {
       setHotspots((prev) =>
-        prev.map((h) => (h._id === selectedHotspotId ? { ...h, [field]: value } : h))
+        prev.map((h) => h._id === selectedHotspotId
+          ? { ...h, [field]: value, ...(field === "sceneId" && h.sceneId !== value ? { targetView: undefined } : {}) }
+          : h)
       );
     }
     setHasUnsaved(true);
@@ -1243,7 +1267,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     setHasUnsaved(true);
   }
 
-  function previewNavigateScene(sceneId: string) {
+  function previewNavigateScene(sceneId: string, entryView?: SceneInitialView) {
     const updatedScenes = scenes.map((s, i) =>
       i === selectedSceneIndex
         ? {
@@ -1255,6 +1279,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
     );
     const idx = updatedScenes.findIndex((s) => s.sceneId === sceneId);
     if (idx < 0) return;
+    setPreviewEntryView(entryView ? { sceneId, view: entryView } : null);
     setScenes(updatedScenes);
     setSelectedSceneIndex(idx);
     setHotspots(sceneToHotspots(updatedScenes[idx]));
@@ -1265,16 +1290,14 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
 
   return (
     <div className="cms-vt-editor flex h-full min-h-0 w-full flex-col overflow-hidden">
-      <div className="relative z-30 flex shrink-0 items-center gap-3 border-b border-[var(--work-line)] bg-[var(--work-subtle)] px-4 py-3 text-[var(--work-text)]">
+      <div className="relative z-30 flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--work-line)] bg-[var(--work-subtle)] px-3 py-2 text-[var(--work-text)]">
         <Button asChild variant="ghost" size="sm" className="shrink-0 text-[var(--work-muted)] hover:text-[var(--work-text)]">
-          <Link href="/cms/dashboard">
-            <ArrowLeft className="mr-1 h-4 w-4" /> Dashboard
+          <Link href="/cms/dashboard" aria-label="Dashboard">
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            <span className="hidden sm:inline">Dashboard</span>
           </Link>
         </Button>
-        <div className="h-5 w-px bg-[var(--work-subtle)]" />
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="shrink-0 text-sm text-[var(--work-muted)]">Train Virtual Tour</span>
-          <span className="text-[var(--work-muted)]">›</span>
+        <div className="flex min-w-0 flex-1 basis-[calc(100%-3.5rem)] items-center gap-1.5 sm:basis-auto">
           <span className="truncate text-sm font-semibold text-[var(--work-text)]">{trainName}</span>
           {currentScene && (
             <>
@@ -1288,8 +1311,74 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
             </>
           )}
         </div>
-        <div className="flex-1" />
-        <div className="flex items-center gap-1 rounded-lg bg-[var(--work-surface)] p-1">
+        <Button asChild variant="outline" size="sm" className="shrink-0 border-[var(--work-line)]">
+          <Link href={`/train/${trainSlug}`} target="_blank">
+            Preview Publik
+          </Link>
+        </Button>
+        <button
+          type="button"
+          className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+            isPreview
+              ? "border-purple-500 bg-purple-600 text-white"
+              : "border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-muted)] hover:border-purple-500 hover:text-purple-300"
+          }`}
+          onClick={() => {
+            setPreviewEntryView(null);
+            setIsPreview((p) => !p);
+            setAddMode("none");
+          }}
+        >
+          {isPreview ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          {isPreview ? "Kembali Edit" : "Preview"}
+        </button>
+        {hasUnsaved && (
+          <span className="flex shrink-0 items-center gap-1 text-xs text-amber-400">
+            <AlertCircle className="h-3.5 w-3.5" /> Belum disimpan
+          </span>
+        )}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void resetChanges()}
+          disabled={!hasUnsaved || saving || !currentScene}
+          className="shrink-0 border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-text)] hover:bg-[var(--work-surface)] hover:text-[var(--work-text)] disabled:opacity-40"
+        >
+          <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reset
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => void saveScene()}
+          disabled={!currentScene || saving}
+          className="ml-auto shrink-0 bg-[#E31E2D] hover:bg-[#c41926] sm:ml-0"
+        >
+          {saving ? (
+            <>
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" /> Menyimpan…
+            </>
+          ) : (
+            <>
+              <Save className="mr-1 h-4 w-4" /> Simpan
+            </>
+          )}
+        </Button>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-[var(--work-line)] bg-[var(--work-subtle)] px-3 py-1" role="group" aria-label="Alat editor kereta">
+        {currentScene && compactViewport ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="shrink-0 border-[var(--work-line)]"
+            aria-expanded={inspectorOpen}
+            aria-controls="train-editor-inspector"
+            onClick={() => setInspectorOpen(open => !open)}
+          >
+            Detail scene
+          </Button>
+        ) : null}
+        <div className="flex shrink-0 items-center gap-1 rounded-lg bg-[var(--work-surface)] p-1">
           <button
             type="button"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
@@ -1351,8 +1440,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
             <EyeOff className="h-3.5 w-3.5" /> + Blur
           </button>
         </div>
-        <div className="h-5 w-px bg-[var(--work-subtle)]" />
-        <div className="flex items-center gap-1 rounded-lg bg-[var(--work-surface)] p-1">
+        <div className="flex shrink-0 items-center gap-1 rounded-lg bg-[var(--work-surface)] p-1">
           <button
             type="button"
             className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--work-muted)] hover:text-[var(--work-text)] disabled:pointer-events-none disabled:opacity-30"
@@ -1385,7 +1473,7 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
             className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--work-muted)] hover:text-[var(--work-text)] disabled:pointer-events-none disabled:opacity-30"
             onClick={handleSetInitialView}
             disabled={!currentScene || isPreview}
-            title="Set view awal dari posisi kamera"
+            title="Set arah bawaan scene dari kamera saat ini"
           >
             <Crosshair className="h-3.5 w-3.5" />
           </button>
@@ -1398,74 +1486,20 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
             <Network className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="h-5 w-px bg-[var(--work-subtle)]" />
-        <Button asChild variant="outline" size="sm" className="shrink-0 border-[var(--work-line)]">
-          <Link href={`/train/${trainSlug}`} target="_blank">
-            Preview Publik
-          </Link>
-        </Button>
-        <button
-          type="button"
-          className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-            isPreview
-              ? "border-purple-500 bg-purple-600 text-white"
-              : "border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-muted)] hover:border-purple-500 hover:text-purple-300"
-          }`}
-          onClick={() => {
-            setIsPreview((p) => !p);
-            setAddMode("none");
-          }}
-        >
-          {isPreview ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-          {isPreview ? "Kembali Edit" : "Full Preview"}
-        </button>
-        {hasUnsaved && (
-          <span className="flex shrink-0 items-center gap-1 text-xs text-amber-400">
-            <AlertCircle className="h-3.5 w-3.5" /> Belum disimpan
-          </span>
-        )}
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => void resetChanges()}
-          disabled={!hasUnsaved || saving || !currentScene}
-          className="shrink-0 border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-text)] hover:bg-[var(--work-surface)] hover:text-[var(--work-text)] disabled:opacity-40"
-        >
-          <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reset
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => void saveScene()}
-          disabled={!currentScene || saving}
-          className="shrink-0 bg-[#E31E2D] hover:bg-[#c41926]"
-        >
-          {saving ? (
-            <>
-              <Loader2 className="mr-1 h-4 w-4 animate-spin" /> Menyimpan…
-            </>
-          ) : (
-            <>
-              <Save className="mr-1 h-4 w-4" /> Simpan
-            </>
-          )}
-        </Button>
       </div>
 
-      {toast && (
-        <div
-          className={`shrink-0 px-4 py-2 text-sm ${toast.type === "ok" ? "bg-emerald-900/50 text-[var(--work-success)]" : "bg-red-900/50 text-red-200"}`}
-        >
-          {toast.msg}
-        </div>
-      )}
+      <EditorNotice notice={notice} />
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <TourStructureSidebar
           levels={levels}
           scenes={scenes}
           selectedSceneIndex={selectedSceneIndex}
           incomingMap={incomingMap}
-          onSelectScene={selectScene}
+          onSelectScene={(index) => {
+            if (compactViewport) setExplorerCollapsed(true);
+            void selectScene(index);
+          }}
           onMoveScene={moveScene}
           onDeleteScene={(scene) => {
             void deleteScene(scene as Scene);
@@ -1481,6 +1515,8 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
           onEditArea={() => showToast("ok", "Edit zona menyusul — gunakan gerbong/zona default dulu.")}
           onDeleteArea={() => showToast("err", "Zona default tidak bisa dihapus.")}
           onAutoWalkPath={() => showToast("ok", "Auto walk path menyusul untuk kereta.")}
+          collapsed={explorerCollapsed}
+          onToggleCollapse={() => setExplorerCollapsed(!explorerCollapsed)}
         />
 
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-black">
@@ -1494,11 +1530,11 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                 privacyBlurs={privacyBlurs}
                 sceneId={currentScene.sceneId}
                 sceneName={currentScene.title}
-                scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
+                scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title, initialView: extractInitialViewFromCanvasData(s.canvasData) }))}
                 levels={toPreviewLevels(cars)}
                 stationName={trainName}
                 onSceneNavigate={previewNavigateScene}
-                initialView={extractInitialViewFromCanvasData(currentScene.canvasData)}
+                initialView={previewEntryView?.sceneId === currentScene.sceneId ? previewEntryView.view : extractInitialViewFromCanvasData(currentScene.canvasData)}
               />
             ) : (
               <PannellumEditor
@@ -1526,13 +1562,13 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
                 onBlurDelete={handleBlurDelete}
                 spaces={rentalSpaces.map((s) => ({ code: s.code, status: s.status }))}
                 scenes={scenes.map((s) => ({ sceneId: s.sceneId, title: s.title }))}
-                initialView={extractInitialViewFromCanvasData(currentScene.canvasData) ?? null}
+                initialView={linkedMediaView?.sceneId === currentScene.sceneId ? linkedMediaView.view : extractInitialViewFromCanvasData(currentScene.canvasData) ?? null}
                 privacyBlurGuideOnly={privacyBlurGuideOnly}
               />
             )
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-[var(--work-muted)]">
-              <p>Pilih atau tambah scene dari panel kiri</p>
+              <p className="px-4 text-center">Pilih atau tambah scene dari Struktur Tur</p>
               <Button size="sm" variant="outline" onClick={() => setShowBulkImport(true)}>
                 <Package className="mr-1 h-4 w-4" /> Bulk Import Panorama
               </Button>
@@ -1541,50 +1577,58 @@ export default function TrainTourEditor({ trainId, trainName, trainSlug }: Props
         </div>
 
         {currentScene ? (
-          <TrainTourEditorSidebar
-            currentScene={currentScene}
-            levels={levels}
-            scenes={scenes}
-            hotspots={hotspots}
-            privacyBlurs={privacyBlurs}
-            rentalSpaces={rentalSpaces}
-            selectedHotspot={selectedHotspot}
-            selectedBlur={selectedBlur}
-            selectedHotspotId={selectedHotspotId}
-            selectedBlurId={selectedBlurId}
-            selectedBlurRadiusMax={selectedBlurRadiusMax}
-            blurSizeLinked={blurSizeLinked}
-            uploading={uploading}
-            uploadingCreative={uploadingCreative}
-            bakingPrivacyBlur={bakingPrivacyBlur}
-            bakePrivacyProgress={bakePrivacyProgress}
-            privacyBlurGuideOnly={privacyBlurGuideOnly}
-            editorPreviewMode={editorPreviewMode}
-            onEditorPreviewModeChange={setEditorPreviewMode}
-            hasHematTiles={Boolean(editorHematMultiRes)}
-            hasHdTiles={Boolean(editorHdMultiRes)}
-            hasHdOriginal={Boolean(currentScene.originalPanoramaUrl)}
-            getLevelConfig={getLevelConfig}
-            onSceneTitleChange={(title) => updateSelectedScene("title", title)}
-            onSceneAreaChange={handleSceneAreaChange}
-            onSceneOrderChange={(order) => updateSelectedScene("order", order)}
-            onUploadPanorama={uploadPanorama}
-            onDeleteScene={() => void deleteScene(currentScene)}
-            fileInputRef={fileRef}
-            creativeInputRef={creativeInputRef}
-            onHotspotDelete={handleHotspotDelete}
-            onBlurDelete={handleBlurDelete}
-            onHotspotSelect={(id) => handleHotspotSelect(id)}
-            onBlurSelect={(id) => handleBlurSelect(id)}
-            updateHotspot={updateHotspot}
-            assignHotspotSpace={assignHotspotSpace}
-            uploadAdCreative={uploadAdCreative}
-            updateBlur={updateBlur}
-            updateBlurSize={updateBlurSize}
-            setBlurSizeLinked={setBlurSizeLinked}
-            bakePrivacyBlurs={requestBakePrivacyBlurs}
-            jumpToHotspot={jumpToHotspot}
-          />
+          <div id="train-editor-inspector" className={`min-h-0 flex-none bg-[var(--work-subtle)] max-lg:absolute max-lg:inset-y-0 max-lg:right-0 max-lg:z-20 ${inspectorOpen ? "flex" : "hidden lg:flex"}`}>
+            <TrainTourEditorSidebar
+              currentScene={currentScene}
+              incomingSceneViews={<IncomingSceneViews key={currentScene.sceneId} destination={currentScene} scenes={scenes} outgoingHotspots={hotspots}
+                endpoint={`/api/cms/virtual-train/${encodeURIComponent(trainId)}/arrival-views`} disabled={isPreview || saving}
+                onSaved={(sourceId, savedHotspots, hasOverride) => {
+                  setScenes(previous => previous.map(scene => scene.sceneId === sourceId ? { ...scene, hotspots: savedHotspots } : scene));
+                  showToast("ok", hasOverride ? "Arah tiba disimpan." : "Koneksi kembali memakai arah bawaan.");
+                }} />}
+              levels={levels}
+              scenes={scenes}
+              hotspots={hotspots}
+              privacyBlurs={privacyBlurs}
+              rentalSpaces={rentalSpaces}
+              selectedHotspot={selectedHotspot}
+              selectedBlur={selectedBlur}
+              selectedHotspotId={selectedHotspotId}
+              selectedBlurId={selectedBlurId}
+              selectedBlurRadiusMax={selectedBlurRadiusMax}
+              blurSizeLinked={blurSizeLinked}
+              uploading={uploading}
+              uploadingCreative={uploadingCreative}
+              bakingPrivacyBlur={bakingPrivacyBlur}
+              bakePrivacyProgress={bakePrivacyProgress}
+              privacyBlurGuideOnly={privacyBlurGuideOnly}
+              editorPreviewMode={editorPreviewMode}
+              onEditorPreviewModeChange={setEditorPreviewMode}
+              hasHematTiles={Boolean(editorHematMultiRes)}
+              hasHdTiles={Boolean(editorHdMultiRes)}
+              hasHdOriginal={Boolean(currentScene.originalPanoramaUrl)}
+              getLevelConfig={getLevelConfig}
+              onSceneTitleChange={(title) => updateSelectedScene("title", title)}
+              onSceneAreaChange={handleSceneAreaChange}
+              onSceneOrderChange={(order) => updateSelectedScene("order", order)}
+              onUploadPanorama={uploadPanorama}
+              onDeleteScene={() => void deleteScene(currentScene)}
+              fileInputRef={fileRef}
+              creativeInputRef={creativeInputRef}
+              onHotspotDelete={handleHotspotDelete}
+              onBlurDelete={handleBlurDelete}
+              onHotspotSelect={(id) => handleHotspotSelect(id)}
+              onBlurSelect={(id) => handleBlurSelect(id)}
+              updateHotspot={updateHotspot}
+              assignHotspotSpace={assignHotspotSpace}
+              uploadAdCreative={uploadAdCreative}
+              updateBlur={updateBlur}
+              updateBlurSize={updateBlurSize}
+              setBlurSizeLinked={setBlurSizeLinked}
+              bakePrivacyBlurs={requestBakePrivacyBlurs}
+              jumpToHotspot={jumpToHotspot}
+            />
+          </div>
         ) : null}
       </div>
 

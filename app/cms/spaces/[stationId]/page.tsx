@@ -322,6 +322,7 @@ export default function CmsSpacesStationPage() {
       <div className="mb-4">
         <h1 className="text-xl font-semibold tracking-tight text-[var(--work-text)]">Ruang Komersial</h1>
         <p className={`mt-1 text-sm ${cmsUi.muted}`}>Kelola unit yang tampil di virtual tour publik.</p>
+        <Button className="mt-3" variant="outline" asChild><Link href={`/cms/spaces/${stationId}/concourse`}>Denah &amp; kode aset</Link></Button>
       </div>
 
       <CmsMediaSearch

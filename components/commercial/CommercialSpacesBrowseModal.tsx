@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
@@ -38,6 +39,7 @@ export default function CommercialSpacesBrowseModal({
   onFavorite,
   totalCount,
 }: Props) {
+  const { t } = useTourLanguage();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -66,7 +68,7 @@ export default function CommercialSpacesBrowseModal({
         type="button"
         className="absolute inset-0 bg-black/70"
         onClick={onClose}
-        aria-label="Tutup daftar area komersial"
+        aria-label={t("Tutup daftar area komersial")}
       />
 
       <div
@@ -78,19 +80,19 @@ export default function CommercialSpacesBrowseModal({
         <div className="flex shrink-0 items-center justify-between gap-3 bg-[#7a1424] px-5 py-3.5 text-white">
           <div className="min-w-0">
             <h2 id="browse-spaces-title" className="font-display text-lg font-bold md:text-xl">
-              Semua Area Komersial
+              {t("Semua Area Komersial")}
             </h2>
             <p className="mt-0.5 text-xs text-white/80">
-              {totalCount} unit
-              {stationName ? ` · ${stationName}` : " · semua stasiun"}
-              {filter !== "all" ? ` · filter aktif` : ""}
+              {t("{count} unit", { count: totalCount })}
+              {stationName ? ` · ${stationName}` : " " + t("· semua stasiun")}
+              {filter !== "all" ? " " + t("· filter aktif") : ""}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="shrink-0 rounded-full p-1.5 transition hover:bg-white/10"
-            aria-label="Tutup"
+            aria-label={t("Tutup")}
           >
             <X className="size-6" strokeWidth={2.5} />
           </button>
@@ -113,7 +115,7 @@ export default function CommercialSpacesBrowseModal({
             </div>
           ) : (
             <p className="py-16 text-center text-sm text-[#667085]">
-              Tidak ada unit untuk filter yang dipilih.
+              {t("Tidak ada unit untuk filter yang dipilih.")}
             </p>
           )}
         </div>

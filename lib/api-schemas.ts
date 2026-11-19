@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ACTIVE_LEAD_STATUSES } from "./commercial-pipeline";
 import { sceneEntryViewSchema } from "./scene-entry-view";
 
 const id = z.string().trim().min(1).max(128);
@@ -83,7 +84,15 @@ export const spaceMutationSchema = z.object({
   tenantId: id.nullable().optional(),
 }).strict();
 
+export const trainMediaSpecificationsSchema = z.object({
+  mediaType: z.string().trim().max(120).optional(),
+  placement: z.string().trim().max(300).optional(),
+  dimensions: z.string().trim().max(200).optional(),
+  technicalNote: z.string().trim().max(500).optional(),
+}).strict();
+
 export const trainRentalSpaceMutationSchema = z.object({
+  specifications: trainMediaSpecificationsSchema.optional(),
   displayNumber: z.string().trim().min(1).max(8).regex(/^\d{2}$/, "Nomor tampilan harus 2 digit, mis. 01"),
   title: shortText,
   description: optionalText(5_000),
@@ -149,6 +158,7 @@ export const occupancySchema = z.object({
 
 export const leadUpdateSchema = z.object({
   id,
+  advance: z.object({ fromStepId: id, toStepId: id }).strict().optional(),
   status: z.enum([
     "NEW",
     "CONTACTED",
@@ -164,6 +174,8 @@ export const leadUpdateSchema = z.object({
     "CLOSED_WON",
     "CLOSED_LOST",
   ]).optional(),
+  /** Ganti pin alur — hanya diizinkan saat pengajuan masih tahap 1 (status NEW). */
+  workflowVersionId: id.optional(),
   siteVisitStatus: z.enum([
     "NONE",
     "REQUESTED",
@@ -173,6 +185,8 @@ export const leadUpdateSchema = z.object({
   ]).optional(),
   siteVisitScheduledAt: optionalDate,
   notes: optionalText(5_000),
+  /** Pesan publik ke mitra saat maju tahap (muncul di timeline portal mitra). */
+  partnerMessage: optionalText(5_000),
   followUpAt: optionalDate,
   rdsOfferNo: optionalText(80),
   baNegotiationNo: optionalText(80),
@@ -295,4 +309,68 @@ export const googleAuthSchema = z.object({
   credential: z.string().trim().min(10).max(4096),
   remember: z.boolean().optional(),
 }).strict();
+
+export const workflowStepInputSchema = z
+  .object({
+    stepOrder: z.number().int().min(1),
+    leadStatus: z
+      .enum(ACTIVE_LEAD_STATUSES as [
+        (typeof ACTIVE_LEAD_STATUSES)[number],
+        ...(typeof ACTIVE_LEAD_STATUSES)[number][],
+      ])
+      .default("CONTACTED"),
+    stepType: z
+      .enum(["STANDARD", "DOCUMENT_ISSUANCE", "SITE_VISIT"])
+      .default("STANDARD"),
+    documentNumberLabel: z.string().trim().max(120).optional().nullable(),
+    slaHours: z.number().int().min(1).max(720).optional().nullable(),
+    mediaRequirement: z.enum(["NONE", "OPTIONAL", "REQUIRED"]).default("OPTIONAL"),
+    spaceEffect: z
+      .enum(["NONE", "RESERVE_SPACE", "FIT_OUT_SPACE", "ACTIVATE_TENANT"])
+      .default("NONE"),
+    title: z.string().trim().min(2, "Judul tahap minimal 2 karakter").max(120),
+    description: z.string().trim().max(500).optional().nullable(),
+    publicMessage: z
+      .string()
+      .trim()
+      .min(5, "Pesan panduan publik minimal 5 karakter")
+      .max(2000),
+    showInSummary: z.boolean().optional().default(true),
+  })
+  .strict()
+  .superRefine((step, ctx) => {
+    if (step.stepType === "DOCUMENT_ISSUANCE" && !step.documentNumberLabel?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["documentNumberLabel"],
+        message:
+          "Label nomor surat wajib diisi untuk tipe proses Penerbitan Nomor Surat Resmi",
+      });
+    }
+  });
+
+export const workflowDraftSaveSchema = z
+  .object({
+    title: z.string().trim().min(3, "Judul versi workflow minimal 3 karakter").max(160),
+    description: z.string().trim().max(1000).optional().nullable(),
+    steps: z
+      .array(workflowStepInputSchema)
+      .min(2, "Workflow wajib memiliki minimal 2 tahapan")
+      .max(30, "Workflow maksimal memiliki 30 tahapan"),
+  })
+  .strict();
+
+export const workflowCreateDraftSchema = z
+  .object({
+    sourceVersionId: id.optional(),
+    createNew: z.boolean().optional(),
+  })
+  .strict()
+  .default({});
+
+export const workflowStatusPatchSchema = z
+  .object({
+    status: z.enum(["ACTIVE", "ARCHIVED"]),
+  })
+  .strict();
 

@@ -66,6 +66,7 @@ export function isMediaSpaceType(type: string | undefined): boolean {
 }
 
 export type HotspotData = {
+  pinId?: string;
   pitch: number;
   yaw: number;
   type: HotspotType;

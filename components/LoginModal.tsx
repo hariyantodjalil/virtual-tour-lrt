@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { createPortal } from "react-dom";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -13,8 +14,10 @@ type Props = {
 };
 
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
+import { announceAuthLogin } from "@/lib/auth-client";
 
 export default function LoginModal({ open, onClose, onSwitchToRegister, onSuccess }: Props) {
+  const { t } = useTourLanguage();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -62,6 +65,7 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
         return;
       }
 
+      if (data.user) announceAuthLogin(data.user, "login");
       onSuccess?.(data.user!);
       onClose();
 
@@ -82,7 +86,7 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
         type="button"
         className="absolute inset-0 bg-black/70 backdrop-blur-[2px]"
         onClick={onClose}
-        aria-label="Tutup login"
+        aria-label={t("Tutup login")}
       />
 
       <div
@@ -95,7 +99,7 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
           type="button"
           onClick={onClose}
           className="absolute top-3 right-3 rounded-full p-1 text-white/70 transition hover:bg-white/10 hover:text-white"
-          aria-label="Tutup"
+          aria-label={t("Tutup")}
         >
           <X className="size-4" />
         </button>
@@ -105,10 +109,10 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
             id="login-modal-title"
             className="font-display text-[20px] font-bold tracking-tight text-white"
           >
-            Login
+            {t("Login")}
           </h2>
           <p className="mx-auto mt-1.5 max-w-[220px] text-[10px] leading-relaxed font-light text-white">
-            Masuk untuk melanjutkan dan mengakses fitur ruang komersial LRT Jabodebek.
+            {t("Masuk untuk melanjutkan dan mengakses fitur ruang komersial LRT Jabodebek.")}
           </p>
         </div>
 
@@ -118,7 +122,7 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
               htmlFor="login-email"
               className="text-[8px] font-semibold tracking-[0.1em] text-white uppercase"
             >
-              Email Address
+              {t("Email Address")}
             </label>
             <div className="relative mt-1.5">
               <Mail className="pointer-events-none absolute top-1/2 left-3 size-3 -translate-y-1/2 text-white/50" />
@@ -129,7 +133,7 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama@email.com"
+                placeholder={t("nama@email.com")}
                 className="h-9 w-full rounded-[9px] border border-white/80 bg-white/[0.07] pr-3 pl-9 text-[11px] text-white placeholder:text-white/25 outline-none focus:border-white"
               />
             </div>
@@ -151,14 +155,14 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Masukkan password Anda"
+                placeholder={t("Masukkan password Anda")}
                 className="h-9 w-full rounded-[9px] border border-white/80 bg-white/[0.07] px-9 text-[11px] text-white placeholder:text-white/25 outline-none focus:border-white"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 className="absolute top-1/2 right-3 -translate-y-1/2 text-white/50 transition hover:text-white"
-                aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                aria-label={showPassword ? t("Sembunyikan password") : t("Tampilkan password")}
               >
                 {showPassword ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
               </button>
@@ -173,18 +177,18 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
                 onChange={(e) => setRemember(e.target.checked)}
                 className="size-3.5 rounded-[4px] border border-white bg-white/[0.06] accent-[#d32f2f]"
               />
-              <span className="text-[9px] font-medium text-white">Ingat saya</span>
+              <span className="text-[9px] font-medium text-white">{t("Ingat saya")}</span>
             </label>
             <button
               type="button"
               className="text-[9px] font-semibold text-[#ff6b6b] transition hover:underline"
               onClick={() => setError("Hubungi admin untuk reset password.")}
             >
-              Lupa Password?
+              {t("Lupa Password?")}
             </button>
           </div>
 
-          {error && <p className="text-center text-[10px] text-red-300">{error}</p>}
+          {error && <p className="text-center text-[10px] text-red-300">{t(error)}</p>}
 
           <button
             type="submit"
@@ -194,14 +198,14 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
               backgroundImage: "linear-gradient(171deg, #d32f2f 0%, #b71c1c 100%)",
             }}
           >
-            {loading ? "Memproses..." : "Masuk Sekarang"}
+            {loading ? t("Memproses...") : t("Masuk Sekarang")}
           </button>
         </form>
 
         <div className="mt-4 flex items-center gap-2">
           <div className="h-px flex-1 bg-white/80" />
           <span className="text-[8px] font-medium whitespace-nowrap text-white">
-            atau masuk dengan
+            {t("atau masuk dengan")}
           </span>
           <div className="h-px flex-1 bg-white/80" />
         </div>
@@ -209,6 +213,7 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
         <GoogleSignInButton
           remember={remember}
           onSuccess={(u, redirect) => {
+            announceAuthLogin(u, "login");
             onSuccess?.(u);
             onClose();
             if (u.role === "ADMIN" || u.role === "EDITOR") {
@@ -217,11 +222,11 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
           }}
           onError={(err) => setError(err)}
           disabled={loading}
-          label="Masuk dengan Google"
+          label={t("Masuk dengan Google")}
         />
 
         <p className="mt-4 text-center text-[10px] text-white">
-          Belum punya akun?{" "}
+          {t("Belum punya akun?")}{" "}
           <button
             type="button"
             className="font-semibold text-[#ff6b6b] transition hover:underline"
@@ -230,7 +235,7 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
               onSwitchToRegister?.();
             }}
           >
-            Daftar Sekarang
+            {t("Daftar Sekarang")}
           </button>
         </p>
       </div>

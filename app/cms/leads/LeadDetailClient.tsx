@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Building2, ChevronRight, RefreshCw, Trash2 } from "lucide-react";
@@ -9,8 +9,11 @@ import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import WorkflowVersionBadge from "@/components/cms/WorkflowVersionBadge";
 import { leadStageBadgeClass, type LeadItem } from "@/lib/cms-leads-shared";
 import { LEAD_STATUS_LABELS, type CommercialLeadStatus } from "@/lib/commercial-pipeline";
+import { CMS_LEADS_UPDATED_EVENT, notifyCmsLeadsUpdated } from "@/lib/inquiry-sync-events";
+import { useInquiryRealtimeSync } from "@/components/realtime/useInquiryRealtimeSync";
 import LeadWorkflowPanel from "./LeadWorkflowPanel";
 import TrainInquiryAllocation from "./TrainInquiryAllocation";
 import styles from "./inquiry-workspace.module.css";
@@ -30,7 +33,7 @@ export default function LeadDetailClient({
   const [error, setError] = useState("");
   const endpoint = `/api/cms/leads/${encodeURIComponent(lead.id)}`;
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -46,7 +49,21 @@ export default function LeadDetailClient({
     } finally {
       setLoading(false);
     }
-  }
+  }, [endpoint, lead.id]);
+
+  useInquiryRealtimeSync({
+    enabled: true,
+    leadId: lead.id,
+    localEvents: [CMS_LEADS_UPDATED_EVENT],
+    fallbackIntervalMs: 60_000,
+    onSync: async () => {
+      try {
+        await load();
+      } catch {
+        /* silent */
+      }
+    },
+  });
 
   async function save(body: Record<string, unknown>) {
     if (!canManage || saving) return false;
@@ -61,6 +78,7 @@ export default function LeadDetailClient({
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error || "Perubahan pengajuan belum tersimpan.");
       await load();
+      notifyCmsLeadsUpdated();
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Perubahan pengajuan belum tersimpan.");
@@ -137,6 +155,14 @@ export default function LeadDetailClient({
             <Badge variant="outline" className={leadStageBadgeClass(lead.status)}>
               {statusLabel}
             </Badge>
+            {lead.workflowVersion ? (
+              <WorkflowVersionBadge
+                version={lead.workflowVersion.version}
+                status={lead.workflowVersion.status}
+                title={lead.workflowVersion.title}
+                stepCount={lead.workflowVersion.stepCount}
+              />
+            ) : null}
           </div>
           <p className="mt-2 flex items-start gap-2 text-sm text-slate-600">
             <Building2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -210,32 +236,6 @@ export default function LeadDetailClient({
                 />
               </details>
             )}
-            <details className="py-2">
-              <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold focus-visible:outline-2 focus-visible:outline-[#D81435]">
-                Informasi pengajuan & kontak
-              </summary>
-              <dl className="grid gap-x-8 gap-y-4 py-4 text-sm sm:grid-cols-2">
-                <div className="min-w-0">
-                  <dt className="text-xs text-slate-500">Penanggung jawab</dt>
-                  <dd className="mt-1 break-words">
-                    {lead.contactName} · {lead.phone}
-                  </dd>
-                  <dd className="mt-1 break-all text-slate-500">{lead.email}</dd>
-                </div>
-                <div className="min-w-0">
-                  <dt className="text-xs text-slate-500">Kategori bisnis</dt>
-                  <dd className="mt-1 break-words">{lead.businessType}</dd>
-                </div>
-                {lead.message && (
-                  <div className="min-w-0 sm:col-span-2">
-                    <dt className="text-xs text-slate-500">Kebutuhan mitra</dt>
-                    <dd className="mt-1 whitespace-pre-wrap break-words leading-relaxed">
-                      {lead.message}
-                    </dd>
-                  </div>
-                )}
-              </dl>
-            </details>
             <details className="py-2">
               <summary className="flex min-h-11 cursor-pointer items-center text-xs text-slate-500 focus-visible:outline-2 focus-visible:outline-[#D81435]">
                 Pengelolaan lanjutan

@@ -9,7 +9,8 @@ import { parseJsonRequest } from "@/lib/api-validation";
 import { z } from "zod";
 import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/rate-limit";
 import { trainLeadRequirement } from "@/lib/train-rental-spaces";
-import { inquiryCreationData, partnerInquiryInclude, toPartnerInquiry } from "@/lib/partner-inquiries";
+import { getWorkflowForNewInquiry, inquiryCreationData, partnerInquiryInclude, toPartnerInquiry } from "@/lib/partner-inquiries";
+import { publishInquiryEvent } from "@/lib/realtime-events";
 
 const partnerLeadSchema = z
   .object({
@@ -119,12 +120,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const workflow = await getWorkflowForNewInquiry();
+  if (!workflow) return NextResponse.json({ error: "Alur pengajuan belum tersedia. Hubungi tim komersial." }, { status: 503 });
+
   const result = await createInquiryOnce({
     userId: user.id,
     target: commercialSpaceId ? { kind: "space", id: commercialSpaceId }
       : parsed.data.trainRentalSpaceId ? { kind: "train", id: parsed.data.trainRentalSpaceId } : null,
     data: {
-      ...await inquiryCreationData(user.id),
+      ...inquiryCreationData(user.id, workflow),
       ...(trainRequest ? { trainInquiry: { create: trainRequest.create } } : {}),
       userId: user.id,
       spaceId: commercialSpaceId,
@@ -154,8 +158,13 @@ export async function POST(request: NextRequest) {
         eventType: "FORM_SUBMIT",
         sessionId: getClientIdentifier(request),
       },
-    });
+    }).catch(error => console.warn("[partner/leads] visit event skipped", error));
   }
 
+  void publishInquiryEvent({
+    kind: "lead-created",
+    leadId: lead.id,
+    userId: lead.userId,
+  });
   return NextResponse.json(lead, { status: 201, headers: rateLimitHeaders(rateLimit) });
 }

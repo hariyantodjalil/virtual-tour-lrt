@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Navigation, RefreshCw, RotateCw } from "lucide-react";
@@ -26,6 +27,7 @@ import { SpatialOverlay } from "@/components/tour/spatial/SpatialOverlay";
 import { isSpatialHotspotEnabled } from "@/lib/spatial-feature";
 import type { SpatialEntity } from "@/lib/spatial/types";
 import { runSpatialAction } from "@/lib/spatial/actions";
+import type { SpaceHotspotTarget } from "@/lib/space-hotspot-locate";
 import { resolveSceneEntryView } from "@/lib/scene-entry-view";
 import type { SpaceHotspotMarker } from "@/lib/pannellum-hotspot";
 import { getAutomaticPanoramaQuality, observePanoramaNetwork, recordPanoramaTileFailure } from "@/lib/panorama-quality";
@@ -49,10 +51,11 @@ type SpaceStatusRef = {
 type Props = {
   scenes: PanoramaScene[];
   spaces?: SpaceStatusRef[];
-  onSpaceClick?: (spaceCode: string) => void;
+  onSpaceClick?: (spaceCode: string, target?: SpaceHotspotTarget) => void;
   onAdClick?: (payload: import("@/lib/pannellum-tour-config").AdHotspotPayload) => void;
   onInfoClick?: (title: string, description: string) => void;
   onSceneChange?: (sceneId: string) => void;
+  onViewYawChange?: (yaw: number, sceneId: string) => void;
   initialScene?: string;
   selectedSceneId?: string;
   focusCamera?: { yaw: number; pitch: number; hfov?: number } | null;
@@ -125,6 +128,7 @@ export default function VirtualTourViewer({
   onAdClick,
   onInfoClick,
   onSceneChange,
+  onViewYawChange,
   initialScene,
   selectedSceneId,
   focusCamera,
@@ -134,6 +138,7 @@ export default function VirtualTourViewer({
   autoRotateControlContainer,
   chromeTone = "default",
 }: Props) {
+  const { t, content } = useTourLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const onSpaceClickRef = useRef(onSpaceClick);
@@ -158,6 +163,26 @@ export default function VirtualTourViewer({
   const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [viewerForOverlay, setViewerForOverlay] = useState<any>(null);
+  useEffect(() => {
+    if (!viewerReady || !onViewYawChange) return;
+    let frame = 0;
+    let previousSceneId: string | undefined;
+    let previousYaw: number | undefined;
+    function update() {
+      const sceneId = viewerRef.current?.getScene?.();
+      const yaw = viewerRef.current?.getYaw?.();
+      if (typeof yaw === "number" && Number.isFinite(yaw) && typeof sceneId === "string" &&
+        (sceneId !== previousSceneId || yaw !== previousYaw)) {
+        onViewYawChange?.(yaw, sceneId);
+        previousSceneId = sceneId;
+        previousYaw = yaw;
+      }
+      frame = requestAnimationFrame(update);
+    }
+    frame = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(frame);
+  }, [onViewYawChange, viewerReady, selectedSceneId]);
+
   const isMounted = useRef(true);
   const spatialEnabled = isSpatialHotspotEnabled();
 
@@ -166,6 +191,24 @@ export default function VirtualTourViewer({
 
   const activeSceneId = selectedSceneId ?? internalSceneId ?? scenes[0]?.id;
   const activeSceneIdRef = useRef(activeSceneId);
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+    const container = containerRef.current;
+    if (!viewerReady || !container) return;
+    for (const [selector, label] of [
+      [".pnlm-zoom-in", "Mendekat"],
+      [".pnlm-zoom-out", "Menjauh"],
+      [".pnlm-fullscreen-toggle-button", "Layar penuh"],
+    ]) {
+      const control = container.querySelector(selector);
+      control?.setAttribute("title", t(label));
+      control?.setAttribute("aria-label", t(label));
+    }
+    container.querySelectorAll<HTMLElement>("[data-tour-text]").forEach(element => {
+      if (element.dataset.tourText) element.setAttribute("aria-label", content(element.dataset.tourText));
+    });
+  }, [t, content, viewerReady, activeSceneId]);
   const currentSceneIdx = Math.max(0, scenes.findIndex((scene) => scene.id === activeSceneId));
   const scenesSig = useMemo(() => scenes.map((s) => s.id).join("|"), [scenes]);
   const activeSpatialEntities: SpatialEntity[] = useMemo(() => {
@@ -335,14 +378,26 @@ export default function VirtualTourViewer({
         onScenePreload: (id: string, view: SceneInitialView) => {
           schedulePanoramaIntent(scenesRef.current.find((scene) => scene.id === id), view);
         },
-        onSpaceClick: (code: string) => onSpaceClickRef.current?.(code),
+        onSpaceClick: (code: string, target?: SpaceHotspotTarget) => onSpaceClickRef.current?.(code, target),
         onAdClick: (payload: import("@/lib/pannellum-tour-config").AdHotspotPayload) => onAdClickRef.current?.(payload),
         onInfoClick: (title: string, desc: string) => onInfoClickRef.current?.(title, desc),
         getSpaceStatus: (code: string) => findSpaceStatus(spacesRef.current, code),
       };
       const config = buildPannellumTourConfig(currentScenes, firstId, handlers);
 
-      const viewer = window.pannellum.viewer(containerRef.current, config);
+      const viewer = window.pannellum.viewer(containerRef.current, {
+        ...config,
+        default: {
+          ...config.default,
+          strings: {
+            loadButtonLabel: tRef.current("Klik untuk memuat panorama"),
+            loadingLabel: tRef.current("Memuat panorama…"),
+            noPanoramaError: tRef.current("Tidak dapat memuat panorama."),
+            genericWebGLError: tRef.current("Tidak dapat memuat panorama."),
+            unknownError: tRef.current("Tidak dapat memuat panorama."),
+          },
+        },
+      });
       if (epoch !== initEpochRef.current) {
         try {
           viewer.destroy();
@@ -514,9 +569,9 @@ export default function VirtualTourViewer({
   };
 
   const autoRotateControl = panoramaVisible && !error ? (
-    <button type="button" onClick={toggleAutoRotate} aria-label="Auto Putar" aria-pressed={autoRotate}
+    <button type="button" onClick={toggleAutoRotate} aria-label={t("Auto Putar")} aria-pressed={autoRotate}
       className={`flex shrink-0 items-center justify-center rounded-full backdrop-blur-md transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${autoRotateControlContainer === undefined ? "size-10" : "size-11"} ${autoRotate ? `bg-[#E31E2D] text-white ${autoRotateControlContainer === undefined ? "shadow-[0_10px_24px_rgba(227,30,45,0.35)]" : ""}` : "tour-chrome-pill"}`}
-      title="Auto Putar">{autoRotateControlContainer === undefined ? <Navigation className="size-4" /> : <RotateCw className="size-5" />}</button>
+      title={t("Auto Putar")}>{autoRotateControlContainer === undefined ? <Navigation className="size-4" /> : <RotateCw className="size-5" />}</button>
   ) : null;
 
   return (
@@ -539,7 +594,7 @@ export default function VirtualTourViewer({
             resolveSpaceStatus={(code) => findSpaceStatus(spacesRef.current, code)}
             onEntityClick={(entity) => {
               runSpatialAction(entity, {
-                openUnit: (code) => onSpaceClickRef.current?.(code),
+                openUnit: (code) => onSpaceClickRef.current?.(code, { sceneId: entity.sceneId, spatialId: entity.id }),
                 openScene: (id) => {
                   if (scenesRef.current.some((scene) => scene.id === id)) {
                     const pitch = viewerRef.current?.getPitch() ?? 0;
@@ -569,7 +624,7 @@ export default function VirtualTourViewer({
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 z-20 gap-4 p-6">
           <div className="text-center">
-            <p className="text-white font-semibold mb-2">{error}</p>
+            <p className="text-white font-semibold mb-2">{t(error)}</p>
             <Button
               variant="outline"
               size="sm"
@@ -577,7 +632,7 @@ export default function VirtualTourViewer({
               className="text-white border-white/30 hover:bg-white/10"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
-              Coba Lagi
+              {t("Coba Lagi")}
             </Button>
           </div>
         </div>
@@ -602,7 +657,7 @@ export default function VirtualTourViewer({
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                {scene.title}
+                {content(scene.title)}
               </button>
             ))}
           </div>

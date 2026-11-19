@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useMemo, useState } from "react";
 import {
   Building2,
@@ -18,6 +19,7 @@ import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 type SpaceItem = {
   id: string;
   code: string;
+  assetCode?: string;
   name: string;
   displayName?: string;
   type: string;
@@ -65,21 +67,22 @@ const STATUS_BADGE: Record<
 function matchesQuery(
   space: SpaceItem,
   query: string,
-  typeLabels: Record<string, string>
+  typeLabels: Record<string, string>,
+  translate: (text: string) => string,
+  locale: string,
 ) {
-  const q = query.trim().toLocaleLowerCase("id-ID");
+  const q = query.trim().toLocaleLowerCase(locale);
   if (!q) return true;
-  const haystack = [
+  const fields = [
     space.displayName,
     space.name,
     space.code,
+    space.assetCode,
     space.tenantBrand,
     typeLabels[space.type] ?? space.type,
     STATUS_BADGE[space.status]?.label,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLocaleLowerCase("id-ID");
+  ].filter((value): value is string => Boolean(value));
+  const haystack = [...fields, ...fields.map(translate)].join(" ").toLocaleLowerCase(locale);
   return haystack.includes(q);
 }
 
@@ -94,17 +97,17 @@ export default function TourUnitsPanel({
   onViewMap,
   contactUrl,
 }: Props) {
+  const { t, content, locale } = useTourLanguage();
   const [query, setQuery] = useState("");
   const available = spaces.filter((s) => s.status === "TERSEDIA").length;
   const occupied = spaces.filter((s) => s.status === "TERISI").length;
   const totalArea = spaces.reduce((sum, s) => sum + (s.area || 0), 0);
-  const areaLabel =
-    totalArea % 1 === 0 ? `${totalArea}` : totalArea.toFixed(1).replace(".", ",");
+  const areaLabel = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(totalArea);
   const inventoryEmpty = spaces.length === 0;
   const noneAvailable = !inventoryEmpty && available === 0;
   const filtered = useMemo(
-    () => spaces.filter((space) => matchesQuery(space, query, typeLabels)),
-    [spaces, query, typeLabels]
+    () => spaces.filter((space) => matchesQuery(space, query, typeLabels, content, locale)),
+    [spaces, query, typeLabels, content, locale]
   );
   const showSearch = spaces.length >= 5;
   const noSearchHits = !inventoryEmpty && filtered.length === 0 && query.trim().length > 0;
@@ -118,7 +121,7 @@ export default function TourUnitsPanel({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <h2 className="font-display text-sm font-bold text-slate-900">Unit Komersial</h2>
+            <h2 className="font-display text-sm font-bold text-slate-900">{t("Unit Komersial")}</h2>
             <span className="rounded-md bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
               {spaces.length}
             </span>
@@ -128,7 +131,7 @@ export default function TourUnitsPanel({
           type="button"
           onClick={onClose}
           className="flex size-9 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-200/60 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-signal"
-          aria-label="Tutup daftar unit"
+          aria-label={t("Tutup daftar unit")}
         >
           <X className="size-4" />
         </button>
@@ -138,25 +141,25 @@ export default function TourUnitsPanel({
       <div className="grid grid-cols-4 gap-1.5 border-b border-slate-200 px-3 py-2.5">
         {[
           {
-            label: "Total Unit",
+            label: t("Total Unit"),
             value: String(spaces.length),
             icon: <Store className="size-3.5 text-slate-500" />,
             valueClass: "text-slate-900",
           },
           {
-            label: "Tersedia",
+            label: t("Tersedia"),
             value: String(available),
             icon: <CheckCircle2 className="size-3.5 text-emerald-600" />,
             valueClass: "text-emerald-700",
           },
           {
-            label: "Terisi",
+            label: t("Terisi"),
             value: String(occupied),
             icon: <CalendarDays className="size-3.5 text-slate-500" />,
             valueClass: "text-slate-900",
           },
           {
-            label: "Total Luas",
+            label: t("Total Luas"),
             value: `${areaLabel} m²`,
             icon: <Maximize2 className="size-3.5 text-slate-500" />,
             valueClass: "text-slate-900",
@@ -172,7 +175,7 @@ export default function TourUnitsPanel({
             <p className={`text-[11px] font-bold leading-tight ${stat.valueClass}`}>
               {stat.value}
             </p>
-            <p className="mt-0.5 text-[8px] leading-tight text-slate-500">{stat.label}</p>
+            <p className="mt-0.5 text-[8px] leading-tight text-slate-500">{t(stat.label)}</p>
           </div>
         ))}
       </div>
@@ -180,7 +183,7 @@ export default function TourUnitsPanel({
       {showSearch && (
         <div className="border-b border-slate-200 px-3 py-2.5">
           <label htmlFor="tour-unit-search" className="sr-only">
-            Cari unit
+            {t("Cari unit")}
           </label>
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
@@ -189,14 +192,14 @@ export default function TourUnitsPanel({
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Cari nama, kode, atau tipe…"
+              placeholder={t("Cari nama, kode, atau tipe…")}
               autoComplete="off"
               className="h-10 w-full rounded-xl border border-slate-300 bg-white py-2 pr-3 pl-9 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-signal focus:ring-2 focus:ring-signal/20"
             />
           </div>
           {query.trim() && (
             <p className="mt-1.5 text-xs text-slate-500">
-              {filtered.length} dari {spaces.length} unit
+              {filtered.length} {t("dari")} {spaces.length} {t("unit")}
             </p>
           )}
         </div>
@@ -223,20 +226,20 @@ export default function TourUnitsPanel({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-slate-900">
-                  {space.displayName || space.name}
+                  {content(space.displayName || space.name)}
                 </span>
                 <span className="mt-0.5 block truncate font-mono text-[11px] text-slate-500">
-                  {space.code}
+                  {space.assetCode ?? space.code}
                 </span>
                 <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
                   <span className="inline-flex items-center gap-1">
                     <Building2 className="size-3 shrink-0" />
-                    {typeLabels[space.type] ?? space.type}
+                    {t(typeLabels[space.type] ?? space.type)}
                   </span>
                   <span aria-hidden="true" className="text-slate-300">·</span>
-                  <span>{space.area} m²</span>
+                  <span>{new Intl.NumberFormat(locale).format(space.area)} m²</span>
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${badge.className}`}>
-                    {badge.label}
+                    {t(badge.label)}
                   </span>
                 </span>
               </span>
@@ -246,14 +249,14 @@ export default function TourUnitsPanel({
         })}
         {noSearchHits && (
           <p className="px-2 py-8 text-center text-sm text-slate-600">
-            Tidak ada unit yang cocok dengan “{query.trim()}”.
+            {t("Tidak ada unit yang cocok dengan “")}{query.trim()}”.
           </p>
         )}
         {inventoryEmpty && (
           <div className="px-2 py-8 text-center">
-            <p className="text-sm font-semibold text-slate-900">Belum ada unit di inventori stasiun ini</p>
+            <p className="text-sm font-semibold text-slate-900">{t("Belum ada unit di inventori stasiun ini")}</p>
             <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
-              Data unit belum dipublikasikan. Tanya tim komersial untuk opsi stasiun lain.
+              {t("Data unit belum dipublikasikan. Tanya tim komersial untuk opsi stasiun lain.")}
             </p>
             {contactUrl && (
               <a
@@ -263,7 +266,7 @@ export default function TourUnitsPanel({
                 className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-signal px-4 text-sm font-semibold text-white hover:bg-signal-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
               >
                 <Phone className="size-4" />
-                Tanya Ketersediaan
+                {t("Tanya Ketersediaan")}
               </a>
             )}
           </div>
@@ -281,7 +284,7 @@ export default function TourUnitsPanel({
               className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-signal px-3.5 text-sm font-semibold text-white transition hover:bg-signal-deep focus-visible:outline-2 focus-visible:outline-signal"
             >
               <Phone className="size-4" />
-              Tanya Ketersediaan Stasiun Lain
+              {t("Tanya Ketersediaan Stasiun Lain")}
             </a>
           )}
           {onViewMap && (
@@ -293,7 +296,7 @@ export default function TourUnitsPanel({
               <span className="flex size-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                 <Maximize2 className="size-3.5" />
               </span>
-              <span className="flex-1">Lihat Peta Unit</span>
+              <span className="flex-1">{t("Lihat Peta Unit")}</span>
               <ChevronRight className="size-4 text-slate-400" />
             </button>
           )}

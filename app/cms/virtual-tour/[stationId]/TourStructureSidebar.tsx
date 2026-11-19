@@ -496,11 +496,11 @@ export function TourStructureSidebar({
                                     </p>
                                     <div className="flex items-center gap-2 text-[9px] text-[var(--work-muted)]">
                                       <span className="font-mono truncate">{scene.sceneId}</span>
-                                      <span className="flex items-center gap-0.5">
+                                      <span className="flex items-center gap-0.5" title="Panah keluar">
                                         <ArrowRightLeft className="h-2 w-2" />
                                         {outgoingCount}
                                       </span>
-                                      <span className="flex items-center gap-0.5">
+                                      <span className="flex items-center gap-0.5" title="Panah masuk">
                                         <Link2 className="h-2 w-2" />
                                         {incomingCount}
                                       </span>

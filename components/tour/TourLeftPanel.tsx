@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { TourLanguageToggle, useTourLanguage } from "./TourLanguageProvider";
 import { ChevronDown, ChevronRight, Home, MapPin, TrainFront } from "lucide-react";
 import type { TourLocationBreadcrumb } from "@/lib/tour-location-breadcrumb";
 
@@ -9,9 +10,8 @@ type Props = {
   stationName: string;
   locationBreadcrumb?: TourLocationBreadcrumb;
   locationKind?: string;
-  onPickStation: () => void;
-  /** Default: Pilih Stasiun */
-  pickLabel?: string;
+  hideTourNameOnCompact?: boolean;
+  onPickStation?: () => void;
   /** Default: / */
   homeHref?: string;
   clearUiControl?: ReactNode;
@@ -22,7 +22,7 @@ type Props = {
 };
 
 /** Void Portal glass — Experience chrome (token CSS) */
-const SURFACE_PILL = "tour-chrome-pill rounded-full";
+const wideHeaderSurface = "md:rounded-xl md:border md:[border-color:var(--hairline)] md:bg-[var(--tour-chrome-bg)] md:backdrop-blur-md";
 const ICON_DISK = "inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-panel";
 
 /**
@@ -31,61 +31,86 @@ const ICON_DISK = "inline-flex size-7 shrink-0 items-center justify-center round
 export default function TourLeftPanel({
   stationName,
   locationBreadcrumb,
-  locationKind = "Stasiun",
+  locationKind,
+  hideTourNameOnCompact = false,
   onPickStation,
-  pickLabel = "Pilih Stasiun",
   homeHref = "/",
   clearUiControl,
   tools,
   railClassName = "",
   map,
 }: Props) {
+  const { t, content } = useTourLanguage();
+  const pickStationLabel = t("Pilih Stasiun");
+  const tourName = content(locationBreadcrumb?.stationName ?? stationName);
+  const location = locationBreadcrumb?.locationParts.map(content).join(" · ");
+  const scene = locationBreadcrumb?.sceneLabel;
+  const showTourNameOnCompact = !hideTourNameOnCompact || !location;
   return (
-    <div className="pointer-events-none absolute inset-y-0 left-0 z-[58] md:right-0">
-      {/* Header kiri atas */}
-      <div className="pointer-events-auto flex w-[min(100vw,288px)] flex-col gap-1 overflow-visible bg-transparent p-2 md:gap-1.5">
-        {/* Home + Pilih */}
-        <div className="tour-panel-in flex items-center gap-1.5">
-          <Link
-            href={homeHref}
-            className={`flex size-11 shrink-0 items-center justify-center transition hover:bg-white/10 ${SURFACE_PILL}`}
-            aria-label="Beranda"
-          >
-            <Home className="size-4" strokeWidth={2.25} />
-          </Link>
-          <button
-            type="button"
-            onClick={onPickStation}
-            aria-label={`${pickLabel}, saat ini ${stationName}`}
-            className={`flex h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm font-semibold transition hover:bg-white/10 ${SURFACE_PILL}`}
-          >
-            <TrainFront className="size-4 shrink-0 opacity-90" />
-            <span className="min-w-0 flex-1 truncate font-display"><span className="md:hidden">{locationBreadcrumb ? locationBreadcrumb.stationName : pickLabel}</span><span className="hidden md:inline">{pickLabel}</span></span>
-            <ChevronDown className="size-4 shrink-0 opacity-70" strokeWidth={2.5} />
-          </button>
+    <div className="pointer-events-none absolute inset-0 z-[58]">
+      <div className="grid min-w-0 items-start justify-items-start gap-2 p-2 md:grid-cols-[auto_minmax(0,1fr)] md:items-stretch md:gap-x-4">
+        <div className="tour-chrome-pill w-full min-w-0 max-w-full rounded-xl min-[700px]:grid min-[700px]:grid-cols-[auto_minmax(0,1fr)] min-[700px]:items-stretch md:contents">
+          <div className={`tour-panel-in pointer-events-auto flex max-w-full items-center px-1 ${wideHeaderSurface}`}>
+            <Link
+              href={homeHref}
+              className="flex size-11 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-white/10 focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-white"
+              aria-label={t("Beranda")}
+            >
+              <Home aria-hidden="true" className="size-4" strokeWidth={2.25} />
+            </Link>
+            {onPickStation ? (
+              <button
+                type="button"
+                onClick={onPickStation}
+                aria-label={t("{pick}, saat ini {station}", { pick: pickStationLabel, station: tourName })}
+                className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-sm font-semibold transition-colors hover:bg-white/10 focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-white md:flex-none"
+              >
+                <TrainFront aria-hidden="true" className="size-4 shrink-0 opacity-90" />
+                <span className="min-w-0 truncate font-display">{pickStationLabel}</span>
+                <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 opacity-70" strokeWidth={2.25} />
+              </button>
+            ) : (
+              <span className="min-w-0 flex-1 truncate px-2 text-xs font-semibold text-ink/85 min-[700px]:hidden" title={tourName}>{tourName}</span>
+            )}
+            <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-white/15" />
+            <TourLanguageToggle embedded />
+          </div>
+
+          {locationBreadcrumb ? (
+            <nav aria-label={t("Lokasi tur")} className={`flex min-h-9 min-w-0 max-w-full items-center border-white/10 max-[700px]:border-t min-[700px]:max-md:border-l px-3.5 py-1.5 min-[700px]:justify-end md:min-h-11 md:justify-self-end ${wideHeaderSurface}`}>
+              <ol className="flex min-w-0 items-center gap-1.5 text-xs leading-relaxed md:gap-2 md:text-sm">
+                <li className={`min-w-0 items-center gap-1.5 ${showTourNameOnCompact ? "flex" : "hidden min-[700px]:flex"}`}>
+                  {locationKind && <span className="hidden shrink-0 text-fog lg:inline">{t(locationKind)}</span>}
+                  <strong className="truncate font-medium" title={tourName}>{tourName}</strong>
+                </li>
+                {location && (
+                  <li className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+                    <ChevronRight aria-hidden="true" className={`size-3 shrink-0 text-fog ${showTourNameOnCompact ? "" : "hidden min-[700px]:block"}`} />
+                    <span className="truncate text-ink/85" title={location}>{location}</span>
+                  </li>
+                )}
+                {scene && (
+                  <li aria-current="location" className="flex min-w-0 max-w-[55%] shrink-0 items-center gap-1.5 sm:gap-2">
+                    <ChevronRight aria-hidden="true" className="size-3 shrink-0 text-fog" />
+                    <span className="truncate font-semibold capitalize" title={content(scene)}>{content(scene)}</span>
+                  </li>
+                )}
+              </ol>
+            </nav>
+          ) : <section className={`flex items-center gap-2 border-white/10 max-[700px]:border-t min-[700px]:max-md:border-l px-3 py-1.5 ${wideHeaderSurface}`}>
+            <span className={ICON_DISK}>
+              <MapPin className="size-3.5 text-ink" strokeWidth={2.4} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[9px] font-medium text-fog">{t("Lokasi Saat Ini")}</p>
+              <p className="truncate font-display text-sm leading-tight font-bold text-ink">
+                {stationName}
+              </p>
+            </div>
+          </section>}
         </div>
 
-        {locationBreadcrumb ? (
-          <nav aria-label="Lokasi tur" className="tour-chrome-pill w-max max-w-[calc(100vw-1rem)] self-start rounded-lg px-2.5 py-1.5 md:absolute md:top-2 md:right-2 md:flex md:min-h-11 md:max-w-[calc(100%-19rem)] md:items-center md:rounded-2xl md:px-4 md:py-2">
-            <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-relaxed md:gap-x-3 md:text-sm">
-              <li className="sr-only md:not-sr-only md:flex md:min-w-0 md:max-w-full md:items-center md:gap-2"><span className="shrink-0 text-fog">{locationKind}</span><strong className="min-w-0 break-words font-semibold">{locationBreadcrumb.stationName}</strong></li>
-              {locationBreadcrumb.locationLabel && <li className="flex min-w-0 max-w-full items-center gap-2 md:gap-3"><ChevronRight aria-hidden="true" className="hidden size-3 shrink-0 text-fog md:block" /><span className="min-w-0 break-words text-ink/85">{locationBreadcrumb.locationLabel}</span></li>}
-              {locationBreadcrumb.sceneLabel && <li aria-current="location" className="flex min-w-0 max-w-full items-center gap-2 md:gap-3"><ChevronRight aria-hidden="true" className="size-3 shrink-0 text-fog" /><span className="min-w-0 break-words font-semibold capitalize">{locationBreadcrumb.sceneLabel}</span></li>}
-            </ol>
-          </nav>
-        ) : <section className={`flex items-center gap-2 px-2 py-1.5 ${SURFACE_PILL}`}>
-          <span className={ICON_DISK}>
-            <MapPin className="size-3.5 text-ink" strokeWidth={2.4} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[9px] font-medium text-fog">Lokasi Saat Ini</p>
-            <p className="truncate font-display text-sm leading-tight font-bold text-ink">
-              {stationName}
-            </p>
-          </div>
-        </section>}
-
-        {map ? <div className="pointer-events-auto">{map}</div> : null}
+        {map ? <div className="pointer-events-auto md:col-span-2">{map}</div> : null}
       </div>
 
       {/* Rail tools — vertikal di tengah kiri */}

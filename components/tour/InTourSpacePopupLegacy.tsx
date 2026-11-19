@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   CalendarDays,
@@ -18,6 +19,7 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import TenantInterestForm from "./TenantInterestForm";
+import TourEditorLink from "./TourEditorLink";
 import type { SpaceAvailabilityStatus } from "@/lib/space-availability";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +65,7 @@ const PANEL_UI = {
 type CommercialSpace = {
   id: string;
   code: string;
+  assetCode?: string;
   name: string;
   displayName?: string;
   type: string;
@@ -108,6 +111,7 @@ type Props = {
   contactPhone?: string;
   onClose: () => void;
   returnToList?: boolean;
+  editHotspotHref?: string;
 };
 
 export default function InTourSpacePopup({
@@ -115,7 +119,9 @@ export default function InTourSpacePopup({
   stationName,
   onClose,
   returnToList = false,
+  editHotspotHref,
 }: Props) {
+  const { t, content } = useTourLanguage();
   const [view, setView] = useState<"detail" | "form">("detail");
   const [copied, setCopied] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -349,7 +355,7 @@ export default function InTourSpacePopup({
                 <ChevronLeft className={cn("size-4", ui.text)} strokeWidth={2.4} />
               </span>
               <span className="min-w-0">
-                <span className="block">Kembali ke detail</span>
+                <span className="block">{t("Kembali ke detail")}</span>
                 <span className={cn("block truncate text-[11px]", ui.faint)}>{space.code}</span>
               </span>
             </button>
@@ -362,15 +368,16 @@ export default function InTourSpacePopup({
               <span className={cn("inline-flex size-11 shrink-0 items-center justify-center rounded-lg border", ui.chip)}>
                 <ChevronLeft className={cn("size-4", ui.text)} strokeWidth={2.4} />
               </span>
-              Kembali ke Daftar Unit
+              {t("Kembali ke Daftar Unit")}
             </button>
           ) : null}
+          {!isForm && editHotspotHref && <TourEditorLink href={editHotspotHref} label={t("Edit hotspot di CMS")} />}
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
             className={cn("inline-flex size-11 items-center justify-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]", ui.soft, ui.softHover)}
-            aria-label={isForm ? "Tutup formulir" : "Tutup detail unit"}
+            aria-label={isForm ? t("Tutup formulir") : t("Tutup detail unit")}
           >
             <X className="size-4" strokeWidth={2.2} />
           </button>
@@ -418,7 +425,7 @@ export default function InTourSpacePopup({
           <div className={cn("flex shrink-0 flex-col justify-between gap-6 border-b px-5 py-5 sm:px-6 lg:border-r lg:border-b-0 lg:px-10 lg:pt-10 lg:pb-8", ui.hairline)}>
             <div className="@container">
               <p className={cn("text-[11px] font-semibold tracking-[0.16em] uppercase lg:text-xs", ui.muted)}>
-                Ruang Komersial
+                {t("Ruang Komersial")}
               </p>
               <div className="mt-3 flex min-w-0 items-start gap-2.5 lg:mt-5">
                 <h3
@@ -431,7 +438,7 @@ export default function InTourSpacePopup({
                   type="button"
                   onClick={copyCode}
                   className={cn("inline-flex size-9 shrink-0 items-center justify-center rounded-lg transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D] lg:size-10", ui.soft, ui.softHover)}
-                  aria-label={copied ? "Kode disalin" : "Salin kode unit"}
+                  aria-label={copied ? t("Kode disalin") : t("Salin kode unit")}
                   title={copied ? "Disalin" : "Salin kode"}
                 >
                   {copied ? (
@@ -448,7 +455,7 @@ export default function InTourSpacePopup({
               ) : null}
               {occupiedTenant ? (
                 <p className={cn("mt-3 text-sm font-semibold lg:text-base", ui.occupied)}>
-                  Penyewa saat ini: {occupiedTenant}
+                  {t("Penyewa saat ini:")} {occupiedTenant}
                 </p>
               ) : null}
             </div>
@@ -461,7 +468,7 @@ export default function InTourSpacePopup({
               className="hidden h-14 w-full items-center justify-center gap-2.5 rounded-xl bg-[#E31E2D] px-4 text-base font-bold text-white shadow-[0_10px_28px_rgba(227,30,45,0.28)] transition hover:bg-[#c41926] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF6B4A] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none lg:inline-flex"
             >
               <MessageSquare className="size-4" strokeWidth={2.2} />
-              {canApply ? "Ajukan Minat Sewa" : "Ruang belum tersedia"}
+              {canApply ? t("Ajukan Minat Sewa") : t("Ruang belum tersedia")}
             </button>
           </div>
 
@@ -477,10 +484,10 @@ export default function InTourSpacePopup({
                     {row.icon}
                   </span>
                   <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)] items-start gap-2 lg:gap-4">
-                    <p className={cn("pt-2 text-sm lg:text-base", ui.muted)}>{row.label}</p>
+                    <p className={cn("pt-2 text-sm lg:text-base", ui.muted)}>{t(row.label)}</p>
                     <div className="min-w-0 text-right lg:text-left">
                       <p className={cn("text-sm font-semibold break-words lg:text-lg", ui.text)}>
-                        {row.value}
+                        {typeof row.value === "string" ? content(row.value) : row.value}
                       </p>
                       {row.hint ? (
                         <p className={cn("mt-0.5 text-xs leading-snug break-words lg:text-sm", ui.muted)}>
@@ -506,7 +513,7 @@ export default function InTourSpacePopup({
             className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-[#E31E2D] px-4 text-sm font-bold text-white shadow-[0_10px_28px_rgba(227,30,45,0.28)] transition hover:bg-[#c41926] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF6B4A] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
           >
             <MessageSquare className="size-4" strokeWidth={2.2} />
-            {canApply ? "Ajukan Minat Sewa" : "Ruang belum tersedia"}
+            {canApply ? t("Ajukan Minat Sewa") : t("Ruang belum tersedia")}
           </button>
         </div>
         ) : null}

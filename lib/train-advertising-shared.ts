@@ -5,10 +5,10 @@ export const TRAIN_INQUIRY_MODE_LABELS = { MEDIA: "Media iklan", FULL_BRANDING: 
 export const trainInquiryInputSchema = z.object({
   ...advertisingApplicantInputSchema.partial().shape,
   carSlugs: z.array(z.string().trim().min(1).max(100)).min(1, "Pilih minimal satu gerbong.").max(100).refine(slugs => new Set(slugs).size === slugs.length, "Gerbong tidak boleh duplikat.").optional(),
-  requestedTrainsetCount: z.number().int("Jumlah trainset harus bilangan bulat.").min(1, "Jumlah trainset minimal 1.").max(999, "Jumlah trainset maksimal 999.").optional(),
-  campaignStart: z.iso.date().optional(),
-  campaignEnd: z.iso.date().optional(),
-  campaignNeeds: z.string().trim().max(2000).optional(),
+  requestedTrainsetCount: z.number({ error: "Jumlah trainset harus bilangan bulat dari 1 hingga 999." }).int("Jumlah trainset harus bilangan bulat.").min(1, "Jumlah trainset minimal 1.").max(999, "Jumlah trainset maksimal 999.").optional(),
+  campaignStart: z.iso.date("Tanggal kampanye tidak valid.").optional(),
+  campaignEnd: z.iso.date("Tanggal kampanye tidak valid.").optional(),
+  campaignNeeds: z.string().trim().max(2000, "Catatan kampanye maksimal 2.000 karakter.").optional(),
 }).strict().superRefine((value, context) => {
   if (Boolean(value.campaignStart) !== Boolean(value.campaignEnd)) context.addIssue({ code: "custom", path: ["campaignEnd"], message: "Isi tanggal mulai dan selesai kampanye." });
   if (value.campaignStart && value.campaignEnd && value.campaignEnd < value.campaignStart) context.addIssue({ code: "custom", path: ["campaignEnd"], message: "Tanggal selesai harus setelah tanggal mulai." });
@@ -32,8 +32,8 @@ export type PublicTrainInquiry = {
   media: { imageUrl: string | null; description: string | null } | null;
 };
 
-export function trainCampaignPeriod(request: Pick<PublicTrainInquiry, "campaignStart" | "campaignEnd">) {
-  const format = (value: string) => new Date(value).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" });
+export function trainCampaignPeriod(request: Pick<PublicTrainInquiry, "campaignStart" | "campaignEnd">, locale = "id-ID") {
+  const format = (value: string) => new Date(value).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" });
   return request.campaignStart && request.campaignEnd ? `${format(request.campaignStart)} – ${format(request.campaignEnd)}` : "Belum ditentukan";
 }
 

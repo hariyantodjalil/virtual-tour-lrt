@@ -4,7 +4,7 @@ import { trainInquiryInputSchema } from "@/lib/train-advertising-shared";
 import { resolveTrainInquiry, TrainInquiryError } from "@/lib/train-advertising";
 import { createInquiryOnce } from "@/lib/active-inquiry";
 import { NextRequest, NextResponse } from "next/server";
-import { inquiryCreationData } from "@/lib/partner-inquiries";
+import { getWorkflowForNewInquiry, inquiryCreationData } from "@/lib/partner-inquiries";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
@@ -12,6 +12,7 @@ import { requireRole } from "@/lib/auth";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { consumeRateLimit, getClientIdentifier, rateLimitHeaders } from "@/lib/rate-limit";
 import { trainLeadRequirement } from "@/lib/train-rental-spaces";
+import { publishInquiryEvent } from "@/lib/realtime-events";
 
 const leadSchema = z.object({
   spaceId: z.string().trim().min(1).max(128).optional(),
@@ -104,6 +105,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email sudah terdaftar. Silakan masuk untuk melanjutkan pengajuan.", code: "ACCOUNT_EXISTS" }, { status: 409 });
     }
 
+    const workflow = await getWorkflowForNewInquiry();
+    if (!workflow) return NextResponse.json({ error: "Alur pengajuan belum tersedia. Hubungi tim komersial." }, { status: 503 });
+
     let user;
     try {
       user = await prisma.user.create({ data: {
@@ -121,7 +125,7 @@ export async function POST(req: NextRequest) {
       target: commercialSpaceId ? { kind: "space", id: commercialSpaceId }
         : data.trainRentalSpaceId ? { kind: "train", id: data.trainRentalSpaceId } : null,
       data: {
-        ...await inquiryCreationData(user.id),
+        ...inquiryCreationData(user.id, workflow),
         ...(trainRequest ? { trainInquiry: { create: trainRequest.create } } : {}),
         ...(commercialSpaceId ? { spaceId: commercialSpaceId } : {}),
         companyName: data.companyName, contactName: data.contactName, phone: data.phone, email,
@@ -138,8 +142,13 @@ export async function POST(req: NextRequest) {
     if (commercialSpaceId) {
       await prisma.visitEvent.create({ data: {
         spaceId: commercialSpaceId, eventType: "FORM_SUBMIT", sessionId: getClientIdentifier(req),
-      } });
+      } }).catch(error => console.warn("[leads] visit event skipped", error));
     }
+    void publishInquiryEvent({
+      kind: "lead-created",
+      leadId: lead.id,
+      userId: lead.userId,
+    });
     return NextResponse.json(lead, { status: 201, headers: rateLimitHeaders(rateLimit) });
   } catch (error) {
     console.error("[api/leads POST]", error);

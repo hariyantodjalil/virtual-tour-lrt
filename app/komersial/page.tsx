@@ -1,3 +1,4 @@
+import { getTourTranslator } from "@/lib/tour-translated-content";
 import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -141,6 +142,7 @@ async function CommercialSection() {
 }
 
 async function VirtualTourSection() {
+  const t = await getTourTranslator();
   const tourHref = await getDefaultStationTourHref();
 
   return (
@@ -148,17 +150,16 @@ async function VirtualTourSection() {
       <div className="mx-auto flex max-w-5xl flex-col items-center px-5 text-center md:px-10">
         <HomeReveal>
           <h2 id="temukan-lokasi" className="scroll-mt-28 font-display text-3xl font-bold text-white md:text-[36px]">
-            Temukan dan Rasakan Lokasi yang Tepat
+            {t("Temukan dan Rasakan Lokasi yang Tepat")}
           </h2>
           <p className="mx-auto mt-4 max-w-3xl text-base leading-relaxed text-white md:text-[20px] md:tracking-tight">
-            Jelajahi setiap sudut stasiun melalui Virtual Tour 360° untuk menemukan fasilitas, area
-            komersial, media promosi, dan berbagai peluang yang tersedia di LRT Jabodebek.
+            {t("Jelajahi setiap sudut stasiun melalui Virtual Tour 360° untuk menemukan fasilitas, area komersial, media promosi, dan berbagai peluang yang tersedia di LRT Jabodebek.")}
           </p>
           <Link
             href={tourHref}
             className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-white underline underline-offset-4"
           >
-            Mulai Virtual Tour — Pilih Stasiun
+            {t("Mulai Virtual Tour — Pilih Stasiun")}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/brand/landing/icons/click.svg"
@@ -177,7 +178,7 @@ async function VirtualTourSection() {
           >
             <Image
               src="/brand/landing/tour-360.jpg"
-              alt="Preview virtual tour 360 stasiun LRT"
+              alt={t("Preview virtual tour 360 stasiun LRT")}
               fill
               sizes="(max-width: 1024px) 100vw, 1017px"
               className="object-cover transition duration-500 group-hover:scale-[1.02]"
@@ -208,7 +209,8 @@ function CommercialSkeleton() {
   );
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const t = await getTourTranslator();
   return (
     <HomeShell>
       <VirtualTourNavbar />
@@ -236,14 +238,13 @@ export default function HomePage() {
               VIRTUAL TOUR 360°
             </p>
             <h1 className="mt-5 font-display text-2xl font-bold leading-tight text-white sm:text-3xl md:text-[42px] md:leading-[1.15]">
-              Temukan Ruang Komersial di Area{" "}
+              {t("Temukan Ruang Komersial di Area")}{" "}
               <span className="text-[#E31E2D]">LRT Jabodebek</span>
             </h1>
           </HomeReveal>
           <HomeReveal delayMs={100}>
             <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-white/90 md:text-base">
-              Jelajahi ruang komersial, media iklan, dan area usaha di stasiun LRT Jabodebek melalui
-              Virtual Tour 360°.
+              {t("Jelajahi ruang komersial, media iklan, dan area usaha di stasiun LRT Jabodebek melalui Virtual Tour 360°.")}
             </p>
           </HomeReveal>
           <HomeReveal delayMs={180}>
@@ -252,7 +253,7 @@ export default function HomePage() {
                 href="#temukan-lokasi"
                 className="inline-flex h-12 min-w-[180px] items-center justify-center gap-2 rounded-full bg-[#E31E2D] px-6 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(227,30,45,0.45)] transition hover:brightness-110"
               >
-                Jelajahi Sekarang
+                {t("Jelajahi Sekarang")}
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </a>
               <a
@@ -260,7 +261,7 @@ export default function HomePage() {
                 className="inline-flex h-12 min-w-[180px] items-center justify-center gap-2 rounded-full border border-white/80 bg-transparent px-6 text-sm font-semibold text-white transition hover:bg-white/10"
               >
                 <Play className="h-4 w-4 fill-white" aria-hidden />
-                Lihat Tutorial
+                {t("Lihat Tutorial")}
               </a>
             </div>
           </HomeReveal>
@@ -279,20 +280,17 @@ export default function HomePage() {
                 </p>
               </div>
               <h2 className="mt-5 font-display text-2xl font-bold text-black md:text-[32px] md:leading-snug">
-                Menghubungkan Perjalanan, Membuka Peluang
+                {t("Menghubungkan Perjalanan, Membuka Peluang")}
               </h2>
               <p className="mt-5 text-base leading-relaxed text-black/85 md:text-[20px] md:tracking-tight">
-                LRT Jabodebek menghubungkan berbagai kawasan strategis di Jabodetabek melalui layanan
-                transportasi yang modern dan terintegrasi. Selain mendukung mobilitas masyarakat, setiap
-                stasiun juga menghadirkan fasilitas serta area komersial yang dapat dimanfaatkan oleh
-                masyarakat maupun mitra usaha.
+                {t("LRT Jabodebek menghubungkan berbagai kawasan strategis di Jabodetabek melalui layanan transportasi yang modern dan terintegrasi. Selain mendukung mobilitas masyarakat, setiap stasiun juga menghadirkan fasilitas serta area komersial yang dapat dimanfaatkan oleh masyarakat maupun mitra usaha.")}
               </p>
             </HomeReveal>
             <HomeReveal delayMs={120}>
               <div className="relative aspect-[595/422] overflow-hidden rounded-none shadow-md lg:rounded-l-none">
                 <Image
                   src="/brand/landing/intro-train.jpg"
-                  alt="Kereta LRT Jabodebek di stasiun"
+                  alt={t("Kereta LRT Jabodebek di stasiun")}
                   fill
                   sizes="(max-width: 1024px) 100vw, 50vw"
                   className="object-cover"
@@ -304,12 +302,11 @@ export default function HomePage() {
           <div className="mt-20">
             <HomeReveal>
               <h2 className="text-center font-display text-2xl font-bold leading-tight text-[#1a1f2b] md:text-[36px]">
-                Kenapa Harus Memilih
+                {t("Kenapa Harus Memilih")}
                 <span className="mt-1 block text-[#d32f2f] md:mt-2">LRT JABODEBEK?</span>
               </h2>
               <p className="mx-auto mt-4 max-w-2xl text-center text-sm leading-relaxed text-black/55 md:text-base">
-                Terintegrasi dengan transportasi lainnya untuk perjalanan yang lebih mudah, cepat, dan
-                nyaman.
+                {t("Terintegrasi dengan transportasi lainnya untuk perjalanan yang lebih mudah, cepat, dan nyaman.")}
               </p>
             </HomeReveal>
 
@@ -323,7 +320,7 @@ export default function HomePage() {
                           <Image src={item.icon} alt="" fill sizes="64px" className="object-contain" />
                         </div>
                         <p className="px-1 text-center text-[11px] font-bold leading-tight text-[#1a1f2b] sm:text-sm">
-                          {item.label}
+                          {t(item.label)}
                         </p>
                       </div>
                       {i < TRANSPORT.length - 1 && (
@@ -355,9 +352,9 @@ export default function HomePage() {
                         <Image src={card.icon} alt="" fill sizes="56px" className="object-contain" />
                       </div>
                       <div className="min-w-0 pr-3">
-                        <h3 className="text-sm font-bold text-[#1a1f2b] sm:text-base">{card.title}</h3>
+                        <h3 className="text-sm font-bold text-[#1a1f2b] sm:text-base">{t(card.title)}</h3>
                         <p className="mt-1.5 text-xs leading-relaxed text-black/55 sm:text-[13px]">
-                          {card.body}
+                          {t(card.body)}
                         </p>
                       </div>
                     </div>
@@ -368,7 +365,7 @@ export default function HomePage() {
               <HomeReveal delayMs={120} className="relative min-h-[240px] overflow-hidden rounded-2xl lg:min-h-[400px]">
                 <Image
                   src="/brand/landing/hero-homepage.jpg"
-                  alt="Kereta LRT Jabodebek di jalur elevated"
+                  alt={t("Kereta LRT Jabodebek di jalur elevated")}
                   fill
                   sizes="(max-width: 1024px) 100vw, 55vw"
                   className="object-cover object-center"
@@ -392,7 +389,7 @@ export default function HomePage() {
               <div className="relative mx-auto h-[260px] w-[200px] lg:mx-0 lg:h-[320px] lg:w-[240px] xl:h-[339px] xl:w-[284px]">
                 <Image
                   src="/brand/landing/mascot-reno-steps.png"
-                  alt="Reno, maskot LRT Jabodebek"
+                  alt={t("Reno, maskot LRT Jabodebek")}
                   fill
                   sizes="284px"
                   className="object-contain object-bottom"
@@ -405,11 +402,10 @@ export default function HomePage() {
               <HomeReveal>
                 <div className="text-center lg:text-left">
                   <h2 className="font-display text-2xl font-bold text-black md:text-[36px] md:leading-tight">
-                    Langkah Langkah Untuk Memulai Bisnis Anda
+                    {t("Langkah Langkah Untuk Memulai Bisnis Anda")}
                   </h2>
                   <p className="mx-auto mt-3 max-w-[788px] text-sm text-black md:text-[15px] lg:mx-auto lg:text-center">
-                    Ikuti langkah-langkah berikut untuk menjelajahi area komersial dan mengajukan
-                    penyewaan dengan mudah melalui platform LRT Jabodebek.
+                    {t("Ikuti langkah-langkah berikut untuk menjelajahi area komersial dan mengajukan penyewaan dengan mudah melalui platform LRT Jabodebek.")}
                   </p>
                 </div>
               </HomeReveal>
@@ -441,10 +437,10 @@ export default function HomePage() {
 
                       <div className="mt-2 flex w-full flex-1 flex-col items-center gap-2 px-1">
                         <h3 className="min-h-[2.5em] text-[15px] leading-normal font-bold text-black">
-                          {step.title}
+                          {t(step.title)}
                         </h3>
                         <div className="h-px w-[117px] shrink-0 bg-[#d32f2f]" aria-hidden />
-                        <p className="text-[11px] leading-normal text-black">{step.body}</p>
+                        <p className="text-[11px] leading-normal text-black">{t(step.body)}</p>
                       </div>
                     </div>
                   </HomeReveal>
@@ -499,7 +495,7 @@ export default function HomePage() {
               </span>
             </div>
             <p className="mt-4 text-xs leading-relaxed text-black md:text-[12px]">
-              KAI Divisi LRT Jabodebek
+              {t("KAI Divisi LRT Jabodebek")}
               <br />
               Jatimulya, Bekasi Timur, Bekasi Regency, West Java
             </p>
@@ -516,11 +512,10 @@ export default function HomePage() {
 
           <div className="text-center md:px-4">
             <p className="font-display text-lg font-bold text-black md:text-xl">
-              Transportasi Cerdas, Mobilitas Tanpa Batas
+              {t("Transportasi Cerdas, Mobilitas Tanpa Batas")}
             </p>
             <p className="mt-3 text-sm leading-relaxed text-black/70">
-              Jelajahi stasiun LRT Jabodebek melalui Virtual Tour 360° untuk melihat fasilitas, area
-              komersial, dan media promosi secara interaktif dalam satu platform.
+              {t("Jelajahi stasiun LRT Jabodebek melalui Virtual Tour 360° untuk melihat fasilitas, area komersial, dan media promosi secara interaktif dalam satu platform.")}
             </p>
             <SocialIconLinks />
           </div>
@@ -530,7 +525,7 @@ export default function HomePage() {
               {FOOTER_LINKS.map((link) => (
                 <li key={link.label}>
                   <a href={link.href} className="transition hover:text-[#d32f2f]">
-                    {link.label}
+                    {t(link.label)}
                   </a>
                 </li>
               ))}

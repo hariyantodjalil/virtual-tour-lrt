@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { createContext, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type PointerEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
@@ -28,6 +29,7 @@ type Props = {
 };
 
 export default function MobileTourSheet({ title, size, onClose, children, footer, initialExpanded = false, onExpandedChange, tone = "operate" }: Props) {
+  const { t } = useTourLanguage();
   const voidChrome = tone === "void";
   const [expanded, setExpanded] = useState(initialExpanded);
   const [closing, setClosing] = useState(false);
@@ -135,10 +137,10 @@ export default function MobileTourSheet({ title, size, onClose, children, footer
         <header onPointerDown={start} onPointerMove={move} onPointerUp={event => end(event)} onPointerCancel={event => end(event, true)} onLostPointerCapture={event => { if (event.target === event.currentTarget) end(event, true); }}
           onClickCapture={event => { if (event.detail > 0 && event.target instanceof Element && event.target.closest("[data-sheet-handle]") && performance.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); } }}
           className={`shrink-0 touch-none border-b px-4 select-none ${voidChrome ? "tour-sheet-void__header" : "border-slate-200 bg-[#F3F8F5]"}`}>
-          <button type="button" data-sheet-handle aria-label={expanded ? "Ringkas panel" : "Perbesar panel"} aria-expanded={expanded} onClick={() => resize(!expanded)} className="mx-auto flex h-7 w-16 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-signal"><span aria-hidden="true" className={`h-1 w-10 rounded-full ${voidChrome ? "tour-sheet-void__handle" : "bg-[#BFCFC5]"}`} /></button>
+          <button type="button" data-sheet-handle aria-label={expanded ? t("Ringkas panel") : t("Perbesar panel")} aria-expanded={expanded} onClick={() => resize(!expanded)} className="mx-auto flex h-7 w-16 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-signal"><span aria-hidden="true" className={`h-1 w-10 rounded-full ${voidChrome ? "tour-sheet-void__handle" : "bg-[#BFCFC5]"}`} /></button>
           <div className="flex min-h-14 items-center gap-3 pb-2">
             <Dialog.Title className="min-w-0 flex-1 text-base font-semibold">{title}</Dialog.Title>
-            <Dialog.Close ref={closeButton} aria-label={`Tutup ${title.toLocaleLowerCase("id-ID")}`} className={`flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-signal ${voidChrome ? "tour-sheet-void__close" : "text-slate-600 hover:bg-slate-200/60"}`}><X className="size-5" /></Dialog.Close>
+            <Dialog.Close ref={closeButton} aria-label={t("Tutup {title}", { title })} className={`flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-signal ${voidChrome ? "tour-sheet-void__close" : "text-slate-600 hover:bg-slate-200/60"}`}><X className="size-5" /></Dialog.Close>
           </div>
         </header>
         <CloseSheetContext.Provider value={close}>

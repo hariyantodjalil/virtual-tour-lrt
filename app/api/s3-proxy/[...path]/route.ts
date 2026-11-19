@@ -2,18 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { requireAuth } from "@/lib/auth";
+import { S3_PRIVATE_BLOCKED_PREFIXES } from "@/lib/s3";
 
-const s3Client = new S3Client({
-  endpoint: process.env.S3_ENDPOINT,
-  region: process.env.S3_REGION || "us-east-1",
-  credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
-  },
-  forcePathStyle: true,
-});
+function getS3Client() {
+  return new S3Client({
+    endpoint: process.env.S3_ENDPOINT,
+    region: process.env.S3_REGION || "us-east-1",
+    credentials: {
+      accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+    },
+    forcePathStyle: true,
+  });
+}
 
-const BUCKET_NAME = process.env.S3_BUCKET || "virtual-tour-lrt";
+function getBucketName() {
+  return process.env.S3_BUCKET || "virtual-tour-lrt";
+}
 
 const CONTENT_TYPE_MAP: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -53,6 +58,7 @@ const PUBLIC_PREFIXES = [
   "virtual-tour/panoramas/",
   "virtual-tour/panorama-tiles/",
   "virtual-tour/thumbnails/",
+  "virtual-tour/floorplans/",
   "virtual-tour/ad-creatives/",
   "stations/covers/",
   "spaces/photos/",
@@ -65,6 +71,10 @@ const PUBLIC_PREFIXES = [
 
 function isPublicKey(key: string): boolean {
   return PUBLIC_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+function isPrivateBlockedKey(key: string): boolean {
+  return S3_PRIVATE_BLOCKED_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
 function toWebStream(body: {
@@ -87,6 +97,11 @@ export async function GET(
       return new NextResponse("Resource not found", { status: 404 });
     }
 
+    // Bukti dokumen pengajuan hanya lewat /api/inquiries/.../documents/...
+    if (isPrivateBlockedKey(s3Key)) {
+      return new NextResponse("Resource not found", { status: 404 });
+    }
+
     const isPublic = isPublicKey(s3Key);
     if (isPublic && !shouldServeDirectly(s3Key)) {
       return new NextResponse("Resource not found", { status: 404 });
@@ -100,8 +115,11 @@ export async function GET(
 
     const contentType = getContentType(s3Key);
 
+    const bucket = getBucketName();
+    const s3Client = getS3Client();
+
     if (shouldServeDirectly(s3Key) || s3Key.endsWith(".json")) {
-      const getObjectCommand = new GetObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key });
+      const getObjectCommand = new GetObjectCommand({ Bucket: bucket, Key: s3Key });
       const s3Response = await s3Client.send(getObjectCommand);
       if (!s3Response.Body) {
         return new NextResponse("Resource not found", { status: 404 });
@@ -130,7 +148,7 @@ export async function GET(
       return new NextResponse(stream, { headers });
     }
 
-    const command = new GetObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key });
+    const command = new GetObjectCommand({ Bucket: bucket, Key: s3Key });
     const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
     return NextResponse.redirect(signedUrl);
   } catch (error) {

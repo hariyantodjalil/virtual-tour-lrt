@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
@@ -33,6 +34,7 @@ export default function StationPickerModal({
   onSelect,
   onClose,
 }: Props) {
+  const { t } = useTourLanguage();
   const scrollRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -58,7 +60,7 @@ export default function StationPickerModal({
         type="button"
         className="absolute inset-0 bg-black/70"
         onClick={onClose}
-        aria-label="Tutup pilih stasiun"
+        aria-label={t("Tutup pilih stasiun")}
       />
 
       <div
@@ -76,20 +78,20 @@ export default function StationPickerModal({
           style={{ height: HEADER_H }}
         >
           <h2 id="pilih-stasiun-title" className="font-display text-lg font-bold md:text-xl">
-            Pilih Stasiun
+            {t("Pilih Stasiun")}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded-full p-1.5 text-white transition hover:bg-white/10"
-            aria-label="Tutup"
+            aria-label={t("Tutup")}
           >
             <X className="size-6" strokeWidth={2.5} />
           </button>
         </div>
 
         <div className="shrink-0 px-4 pt-4 sm:px-5">
-          <label htmlFor="station-picker-search" className="sr-only">Cari stasiun</label>
+          <label htmlFor="station-picker-search" className="sr-only">{t("Cari stasiun")}</label>
           <div className="flex items-center rounded-xl border border-slate-300 bg-white px-3 focus-within:border-[#7a1424] focus-within:ring-2 focus-within:ring-[#7a1424]/20">
             <Search aria-hidden="true" className="size-5 shrink-0 text-slate-500" />
             <input
@@ -97,14 +99,14 @@ export default function StationPickerModal({
               id="station-picker-search"
               type="search"
               autoComplete="off"
-              placeholder="Cari stasiun…"
+              placeholder={t("Cari stasiun…")}
               value={query}
               onChange={event => updateSearch(event.target.value)}
               className="h-11 min-w-0 flex-1 bg-transparent px-3 text-base text-slate-900 outline-none placeholder:text-slate-500 [&::-webkit-search-cancel-button]:appearance-none"
             />
-            {query && <button type="button" aria-label="Hapus pencarian" onClick={() => { updateSearch(""); searchRef.current?.focus(); }} className="flex size-11 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-[#7a1424]"><X aria-hidden="true" className="size-4" /></button>}
+            {query && <button type="button" aria-label={t("Hapus pencarian")} onClick={() => { updateSearch(""); searchRef.current?.focus(); }} className="flex size-11 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-[#7a1424]"><X aria-hidden="true" className="size-4" /></button>}
           </div>
-          <p role="status" aria-atomic="true" className="sr-only">{filteredStations.length} stasiun ditemukan</p>
+          <p role="status" aria-atomic="true" className="sr-only">{filteredStations.length} {t("stasiun ditemukan")}</p>
         </div>
 
         <div
@@ -130,11 +132,11 @@ export default function StationPickerModal({
 
           {stations.length === 0 && (
             <p className="py-10 text-center text-sm text-[#667085]">
-              Belum ada stasiun dengan virtual tour.
+              {t("Belum ada stasiun dengan virtual tour.")}
             </p>
           )}
           {stations.length > 0 && filteredStations.length === 0 && (
-            <p className="py-10 text-center text-sm text-slate-600">Stasiun tidak ditemukan.</p>
+            <p className="py-10 text-center text-sm text-slate-600">{t("Stasiun tidak ditemukan.")}</p>
           )}
         </div>
       </div>

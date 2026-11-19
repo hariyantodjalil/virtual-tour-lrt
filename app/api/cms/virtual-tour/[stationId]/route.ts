@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { lockTourSceneLinks, validSceneHotspots } from "@/lib/tour-scene-links";
 import { sortScenesByTourOrder } from "@/lib/virtual-tour-structure";
-import { Prisma } from "@prisma/client";
 import { parseJsonRequest } from "@/lib/api-validation";
 import { sceneCreateSchema, sceneOrderSchema } from "@/lib/api-schemas";
 
@@ -83,20 +83,24 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
   }
 
-  const scene = await prisma.virtualTourScene.create({
-    data: {
-      stationId,
-      sceneId: body.sceneId,
-      title: body.title,
-      level: levelSlug,
-      levelId: levelId ?? null,
-      areaId: areaId ?? null,
-      panoramaUrl: body.panoramaUrl || "",
-      order: body.order ?? 0,
-      hotspots: (body.hotspots ?? []) as Prisma.InputJsonValue,
-      isActive: body.isActive ?? true,
-    },
-    select: sceneSelect,
+  const scene = await prisma.$transaction(async tx => {
+    await lockTourSceneLinks(tx, { stationId });
+    const hotspots = body.hotspots?.length ? await validSceneHotspots(tx, { stationId }, body.hotspots, body.sceneId) : [];
+    return tx.virtualTourScene.create({
+      data: {
+        stationId,
+        sceneId: body.sceneId,
+        title: body.title,
+        level: levelSlug,
+        levelId: levelId ?? null,
+        areaId: areaId ?? null,
+        panoramaUrl: body.panoramaUrl || "",
+        order: body.order ?? 0,
+        hotspots,
+        isActive: body.isActive ?? true,
+      },
+      select: sceneSelect,
+    });
   });
 
   return NextResponse.json(scene, { status: 201 });

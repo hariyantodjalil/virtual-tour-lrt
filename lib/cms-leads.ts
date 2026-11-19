@@ -4,7 +4,50 @@ import type { LeadItem } from "./cms-leads-shared";
 
 export const cmsLeadInclude = {
   trainInquiry: { select: cmsTrainInquirySelect },
-  space: { include: { station: { select: { name: true } } } },
+  workflowVersion: {
+    select: {
+      id: true,
+      version: true,
+      title: true,
+      status: true,
+      steps: {
+        orderBy: { stepOrder: "asc" as const },
+        select: {
+          id: true,
+          stepOrder: true,
+          leadStatus: true,
+          stepType: true,
+          documentNumberLabel: true,
+          slaHours: true,
+          mediaRequirement: true,
+          requiresMedia: true,
+          spaceEffect: true,
+          title: true,
+          description: true,
+          publicMessage: true,
+          showInSummary: true,
+        },
+      },
+    },
+  },
+  space: {
+    include: {
+      station: {
+        select: { name: true, code: true, slug: true, line: true, imageUrl: true },
+      },
+    },
+  },
+  stepLogs: {
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      stepOrder: true,
+      status: true,
+      action: true,
+      notes: true,
+      createdAt: true,
+    },
+  },
 } satisfies Prisma.TenantLeadInclude;
 
 type CmsLeadRow = Prisma.TenantLeadGetPayload<{ include: typeof cmsLeadInclude }>;
@@ -36,6 +79,72 @@ export function toCmsLeadItem(lead: CmsLeadRow): LeadItem {
     baNegotiationNo: lead.baNegotiationNo,
     updatedAt: lead.updatedAt.toISOString(),
     createdAt: lead.createdAt.toISOString(),
-    space: lead.space ? { id: lead.space.id, code: lead.space.code, name: lead.space.name, status: lead.space.status, station: { name: lead.space.station.name } } : null,
+    currentStepOrder: lead.currentStepOrder,
+    workflowVersion: lead.workflowVersion
+      ? {
+          id: lead.workflowVersion.id,
+          version: lead.workflowVersion.version,
+          title: lead.workflowVersion.title,
+          status: lead.workflowVersion.status,
+          stepCount: lead.workflowVersion.steps.length,
+          steps: lead.workflowVersion.steps.map((step) => ({
+            id: step.id,
+            stepOrder: step.stepOrder,
+            leadStatus: step.leadStatus,
+            stepType: step.stepType as
+              | "STANDARD"
+              | "DOCUMENT_ISSUANCE"
+              | "SITE_VISIT",
+            documentNumberLabel: step.documentNumberLabel,
+            slaHours: step.slaHours,
+            mediaRequirement: step.mediaRequirement as
+              | "NONE"
+              | "OPTIONAL"
+              | "REQUIRED",
+            requiresMedia: step.requiresMedia,
+            spaceEffect: step.spaceEffect as
+              | "NONE"
+              | "RESERVE_SPACE"
+              | "FIT_OUT_SPACE"
+              | "ACTIVATE_TENANT",
+            title: step.title,
+            description: step.description,
+            publicMessage: step.publicMessage,
+            showInSummary: step.showInSummary,
+          })),
+        }
+      : null,
+    space: lead.space
+      ? {
+          id: lead.space.id,
+          code: lead.space.code,
+          name: lead.space.name,
+          status: lead.space.status,
+          type: lead.space.type,
+          area: lead.space.area,
+          floor: lead.space.floor,
+          location: lead.space.location,
+          nearestExit: lead.space.nearestExit,
+          powerSupply: lead.space.powerSupply,
+          waterAccess: lead.space.waterAccess,
+          airConditioning: lead.space.airConditioning,
+          panoramaUrl: lead.space.panoramaUrl,
+          station: {
+            name: lead.space.station.name,
+            code: lead.space.station.code,
+            slug: lead.space.station.slug,
+            line: lead.space.station.line,
+            imageUrl: lead.space.station.imageUrl,
+          },
+        }
+      : null,
+    stepLogs: lead.stepLogs.map((log) => ({
+      id: log.id,
+      stepOrder: log.stepOrder,
+      status: log.status,
+      action: log.action,
+      notes: log.notes,
+      createdAt: log.createdAt.toISOString(),
+    })),
   };
 }

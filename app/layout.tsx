@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import PublicContactFab from "@/components/PublicContactFab";
 import { CommercialProfileProvider } from "@/components/commercial/CommercialProfileProvider";
+import { AppToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
 const poppins = localFont({
@@ -31,10 +32,12 @@ export default function RootLayout({
   return (
     <html lang="id" className={`${poppins.variable} h-full scroll-smooth antialiased`}>
       <body className="flex min-h-full flex-col font-body">
-        <CommercialProfileProvider>
-          {children}
-          <PublicContactFab />
-        </CommercialProfileProvider>
+        <AppToastProvider>
+          <CommercialProfileProvider>
+            {children}
+            <PublicContactFab />
+          </CommercialProfileProvider>
+        </AppToastProvider>
       </body>
     </html>
   );

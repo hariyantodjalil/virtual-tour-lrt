@@ -43,6 +43,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
         title: parsed.data.title,
         ...(parsed.data.inquiryMode ? { inquiryMode: parsed.data.inquiryMode } : {}),
         description: parsed.data.description ?? null,
+        ...(parsed.data.specifications ? { specifications: parsed.data.specifications } : {}),
         imageUrl: parsed.data.imageUrl ?? null,
         objectPosition: parsed.data.objectPosition ?? "50% 50%",
         order: parsed.data.order ?? existing.order,

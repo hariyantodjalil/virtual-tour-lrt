@@ -5,9 +5,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatRupiah(amount: number | null | undefined): string {
+export function formatRupiah(amount: number | null | undefined, locale = "id-ID"): string {
   if (amount == null) return "—";
-  return new Intl.NumberFormat("id-ID", {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "IDR",
     minimumFractionDigits: 0,

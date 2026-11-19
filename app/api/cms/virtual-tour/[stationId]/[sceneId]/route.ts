@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { deleteSceneAndLinks, lockTourSceneLinks, validSceneHotspots } from "@/lib/tour-scene-links";
 import { generateS3Key, uploadToS3 } from "@/lib/s3";
 import { uploadAdaptivePanoramaTiles } from "@/lib/panorama-tile-upload";import { withoutHdPanoramaProfiles } from "@/lib/panorama-profile";
 
@@ -68,7 +69,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (body.title !== undefined) updateData.title = body.title;
   if (body.level !== undefined) updateData.level = body.level;
   if (body.order !== undefined) updateData.order = body.order;
-  if (body.hotspots !== undefined) updateData.hotspots = body.hotspots as Prisma.InputJsonValue;
   if (body.spatialEntities !== undefined) {
     const parsedSpatial = spatialEntitiesSchema.safeParse(body.spatialEntities);
     if (!parsedSpatial.success) {
@@ -143,6 +143,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
   // spatialEntities handled above with strict Zod
 
   const scene = await prisma.$transaction(async (tx) => {
+    if (body.hotspots !== undefined) {
+      await lockTourSceneLinks(tx, { stationId });
+      updateData.hotspots = await validSceneHotspots(tx, { stationId }, body.hotspots);
+    }
     const updated = await tx.virtualTourScene.updateMany({
       where: {
         stationId, sceneId,
@@ -166,9 +170,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const { stationId, sceneId } = await params;
-  await prisma.virtualTourScene.delete({
-    where: { stationId_sceneId: { stationId, sceneId } },
-  });
+  if (!(await deleteSceneAndLinks({ stationId }, sceneId))) {
+    return NextResponse.json({ error: "Scene tidak ditemukan" }, { status: 404 });
+  }
   return NextResponse.json({ message: "Scene dihapus" });
 }
 

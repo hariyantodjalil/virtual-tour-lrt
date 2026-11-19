@@ -9,6 +9,7 @@ import {
   Hexagon,
   Info,
   Loader2,
+  Map,
   Megaphone,
   MousePointer,
   Network,
@@ -43,6 +44,8 @@ type Props = {
   onUndo: () => void;
   onRedo: () => void;
   onOpenConnectionMap: () => void;
+  onOpenMinimap?: () => void;
+  onOpenFloorplan?: () => void;
   onTogglePreview: () => void;
   onReset: () => void;
   onSave: () => void;
@@ -74,6 +77,8 @@ export function EditorToolbar({
   onUndo,
   onRedo,
   onOpenConnectionMap,
+  onOpenMinimap,
+  onOpenFloorplan,
   onTogglePreview,
   onReset,
   onSave,
@@ -108,6 +113,18 @@ export function EditorToolbar({
           </span>
         ) : (
           <span className="text-xs text-[var(--work-muted)]">Tersimpan</span>
+        )}
+        {onOpenFloorplan && (
+          <Button type="button" size="sm" variant="outline" onClick={onOpenFloorplan} disabled={saving}
+            title="Kelola denah 2D, upload SVG/webp, dan pin unit komersial">
+            <Store className="mr-1.5 size-3.5" /> Denah
+          </Button>
+        )}
+        {onOpenMinimap && (
+          <Button type="button" size="sm" variant="outline" onClick={onOpenMinimap} disabled={saving}
+            title="Arahkan kamera ke titik acuan sebelum mengatur minimap">
+            <Map className="mr-1.5 size-3.5" /> Minimap
+          </Button>
         )}
         <button
           type="button"

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useCallback, useEffect, useRef, useState, type ComponentProps, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import Image from "next/image";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -20,6 +21,7 @@ import {
   Zap,
 } from "lucide-react";
 import type InTourSpacePopupLegacy from "./InTourSpacePopupLegacy";
+import TourEditorLink from "./TourEditorLink";
 import SpaceInquiryForm, { type SpaceInquiryStage } from "./SpaceInquiryForm";
 import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 import { SPACE_STATUS_LABELS } from "@/lib/commercial-pipeline";
@@ -68,7 +70,9 @@ export default function SpaceInquiryModal({
   onClose,
   onExplore = onClose,
   returnToList = false,
+  editHotspotHref,
 }: SpaceInquiryModalProps) {
+  const { t, content, locale } = useTourLanguage();
   const profile = useCommercialProfile();
   const phone = contactPhone || profile.whatsappNumber;
   const [copied, setCopied] = useState(false);
@@ -100,14 +104,14 @@ export default function SpaceInquiryModal({
     ? ((space as { preferredUses?: string[] }).preferredUses ?? []).map((item) => item.trim()).filter(Boolean)
     : [];
   const breadcrumb = [stationName, space.floor, space.location]
-    .map((part) => part?.trim())
+    .map((part) => part?.trim() ? content(part.trim()) : "")
     .filter(Boolean)
     .join(" | ");
   const lokasiValue = [stationName, space.floor || space.location]
-    .map((part) => part?.trim())
+    .map((part) => part?.trim() ? content(part.trim()) : "")
     .filter(Boolean)
     .join(" — ") || "—";
-  const areaLabel = `${Number(space.area).toLocaleString("id-ID", { maximumFractionDigits: 2 })} m²`;
+  const areaLabel = `${Number(space.area).toLocaleString(locale, { maximumFractionDigits: 2 })} m²`;
   const powerLabel = space.powerSupply?.trim() || "—";
   const statusLabel =
     SPACE_STATUS_LABELS[space.status as keyof typeof SPACE_STATUS_LABELS] ?? space.status;
@@ -118,7 +122,7 @@ export default function SpaceInquiryModal({
     : null;
   const waUrl = getWhatsAppUrl(
     phone,
-    `Halo, saya tertarik dengan unit komersial ${space.code} (${space.name}) di Stasiun ${stationName}. Mohon informasi lebih lanjut.`
+    t("Halo, saya tertarik dengan unit komersial {code} ({name}) di Stasiun {station}. Mohon informasi lebih lanjut.", { code: space.code, name: content(space.name), station: stationName })
   );
   const statusTone =
     space.status === "TERSEDIA"
@@ -308,7 +312,7 @@ export default function SpaceInquiryModal({
 
   async function copyCode() {
     try {
-      await navigator.clipboard.writeText(space.code);
+      await navigator.clipboard.writeText(space.assetCode ?? space.code);
       setCopied(true);
       if (copyTimeout.current) clearTimeout(copyTimeout.current);
       copyTimeout.current = setTimeout(() => setCopied(false), 1600);
@@ -324,16 +328,16 @@ export default function SpaceInquiryModal({
 
   const infoPanel = (
     <div>
-      <h3 className="text-base font-semibold text-slate-900">Informasi Ruang Komersial</h3>
+      <h3 className="text-base font-semibold text-slate-900">{t("Informasi Ruang Komersial")}</h3>
       <div className="mt-4 overflow-hidden rounded-xl border border-[#F3C5CB] bg-[#FFF5F6] px-4 py-3">
-        <p className="text-xs font-medium text-slate-500">Total Luas</p>
+        <p className="text-xs font-medium text-slate-500">{t("Total Luas")}</p>
         <p className="mt-1 text-2xl font-semibold tracking-tight text-[#C41926]">{areaLabel}</p>
       </div>
       <div className="mt-1">
-        <InfoRow label="Lokasi" icon={<MapPin className="size-4" />}>
-          <span className="break-words">{lokasiValue}</span>
+        <InfoRow label={t("Lokasi")} icon={<MapPin className="size-4" />}>
+          <span className="break-words">{content(lokasiValue)}</span>
         </InfoRow>
-        <InfoRow label="Preferred Use" icon={<Store className="size-4" />}>
+        <InfoRow label={t("Peruntukan usaha")} icon={<Store className="size-4" />}>
           {preferredUses.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {preferredUses.map((use) => (
@@ -341,7 +345,7 @@ export default function SpaceInquiryModal({
                   key={use}
                   className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700"
                 >
-                  {use}
+                  {content(use)}
                 </span>
               ))}
             </div>
@@ -349,12 +353,12 @@ export default function SpaceInquiryModal({
             <span className="font-normal text-slate-400">—</span>
           )}
         </InfoRow>
-        <InfoRow label="Pasokan Listrik" icon={<Zap className="size-4" />}>
+        <InfoRow label={t("Pasokan Listrik")} icon={<Zap className="size-4" />}>
           <span className={cn("break-words", powerLabel === "—" && "font-normal text-slate-400")}>
-            {powerLabel}
+            {content(powerLabel)}
           </span>
         </InfoRow>
-        <InfoRow label="Ketersediaan" icon={<CalendarDays className="size-4" />}>
+        <InfoRow label={t("Ketersediaan")} icon={<CalendarDays className="size-4" />}>
           <span
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
@@ -364,9 +368,9 @@ export default function SpaceInquiryModal({
             {space.status === "TERSEDIA" ? (
               <CheckCircle2 className="size-3.5" aria-hidden />
             ) : null}
-            {statusLabel}
+            {t(statusLabel)}
           </span>
-          {tenant ? <p className="mt-2 text-xs font-normal text-slate-600">Penyewa: {tenant}</p> : null}
+          {tenant ? <p className="mt-2 text-xs font-normal text-slate-600">{t("Penyewa:")} {tenant}</p> : null}
         </InfoRow>
       </div>
     </div>
@@ -376,12 +380,12 @@ export default function SpaceInquiryModal({
     <div className="min-w-0">
       <div className="flex items-start gap-2">
         <h2 className="min-w-0 flex-1 text-2xl leading-tight font-semibold tracking-tight text-slate-900 [overflow-wrap:anywhere] lg:text-[1.75rem]">
-          {space.code}
+          {space.assetCode ?? space.code}
         </h2>
         <button
           type="button"
           onClick={() => void copyCode()}
-          aria-label={copied ? "Kode disalin" : "Salin kode unit"}
+          aria-label={copied ? t("Kode disalin") : t("Salin kode unit")}
           className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800"
         >
           {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
@@ -392,7 +396,7 @@ export default function SpaceInquiryModal({
         {imageSrc ? (
           <Image
             src={imageSrc}
-            alt={space.name || space.code}
+            alt={content(space.name || space.code)}
             fill
             className="object-cover"
             sizes="(max-width: 1023px) 100vw, 520px"
@@ -411,7 +415,7 @@ export default function SpaceInquiryModal({
           <span aria-hidden className="text-[11px] font-bold tracking-wide text-[#C41926]">
             360°
           </span>
-          Lihat di Virtual Tour
+          {t("Lihat di Virtual Tour")}
           <ExternalLink className="size-3.5 text-slate-500" aria-hidden />
         </button>
       </div>
@@ -479,7 +483,7 @@ export default function SpaceInquiryModal({
               data-sheet-handle
               type="button"
               onClick={() => setExpanded((value) => !value)}
-              aria-label={expanded ? "Ringkas detail unit" : "Perbesar detail unit"}
+              aria-label={expanded ? t("Ringkas detail unit") : t("Perbesar detail unit")}
               aria-expanded={expanded}
               className="mx-auto flex h-7 w-16 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-[#E31E2D] lg:hidden"
             >
@@ -494,14 +498,14 @@ export default function SpaceInquiryModal({
                     className="mb-2 inline-flex min-h-10 items-center gap-2 rounded-lg text-sm font-medium text-slate-700 hover:text-slate-900"
                   >
                     <ChevronLeft className="size-4 shrink-0" />
-                    Kembali ke Daftar Unit
+                    {t("Kembali ke Daftar Unit")}
                   </button>
                 ) : null}
                 <Dialog.Title className="text-lg font-semibold tracking-tight text-slate-900 lg:text-xl">
-                  {stage === "details" ? "Available Space" : space.code}
+                  {stage === "details" ? t(canApply ? "Ruang tersedia" : "Detail unit") : space.assetCode ?? space.code}
                 </Dialog.Title>
                 <p className="mt-0.5 text-sm text-slate-500">
-                  {stage === "details" ? "Ruang Komersial LRT Jabodebek" : space.name}
+                  {stage === "details" ? t("Ruang Komersial LRT Jabodebek") : content(space.name)}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -509,9 +513,9 @@ export default function SpaceInquiryModal({
                   <button
                     type="button"
                     onClick={toggleFavorite}
-                    aria-label={favorite ? "Hapus dari favorit" : "Simpan ke favorit"}
+                    aria-label={favorite ? t("Hapus dari favorit") : t("Simpan ke favorit")}
                     aria-pressed={favorite}
-                    title={favorite ? "Hapus dari favorit" : "Simpan ke favorit"}
+                    title={favorite ? t("Hapus dari favorit") : t("Simpan ke favorit")}
                     className={cn(
                       "inline-flex size-11 items-center justify-center rounded-full transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]",
                       favorite ? "text-[#C41926]" : "text-slate-600"
@@ -522,16 +526,17 @@ export default function SpaceInquiryModal({
                 ) : null}
                 <Dialog.Close
                   ref={closeRef}
-                  aria-label="Tutup detail unit"
+                  aria-label={t("Tutup detail unit")}
                   className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E31E2D]"
                 >
                   <X className="size-5" />
                 </Dialog.Close>
               </div>
             </div>
+            {stage === "details" && editHotspotHref && <TourEditorLink href={editHotspotHref} label={t("Edit hotspot di CMS")} />}
             {favoriteError ? (
               <p role="alert" className="mt-2 text-xs text-red-700">
-                {favoriteError}
+                {t(favoriteError)}
               </p>
             ) : null}
           </header>
@@ -540,13 +545,13 @@ export default function SpaceInquiryModal({
             <>
               <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto overscroll-contain lg:grid-cols-2 lg:overflow-hidden">
                 <section
-                  aria-label="Identitas dan foto unit"
+                  aria-label={t("Identitas dan foto unit")}
                   className="min-w-0 border-b border-slate-100 px-4 py-4 sm:px-6 lg:overflow-y-auto lg:overscroll-contain lg:border-r lg:border-b-0 lg:px-7 lg:py-6"
                 >
                   {mediaPanel}
                 </section>
                 <section
-                  aria-label="Informasi ruang komersial"
+                  aria-label={t("Informasi ruang komersial")}
                   className="min-w-0 px-4 py-4 sm:px-6 lg:overflow-y-auto lg:overscroll-contain lg:px-7 lg:py-6"
                 >
                   {infoPanel}
@@ -562,7 +567,7 @@ export default function SpaceInquiryModal({
                     className={cn(secondaryClass, "w-full sm:w-auto sm:min-w-[10.5rem]")}
                   >
                     <MessageCircle className="size-4 shrink-0" />
-                    WhatsApp Tim
+                    {t("WhatsApp Tim")}
                   </a>
                   <button
                     type="button"
@@ -575,11 +580,11 @@ export default function SpaceInquiryModal({
                   >
                     {canApply ? (
                       <>
-                        Ajukan Minat Sewa
+                        {t("Ajukan Minat Sewa")}
                         <ArrowRight className="size-4" />
                       </>
                     ) : (
-                      "Ruang belum tersedia"
+                      t("Ruang belum tersedia")
                     )}
                   </button>
                 </div>
@@ -589,7 +594,7 @@ export default function SpaceInquiryModal({
             <SpaceInquiryForm
               key={`${space.id}-form`}
               spaceId={space.id}
-              spaceCode={space.code}
+              spaceCode={space.assetCode ?? space.code}
               stationName={stationName}
               area={space.area}
               canApply={canApply}

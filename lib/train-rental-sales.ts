@@ -16,7 +16,7 @@ export function trainRentalStatusBadgeClass(status: string): string {
     case "TERBATAS":
       return "border-amber-200 bg-amber-50 text-amber-900";
     case "PENUH":
-      return "border-violet-200 bg-violet-50 text-violet-800";
+      return "border-red-200 bg-red-50 text-red-800";
     default:
       return "border-[var(--work-line)] bg-[var(--work-subtle)] text-[var(--work-muted)]";
   }

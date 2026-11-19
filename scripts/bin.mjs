@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
+import { config as loadDotenv } from "dotenv";
 
 const require = createRequire(import.meta.url);
 const [pkg, ...args] = process.argv.slice(2);
@@ -9,6 +10,9 @@ if (!pkg) {
   console.error("usage: node scripts/bin.mjs <package> [args...]");
   process.exit(1);
 }
+
+// Shell/agent env often pollutes S3_* (e.g. portal-interaktif-prod). Prefer repo .env.
+loadDotenv({ path: path.resolve(process.cwd(), ".env"), override: true });
 
 const pkgJson = require(`${pkg}/package.json`);
 const binField = pkgJson.bin;

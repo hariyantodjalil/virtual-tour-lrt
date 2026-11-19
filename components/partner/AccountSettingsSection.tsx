@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useMemo, useState } from "react";
 import {
   ChevronRight,
@@ -74,6 +75,7 @@ export default function AccountSettingsSection({
   onLogout,
   onUserUpdated,
 }: Props) {
+  const { t } = useTourLanguage();
   const [query, setQuery] = useState("");
   const [activePanel, setActivePanel] = useState<"akun" | "feedback" | null>(null);
   const [nameDraft, setNameDraft] = useState(user?.name ?? "");
@@ -84,11 +86,11 @@ export default function AccountSettingsSection({
     return SETTING_GROUPS.map((group) =>
       group.filter(
         (item) =>
-          item.title.toLowerCase().includes(q) ||
-          item.description.toLowerCase().includes(q)
+          t(item.title).toLocaleLowerCase().includes(q) ||
+          t(item.description).toLocaleLowerCase().includes(q)
       )
     ).filter((group) => group.length > 0);
-  }, [query]);
+  }, [query, t]);
 
   function handleItemClick(item: SettingItem) {
     if (item.kind === "danger" || item.id === "logout") {
@@ -104,16 +106,16 @@ export default function AccountSettingsSection({
   return (
     <>
       <p className="text-base font-semibold text-[#101828] md:text-lg">
-        Halo, {displayName}
+        {t("Halo,")} {displayName}
       </p>
 
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[#101828] md:text-[28px]">
-            Pengaturan Akun
+            {t("Pengaturan Akun")}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Kelola profil akun dan kirim feedback ke tim.
+            {t("Kelola profil akun dan kirim feedback ke tim.")}
           </p>
         </div>
         <label className="relative w-full sm:max-w-[240px]">
@@ -122,7 +124,7 @@ export default function AccountSettingsSection({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Cari pengaturan..."
+            placeholder={t("Cari pengaturan...")}
             className="h-10 w-full rounded-full border border-slate-200 bg-white pr-3 pl-9 text-sm text-[#101828] outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200"
           />
         </label>
@@ -156,10 +158,10 @@ export default function AccountSettingsSection({
                         isDanger ? "text-[#c41230]" : "text-[#101828]"
                       }`}
                     >
-                      {item.title}
+                      {t(item.title)}
                     </span>
                     <span className="mt-0.5 block text-xs leading-relaxed text-slate-500 sm:text-[13px]">
-                      {item.description}
+                      {t(item.description)}
                     </span>
                   </span>
                   <ChevronRight className="size-5 shrink-0 text-slate-300" />
@@ -171,7 +173,7 @@ export default function AccountSettingsSection({
 
         {groups.length === 0 && (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
-            Tidak ada pengaturan yang cocok dengan pencarian.
+            {t("Tidak ada pengaturan yang cocok dengan pencarian.")}
           </div>
         )}
       </div>
@@ -210,6 +212,7 @@ function AccountDetailPanel({
   onClose: () => void;
   onSaved: (user: UserInfo) => void;
 }) {
+  const { t } = useTourLanguage();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -250,8 +253,8 @@ function AccountDetailPanel({
               <UserRound className="size-7" strokeWidth={1.85} />
             </span>
             <div>
-              <p className="text-xs font-bold tracking-wide text-[#c41230] uppercase">Akun Saya</p>
-              <h2 className="mt-0.5 text-xl font-bold text-[#101828]">Detail Profil</h2>
+              <p className="text-xs font-bold tracking-wide text-[#c41230] uppercase">{t("Akun Saya")}</p>
+              <h2 className="mt-0.5 text-xl font-bold text-[#101828]">{t("Detail Profil")}</h2>
             </div>
           </div>
           <button
@@ -259,13 +262,13 @@ function AccountDetailPanel({
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-sm font-semibold text-slate-500 hover:bg-slate-100"
           >
-            Tutup
+            {t("Tutup")}
           </button>
         </div>
 
         <div className="mt-5 space-y-4">
           <div>
-            <label className="text-xs font-semibold text-slate-500">Nama</label>
+            <label className="text-xs font-semibold text-slate-500">{t("Nama")}</label>
             <input
               value={nameDraft}
               onChange={(e) => onNameChange(e.target.value)}
@@ -281,16 +284,16 @@ function AccountDetailPanel({
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-500">Peran</label>
+            <label className="text-xs font-semibold text-slate-500">{t("Peran")}</label>
             <input
-              value={user?.role ?? "MITRA"}
+              value={user?.role === "MITRA" || !user?.role ? t("Mitra") : user.role}
               readOnly
               className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600"
             />
           </div>
         </div>
 
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="mt-3 text-sm text-red-600">{t(error)}</p> : null}
 
         <div className="mt-5 flex gap-2">
           <button
@@ -299,7 +302,7 @@ function AccountDetailPanel({
             disabled={saving}
             className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
-            Batal
+            {t("Batal")}
           </button>
           <button
             type="button"
@@ -307,7 +310,7 @@ function AccountDetailPanel({
             disabled={saving}
             className="flex-1 rounded-xl bg-[#c41230] px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
           >
-            {saving ? "Menyimpan..." : "Simpan"}
+            {saving ? t("Menyimpan...") : t("Simpan")}
           </button>
         </div>
       </div>
@@ -316,6 +319,7 @@ function AccountDetailPanel({
 }
 
 function FeedbackPanel({ onClose }: { onClose: () => void }) {
+  const { t } = useTourLanguage();
   const [topic, setTopic] = useState<(typeof FEEDBACK_TOPICS)[number]>("Portal Mitra");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -365,7 +369,7 @@ function FeedbackPanel({ onClose }: { onClose: () => void }) {
             </span>
             <div>
               <p className="text-xs font-bold tracking-wide text-[#c41230] uppercase">Feedback</p>
-              <h2 className="mt-0.5 text-xl font-bold text-[#101828]">Kirim Masukan</h2>
+              <h2 className="mt-0.5 text-xl font-bold text-[#101828]">{t("Kirim Masukan")}</h2>
             </div>
           </div>
           <button
@@ -373,21 +377,21 @@ function FeedbackPanel({ onClose }: { onClose: () => void }) {
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-sm font-semibold text-slate-500 hover:bg-slate-100"
           >
-            Tutup
+            {t("Tutup")}
           </button>
         </div>
 
         {success ? (
           <div className="mt-5 space-y-4">
             <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              Terima kasih. Feedback Anda sudah tersimpan dan dapat dibaca tim admin.
+              {t("Terima kasih. Feedback Anda sudah tersimpan dan dapat dibaca tim admin.")}
             </p>
             <button
               type="button"
               onClick={onClose}
               className="w-full rounded-xl bg-[#c41230] px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110"
             >
-              Selesai
+              {t("Selesai")}
             </button>
           </div>
         ) : (
@@ -395,7 +399,7 @@ function FeedbackPanel({ onClose }: { onClose: () => void }) {
             <div className="mt-5 space-y-4">
               <div>
                 <label htmlFor="feedback-topic" className="text-xs font-semibold text-slate-500">
-                  Topik
+                  {t("Topik")}
                 </label>
                 <select
                   id="feedback-topic"
@@ -405,14 +409,14 @@ function FeedbackPanel({ onClose }: { onClose: () => void }) {
                 >
                   {FEEDBACK_TOPICS.map((item) => (
                     <option key={item} value={item}>
-                      {item}
+                      {t(item)}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
                 <label htmlFor="feedback-message" className="text-xs font-semibold text-slate-500">
-                  Pesan
+                  {t("Pesan")}
                 </label>
                 <textarea
                   id="feedback-message"
@@ -420,14 +424,14 @@ function FeedbackPanel({ onClose }: { onClose: () => void }) {
                   onChange={(e) => setMessage(e.target.value)}
                   rows={5}
                   maxLength={2000}
-                  placeholder="Ceritakan kendala, saran, atau pengalaman Anda memakai portal mitra."
+                  placeholder={t("Ceritakan kendala, saran, atau pengalaman Anda memakai portal mitra.")}
                   className="mt-1.5 w-full resize-y rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-[#c41230] focus:ring-2 focus:ring-[#c41230]/20"
                 />
                 <p className="mt-1 text-right text-[11px] text-slate-400">{message.trim().length}/2000</p>
               </div>
             </div>
 
-            {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+            {error ? <p className="mt-3 text-sm text-red-600">{t(error)}</p> : null}
 
             <div className="mt-5 flex gap-2">
               <button
@@ -436,7 +440,7 @@ function FeedbackPanel({ onClose }: { onClose: () => void }) {
                 disabled={saving}
                 className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
-                Batal
+                {t("Batal")}
               </button>
               <button
                 type="button"
@@ -444,7 +448,7 @@ function FeedbackPanel({ onClose }: { onClose: () => void }) {
                 disabled={saving}
                 className="flex-1 rounded-xl bg-[#c41230] px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
               >
-                {saving ? "Mengirim..." : "Kirim Feedback"}
+                {saving ? t("Mengirim...") : t("Kirim Feedback")}
               </button>
             </div>
           </>

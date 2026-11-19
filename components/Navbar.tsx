@@ -5,13 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import LoginModal from "@/components/LoginModal";
 import RegisterModal from "@/components/RegisterModal";
-
-type AuthUser = {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-};
+import PublicAccountMenu, {
+  type PublicAuthUser,
+} from "@/components/auth/PublicAccountMenu";
+import { subscribeAuthSessionChanged } from "@/lib/auth-client";
 
 const navItems = [
   { href: "/komersial", label: "Beranda", active: true },
@@ -20,17 +17,28 @@ const navItems = [
 ] as const;
 
 export default function Navbar({ variant = "light" }: { variant?: "light" | "dark" }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<PublicAuthUser | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const [authView, setAuthView] = useState<"login" | "register" | null>(null);
-  const panelHref = user?.role === "MITRA" ? "/partner" : "/cms/dashboard";
   void variant;
 
   useEffect(() => {
-    fetch("/api/auth/verify")
+    let active = true;
+    fetch("/api/auth/verify", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setUser(data?.authenticated ? data.user : null))
-      .catch(() => setUser(null));
+      .then((data) => {
+        if (active) setUser(data?.authenticated ? data.user : null);
+      })
+      .catch(() => {
+        if (active) setUser(null);
+      });
+    const unsubscribe = subscribeAuthSessionChanged((nextUser) => {
+      setUser(nextUser);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -104,27 +112,11 @@ export default function Navbar({ variant = "light" }: { variant?: "light" | "dar
 
           <div className="relative z-10 ml-auto shrink-0">
             {user ? (
-              user.role === "MITRA" ? (
-                <Link
-                  href={panelHref}
-                  aria-label={`Profil ${user.name || "Mitra"}`}
-                  title={user.name || "Panel Mitra"}
-                  className="inline-flex size-12 items-center justify-center rounded-xl text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110"
-                  style={{ backgroundImage: "linear-gradient(155deg, #d32f2f 0%, #b71c1c 100%)" }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/brand/landing/icons/user.svg" alt="" width={18} height={18} className="size-[18px]" />
-                </Link>
-              ) : (
-                <Link
-                  href={panelHref}
-                  title={user.name}
-                  className="inline-flex h-12 max-w-[180px] items-center justify-center rounded-xl px-5 text-xs font-semibold tracking-wide text-white shadow-[0_8px_32px_rgba(211,47,47,0.4)] transition hover:brightness-110"
-                  style={{ backgroundImage: "linear-gradient(155deg, #d32f2f 0%, #b71c1c 100%)" }}
-                >
-                  <span className="truncate">{user.name || "Akun"}</span>
-                </Link>
-              )
+              <PublicAccountMenu
+                user={user}
+                variant="rounded"
+                onLoggedOut={() => setUser(null)}
+              />
             ) : (
               <button
                 type="button"

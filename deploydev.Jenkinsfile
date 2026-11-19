@@ -132,14 +132,19 @@ pipeline {
                                 echo "${PASSWORD_HARBOR}" | sudo docker login -u "${USERNAME_HARBOR}" --password-stdin hub.kai.id
                                 sudo docker compose --project-name ${LEGACY_COMPOSE_PROJECT} -f ${COMPOSE_FILE} down --remove-orphans 2>/dev/null || true
                                 sudo -E docker stack deploy --resolve-image=always --with-registry-auth -c ${COMPOSE_FILE} ${STACK_NAME}
+                                echo "Pre-pull migrate image supaya ID postgres tidak basi saat pull"
+                                sudo docker pull ${imageRef}
                                 echo "Waiting for postgres..."
                                 ready=0
                                 postgres_id=""
                                 for i in \$(seq 1 30); do
                                     postgres_id="\$(sudo docker ps -q -f name=${STACK_NAME}_postgres | head -n 1)"
                                     if [ -n "\$postgres_id" ] && sudo docker exec "\$postgres_id" pg_isready -U "\${POSTGRES_USER}" -d "\${POSTGRES_DB}" >/dev/null 2>&1; then
-                                        ready=1
-                                        break
+                                        # pastikan container masih Running (hindari race Swarm replace task)
+                                        if sudo docker inspect -f '{{.State.Running}}' "\$postgres_id" 2>/dev/null | grep -qx true; then
+                                            ready=1
+                                            break
+                                        fi
                                     fi
                                     sleep 5
                                 done
@@ -153,6 +158,8 @@ pipeline {
                                     -e DATABASE_URL="\$migrate_url" \\
                                     ${imageRef} \\
                                     npx prisma migrate deploy
+                                # re-resolve postgres id jika task diganti di tengah jalan
+                                postgres_id="\$(sudo docker ps -q -f name=${STACK_NAME}_postgres | head -n 1)"
                                 sudo docker run --rm --network "container:\${postgres_id}" \\
                                     -e DATABASE_URL="\$migrate_url" \\
                                     ${imageRef} \\

@@ -23,6 +23,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Do not commit real secrets. Use ignored local environment files for runtime configuration.
 - Preserve app behavior from the repository branch being merged unless a change is explicitly requested.
 
+## Interactive UI
+
+- Before using UI SDK, apply the shared `ui-sdk` skill when available and read `node_modules/@ui-sdk/react/docs/llms.txt`. The installed official skill is at `node_modules/@ui-sdk/core/skills/ui-sdk/SKILL.md`. For a custom primitive, look up the relevant behavior in `node_modules/@ui-sdk/react/docs/core.md` and read `node_modules/@ui-sdk/react/docs/rendering.md`.
+- Start with the closest shared component. Use UI SDK for new interaction behavior when it fits, styling it with the existing tokens and variants from `components/ui/` and `app/globals.css`. Follow the visual conventions of the viewer, CMS, or Portal Mitra surface being changed.
+
 ## Validation
 
 - Use MCP Responsively for visual and responsive UI checks, as requested by the user. Do not substitute another browser tool for these checks without a user request.
