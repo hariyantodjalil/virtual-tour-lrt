@@ -68,3 +68,5 @@ tasks/
 scripts/tmp-*
 scripts/tmp-diff-out/
 scripts/**/tmp-*
+tmp/
+

@@ -36,12 +36,28 @@ export function extractMultiResProfilesFromCanvasData(value: unknown): PanoramaM
   }
 }
 
-/** F5/WAF prod menolak path tile yang berisi UUID → HTML "Request Rejected". */
+/** F5/WAF sering menolak path tile yang berisi UUID → HTML "Request Rejected". */
 const UUID_IN_PATH =
   /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
+/**
+ * VIP publik prod (`virtualtour-lrtjabodebek.kai.id`) menolak SELURUH pohon
+ * `/api/s3-proxy/.../panorama-tiles/` (bukan hanya UUID). DEV hostname dan akses
+ * IP:3000 tetap meloloskan tile. Override: NEXT_PUBLIC_PANORAMA_BLOCK_MULTIRES=1.
+ */
+export function isPanoramaMultiresBlockedByEdge(): boolean {
+  if (process.env.NEXT_PUBLIC_PANORAMA_BLOCK_MULTIRES === "1") return true;
+  if (process.env.NEXT_PUBLIC_PANORAMA_BLOCK_MULTIRES === "0") return false;
+  if (typeof window !== "undefined") {
+    return window.location.hostname === "virtualtour-lrtjabodebek.kai.id";
+  }
+  return false;
+}
+
 export function isWafSafePanoramaBasePath(basePath: string | undefined): boolean {
-  return Boolean(basePath) && !UUID_IN_PATH.test(basePath!);
+  if (!basePath || UUID_IN_PATH.test(basePath)) return false;
+  if (isPanoramaMultiresBlockedByEdge()) return false;
+  return true;
 }
 
 export function selectSceneMultiRes(
@@ -49,14 +65,15 @@ export function selectSceneMultiRes(
   viewportWidth: number,
 ): PannellumMultiRes | undefined {
   const profile = scene.multiResProfiles?.[viewportWidth >= 1024 ? "desktop" : "mobile"];
-  // Prefer path legacy tanpa UUID (aman di WAF prod), baru profiles.
+  // Hanya path tanpa UUID. Path ber-UUID ditolak F5/WAF prod ("Request Rejected")
+  // → viewer harus jatuh ke equirectangular WebP, bukan preload tile yang pasti gagal.
   if (scene.multiRes && isWafSafePanoramaBasePath(scene.multiRes.basePath)) {
     return scene.multiRes;
   }
   if (profile && isWafSafePanoramaBasePath(profile.basePath)) {
     return profile;
   }
-  return scene.multiRes ?? profile;
+  return undefined;
 }
 
 // ── Profil HD (aset asli/native) ──────────────────────────────────────────────

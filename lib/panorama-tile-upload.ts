@@ -1,11 +1,15 @@
 import { uploadToS3 } from "@/lib/s3";
 import { buildPanoramaTiles, multiResConfig, type PannellumMultiRes } from "@/lib/panorama-multires";
 import type { PanoramaMultiResProfiles, PanoramaMultiResProfilesHd } from "./panorama-profile";
+import { newPanoramaTileRevisionId } from "./panorama-tile-revision";
 import sharp from "sharp";
-import { randomUUID } from "node:crypto";
 
 function safeSegment(value: string) {
   return value.replace(/[^a-z0-9-]/gi, "-").toLowerCase() || "scene";
+}
+
+function tilePrefix(ownerSlug: string, sceneId: string, kind: "economy" | "hd" = "economy") {
+  return `virtual-tour/panorama-tiles/${safeSegment(ownerSlug)}/${safeSegment(sceneId)}/${newPanoramaTileRevisionId(kind)}`;
 }
 
 async function mapPool<T>(items: T[], limit: number, task: (item: T) => Promise<void>) {
@@ -26,7 +30,7 @@ export async function uploadPanoramaTiles(
   ownerSlug: string,
   sceneId: string
 ): Promise<PannellumMultiRes> {
-  const prefix = `virtual-tour/panorama-tiles/${safeSegment(ownerSlug)}/${safeSegment(sceneId)}/${randomUUID()}`;
+  const prefix = tilePrefix(ownerSlug, sceneId);
   const tiles = await buildPanoramaTiles(panorama);
   await mapPool(tiles, 3, async (tile) => {
     await uploadToS3(tile.buffer, `${prefix}/${tile.name}`, "image/jpeg", {
@@ -43,7 +47,7 @@ export async function uploadAdaptivePanoramaTiles(
 ): Promise<PanoramaMultiResProfiles> {
   const metadata = await sharp(panorama).metadata();
   const cubeResolution = (metadata.width ?? 0) > 6400 ? 4096 : 2048;
-  const prefix = `virtual-tour/panorama-tiles/${safeSegment(ownerSlug)}/${safeSegment(sceneId)}/${randomUUID()}`;
+  const prefix = tilePrefix(ownerSlug, sceneId);
   const profiles = {} as Pick<PanoramaMultiResProfiles, "desktop" | "mobile">;
   // Sequential generation limits peak memory; publish metadata only after both uploads finish.
   for (const [name, tileResolution] of [["mobile", 512], ["desktop", 1024]] as const) {
@@ -67,7 +71,7 @@ export async function uploadHdPanoramaTiles(
 ): Promise<Pick<PanoramaMultiResProfilesHd, "desktop" | "mobile">> {
   const metadata = await sharp(panorama, { limitInputPixels: false }).metadata();
   const cubeResolution = (metadata.width ?? 0) > 6400 ? 4096 : 2048;
-  const prefix = `virtual-tour/panorama-tiles/${safeSegment(ownerSlug)}/${safeSegment(sceneId)}/hd-${randomUUID()}`;
+  const prefix = tilePrefix(ownerSlug, sceneId, "hd");
   const profiles = {} as Pick<PanoramaMultiResProfilesHd, "desktop" | "mobile">;
   // Sequential generation limits peak memory at native resolution.
   for (const [name, tileResolution] of [["mobile", 512], ["desktop", 1024]] as const) {

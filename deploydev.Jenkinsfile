@@ -79,7 +79,8 @@ pipeline {
                         cp /var/filebrowser/root/${ENV}/${APP_NAME}/.env ${WORKSPACE}/
                         sed -i 's/\\r\$//' ${WORKSPACE}/.env
                         sudo chmod 777 -R ${WORKSPACE}
-                        sudo docker build -t ${HARBOR_REGISTRY}/${APP_NAME}:${TAG} .
+                        sudo docker builder prune -f || true
+                        sudo docker build --pull -t ${HARBOR_REGISTRY}/${APP_NAME}:${TAG} .
                     """
                     withCredentials([usernamePassword(
                         credentialsId: 'harbor-creds',
