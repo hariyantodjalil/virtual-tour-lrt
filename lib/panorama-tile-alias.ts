@@ -45,7 +45,8 @@ function rebuild(): Promise<AliasIndex> {
 /** Resolve alias id → basePath tile di S3, dari canvasData scene stasiun & kereta. */
 export async function resolveTileAlias(id: string): Promise<string | undefined> {
   const now = Date.now();
-  if (!index || now - index.builtAt > FRESH_MS) await rebuild();
+  if (!index) await rebuild();
+  else if (now - index.builtAt > FRESH_MS) void rebuild().catch(() => undefined);
   const hit = index?.map.get(id);
   if (hit) return hit;
   if (index && now - index.builtAt > MISS_REBUILD_MIN_MS) await rebuild();
