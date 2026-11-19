@@ -1,0 +1,318 @@
+{
+  "cawang": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/cawang/concourse.webp",
+      "url": "/virtual-tour/floorplans/cawang/concourse.webp",
+      "width": 866,
+      "height": 514
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/cawang/peron.webp",
+      "url": "/virtual-tour/floorplans/cawang/peron.webp",
+      "width": 869,
+      "height": 503
+    },
+    {
+      "name": "Mezzanine",
+      "sourceKey": "virtual-tour/floorplans/cawang/mezzanine.webp",
+      "url": "/virtual-tour/floorplans/cawang/mezzanine.webp",
+      "width": 584,
+      "height": 378
+    }
+  ],
+  "cikunir-1": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/cikunir-1/concourse.webp",
+      "url": "/virtual-tour/floorplans/cikunir-1/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/cikunir-1/peron.webp",
+      "url": "/virtual-tour/floorplans/cikunir-1/peron.webp",
+      "width": 796,
+      "height": 465
+    },
+    {
+      "name": "line2",
+      "sourceKey": "virtual-tour/floorplans/cikunir-1/line2.webp",
+      "url": "/virtual-tour/floorplans/cikunir-1/line2.webp",
+      "width": 796,
+      "height": 473
+    }
+  ],
+  "bekasi-barat": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/bekasi-barat/concourse.webp",
+      "url": "/virtual-tour/floorplans/bekasi-barat/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/bekasi-barat/peron.webp",
+      "url": "/virtual-tour/floorplans/bekasi-barat/peron.webp",
+      "width": 796,
+      "height": 465
+    },
+    {
+      "name": "line2",
+      "sourceKey": "virtual-tour/floorplans/bekasi-barat/line2.webp",
+      "url": "/virtual-tour/floorplans/bekasi-barat/line2.webp",
+      "width": 796,
+      "height": 473
+    }
+  ],
+  "halim": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/halim/concourse.webp",
+      "url": "/virtual-tour/floorplans/halim/concourse.webp",
+      "width": 800,
+      "height": 477
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/halim/peron.webp",
+      "url": "/virtual-tour/floorplans/halim/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "dukuh-atas": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/dukuh-atas/concourse.webp",
+      "url": "/virtual-tour/floorplans/dukuh-atas/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/dukuh-atas/peron.webp",
+      "url": "/virtual-tour/floorplans/dukuh-atas/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "harjamukti": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/harjamukti/concourse.webp",
+      "url": "/virtual-tour/floorplans/harjamukti/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/harjamukti/peron.webp",
+      "url": "/virtual-tour/floorplans/harjamukti/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "jatimulya": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/jatimulya/concourse.webp",
+      "url": "/virtual-tour/floorplans/jatimulya/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/jatimulya/peron.webp",
+      "url": "/virtual-tour/floorplans/jatimulya/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "kuningan": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/kuningan/concourse.webp",
+      "url": "/virtual-tour/floorplans/kuningan/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/kuningan/peron.webp",
+      "url": "/virtual-tour/floorplans/kuningan/peron.webp",
+      "width": 796,
+      "height": 465
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/kuningan/peron-2.webp",
+      "url": "/virtual-tour/floorplans/kuningan/peron-2.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "rasuna-said": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/rasuna-said/concourse.webp",
+      "url": "/virtual-tour/floorplans/rasuna-said/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/rasuna-said/peron.webp",
+      "url": "/virtual-tour/floorplans/rasuna-said/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "tmii": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/tmii/concourse.webp",
+      "url": "/virtual-tour/floorplans/tmii/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/tmii/peron.webp",
+      "url": "/virtual-tour/floorplans/tmii/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "kampung-rambutan": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/kampung-rambutan/concourse.webp",
+      "url": "/virtual-tour/floorplans/kampung-rambutan/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/kampung-rambutan/peron.webp",
+      "url": "/virtual-tour/floorplans/kampung-rambutan/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "ciracas": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/ciracas/concourse.webp",
+      "url": "/virtual-tour/floorplans/ciracas/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/ciracas/peron.webp",
+      "url": "/virtual-tour/floorplans/ciracas/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "jatibening-baru": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/jatibening-baru/concourse.webp",
+      "url": "/virtual-tour/floorplans/jatibening-baru/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/jatibening-baru/peron.webp",
+      "url": "/virtual-tour/floorplans/jatibening-baru/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "cikunir-2": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/cikunir-2/concourse.webp",
+      "url": "/virtual-tour/floorplans/cikunir-2/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/cikunir-2/peron.webp",
+      "url": "/virtual-tour/floorplans/cikunir-2/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "setiabudi": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/setiabudi/concourse.webp",
+      "url": "/virtual-tour/floorplans/setiabudi/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/setiabudi/peron.webp",
+      "url": "/virtual-tour/floorplans/setiabudi/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "pancoran-bank-bjb": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/pancoran-bank-bjb/concourse.webp",
+      "url": "/virtual-tour/floorplans/pancoran-bank-bjb/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/pancoran-bank-bjb/peron.webp",
+      "url": "/virtual-tour/floorplans/pancoran-bank-bjb/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "cikoko": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/cikoko/concourse.webp",
+      "url": "/virtual-tour/floorplans/cikoko/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/cikoko/peron.webp",
+      "url": "/virtual-tour/floorplans/cikoko/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ],
+  "ciliwung": [
+    {
+      "name": "Concourse",
+      "sourceKey": "virtual-tour/floorplans/ciliwung/concourse.webp",
+      "url": "/virtual-tour/floorplans/ciliwung/concourse.webp",
+      "width": 796,
+      "height": 473
+    },
+    {
+      "name": "Peron",
+      "sourceKey": "virtual-tour/floorplans/ciliwung/peron.webp",
+      "url": "/virtual-tour/floorplans/ciliwung/peron.webp",
+      "width": 796,
+      "height": 465
+    }
+  ]
+}
