@@ -196,6 +196,34 @@ export default function WorkflowListClient({
     setStatusTab("ALL");
   }
 
+  function renderVersionActions(version: CmsWorkflowVersionDTO) {
+    const updating = statusUpdatingId === version.id;
+    const isActive = version.status === "ACTIVE";
+    return (
+      <>
+        <Button asChild size="sm" variant="outline" className="min-h-9">
+          <Link href={`/cms/workflow/${version.id}`} prefetch={false}>
+            Detail
+            <ChevronRight className="size-3.5" aria-hidden />
+          </Link>
+        </Button>
+        {version.version !== null && (isActive || version.status === "ARCHIVED") ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={updating}
+            onClick={() => void handleToggleStatus(version, isActive ? "ARCHIVED" : "ACTIVE")}
+            className="min-h-9"
+          >
+            {updating ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+            {isActive ? "Nonaktifkan" : "Aktifkan"}
+          </Button>
+        ) : null}
+      </>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -322,7 +350,24 @@ export default function WorkflowListClient({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-lg border border-slate-200">
+          {filteredVersions.length > 0 ? (
+            <ul className="space-y-3 lg:hidden">
+              {filteredVersions.map(version => (
+                <li key={version.id} className="rounded-xl border border-slate-200 p-3.5">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                    <span className="font-mono">{versionLabel(version)}</span>
+                    <Badge variant="outline" className={workflowStatusBadgeClass(version.status)}>
+                      {workflowStatusLabel(version.status)}
+                    </Badge>
+                  </div>
+                  <h3 className="mt-2 text-sm font-semibold break-words">{version.title}</h3>
+                  <p className="mt-1 text-xs text-slate-600">{version.steps.length} tahap · {version.leadsCount} pengajuan</p>
+                  <div className="mt-3 flex flex-wrap gap-2">{renderVersionActions(version)}</div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <div className="hidden rounded-lg border border-slate-200 lg:block">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -337,8 +382,6 @@ export default function WorkflowListClient({
               </TableHeader>
               <TableBody>
                 {filteredVersions.map((v) => {
-                  const isPublished = v.version !== null;
-                  const toggleBusy = statusUpdatingId === v.id;
                   return (
                     <TableRow key={v.id}>
                       <TableCell className="max-w-56">
@@ -362,49 +405,7 @@ export default function WorkflowListClient({
                         {formatUpdated(v.updatedAt)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-1.5">
-                          {isPublished && (
-                            <>
-                              {v.status === "ACTIVE" ? (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={toggleBusy}
-                                  onClick={() => void handleToggleStatus(v, "ARCHIVED")}
-                                  className="h-8 text-xs"
-                                >
-                                  {toggleBusy ? (
-                                    <Loader2 className="size-3 animate-spin" />
-                                  ) : (
-                                    "Nonaktifkan"
-                                  )}
-                                </Button>
-                              ) : v.status === "ARCHIVED" ? (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={toggleBusy}
-                                  onClick={() => void handleToggleStatus(v, "ACTIVE")}
-                                  className="h-8 text-xs"
-                                >
-                                  {toggleBusy ? (
-                                    <Loader2 className="size-3 animate-spin" />
-                                  ) : (
-                                    "Aktifkan"
-                                  )}
-                                </Button>
-                              ) : null}
-                            </>
-                          )}
-                          <Button asChild size="sm" variant="outline">
-                            <Link href={`/cms/workflow/${v.id}`} prefetch={false}>
-                              Detail
-                              <ChevronRight className="h-3.5 w-3.5" />
-                            </Link>
-                          </Button>
-                        </div>
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">{renderVersionActions(v)}</div>
                       </TableCell>
                     </TableRow>
                   );

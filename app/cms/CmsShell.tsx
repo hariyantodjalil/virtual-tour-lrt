@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   LayoutDashboard,
+  Menu,
   LogOut,
   Map,
   Globe2,
@@ -27,6 +28,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import CmsNotifications from "@/components/cms/CmsNotifications";
+import { useCompactCmsViewport } from "@/components/cms/useCompactCmsViewport";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export type CmsUser = {
   id: string;
@@ -143,7 +146,7 @@ function getPageMeta(pathname: string) {
   }
   if (pathname.startsWith("/cms/workflow")) {
     return {
-      title: "Alur Pengajuan (Workflow Builder)",
+      title: "Alur Pengajuan",
       subtitle:
         "Kelola versi tahapan proses, tipe form tahapan, target SLA, syarat dokumen, dan automasi status ruang",
     };
@@ -217,6 +220,8 @@ export default function CmsShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const compactViewport = useCompactCmsViewport();
   const collapsed = useSyncExternalStore(
     subscribeSidebar,
     getSidebarSnapshot,
@@ -230,6 +235,7 @@ export default function CmsShell({
   };
 
   async function handleLogout() {
+    setMobileMenuOpen(false);
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/");
   }
@@ -262,13 +268,15 @@ export default function CmsShell({
     setNavState({ path: pathname, open: openGroups.has(label) ? new Set<string>() : new Set([label]) });
   }
 
-  function renderNavLink(item: NavItem) {
+  function renderNavLink(item: NavItem, collapsed: boolean, onNavigate?: () => void) {
     const active = pathname === item.href || pathname.startsWith(item.href + "/");
     const Icon = item.icon;
     return (
       <Link
         key={item.href}
         href={item.href}
+        onClick={onNavigate}
+        aria-label={item.label}
         title={collapsed ? item.label : undefined}
         aria-current={active ? "page" : undefined}
         className={`flex items-center rounded-lg text-sm transition-colors group ${
@@ -295,13 +303,9 @@ export default function CmsShell({
     prevFullWidth.current = fullWidth;
   }, [fullWidth]);
 
-  return (
-    <div className="cms-shell flex h-screen overflow-hidden bg-[#F6F7F9] text-slate-900">
-      <aside
-        className={`relative z-20 flex h-full min-h-0 flex-none flex-col border-r border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE] transition-all duration-200 ${
-          collapsed ? "w-14" : "w-56"
-        }`}
-      >
+  function renderSidebar(collapsed: boolean, idPrefix: string, onNavigate?: () => void) {
+    return (
+      <>
         <div
           className={`border-b border-[rgba(255,214,218,0.14)] flex items-center ${
             collapsed ? "justify-center p-3" : "gap-2.5 p-4"
@@ -319,18 +323,18 @@ export default function CmsShell({
         </div>
 
         <nav className="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Menu CMS">
-          <div className="space-y-0.5">{standaloneItems.map(renderNavLink)}</div>
+          <div className="space-y-0.5">{standaloneItems.map(item => renderNavLink(item, collapsed, onNavigate))}</div>
           {collapsed ? (
             visibleGroups.map((group) => (
               <div key={group.label}>
                 <div aria-hidden="true" className="mx-auto my-2 h-px w-6 bg-white/10" />
-                <div className="space-y-0.5">{group.items.map(renderNavLink)}</div>
+                <div className="space-y-0.5">{group.items.map(item => renderNavLink(item, collapsed, onNavigate))}</div>
               </div>
             ))
           ) : (
             visibleGroups.map((group) => {
               const isOpen = openGroups.has(group.label);
-              const listId = `navgroup-${group.label.replace(/\s+/g, "-").toLowerCase()}`;
+              const listId = `navgroup-${idPrefix}-${group.label.replace(/\s+/g, "-").toLowerCase()}`;
               return (
                 <div key={group.label} className="mt-1">
                   <button
@@ -348,7 +352,7 @@ export default function CmsShell({
                   </button>
                   {isOpen && (
                     <div id={listId} className="mt-0.5 space-y-0.5">
-                      {group.items.map(renderNavLink)}
+                      {group.items.map(item => renderNavLink(item, collapsed, onNavigate))}
                     </div>
                   )}
                 </div>
@@ -385,45 +389,76 @@ export default function CmsShell({
             {!collapsed && <span className="text-sm flex-1 text-left">Logout</span>}
           </button>
         </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="cms-shell flex h-dvh overflow-hidden bg-[#F6F7F9] text-slate-900">
+      <aside
+        className={`relative z-20 hidden h-full min-h-0 flex-none flex-col border-r border-[rgba(255,214,218,0.14)] bg-[#261015] text-[#F8ECEE] transition-all duration-200 lg:flex ${
+          collapsed ? "w-14" : "w-56"
+        }`}
+      >
+        {renderSidebar(collapsed, "desktop")}
       </aside>
 
       <main className="cms-light relative flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="@container relative z-20 border-b border-slate-200 bg-white">
-          <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
+          <div className="flex h-14 items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-5">
+            <Dialog open={compactViewport && mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <DialogTrigger asChild>
+                <button type="button" aria-label="Buka menu CMS" className="grid size-10 flex-none place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 focus-visible:outline-2 focus-visible:outline-[#D81435] lg:hidden">
+                  <Menu className="size-5" aria-hidden />
+                </button>
+              </DialogTrigger>
+              {compactViewport ? (
+                <DialogContent
+                  aria-describedby={undefined}
+                  overlayClassName="bg-black/45 backdrop-blur-none"
+                  className="inset-y-0 left-0 top-0 flex h-dvh max-h-none w-[min(19rem,90vw)] max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none bg-[#261015] p-0 text-[#F8ECEE] data-[state=open]:animate-none data-[state=closed]:animate-none"
+                >
+                  <DialogTitle className="sr-only">Menu CMS</DialogTitle>
+                  {renderSidebar(false, "mobile", () => setMobileMenuOpen(false))}
+                </DialogContent>
+              ) : null}
+            </Dialog>
             <button
               type="button"
               onClick={toggleSidebar}
               title={collapsed ? "Perluas sidebar" : "Sembunyikan sidebar"}
               aria-label={collapsed ? "Perluas sidebar" : "Sembunyikan sidebar"}
-              className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D81435]"
+              className="hidden h-10 w-10 flex-none items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 lg:flex transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D81435]"
             >
               {collapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
             </button>
 
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-base font-black text-slate-900 sm:text-lg">{pageMeta.title}</h1>
+              <h1 className="line-clamp-2 text-sm leading-tight font-black text-slate-900 sm:text-base">{pageMeta.title}</h1>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <Link
                 href="/"
+                aria-label="Beranda"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D81435]"
+                className="inline-flex size-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white @min-[34rem]:w-auto @min-[34rem]:px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D81435]"
               >
                 <Home className="size-4 shrink-0" aria-hidden />
-                <span className="hidden sm:inline">Beranda</span>
-                <ExternalLink className="size-3.5 shrink-0 text-slate-400" aria-hidden />
+                <span className="hidden @min-[34rem]:inline">Beranda</span>
+                <ExternalLink className="hidden size-3.5 shrink-0 text-slate-400 @min-[34rem]:block" aria-hidden />
               </Link>
               <Link
                 href="/komersial"
+                aria-label="Virtual Tour"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D81435]"
+                className="inline-flex size-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white @min-[34rem]:w-auto @min-[34rem]:px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D81435]"
               >
                 <Map className="size-4 shrink-0" aria-hidden />
-                <span className="hidden sm:inline">Virtual Tour</span>
-                <ExternalLink className="size-3.5 shrink-0 text-slate-400" aria-hidden />
+                <span className="hidden @min-[34rem]:inline">Virtual Tour</span>
+                <ExternalLink className="hidden size-3.5 shrink-0 text-slate-400 @min-[34rem]:block" aria-hidden />
               </Link>
               <CmsNotifications />
             </div>
@@ -435,7 +470,7 @@ export default function CmsShell({
             <div className="relative z-10 flex h-full min-h-0 w-full flex-col overflow-hidden">{children}</div>
           ) : (
             <div
-              className={`relative z-10 mx-auto w-full min-w-0 p-6 ${
+              className={`relative z-10 mx-auto w-full min-w-0 p-3 sm:p-5 lg:p-6 ${
                 pathname.startsWith("/cms/workflow") ? "max-w-none" : "max-w-7xl"
               }`}
             >

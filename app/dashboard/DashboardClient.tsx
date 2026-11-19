@@ -91,14 +91,14 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="p-5">
+      <CardContent className="p-3.5 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-500">{title}</p>
             <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{value}</p>
             {subtitle ? <p className="mt-1 text-xs text-slate-500">{subtitle}</p> : null}
           </div>
-          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600">
+          <span className="hidden size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 sm:inline-flex">
             <Icon className="size-4" aria-hidden />
           </span>
         </div>
@@ -154,18 +154,16 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard
           title="Total Kunjungan"
           value={stats.totalVisits === null ? unavailable : formatNumber(stats.totalVisits)}
           icon={Eye}
-          subtitle="Semua sesi virtual tour"
         />
         <StatCard
-          title="Total Lead"
+          title="Total Pengajuan"
           value={stats.totalLeads === null ? unavailable : formatNumber(stats.totalLeads)}
           icon={Users}
-          subtitle="Calon tenant terdaftar"
         />
         <StatCard
           title="Unit Tersedia"
@@ -187,7 +185,6 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Kunjungan 7 Hari Terakhir</CardTitle>
-            <CardDescription>Agregat STATION_VIEW per hari</CardDescription>
           </CardHeader>
           <CardContent>
             {hasError("dailyVisits") ? (
@@ -226,7 +223,6 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Status Hunian</CardTitle>
-            <CardDescription>Terisi vs tersedia</CardDescription>
           </CardHeader>
           <CardContent>
             {stats.occupiedSpaces === null || stats.availableSpaces === null ? (
@@ -273,7 +269,6 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Stasiun Paling Banyak Dikunjungi</CardTitle>
-            <CardDescription>Top 8 stasiun dari STATION_VIEW</CardDescription>
           </CardHeader>
           <CardContent>
             {hasError("topStations") ? (
@@ -312,7 +307,6 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Aktivitas Pengguna</CardTitle>
-            <CardDescription>Breakdown event analitik</CardDescription>
           </CardHeader>
           <CardContent>
             {hasError("eventsByType") ? (
@@ -354,7 +348,7 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1.5">
-            <CardTitle className="text-base">Journey Lead Tenant</CardTitle>
+            <CardTitle className="text-base">Tahapan Pengajuan</CardTitle>
             <CardDescription>
               {hasError("leadsByStatus")
                 ? "Ringkasan tahap gagal dimuat"
@@ -421,7 +415,6 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                       <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
                         {formatNumber(step.count)}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">pengajuan di tahap ini</p>
                       <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100" aria-hidden>
                         <div
                           className={cn(

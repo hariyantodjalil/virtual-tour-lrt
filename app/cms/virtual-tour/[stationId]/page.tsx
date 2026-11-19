@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { add, angularDiffDeg, dirToSpherical, sphericalToDir } from "@/lib/spatial/geometry/spherical";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { EditorNotice, useEditorNotice } from "@/components/cms/EditorNotice";
+import { useCompactCmsViewport } from "@/components/cms/useCompactCmsViewport";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -276,12 +277,6 @@ type BulkRow = {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-function subscribeCompactViewport(listener: () => void) {
-  const query = window.matchMedia("(max-width: 1023px)");
-  query.addEventListener("change", listener);
-  return () => query.removeEventListener("change", listener);
-}
-
 export default function VirtualTourEditorPage() {
   const { stationId } = useParams<{ stationId: string }>();
   const query = useSearchParams();
@@ -309,8 +304,7 @@ export default function VirtualTourEditorPage() {
   const [linkedView, setLinkedView] = useState<{ sceneId: string; view: SceneInitialView } | null>(null);
   const [hasUnsaved, setHasUnsaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const compactViewport = useSyncExternalStore(subscribeCompactViewport,
-    () => window.matchMedia("(max-width: 1023px)").matches, () => false);
+  const compactViewport = useCompactCmsViewport();
   const [explorerPreference, setExplorerCollapsed] = useState<boolean | null>(null);
   const [inspectorPreference, setInspectorCollapsed] = useState<boolean | null>(null);
   const explorerCollapsed = explorerPreference ?? compactViewport;
