@@ -23,6 +23,7 @@ import {
   ExternalLink,
   Home,
   MessageSquareHeart,
+  GitBranch,
   type LucideIcon,
 } from "lucide-react";
 import CmsNotifications from "@/components/cms/CmsNotifications";
@@ -73,6 +74,12 @@ const navGroups: NavGroup[] = [
     label: "Pengajuan",
     items: [
       { href: "/cms/leads", label: "Pengajuan & Site Visit", icon: UserCircle },
+      {
+        href: "/cms/workflow",
+        label: "Alur Pengajuan",
+        icon: GitBranch,
+        adminOnly: true,
+      },
       { href: "/cms/advertising-form", label: "Form Advertising", icon: Sliders },
       { href: "/cms/feedback", label: "Feedback", icon: MessageSquareHeart },
     ],
@@ -132,6 +139,13 @@ function getPageMeta(pathname: string) {
     return {
       title: "Pengaturan Sistem",
       subtitle: "Mode maintenance dan konfigurasi sistem",
+    };
+  }
+  if (pathname.startsWith("/cms/workflow")) {
+    return {
+      title: "Alur Pengajuan (Workflow Builder)",
+      subtitle:
+        "Kelola versi tahapan proses, tipe form tahapan, target SLA, syarat dokumen, dan automasi status ruang",
     };
   }
   if (pathname.startsWith("/cms/inquiry-workflow")) {
@@ -420,7 +434,13 @@ export default function CmsShell({
           {fullWidth ? (
             <div className="relative z-10 flex h-full min-h-0 w-full flex-col overflow-hidden">{children}</div>
           ) : (
-            <div className="relative z-10 mx-auto max-w-7xl p-6">{children}</div>
+            <div
+              className={`relative z-10 mx-auto w-full min-w-0 p-6 ${
+                pathname.startsWith("/cms/workflow") ? "max-w-none" : "max-w-7xl"
+              }`}
+            >
+              {children}
+            </div>
           )}
         </div>
       </main>
