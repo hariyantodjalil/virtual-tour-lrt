@@ -40,15 +40,9 @@ export default async function StationPickerPage() {
         <div className="relative z-10 mx-auto w-full max-w-6xl px-5 md:px-10">
           <HomeReveal>
             <div className="text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
-                Virtual Tour 360°
-              </p>
-              <h1 className="mt-3 font-display text-2xl font-bold leading-tight text-white sm:text-3xl md:text-[40px]">
+              <h1 className="font-display text-2xl font-bold leading-tight text-white sm:text-3xl md:text-[40px]">
                 {t("Pilih Stasiun")}
               </h1>
-              <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-white/90 md:text-base">
-                {t("Pilih stasiun untuk memulai pengalaman virtual tour interaktif.")}
-              </p>
             </div>
           </HomeReveal>
 
@@ -65,7 +59,7 @@ export default async function StationPickerPage() {
           </HomeReveal>
 
           {stations.length > 0 ? (
-            <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-7 grid grid-cols-1 gap-5 sm:mt-10 sm:grid-cols-2 lg:grid-cols-3">
               {stations.map((station, index) => (
                 <HomeReveal key={station.slug} delayMs={80 + (index % 3) * 60}>
                   <Link href={`/station/${station.slug}`} className="group block h-full">

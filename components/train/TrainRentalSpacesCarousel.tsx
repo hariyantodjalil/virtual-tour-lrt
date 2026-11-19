@@ -282,11 +282,8 @@ export default function TrainRentalSpacesCarousel({
       <div className="mx-auto max-w-7xl px-5 md:px-10">
         <div className="text-center">
           <h2 className="font-display text-2xl font-bold text-black md:text-[32px] md:leading-tight">
-            {t("Apa yang Ingin Anda Sewa?")}
+            {t("Media Iklan")}
           </h2>
-          <p className="mx-auto mt-3 max-w-3xl text-sm leading-relaxed text-black/75 md:text-[15px]">
-            {t("Pilih berbagai ruang dan fitur interior kereta untuk menempatkan brand Anda di tempat yang tepat.")}
-          </p>
         </div>
 
         <div className="relative mt-10">
