@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import {
   cmsWorkflowVersionInclude,
   getNextPublishedVersionNumber,
+  lockWorkflowVersions,
   serializeWorkflowVersion,
   validateWorkflowForPublish,
 } from "@/lib/cms-workflow";
@@ -18,37 +19,37 @@ export async function POST(request: NextRequest, context: Context) {
   }
 
   const { id } = await context.params;
-  const target = await prisma.pipelineWorkflowVersion.findUnique({
-    where: { id },
-    include: cmsWorkflowVersionInclude,
-  });
+  return prisma.$transaction(async tx => {
+    await lockWorkflowVersions(tx);
+    const target = await tx.pipelineWorkflowVersion.findUnique({
+      where: { id },
+      include: cmsWorkflowVersionInclude,
+    });
 
-  if (!target) {
-    return NextResponse.json({ error: "Versi workflow tidak ditemukan." }, { status: 404 });
-  }
+    if (!target) {
+      return NextResponse.json({ error: "Versi workflow tidak ditemukan." }, { status: 404 });
+    }
 
-  if (target.status !== "DRAFT") {
-    return NextResponse.json(
-      { error: "Hanya versi berstatus DRAFT yang dapat dipublikasikan." },
-      { status: 400 }
-    );
-  }
+    if (target.status !== "DRAFT") {
+      return NextResponse.json(
+        { error: "Hanya versi berstatus DRAFT yang dapat dipublikasikan." },
+        { status: 400 }
+      );
+    }
 
-  const issues = validateWorkflowForPublish(target.steps);
-  if (issues.length > 0) {
-    return NextResponse.json(
-      {
-        error: issues[0],
-        issues,
-      },
-      { status: 400 }
-    );
-  }
+    const issues = validateWorkflowForPublish(target.steps);
+    if (issues.length > 0) {
+      return NextResponse.json(
+        {
+          error: issues[0],
+          issues,
+        },
+        { status: 400 }
+      );
+    }
 
-  const published = await prisma.$transaction(async (tx) => {
     const nextVersion = target.version ?? (await getNextPublishedVersionNumber(tx));
-
-    return tx.pipelineWorkflowVersion.update({
+    const published = await tx.pipelineWorkflowVersion.update({
       where: { id },
       data: {
         version: nextVersion,
@@ -57,9 +58,7 @@ export async function POST(request: NextRequest, context: Context) {
       },
       include: cmsWorkflowVersionInclude,
     });
-  });
 
-  return NextResponse.json({
-    version: serializeWorkflowVersion(published),
+    return NextResponse.json({ version: serializeWorkflowVersion(published) });
   });
 }

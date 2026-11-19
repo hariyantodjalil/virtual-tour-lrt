@@ -122,6 +122,10 @@ export async function getWorkflowVersionById(
 }
 
 /** Menghitung nomor versi resmi berikutnya secara berurutan dari seluruh versi terpublikasi. */
+export async function lockWorkflowVersions(tx: Prisma.TransactionClient) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(82419067)`;
+}
+
 export async function getNextPublishedVersionNumber(
   tx: Prisma.TransactionClient
 ): Promise<number> {
@@ -227,6 +231,12 @@ export function validateWorkflowForPublish(
     }
   }
 
+  if (ordered.filter(step => step.stepType === "SITE_VISIT").length > 1) {
+    issues.push("Satu alur hanya dapat memiliki satu tahap site visit.");
+  }
+  if (ordered.slice(0, -1).some(step => step.spaceEffect === "ACTIVATE_TENANT")) {
+    issues.push("Efek aktivasi penyewa hanya boleh dipakai pada tahap terakhir.");
+  }
   const lastStep = ordered[ordered.length - 1];
   if (!lastStep || lastStep.spaceEffect !== "ACTIVATE_TENANT") {
     issues.push(
