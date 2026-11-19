@@ -14,6 +14,7 @@ type Props = {
 };
 
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
+import { announceAuthLogin } from "@/lib/auth-client";
 
 export default function LoginModal({ open, onClose, onSwitchToRegister, onSuccess }: Props) {
   const { t } = useTourLanguage();
@@ -64,6 +65,7 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
         return;
       }
 
+      if (data.user) announceAuthLogin(data.user, "login");
       onSuccess?.(data.user!);
       onClose();
 
@@ -211,6 +213,7 @@ export default function LoginModal({ open, onClose, onSwitchToRegister, onSucces
         <GoogleSignInButton
           remember={remember}
           onSuccess={(u, redirect) => {
+            announceAuthLogin(u, "login");
             onSuccess?.(u);
             onClose();
             if (u.role === "ADMIN" || u.role === "EDITOR") {

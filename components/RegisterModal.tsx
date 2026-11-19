@@ -15,6 +15,7 @@ type Props = {
 };
 
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
+import { announceAuthLogin } from "@/lib/auth-client";
 
 export default function RegisterModal({
   open,
@@ -52,6 +53,7 @@ export default function RegisterModal({
         return;
       }
 
+      if (data.user) announceAuthLogin(data.user, "register");
       onSuccess?.(data.user);
       onClose();
       // Mitra tetap di halaman saat ini — panel bisa dibuka dari navbar
@@ -218,6 +220,7 @@ export default function RegisterModal({
         <GoogleSignInButton
           remember={remember}
           onSuccess={(u) => {
+            announceAuthLogin(u, "login");
             onSuccess?.(u);
             onClose();
           }}

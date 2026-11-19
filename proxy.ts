@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifyToken, type JWTPayload } from "@/lib/auth";
+import { authCookieName } from "@/lib/auth-cookie";
 import { isMaintenanceActiveFast } from "@/lib/maintenance";
 
 function getCookieToken(request: NextRequest): string | undefined {
-  return request.cookies.get("cms-token")?.value;
+  return request.cookies.get(authCookieName())?.value;
 }
 
 function getApiToken(request: NextRequest): string | undefined {
@@ -70,7 +71,7 @@ export function proxy(request: NextRequest) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
       const response = NextResponse.redirect(loginUrl);
-      if (cookieToken) response.cookies.delete("cms-token");
+      if (cookieToken) response.cookies.delete(authCookieName());
       return response;
     }
 
@@ -85,7 +86,7 @@ export function proxy(request: NextRequest) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
       const response = NextResponse.redirect(loginUrl);
-      if (cookieToken) response.cookies.delete("cms-token");
+      if (cookieToken) response.cookies.delete(authCookieName());
       return response;
     }
 

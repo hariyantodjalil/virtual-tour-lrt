@@ -1,10 +1,11 @@
 import { cookies } from "next/headers";
 import { verifyToken } from "@/lib/auth";
+import { authCookieName } from "@/lib/auth-cookie";
 import { prisma } from "@/lib/prisma";
 
 export async function getCmsSessionUser() {
   try {
-    const token = (await cookies()).get("cms-token")?.value;
+    const token = (await cookies()).get(authCookieName())?.value;
     if (!token) return null;
 
     const payload = verifyToken(token);
