@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import Image from "next/image";
 import Link from "next/link";
 import { Heart, MapPin, Train } from "lucide-react";
@@ -35,6 +36,7 @@ type Props = {
 };
 
 export default function CommercialSpaceCard({ space, favorited, onFavorite }: Props) {
+  const { t, content, locale } = useTourLanguage();
   const occupiedTenant = space.status === "TERISI" ? space.tenantBrand?.trim() : "";
   const statusMeta = STATUS_META[space.status] ?? {
     label: space.status,
@@ -53,7 +55,7 @@ export default function CommercialSpaceCard({ space, favorited, onFavorite }: Pr
       <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
         <Image
           src={getStationImage(space.stationSlug, space.stationOrder)}
-          alt={`${space.name} di ${space.stationName}`}
+          alt={t("{space} di {station}", { space: content(space.name), station: space.stationName })}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 33vw, 20vw"
           className="object-cover transition duration-500 group-hover:scale-105"
@@ -63,19 +65,19 @@ export default function CommercialSpaceCard({ space, favorited, onFavorite }: Pr
           <span
             className={`rounded-full px-2 py-0.5 text-[9px] font-semibold text-white ${statusMeta.className}`}
           >
-            {statusMeta.label}
+            {content(statusMeta.label)}
           </span>
           <span
             className={`rounded-full px-2 py-0.5 text-[9px] font-semibold text-white ${typeMeta.className}`}
           >
-            {typeMeta.label}
+            {content(typeMeta.label)}
           </span>
         </div>
 
         <button
           type="button"
           onClick={(e) => onFavorite(e, space)}
-          aria-label={favorited ? "Hapus dari favorit" : "Tambah ke favorit"}
+          aria-label={favorited ? t("Hapus dari favorit") : t("Tambah ke favorit")}
           className="absolute top-2 right-2 inline-flex size-7 items-center justify-center rounded-full bg-white/90 text-[#98a2b3] shadow-sm transition hover:text-[#d32f2f]"
         >
           <Heart
@@ -91,13 +93,13 @@ export default function CommercialSpaceCard({ space, favorited, onFavorite }: Pr
         </h3>
         {occupiedTenant && (
           <p className="-mt-0.5 truncate text-[9px] font-medium text-[#98a2b3]">
-            Unit {space.code} · {space.name}
+            {t("Unit")} {space.code} · {content(space.name)}
           </p>
         )}
 
         <p className="flex items-center gap-1 truncate text-[10px] text-[#667085]">
           <MapPin className="size-3 shrink-0 text-[#d32f2f]" strokeWidth={2.25} />
-          <span className="truncate">Stasiun {space.stationName}</span>
+          <span className="truncate">{t("Stasiun {station}", { station: space.stationName })}</span>
         </p>
 
         <span className="inline-flex w-fit max-w-full items-center gap-1 rounded-full bg-[#fce8eb] px-2 py-0.5 text-[9px] font-medium text-[#d32f2f]">
@@ -107,13 +109,13 @@ export default function CommercialSpaceCard({ space, favorited, onFavorite }: Pr
 
         <div className="mt-auto flex items-end justify-between gap-1.5 border-t border-[#f2f4f7] pt-2">
           <div className="min-w-0 flex-1">
-            <p className="text-[9px] text-[#98a2b3]">Luas Area</p>
+            <p className="text-[9px] text-[#98a2b3]">{t("Luas Area")}</p>
             <p className="mt-0.5 flex items-center gap-1 text-xs font-bold text-[#101828]">
               <span
                 className="inline-block size-3 shrink-0 rounded-[2px] border border-dashed border-[#98a2b3]"
                 aria-hidden
               />
-              {space.area > 0 ? `${space.area} m²` : "-"}
+              {space.area > 0 ? `${new Intl.NumberFormat(locale).format(space.area)} m²` : "-"}
             </p>
           </div>
 

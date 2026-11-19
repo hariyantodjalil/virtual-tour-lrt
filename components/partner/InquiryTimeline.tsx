@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Check, Circle, LoaderCircle } from "lucide-react";
@@ -7,15 +8,13 @@ import {
   PUBLIC_LEAD_PROCESS_STEPS,
   publicLeadStageIndex,
   completedLeadStageIndex,
-  inquiryStatusLabel,
   SITE_VISIT_STATUS_LABELS,
   type CommercialSiteVisitStatus,
 } from "@/lib/commercial-pipeline";
 
-export { inquiryStatusLabel };
-
 /** Always render the six public milestones, never historical CMS workflow steps. */
 export default function InquiryTimeline({ status, compact = false }: { status: string; compact?: boolean }) {
+  const { t } = useTourLanguage();
   const active = publicLeadStageIndex(status);
   const completed = completedLeadStageIndex(status);
 
@@ -23,7 +22,7 @@ export default function InquiryTimeline({ status, compact = false }: { status: s
     const currentStep = PUBLIC_LEAD_PROCESS_STEPS[Math.max(0, active)] ?? PUBLIC_LEAD_PROCESS_STEPS[0];
     return (
       <div className="space-y-2.5">
-        <ol aria-label="Tahapan proses sewa" className="flex items-center">
+        <ol aria-label={t("Tahapan proses sewa")} className="flex items-center">
           {PUBLIC_LEAD_PROCESS_STEPS.map((step, index) => {
             const done = index <= completed;
             const current = index === active && !done;
@@ -31,7 +30,7 @@ export default function InquiryTimeline({ status, compact = false }: { status: s
               <li
                 key={step.status}
                 aria-current={current ? "step" : undefined}
-                title={step.title}
+                title={t(step.title)}
                 className="relative flex min-w-0 flex-1 items-center justify-center"
               >
                 {index < PUBLIC_LEAD_PROCESS_STEPS.length - 1 ? (
@@ -59,19 +58,19 @@ export default function InquiryTimeline({ status, compact = false }: { status: s
                   )}
                 </span>
                 <span className="sr-only">
-                  {step.title}. {done ? "Selesai" : current ? "Dalam proses" : "Menunggu"}
+                  {t(step.title)}. {done ? t("Selesai") : current ? t("Dalam proses") : t("Menunggu")}
                 </span>
               </li>
             );
           })}
         </ol>
-        <p className="text-sm font-medium text-[#101828]">{currentStep.title}</p>
+        <p className="text-sm font-medium text-[#101828]">{t(currentStep.title)}</p>
       </div>
     );
   }
 
   return (
-    <ol aria-label="Tahapan proses sewa" className="space-y-5">
+    <ol aria-label={t("Tahapan proses sewa")} className="space-y-5">
       {PUBLIC_LEAD_PROCESS_STEPS.map((step, index) => {
         const done = index <= completed;
         const current = index === active && !done;
@@ -97,16 +96,16 @@ export default function InquiryTimeline({ status, compact = false }: { status: s
             </span>
             <div className="min-w-0 pt-0.5">
               <p className={`text-sm ${done || current ? "font-semibold text-slate-900" : "text-slate-600"}`}>
-                {step.title}
+                {t(step.title)}
               </p>
               <p
                 className={`mt-1 text-xs font-medium ${
                   done ? "text-emerald-800" : current ? "text-[#a81724]" : "text-slate-500"
                 }`}
               >
-                {done ? "Selesai" : current ? "Dalam proses" : status === "CLOSED_LOST" ? "Tidak dilanjutkan" : "Menunggu"}
+                {done ? t("Selesai") : current ? t("Dalam proses") : status === "CLOSED_LOST" ? t("Tidak dilanjutkan") : t("Menunggu")}
               </p>
-              <p className="mt-1 text-sm leading-relaxed text-slate-600">{step.detail}</p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">{t(step.detail)}</p>
             </div>
           </li>
         );
@@ -116,6 +115,7 @@ export default function InquiryTimeline({ status, compact = false }: { status: s
 }
 
 export function InquirySiteVisit({ id, status, siteVisitStatus, scheduledAt, preference }: { id: string; status: string; siteVisitStatus: string; scheduledAt: string | null; preference: string | null }) {
+  const { t, locale } = useTourLanguage();
   const router = useRouter();
   const [value, setValue] = useState(preference ?? "");
   const [pending, setPending] = useState(false);
@@ -134,17 +134,17 @@ export function InquirySiteVisit({ id, status, siteVisitStatus, scheduledAt, pre
     finally { setPending(false); }
   }
   return <section className="rounded-2xl border border-slate-200 bg-white p-5">
-    <h2 className="flex items-center gap-2 font-semibold"><CalendarDays aria-hidden="true" className="size-5 text-[#c41230]" />Site visit · Negosiasi</h2>
-    <p className="mt-2 text-sm leading-relaxed text-slate-600">Kunjungan lokasi merupakan bagian dari negosiasi, bukan tahapan terpisah.</p>
-    {(siteVisitStatus !== "NONE" || submitted) && <p role="status" className="mt-3 text-sm font-medium">{submitted ? "Permintaan site visit terkirim" : SITE_VISIT_STATUS_LABELS[siteVisitStatus as CommercialSiteVisitStatus] ?? siteVisitStatus}</p>}
-    {scheduledAt && <p className="mt-2 text-sm">{new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(new Date(scheduledAt))} WIB</p>}
-    {preference && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-600">Preferensi: {preference}</p>}
+    <h2 className="flex items-center gap-2 font-semibold"><CalendarDays aria-hidden="true" className="size-5 text-[#c41230]" />{t("Site visit · Negosiasi")}</h2>
+    <p className="mt-2 text-sm leading-relaxed text-slate-600">{t("Kunjungan lokasi merupakan bagian dari negosiasi, bukan tahapan terpisah.")}</p>
+    {(siteVisitStatus !== "NONE" || submitted) && <p role="status" className="mt-3 text-sm font-medium">{submitted ? t("Permintaan site visit terkirim") : t(SITE_VISIT_STATUS_LABELS[siteVisitStatus as CommercialSiteVisitStatus] ?? siteVisitStatus)}</p>}
+    {scheduledAt && <p className="mt-2 text-sm">{new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Jakarta" }).format(new Date(scheduledAt))} {t("WIB")}</p>}
+    {preference && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-600">{t("Preferensi:")} {preference}</p>}
     {canRequest && <form onSubmit={submit} className="mt-4">
-      <label htmlFor="survey-preference" className="block text-sm font-medium">Preferensi waktu kunjungan</label>
-      <textarea id="survey-preference" required minLength={3} maxLength={500} rows={3} value={value} onChange={event => setValue(event.target.value)} placeholder="Tuliskan hari, waktu, dan kebutuhan kunjungan Anda" className="mt-2 w-full rounded-lg border border-slate-300 p-3 text-sm focus-visible:outline-2 focus-visible:outline-[#c41230]" />
-      <p className="mt-1 text-xs text-slate-600">Tim komersial akan mengonfirmasi jadwal kunjungan.</p>
-      {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
-      <button type="submit" disabled={pending || value.trim().length < 3} className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#c41230] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a80f29] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230] disabled:opacity-50">{pending && <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />}{pending ? "Mengirim…" : "Ajukan site visit"}</button>
+      <label htmlFor="survey-preference" className="block text-sm font-medium">{t("Preferensi waktu kunjungan")}</label>
+      <textarea id="survey-preference" required minLength={3} maxLength={500} rows={3} value={value} onChange={event => setValue(event.target.value)} placeholder={t("Tuliskan hari, waktu, dan kebutuhan kunjungan Anda")} className="mt-2 w-full rounded-lg border border-slate-300 p-3 text-sm focus-visible:outline-2 focus-visible:outline-[#c41230]" />
+      <p className="mt-1 text-xs text-slate-600">{t("Tim komersial akan mengonfirmasi jadwal kunjungan.")}</p>
+      {error && <p role="alert" className="mt-3 text-sm text-red-700">{t(error)}</p>}
+      <button type="submit" disabled={pending || value.trim().length < 3} className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#c41230] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a80f29] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230] disabled:opacity-50">{pending && <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />}{pending ? t("Mengirim…") : t("Ajukan site visit")}</button>
     </form>}
   </section>;
 }

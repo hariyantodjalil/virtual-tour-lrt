@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useEffect, useState, type BaseSyntheticEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useActiveInquiry } from "@/lib/use-active-inquiry";
@@ -190,6 +191,7 @@ export default function TenantInterestForm({
   layout = "stack",
   aside,
 }: Props) {
+  const { t: translate } = useTourLanguage();
   const t: Tone = TONES[tone];
   const isLedger = layout === "ledger";
   const labelClass = t.label;
@@ -274,11 +276,11 @@ export default function TenantInterestForm({
         if (res.status === 409 && typeof error?.existingInquiryId === "string") {
           setDuplicateInquiryId(error.existingInquiryId);
         } else {
-          alert(error?.error ?? "Gagal mengirim formulir. Coba lagi.");
+          alert(translate(error?.error ?? "Gagal mengirim formulir. Coba lagi."));
         }
       }
     } catch (error) {
-      alert(error instanceof z.ZodError ? error.issues[0].message : "Gagal mengirim formulir. Coba lagi.");
+      alert(translate(error instanceof z.ZodError ? error.issues[0].message : "Gagal mengirim formulir. Coba lagi."));
     } finally {
       setIsLoading(false);
     }
@@ -321,10 +323,10 @@ export default function TenantInterestForm({
       if (res.status === 409 && typeof error?.existingInquiryId === "string") {
         setDuplicateInquiryId(error.existingInquiryId);
       } else {
-        alert(error?.error ?? "Gagal mengirim pengajuan. Coba lagi.");
+        alert(translate(error?.error ?? "Gagal mengirim pengajuan. Coba lagi."));
       }
     } catch (error) {
-      alert(error instanceof z.ZodError ? error.issues[0].message : "Gagal mengirim pengajuan. Coba lagi.");
+      alert(translate(error instanceof z.ZodError ? error.issues[0].message : "Gagal mengirim pengajuan. Coba lagi."));
     } finally {
       setIsLoading(false);
     }
@@ -342,7 +344,7 @@ export default function TenantInterestForm({
     >
       {isLoading ? (
         <>
-          <Loader2 className="size-4 animate-spin" /> Mengirim...
+          <Loader2 className="size-4 animate-spin" /> {translate("Mengirim...")}
         </>
       ) : (
         <>
@@ -375,7 +377,7 @@ export default function TenantInterestForm({
           {note ? <div className="mt-4 lg:mt-6">{note}</div> : null}
           <div className={cn("mt-8 hidden border-t pt-6 lg:block", t.ledgerHairline)}>
             <p className={cn("text-[11px] font-semibold tracking-[0.16em] uppercase", t.ledgerStepHead)}>
-              Setelah dikirim
+              {translate("Setelah dikirim")}
             </p>
             <ol className="mt-4 space-y-4">
               {leasingSteps.map((step) => (
@@ -384,7 +386,7 @@ export default function TenantInterestForm({
                     {step.stepOrder}
                   </span>
                   <span className="min-w-0">
-                    <span className={cn("block text-sm font-semibold", t.ledgerStepTitle)}>{step.title}</span>
+                    <span className={cn("block text-sm font-semibold", t.ledgerStepTitle)}>{translate(step.title)}</span>
                     <span className={cn("mt-0.5 block text-xs leading-snug", t.ledgerStepDetail)}>{step.publicMessage}</span>
                   </span>
                 </li>
@@ -428,16 +430,16 @@ export default function TenantInterestForm({
                     htmlFor={field.id}
                     className={cn("text-xs transition-colors lg:pt-2.5 lg:text-sm", t.ledgerFieldLabel)}
                   >
-                    {field.label}
+                    {translate(field.label)}
                     {field.required ? <span className={t.ledgerRequired}> *</span> : null}
-                    {field.optional ? <span className={t.ledgerOptional}> (opsional)</span> : null}
+                    {field.optional ? <span className={t.ledgerOptional}> {translate("(opsional)")}</span> : null}
                   </label>
                   <div className="min-w-0">
                     {field.multiline ? (
                       <textarea
                         id={field.id}
                         rows={2}
-                        placeholder={field.placeholder}
+                        placeholder={field.placeholder ? translate(field.placeholder) : undefined}
                         aria-invalid={field.error ? true : undefined}
                         aria-describedby={describedBy || undefined}
                         className={cn(control, "py-1 lg:py-2")}
@@ -447,7 +449,7 @@ export default function TenantInterestForm({
                       <input
                         id={field.id}
                         type={field.type ?? "text"}
-                        placeholder={field.placeholder}
+                        placeholder={field.placeholder ? translate(field.placeholder) : undefined}
                         autoComplete={field.autoComplete}
                         aria-invalid={field.error ? true : undefined}
                         aria-describedby={describedBy || undefined}
@@ -462,7 +464,7 @@ export default function TenantInterestForm({
                     ) : null}
                     {field.error ? (
                       <p id={`${field.id}-error`} className={cn("mt-1", t.error)}>
-                        {field.error}
+                        {translate(field.error)}
                       </p>
                     ) : null}
                   </div>
@@ -483,19 +485,19 @@ export default function TenantInterestForm({
     return (
       <div className={cn("flex items-center justify-center gap-2 py-10 text-sm", t.muted, isLedger && "flex-1")}>
         <Loader2 className="h-4 w-4 animate-spin" />
-        Memuat formulir...
+        {translate("Memuat formulir...")}
       </div>
     );
   }
 
   if (activeInquiry.error) {
-    return <div role="alert" className="space-y-3 p-5"><p className="text-sm">{activeInquiry.error}</p><Button type="button" onClick={activeInquiry.retry}>Coba lagi</Button></div>;
+    return <div role="alert" className="space-y-3 p-5"><p className="text-sm">{translate(activeInquiry.error)}</p><Button type="button" onClick={activeInquiry.retry}>{translate("Coba lagi")}</Button></div>;
   }
 
   if (existingInquiryId) {
     return <div role="status" className={cn("space-y-4 p-5", t.text)}>
-      <p className="text-sm">Pengajuan aktif untuk unit ini sudah tercatat.</p>
-      <Button asChild className="bg-[#E31E2D] text-white hover:bg-[#c41926]"><Link href={`/partner/inquiries/${encodeURIComponent(existingInquiryId)}`}>Pantau pengajuan</Link></Button>
+      <p className="text-sm">{translate("Pengajuan aktif untuk unit ini sudah tercatat.")}</p>
+      <Button asChild className="bg-[#E31E2D] text-white hover:bg-[#c41926]"><Link href={`/partner/inquiries/${encodeURIComponent(existingInquiryId)}`}>{translate("Pantau pengajuan")}</Link></Button>
     </div>;
   }
 
@@ -505,9 +507,9 @@ export default function TenantInterestForm({
         <div className="flex flex-col items-center gap-3 text-center">
           <CheckCircle className="h-10 w-10 text-emerald-500" />
           <div>
-            <p className="font-bold">Minat Anda Tercatat</p>
+            <p className="font-bold">{translate("Minat Anda Tercatat")}</p>
             <p className={cn("mt-1 text-sm", t.muted)}>
-              Pengajuan untuk {spaceCode} di {stationName} sudah masuk. Tim KAI meninjau sebelum ada penawaran resmi.
+              {translate("Pengajuan untuk")} {spaceCode} {translate("di")} {stationName} {translate("sudah masuk. Tim KAI meninjau sebelum ada penawaran resmi.")}
             </p>
           </div>
         </div>
@@ -516,7 +518,7 @@ export default function TenantInterestForm({
             <li key={step.stepOrder} className="flex gap-3">
               <span className="font-display text-xs font-bold text-[#E31E2D]">{step.stepOrder}</span>
               <span>
-                <span className="block text-sm font-semibold">{step.title}</span>
+                <span className="block text-sm font-semibold">{translate(step.title)}</span>
                 <span className={cn("block text-xs", t.muted)}>{step.publicMessage}</span>
               </span>
             </li>
@@ -524,7 +526,7 @@ export default function TenantInterestForm({
         </ol>
         <div className="mt-5 flex justify-center">
           <Button asChild className="bg-[#E31E2D] hover:bg-[#c41926]">
-            <Link href={submittedInquiryId ? `/partner/inquiries/${encodeURIComponent(submittedInquiryId)}` : "/partner"}>Pantau pengajuan</Link>
+            <Link href={submittedInquiryId ? `/partner/inquiries/${encodeURIComponent(submittedInquiryId)}` : "/partner"}>{translate("Pantau pengajuan")}</Link>
           </Button>
         </div>
       </div>
@@ -551,8 +553,7 @@ export default function TenantInterestForm({
           <p className={cn("flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-xs leading-relaxed lg:text-sm", t.partnerNote)}>
             <UserRound className={cn("mt-0.5 size-4 shrink-0", t.partnerIcon)} />
             <span>
-              Login sebagai <span className="font-semibold">{authUser.name}</span>. Pengajuan langsung
-              masuk ke Panel Mitra Anda.
+              {translate("Login sebagai")} <span className="font-semibold">{authUser.name}</span>{translate(". Pengajuan langsung masuk ke Panel Mitra Anda.")}
             </span>
           </p>
         ),
@@ -618,8 +619,8 @@ export default function TenantInterestForm({
             <UserRound className="size-4" />
           </span>
           <p>
-            Login sebagai <span className="font-semibold">{authUser.name}</span> ({authUser.email}
-            ). Pengajuan akan langsung masuk ke Panel Mitra Anda.
+            {translate("Login sebagai")} <span className="font-semibold">{authUser.name}</span> ({authUser.email}
+            {translate("). Pengajuan akan langsung masuk ke Panel Mitra Anda.")}
           </p>
         </div>
 
@@ -631,33 +632,33 @@ export default function TenantInterestForm({
               t.dividerLabel
             )}
           >
-            Pengajuan Cepat
+            {translate("Pengajuan Cepat")}
           </p>
         </div>
 
         <div className={cn("space-y-2", full)}>
           <Label htmlFor="businessType" className={labelClass}>
-            Jenis Usaha *
+            {translate("Jenis Usaha *")}
           </Label>
           <FieldShell icon={<Briefcase className="size-4" />} filled={businessFilled} iconClass={t.faint}>
             <Input
               id="businessType"
-              placeholder="F&B, Retail, Perbankan, dll."
+              placeholder={translate("F&B, Retail, Perbankan, dll.")}
               className={cn(inputClass, fieldPad(businessFilled))}
               {...register("businessType")}
             />
           </FieldShell>
-          {errors.businessType && <p className={t.error}>{errors.businessType.message}</p>}
+          {errors.businessType && <p className={t.error}>{errors.businessType.message && translate(errors.businessType.message)}</p>}
         </div>
 
         <div className={cn("space-y-2", "")}>
           <Label htmlFor="companyName" className={labelClass}>
-            Nama Perusahaan
+            {translate("Nama Perusahaan")}
           </Label>
           <FieldShell icon={<Building2 className="size-4" />} filled={companyFilled} iconClass={t.faint}>
             <Input
               id="companyName"
-              placeholder="Opsional jika sudah pernah mengajukan"
+              placeholder={translate("Opsional jika sudah pernah mengajukan")}
               className={cn(inputClass, fieldPad(companyFilled))}
               {...register("companyName")}
             />
@@ -666,7 +667,7 @@ export default function TenantInterestForm({
 
         <div className={cn("space-y-2", "")}>
           <Label htmlFor="phone" className={labelClass}>
-            Telepon {needsPhone ? "*" : "(opsional)"}
+            {translate("Telepon")} {needsPhone ? "*" : translate("(opsional)")}
           </Label>
           <FieldShell icon={<Phone className="size-4" />} filled={phoneFilled} iconClass={t.faint}>
             <Input
@@ -677,12 +678,12 @@ export default function TenantInterestForm({
               {...register("phone")}
             />
           </FieldShell>
-          {errors.phone && <p className={t.error}>{errors.phone.message}</p>}
+          {errors.phone && <p className={t.error}>{errors.phone.message && translate(errors.phone.message)}</p>}
         </div>
 
         <div className={cn("space-y-2", full)}>
           <Label htmlFor="message" className={labelClass}>
-            Pesan Tambahan
+            {translate("Pesan Tambahan")}
           </Label>
           <div className="relative">
             {!messageFilled ? (
@@ -692,7 +693,7 @@ export default function TenantInterestForm({
             ) : null}
             <Textarea
               id="message"
-              placeholder="Kebutuhan khusus, pertanyaan, dll."
+              placeholder={translate("Kebutuhan khusus, pertanyaan, dll.")}
               className={cn(textareaClass, fieldPad(messageFilled))}
               {...register("message")}
             />
@@ -710,12 +711,12 @@ export default function TenantInterestForm({
         >
           {isLoading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Mengirim...
+              <Loader2 className="h-4 w-4 animate-spin" /> {translate("Mengirim...")}
             </>
           ) : (
             <>
               <Send className="h-4 w-4" />
-              Kirim Pengajuan Sewa
+              {translate("Kirim Pengajuan Sewa")}
             </>
           )}
         </button>
@@ -824,28 +825,28 @@ export default function TenantInterestForm({
     >
       {!isModal && (
         <p className={cn("text-xs font-black tracking-[0.18em] uppercase", t.sectionTitle, full)}>
-          Formulir Minat Sewa
+          {translate("Formulir Minat Sewa")}
         </p>
       )}
 
         <div className={cn("space-y-2", "")}>
           <Label htmlFor="companyName" className={labelClass}>
-            Nama Perusahaan *
+            {translate("Nama Perusahaan *")}
           </Label>
           <FieldShell icon={<Building2 className="size-4" />} filled={companyFilled} iconClass={t.faint}>
             <Input
               id="companyName"
-              placeholder="PT Contoh"
+              placeholder={translate("PT Contoh")}
               className={cn(inputClass, fieldPad(companyFilled))}
               {...register("companyName")}
             />
           </FieldShell>
-          {errors.companyName && <p className={t.error}>{errors.companyName.message}</p>}
+          {errors.companyName && <p className={t.error}>{errors.companyName.message && translate(errors.companyName.message)}</p>}
         </div>
 
         <div className={cn("space-y-2", "")}>
           <Label htmlFor="contactName" className={labelClass}>
-            Nama Kontak *
+            {translate("Nama Kontak *")}
           </Label>
           <FieldShell icon={<UserRound className="size-4" />} filled={contactFilled} iconClass={t.faint}>
             <Input
@@ -855,12 +856,12 @@ export default function TenantInterestForm({
               {...register("contactName")}
             />
           </FieldShell>
-          {errors.contactName && <p className={t.error}>{errors.contactName.message}</p>}
+          {errors.contactName && <p className={t.error}>{errors.contactName.message && translate(errors.contactName.message)}</p>}
         </div>
 
         <div className={cn("space-y-2", "")}>
           <Label htmlFor="phone" className={labelClass}>
-            Telepon *
+            {translate("Telepon *")}
           </Label>
           <FieldShell icon={<Phone className="size-4" />} filled={phoneFilled} iconClass={t.faint}>
             <Input
@@ -871,7 +872,7 @@ export default function TenantInterestForm({
               {...register("phone")}
             />
           </FieldShell>
-          {errors.phone && <p className={t.error}>{errors.phone.message}</p>}
+          {errors.phone && <p className={t.error}>{errors.phone.message && translate(errors.phone.message)}</p>}
         </div>
 
         <div className={cn("space-y-2", "")}>
@@ -887,45 +888,45 @@ export default function TenantInterestForm({
               {...register("email")}
             />
           </FieldShell>
-          {errors.email && <p className={t.error}>{errors.email.message}</p>}
+          {errors.email && <p className={t.error}>{errors.email.message && translate(errors.email.message)}</p>}
         </div>
 
         <div className={cn("space-y-2", full)}>
           <Label htmlFor="password" className={labelClass}>
-            Password Akun Mitra *
+            {translate("Password Akun Mitra *")}
           </Label>
           <Input
             id="password"
             type="password"
-            placeholder="Minimal 8 karakter"
+            placeholder={translate("Minimal 8 karakter")}
             aria-describedby="password-hint"
             className={inputClass}
             {...register("password")}
           />
           <p id="password-hint" className={cn("text-xs", t.muted)}>
-            Password ini dipakai untuk login dan memantau status pengajuan Anda.
+            {translate("Password ini dipakai untuk login dan memantau status pengajuan Anda.")}
           </p>
-          {errors.password && <p className={t.error}>{errors.password.message}</p>}
+          {errors.password && <p className={t.error}>{errors.password.message && translate(errors.password.message)}</p>}
         </div>
 
         <div className={cn("space-y-2", full)}>
           <Label htmlFor="businessType" className={labelClass}>
-            Jenis Usaha *
+            {translate("Jenis Usaha *")}
           </Label>
           <FieldShell icon={<Briefcase className="size-4" />} filled={businessFilled} iconClass={t.faint}>
             <Input
               id="businessType"
-              placeholder="F&B, Retail, Perbankan, dll."
+              placeholder={translate("F&B, Retail, Perbankan, dll.")}
               className={cn(inputClass, fieldPad(businessFilled))}
               {...register("businessType")}
             />
           </FieldShell>
-          {errors.businessType && <p className={t.error}>{errors.businessType.message}</p>}
+          {errors.businessType && <p className={t.error}>{errors.businessType.message && translate(errors.businessType.message)}</p>}
         </div>
 
         <div className={cn("space-y-2", full)}>
           <Label htmlFor="message" className={labelClass}>
-            Pesan Tambahan
+            {translate("Pesan Tambahan")}
           </Label>
           <div className="relative">
             {!messageFilled ? (
@@ -935,7 +936,7 @@ export default function TenantInterestForm({
             ) : null}
             <Textarea
               id="message"
-              placeholder="Kebutuhan khusus, pertanyaan, dll."
+              placeholder={translate("Kebutuhan khusus, pertanyaan, dll.")}
               className={cn(textareaClass, fieldPad(messageFilled))}
               {...register("message")}
             />
@@ -953,12 +954,12 @@ export default function TenantInterestForm({
         >
           {isLoading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Mengirim...
+              <Loader2 className="h-4 w-4 animate-spin" /> {translate("Mengirim...")}
             </>
           ) : (
             <>
               <Send className="h-4 w-4" />
-              Kirim Minat Sewa
+              {translate("Kirim Minat Sewa")}
             </>
           )}
         </button>

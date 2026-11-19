@@ -12,6 +12,7 @@ import {
   startCameraSync,
   type PannellumViewerLike,
 } from "@/lib/spatial/pannellum-adapter";
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { spatialAreaBadgeCaption } from "@/lib/spatial/normalize";
 import { spatialUnitInteractionKeys } from "@/lib/spatial/unit-groups";
 import { validateSphericalPolygonAuthoring } from "@/lib/spatial/geometry/polygon-validation";
@@ -97,6 +98,7 @@ function SpatialOverlayContent({
   onEditError,
   onCloseDraft,
 }: Props) {
+  const { t, content } = useTourLanguage();
   const [camera, setCamera] = useState<CameraState | null>(null);
   const hasGeometry = entities.some((entity) => entity.enabled) || draftVertices.length > 0;
   const [hoveredUnitKey, setHoveredUnitKey] = useState<string | null>(null);
@@ -246,7 +248,7 @@ function SpatialOverlayContent({
           style.strokeColor ??
           (status ? spaceStatusColor(status) : "#4ADE80");
         const fill = style.fillColor ?? stroke;
-        const caption = spatialAreaBadgeCaption(entity, status);
+        const caption = content(spatialAreaBadgeCaption(entity, status));
         const pill = pillColors(status);
         const approxCharW = 7.2;
         const maxPillW = Math.max(80, Math.min(360, width - 16));
@@ -475,7 +477,7 @@ function SpatialOverlayContent({
                 fontWeight={600}
                 style={{ fontFamily: "Source Sans 3, system-ui, sans-serif" }}
               >
-                Boundary Indicative*
+                {t("Batas area perkiraan*")}
               </text>
             )}
           </g>

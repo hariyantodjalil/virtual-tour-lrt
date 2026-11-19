@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import Image from "next/image";
 import Link from "next/link";
 import { Building2, CalendarDays, Glasses, MapPin, Store } from "lucide-react";
@@ -35,9 +36,8 @@ export type ActiveTenancy = {
   }>;
 };
 
-function formatDate(value: string | null) {
-  if (!value) return "Tanggal mulai belum dicatat";
-  return new Date(value).toLocaleDateString("id-ID", {
+function formatDate(value: string, locale: string) {
+  return new Date(value).toLocaleDateString(locale, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -53,6 +53,7 @@ export default function ActiveTenanciesSection({
   tenancies: ActiveTenancy[];
   loading: boolean;
 }) {
+  const { t, locale, content } = useTourLanguage();
   const totalUnits = tenancies.reduce(
     (total, tenant) => total + tenant.occupancies.length,
     0
@@ -62,13 +63,13 @@ export default function ActiveTenanciesSection({
     <>
       <div>
         <p className="text-base text-slate-600 md:text-lg">
-          Halo, <span className="font-semibold text-[#101828]">{displayName}</span>
+          {t("Halo,")} <span className="font-semibold text-[#101828]">{displayName}</span>
         </p>
         <h1 className="mt-3 text-2xl font-bold tracking-tight text-[#101828] md:text-[28px]">
-          Unit Aktif Saya
+          {t("Unit Aktif Saya")}
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-500">
-          Daftar brand dan ruang komersial yang sudah memasuki tahap operasional.
+          {t("Daftar brand dan ruang komersial yang sudah memasuki tahap operasional.")}
         </p>
       </div>
 
@@ -80,7 +81,7 @@ export default function ActiveTenanciesSection({
             </span>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Brand Aktif
+                {t("Brand Aktif")}
               </p>
               <p className="text-2xl font-bold text-[#101828]">{tenancies.length}</p>
             </div>
@@ -93,7 +94,7 @@ export default function ActiveTenanciesSection({
             </span>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Unit Beroperasi
+                {t("Unit Beroperasi")}
               </p>
               <p className="text-2xl font-bold text-[#101828]">{totalUnits}</p>
             </div>
@@ -103,17 +104,16 @@ export default function ActiveTenanciesSection({
 
       {loading ? (
         <div className="mt-6 rounded-2xl border border-slate-200 bg-white py-16 text-center text-sm text-slate-500">
-          Memuat unit aktif...
+          {t("Memuat unit aktif...")}
         </div>
       ) : tenancies.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
           <Building2 className="mx-auto size-12 text-slate-300" />
           <h2 className="mt-4 text-lg font-bold text-[#101828]">
-            Belum ada unit yang beroperasi
+            {t("Belum ada unit yang beroperasi")}
           </h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-            Unit akan muncul otomatis ketika admin mengubah pengajuan Anda ke
-            Operasional Komersial.
+            {t("Unit akan muncul otomatis ketika admin mengubah pengajuan Anda ke Operasional Komersial.")}
           </p>
         </div>
       ) : (
@@ -145,12 +145,12 @@ export default function ActiveTenanciesSection({
                     <h2 className="font-bold text-[#101828]">{tenant.brandName}</h2>
                     <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                       <MapPin className="size-3.5" />
-                      {tenant.station.name} · {tenant.station.line}
+                      {tenant.station.name} · {content(tenant.station.line)}
                     </p>
                   </div>
                 </div>
                 <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  Operasional
+                  {t("Operasional")}
                 </span>
               </div>
 
@@ -162,15 +162,15 @@ export default function ActiveTenanciesSection({
                   >
                     <div>
                       <p className="font-semibold text-[#101828]">
-                        {occupancy.space.code} — {occupancy.space.name}
+                        {occupancy.space.code} — {content(occupancy.space.name)}
                       </p>
                       <p className="mt-1 text-sm text-slate-500">
-                        {occupancy.space.floor} · {occupancy.space.location} ·{" "}
+                        {content(occupancy.space.floor)} · {content(occupancy.space.location)} ·{" "}
                         {occupancy.space.area} m²
                       </p>
                       <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
                         <CalendarDays className="size-3.5 text-emerald-600" />
-                        Aktif sejak {formatDate(occupancy.startDate)}
+                        {occupancy.startDate ? t("Aktif sejak {date}", { date: formatDate(occupancy.startDate, locale) }) : t("Tanggal mulai belum dicatat")}
                       </p>
                     </div>
                     <Link
@@ -178,7 +178,7 @@ export default function ActiveTenanciesSection({
                       className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#c41230] px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
                     >
                       <Glasses className="size-4" />
-                      Lihat di Virtual Tour
+                      {t("Lihat di Virtual Tour")}
                     </Link>
                   </div>
                 ))}

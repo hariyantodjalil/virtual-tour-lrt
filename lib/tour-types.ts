@@ -4,6 +4,7 @@ import type { PannellumMultiRes } from "./panorama-multires";
 import type { PanoramaMultiResProfiles } from "./panorama-profile";
 
 export type Hotspot = {
+  pinId?: string;
   pitch: number;
   yaw: number;
   type: "scene" | "space" | "info" | "ad";

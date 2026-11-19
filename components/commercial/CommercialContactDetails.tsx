@@ -1,19 +1,21 @@
 "use client";
 
 import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useCommercialProfile } from "@/components/commercial/CommercialProfileProvider";
 import { getWhatsAppUrl } from "@/lib/utils";
 
 export default function CommercialContactDetails() {
   const profile = useCommercialProfile();
+  const { content } = useTourLanguage();
   const whatsappUrl = getWhatsAppUrl(
     profile.whatsappNumber,
-    profile.defaultWhatsappMessage
+    content(profile.defaultWhatsappMessage)
   );
 
   return (
     <div className="mt-5 border-t border-black/10 pt-4">
-      <p className="text-xs font-bold text-black">{profile.teamName}</p>
+      <p className="text-xs font-bold text-black">{content(profile.teamName)}</p>
       {profile.contactPersonName && (
         <p className="mt-1 text-xs text-black/65">{profile.contactPersonName}</p>
       )}

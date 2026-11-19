@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -98,8 +99,8 @@ function coverUrl(panoramaUrl: string | null | undefined) {
   return getS3ProxyUrl(panoramaUrl);
 }
 
-function priceLabel(monthlyRent: number | undefined | null) {
-  if (monthlyRent && monthlyRent > 0) return formatRupiah(monthlyRent);
+function priceLabel(monthlyRent: number | undefined | null, locale: string) {
+  if (monthlyRent && monthlyRent > 0) return formatRupiah(monthlyRent, locale);
   return null;
 }
 
@@ -123,6 +124,7 @@ export default function ApplicationsSection({
   onExplore,
   pickerReady,
 }: Props) {
+  const { t, locale, content } = useTourLanguage();
   const router = useRouter();
   const [filter, setFilter] = useState<FilterTab>("semua");
   const [recommendations, setRecommendations] = useState<RecommendedSpace[]>([]);
@@ -174,13 +176,13 @@ export default function ApplicationsSection({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-base text-slate-600 md:text-lg">
-            Halo, <span className="font-semibold text-[#101828]">{displayName}</span>
+            {t("Halo,")} <span className="font-semibold text-[#101828]">{displayName}</span>
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#101828] md:text-3xl">
-            Pengajuan Sewa
+            {t("Pengajuan Sewa")}
           </h1>
           <p className="mt-1 max-w-xl text-sm text-slate-500">
-            Pantau progres, site visit, dan tindak lanjut pengajuan Anda.
+            {t("Pantau progres, site visit, dan tindak lanjut pengajuan Anda.")}
           </p>
         </div>
         <button
@@ -190,21 +192,21 @@ export default function ApplicationsSection({
           className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#c41230] px-4 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="size-4" strokeWidth={2.5} aria-hidden />
-          Ajukan Penyewaan Baru
+          {t("Ajukan Penyewaan Baru")}
         </button>
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <SummaryStat label="Total" value={summary.total} icon={<FileText className="size-3.5" />} />
-          <SummaryStat label="Diproses" value={summary.diproses} icon={<Clock3 className="size-3.5" />} />
+          <SummaryStat label={t("Diproses")} value={summary.diproses} icon={<Clock3 className="size-3.5" />} />
           <SummaryStat
-            label="Site Visit"
+            label={t("Site Visit")}
             value={summary.siteVisit}
             icon={<CalendarDays className="size-3.5" />}
           />
           <SummaryStat
-            label="Sewa Aktif"
+            label={t("Sewa Aktif")}
             value={summary.disetujui}
             icon={<CheckCircle2 className="size-3.5" />}
           />
@@ -214,14 +216,14 @@ export default function ApplicationsSection({
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-lg font-bold text-[#101828]">Pengajuan Saya</h2>
+            <h2 className="text-lg font-bold text-[#101828]">{t("Pengajuan Saya")}</h2>
             <p className="mt-0.5 text-sm text-slate-500">
-              {filtered.length} pengajuan pada filter ini
+              {filtered.length} {t("pengajuan pada filter ini")}
             </p>
           </div>
           <div
             role="tablist"
-            aria-label="Filter pengajuan"
+            aria-label={t("Filter pengajuan")}
             className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1"
           >
             {tabs.map((tab) => {
@@ -243,7 +245,7 @@ export default function ApplicationsSection({
                       : "text-slate-500 hover:text-slate-800"
                   )}
                 >
-                  {tab.label}
+                  {t(tab.label)}
                   <span
                     className={cn(
                       "rounded-md px-1.5 py-0.5 text-xs tabular-nums",
@@ -261,7 +263,7 @@ export default function ApplicationsSection({
         <div className="mt-5 space-y-3">
           {loading ? (
             <div className="rounded-xl border border-dashed border-slate-200 px-4 py-16 text-center text-sm text-slate-500">
-              Memuat pengajuan…
+              {t("Memuat pengajuan…")}
             </div>
           ) : visibleLeads.length === 0 ? (
             <EmptyApplications onExplore={onExplore} pickerReady={pickerReady} filter={filter} />
@@ -283,7 +285,7 @@ export default function ApplicationsSection({
               onClick={() => setShowAll(true)}
               className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[#c41230] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230]"
             >
-              Lihat semua {filtered.length} pengajuan
+              {t("Lihat semua")} {filtered.length} {t("pengajuan")}
               <ChevronRight className="size-4" aria-hidden />
             </button>
           </div>
@@ -292,8 +294,8 @@ export default function ApplicationsSection({
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-base font-bold text-[#101828]">Rekomendasi untuk Anda</h3>
-          <p className="mt-0.5 text-sm text-slate-500">Unit tersedia yang cocok untuk dijelajahi.</p>
+          <h3 className="text-base font-bold text-[#101828]">{t("Rekomendasi untuk Anda")}</h3>
+          <p className="mt-0.5 text-sm text-slate-500">{t("Unit tersedia yang cocok untuk dijelajahi.")}</p>
           <div className="mt-4 space-y-3">
             {recommendations.slice(0, 3).map((space) => {
               const image = coverUrl(space.panoramaUrl);
@@ -306,7 +308,7 @@ export default function ApplicationsSection({
                     {image ? (
                       <Image
                         src={image}
-                        alt={space.name}
+                        alt={content(space.name)}
                         fill
                         sizes="64px"
                         className="object-cover"
@@ -320,12 +322,12 @@ export default function ApplicationsSection({
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-[#101828]">
-                      {space.code} — {space.name}
+                      {space.code} — {content(space.name)}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-slate-500">
                       {space.station.name} · {space.area} m²
-                      {priceLabel(space.monthlyRent)
-                        ? ` · ${priceLabel(space.monthlyRent)}`
+                      {priceLabel(space.monthlyRent, locale)
+                        ? ` · ${priceLabel(space.monthlyRent, locale)}`
                         : ""}
                     </p>
                   </div>
@@ -333,33 +335,33 @@ export default function ApplicationsSection({
                     href={`/station/${space.station.slug}?unit=${space.id}`}
                     className="inline-flex shrink-0 items-center self-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230]"
                   >
-                    Lihat
+                    {t("Lihat")}
                   </Link>
                 </div>
               );
             })}
             {recommendations.length === 0 ? (
               <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-                Belum ada rekomendasi unit.
+                {t("Belum ada rekomendasi unit.")}
               </p>
             ) : null}
           </div>
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-base font-bold text-[#101828]">Site Visit</h3>
-          <p className="mt-0.5 text-sm text-slate-500">Jadwal dan status kunjungan lokasi.</p>
+          <h3 className="text-base font-bold text-[#101828]">{t("Site Visit")}</h3>
+          <p className="mt-0.5 text-sm text-slate-500">{t("Jadwal dan status kunjungan lokasi.")}</p>
           {siteVisits.length > 0 ? (
             <ul className="mt-4 space-y-3">
               {siteVisits.slice(0, 4).map((lead) => (
                 <li key={lead.id} className="rounded-xl border border-slate-200 px-3.5 py-3">
                   <p className="text-sm font-semibold text-[#101828]">
-                    {lead.space ? `${lead.space.code} — ${lead.space.name}` : "Unit"}
+                    {lead.space ? `${lead.space.code} — ${content(lead.space.name)}` : t("Unit")}
                   </p>
                   <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-slate-600">
                     <CalendarDays className="mt-0.5 size-3.5 shrink-0 text-[#c41230]" aria-hidden />
                     {lead.siteVisitScheduledAt
-                      ? new Date(lead.siteVisitScheduledAt).toLocaleString("id-ID", {
+                      ? new Date(lead.siteVisitScheduledAt).toLocaleString(locale, {
                           day: "numeric",
                           month: "long",
                           year: "numeric",
@@ -367,10 +369,8 @@ export default function ApplicationsSection({
                           minute: "2-digit",
                         })
                       : `${
-                          SITE_VISIT_STATUS_LABELS[
-                            lead.siteVisitStatus as keyof typeof SITE_VISIT_STATUS_LABELS
-                          ] ?? lead.siteVisitStatus
-                        }: ${lead.surveyPreference || "menunggu jadwal dari admin"}`}
+                          t(SITE_VISIT_STATUS_LABELS[lead.siteVisitStatus as keyof typeof SITE_VISIT_STATUS_LABELS] ?? lead.siteVisitStatus)
+                        }: ${lead.surveyPreference || t("menunggu jadwal dari admin")}`}
                   </p>
                 </li>
               ))}
@@ -378,9 +378,9 @@ export default function ApplicationsSection({
           ) : (
             <div className="mt-6 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
               <CalendarDays className="mx-auto size-8 text-slate-300" aria-hidden />
-              <p className="mt-3 text-sm font-medium text-slate-600">Belum ada permintaan site visit</p>
+              <p className="mt-3 text-sm font-medium text-slate-600">{t("Belum ada permintaan site visit")}</p>
               <p className="mt-1 text-xs text-slate-400">
-                Preferensi kunjungan akan dijadwalkan admin setelah diajukan.
+                {t("Preferensi kunjungan akan dijadwalkan admin setelah diajukan.")}
               </p>
             </div>
           )}
@@ -419,21 +419,22 @@ function ApplicationCard({
   lead: PartnerLead;
   onDetail: () => void;
 }) {
+  const { t, locale, content } = useTourLanguage();
   const space = lead.space;
   const cover = coverUrl(lead.trainInquiry?.media?.imageUrl ?? space?.panoramaUrl);
-  const label = statusLabel(lead.status);
+  const label = t(statusLabel(lead.status));
   const code = space?.code ?? lead.trainInquiry?.mediaCode ?? null;
-  const name = space?.name ?? lead.trainInquiry?.mediaTitle ?? "Unit Komersial";
-  const rent = space ? priceLabel(space.monthlyRent) : null;
+  const name = content(space?.name ?? lead.trainInquiry?.mediaTitle ?? "Unit Komersial");
+  const rent = space ? priceLabel(space.monthlyRent, locale) : null;
   const metaParts = space
     ? [
         space.station?.name,
-        space.floor || space.location || null,
-        TYPE_LABELS[space.type] ?? lead.businessType,
+        content(space.floor || space.location || ""),
+        content(TYPE_LABELS[space.type] ?? lead.businessType),
         `${space.area} m²`,
         rent,
       ].filter(Boolean)
-    : [lead.trainInquiry?.train.name ?? null, lead.businessType].filter(Boolean);
+    : [lead.trainInquiry?.train.name ?? null, content(lead.businessType)].filter(Boolean);
 
   return (
     <article className="overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-slate-300">
@@ -467,7 +468,7 @@ function ApplicationCard({
                 {label}
               </span>
               <time className="text-xs text-slate-400" dateTime={lead.createdAt}>
-                {new Date(lead.createdAt).toLocaleDateString("id-ID", {
+                {new Date(lead.createdAt).toLocaleDateString(locale, {
                   day: "numeric",
                   month: "short",
                   year: "numeric",
@@ -509,7 +510,7 @@ function ApplicationCard({
                   lead.trainInquiry.requestedTrainsetCount !== null
                     ? `${lead.trainInquiry.requestedTrainsetCount} trainset`
                     : null,
-                  trainCampaignPeriod(lead.trainInquiry),
+                  trainCampaignPeriod(lead.trainInquiry, locale),
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -519,11 +520,11 @@ function ApplicationCard({
 
           <div className="flex shrink-0 flex-col justify-between gap-4 border-t border-slate-100 pt-4 lg:w-[220px] lg:border-t-0 lg:border-l lg:pl-5 lg:pt-0">
             <div>
-              <p className="mb-2 text-xs font-medium text-slate-500">Progres</p>
+              <p className="mb-2 text-xs font-medium text-slate-500">{t("Progres")}</p>
               {lead.status === "CLOSED_LOST" ? (
                 <div className="flex items-start gap-2 text-sm text-red-700">
                   <XCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-                  <span>Pengajuan dihentikan</span>
+                  <span>{t("Pengajuan dihentikan")}</span>
                 </div>
               ) : (
                 <InquiryTimeline status={lead.status} compact />
@@ -534,7 +535,7 @@ function ApplicationCard({
               onClick={onDetail}
               className="inline-flex min-h-10 w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230]"
             >
-              Lihat detail
+              {t("Lihat detail")}
               <ChevronRight className="size-4 text-slate-400" aria-hidden />
             </button>
           </div>
@@ -553,6 +554,7 @@ function EmptyApplications({
   pickerReady: boolean;
   filter: FilterTab;
 }) {
+  const { t } = useTourLanguage();
   const copy =
     filter === "semua"
       ? {
@@ -569,8 +571,8 @@ function EmptyApplications({
   return (
     <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-200 px-4 py-14 text-center">
       <FileText className="size-10 text-slate-300" aria-hidden />
-      <h3 className="mt-3 text-lg font-bold text-[#101828]">{copy.title}</h3>
-      <p className="mt-1 max-w-sm text-sm text-slate-500">{copy.detail}</p>
+      <h3 className="mt-3 text-lg font-bold text-[#101828]">{t(copy.title)}</h3>
+      <p className="mt-1 max-w-sm text-sm text-slate-500">{t(copy.detail)}</p>
       {copy.cta ? (
         <button
           type="button"
@@ -579,7 +581,7 @@ function EmptyApplications({
           className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#c41230] px-5 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c41230] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Glasses className="size-4" aria-hidden />
-          Jelajahi Virtual Tour
+          {t("Jelajahi Virtual Tour")}
         </button>
       ) : null}
     </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { RouteStop } from "@/lib/tour-route-waypoints";
@@ -19,6 +20,7 @@ type Props = {
  * Picker tujuan rute — Void solid (bukan native OS select).
  */
 export default function TourRouteStopPicker({ id, label, value, stops, levels, onChange }: Props) {
+  const { t, content } = useTourLanguage();
   const autoId = useId();
   const fieldId = id ?? autoId;
   const listId = `${fieldId}-list`;
@@ -60,7 +62,7 @@ export default function TourRouteStopPicker({ id, label, value, stops, levels, o
           active ? "bg-signal/20 font-semibold text-ink" : "text-ink/90 hover:bg-panel"
         }`}
       >
-        <span className="min-w-0 flex-1 truncate">{stop.label}</span>
+        <span className="min-w-0 flex-1 truncate">{content(stop.label)}</span>
         {active && <Check className="size-4 shrink-0 text-signal" aria-hidden="true" />}
       </button>
     );
@@ -81,7 +83,7 @@ export default function TourRouteStopPicker({ id, label, value, stops, levels, o
         className="flex h-11 w-full items-center gap-2 rounded-xl border bg-void px-3 text-left text-sm font-semibold text-ink outline-none transition hover:bg-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
         style={{ borderColor: "var(--hairline)" }}
       >
-        <span className="min-w-0 flex-1 truncate">{selected?.label ?? "Pilih titik"}</span>
+        <span className="min-w-0 flex-1 truncate">{selected ? content(selected.label) : t("Pilih titik")}</span>
         <ChevronDown className={`size-4 shrink-0 text-fog transition ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
 
@@ -96,7 +98,7 @@ export default function TourRouteStopPicker({ id, label, value, stops, levels, o
           {navStops.length > 0 && (
             <div className="py-1">
               <p className="px-3 py-1 text-[10px] font-semibold tracking-wide text-fog uppercase">
-                Navigasi
+                {t("Navigasi")}
               </p>
               {navStops.map(renderStopButton)}
             </div>
@@ -107,7 +109,7 @@ export default function TourRouteStopPicker({ id, label, value, stops, levels, o
             return (
               <div key={level.id} className="py-1">
                 <p className="px-3 py-1 text-[10px] font-semibold tracking-wide text-fog uppercase">
-                  {level.label}
+                  {content(level.label)}
                 </p>
                 {levelStops.map(renderStopButton)}
               </div>

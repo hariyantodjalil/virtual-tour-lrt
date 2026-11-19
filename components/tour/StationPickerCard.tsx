@@ -1,3 +1,6 @@
+"use client";
+
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import Image from "next/image";
 import { MapPin, Train } from "lucide-react";
 import { resolveStationCover, stationCoverUnoptimized } from "@/lib/station-images";
@@ -17,6 +20,7 @@ export default function StationPickerCard({
   variant = "light",
   className = "",
 }: Props) {
+  const { t, content } = useTourLanguage();
   const { area, city } = splitStationLocation(station);
   const isDark = variant === "dark";
   const coverSrc = resolveStationCover(station.slug, station.order, station.imageUrl);
@@ -36,7 +40,7 @@ export default function StationPickerCard({
       <span className={`relative block h-[140px] w-full shrink-0 overflow-hidden sm:h-[150px] ${isDark ? "bg-[#171717]" : "bg-slate-100"}`}>
         <Image
           src={coverSrc}
-          alt={`Stasiun ${station.name}`}
+          alt={t("Stasiun {name}", { name: station.name })}
           fill
           sizes="(max-width: 640px) 100vw, 320px"
           className="object-cover transition duration-500 group-hover:scale-105"
@@ -64,8 +68,8 @@ export default function StationPickerCard({
             strokeWidth={2.25}
           />
           <span className="min-w-0">
-            <span className="block truncate">{area}</span>
-            {city ? <span className="block truncate">{city}</span> : null}
+            <span className="block truncate">{content(area)}</span>
+            {city ? <span className="block truncate">{content(city)}</span> : null}
           </span>
         </span>
 
@@ -76,7 +80,7 @@ export default function StationPickerCard({
             }`}
           >
             <Train className="size-3.5 shrink-0" strokeWidth={2.25} />
-            {stationLineLabel(station.line)}
+            {t(stationLineLabel(station.line))}
           </span>
           <span
             className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full transition ${

@@ -1,5 +1,6 @@
 "use client";
 
+import { TourLanguageToggle, useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -48,20 +49,21 @@ type User = {
 type Lead = PartnerLead;
 
 const NAV_ITEMS = [
-  { id: "pengajuan", label: "Pengajuan Sewa", icon: FileText },
-  { id: "unit-aktif", label: "Unit Aktif Saya", icon: Building2 },
-  { id: "favorit", label: "Favorit", icon: Heart },
-  { id: "akun", label: "Pengaturan Akun", icon: Settings },
-  { id: "bantuan", label: "Bantuan", icon: CircleHelp },
+  { id: "pengajuan", shortLabel: "Pengajuan", label: "Pengajuan Sewa", icon: FileText },
+  { id: "unit-aktif", shortLabel: "Unit", label: "Unit Aktif Saya", icon: Building2 },
+  { id: "favorit", shortLabel: "Favorit", label: "Favorit", icon: Heart },
+  { id: "akun", shortLabel: "Akun", label: "Pengaturan Akun", icon: Settings },
+  { id: "bantuan", shortLabel: "Bantuan", label: "Bantuan", icon: CircleHelp },
 ] as const;
 
 export default function PartnerPage() {
+  const { t, content } = useTourLanguage();
   const router = useRouter();
   const commercialProfile = useCommercialProfile();
   const contactWhatsAppUrl = getWhatsAppUrl(
     commercialProfile.whatsappNumber,
-    commercialProfile.defaultWhatsappMessage ||
-      "Halo, saya mitra portal LRT Jabodebek. Mohon bantuan untuk proses sewa ruang komersial."
+    content(commercialProfile.defaultWhatsappMessage) ||
+      t("Halo, saya mitra portal LRT Jabodebek. Mohon bantuan untuk proses sewa ruang komersial.")
   );
   const [user, setUser] = useState<User | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -168,7 +170,7 @@ export default function PartnerPage() {
       {/* Top bar */}
       <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between bg-[#c41230] px-4 text-white shadow-md md:px-6">
         <Link href="/" className="flex items-center gap-2.5 md:gap-3" aria-label="LRT Jabodebek">
-          <span className="relative h-8 w-[72px] shrink-0">
+          <span className="relative hidden h-8 w-11 shrink-0 min-[400px]:block sm:w-[72px]">
             <Image
               src="/brand/landing/logo-kai-nav.png"
               alt="KAI"
@@ -178,7 +180,7 @@ export default function PartnerPage() {
               priority
             />
           </span>
-          <span className="relative h-9 w-[84px] shrink-0">
+          <span className="relative h-9 w-[60px] shrink-0 sm:w-[84px]">
             <Image
               src="/brand/landing/logo-lrt-nav.png"
               alt="LRT Jabodebek"
@@ -188,27 +190,30 @@ export default function PartnerPage() {
               priority
             />
           </span>
-          <span className="hidden h-5 w-px bg-white/35 sm:block" aria-hidden />
-          <span className="hidden text-sm font-semibold tracking-wide sm:inline">
-            Panel Mitra <span className="font-normal opacity-80">|</span>{" "}
-            <span className="font-normal opacity-90">Virtual Tour Komersial</span>
+          <span className="hidden h-5 w-px bg-white/35 lg:block" aria-hidden />
+          <span className="hidden text-sm font-semibold tracking-wide lg:inline">
+            {t("Panel Mitra")} <span className="font-normal opacity-80">|</span>{" "}
+            <span className="font-normal opacity-90">{t("Virtual Tour Komersial")}</span>
           </span>
         </Link>
 
         <div className="flex items-center gap-2 md:gap-3">
+          <TourLanguageToggle />
           <Link
             href="/"
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={t("Beranda")}
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:px-3 sm:text-sm"
           >
             <Home className="size-3.5 shrink-0" aria-hidden />
-            <span className="hidden sm:inline">Beranda</span>
-            <ExternalLink className="size-3 shrink-0 opacity-80" aria-hidden />
+            <span className="hidden sm:inline">{t("Beranda")}</span>
+            <ExternalLink className="hidden size-3 shrink-0 opacity-80 sm:block" aria-hidden />
           </Link>
           <button
             type="button"
             onClick={openStationPicker}
+            aria-label={t("Buka Virtual Tour")}
             disabled={pickerStations.length === 0}
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-white/25 bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-60 sm:px-3 sm:text-sm"
           >
@@ -235,7 +240,7 @@ export default function PartnerPage() {
                 <button
                   type="button"
                   className="fixed inset-0 z-40 cursor-default"
-                  aria-label="Tutup menu profil"
+                  aria-label={t("Tutup menu profil")}
                   onClick={() => setProfileOpen(false)}
                 />
                 <div className="absolute top-full right-0 z-50 mt-2 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-[#101828] shadow-xl">
@@ -249,7 +254,7 @@ export default function PartnerPage() {
                     className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
                   >
                     <LogOut className="size-4" />
-              Logout
+              {t("Logout")}
                   </button>
                 </div>
               </>
@@ -261,7 +266,7 @@ export default function PartnerPage() {
       <div className="flex min-h-screen pt-14">
         {/* Sidebar */}
         <aside className="fixed top-14 bottom-0 left-0 z-30 hidden w-[240px] flex-col border-r border-slate-200 bg-white md:flex">
-          <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4" aria-label="Menu mitra">
+          <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4" aria-label={t("Menu mitra")}>
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const active = activeNav === item.id;
@@ -277,7 +282,7 @@ export default function PartnerPage() {
                   }`}
                 >
                   <Icon className="size-[18px] shrink-0" strokeWidth={active ? 2.25 : 2} />
-                  {item.label}
+                  {t(item.label)}
                 </button>
               );
             })}
@@ -285,9 +290,9 @@ export default function PartnerPage() {
 
           <div className="space-y-4 border-t border-slate-100 p-4">
             <div className="rounded-xl bg-[#c41230]/[0.06] p-3.5">
-              <p className="text-sm font-semibold text-[#101828]">Butuh Bantuan?</p>
+              <p className="text-sm font-semibold text-[#101828]">{t("Butuh Bantuan?")}</p>
               <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                Tim komersial siap membantu proses sewa Anda.
+                {t("Tim komersial siap membantu proses sewa Anda.")}
               </p>
               <a
                 href={contactWhatsAppUrl}
@@ -296,7 +301,7 @@ export default function PartnerPage() {
                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#c41230] px-3 py-2 text-xs font-semibold text-white transition hover:brightness-110"
               >
                 <Headset className="size-3.5" />
-                Hubungi Kami
+                {t("Hubungi Kami")}
               </a>
             </div>
 
@@ -368,7 +373,7 @@ export default function PartnerPage() {
       {/* Mobile bottom nav */}
       <nav
         className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white px-2 py-2 md:hidden"
-        aria-label="Menu mitra mobile"
+        aria-label={t("Menu mitra mobile")}
       >
         {NAV_ITEMS.slice(0, 4).map((item) => {
           const Icon = item.icon;
@@ -383,7 +388,7 @@ export default function PartnerPage() {
               }`}
             >
               <Icon className="size-5" />
-              {item.label.split(" ")[0]}
+              {t(item.shortLabel)}
             </button>
           );
         })}
@@ -405,18 +410,19 @@ function FavoritesSection({
   pickerReady: boolean;
   onRemove: (spaceId: string) => void;
 }) {
+  const { t, locale, content } = useTourLanguage();
   return (
     <>
       <p className="text-base text-slate-600 md:text-lg">
-        Halo, <span className="font-semibold text-[#101828]">{displayName}</span>      </p>
+        {t("Halo,")} <span className="font-semibold text-[#101828]">{displayName}</span>      </p>
 
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[#101828] md:text-[28px]">
-            Unit Favorit
+            {t("Unit Favorit")}
           </h1>
           <p className="mt-1 max-w-xl text-sm text-slate-500">
-            Unit yang Anda simpan dari virtual tour akan muncul di sini.
+            {t("Unit yang Anda simpan dari virtual tour akan muncul di sini.")}
           </p>
         </div>
         <button
@@ -426,7 +432,7 @@ function FavoritesSection({
           className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#c41230] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-50"
         >
           <Glasses className="size-4" />
-          Jelajahi Virtual Tour
+          {t("Jelajahi Virtual Tour")}
         </button>
       </div>
 
@@ -437,10 +443,9 @@ function FavoritesSection({
               <Heart className="size-16 text-[#c41230]/35" />
             </div>
             <div className="text-center md:text-left">
-              <h2 className="text-xl font-bold text-[#101828]">Belum ada favorit.</h2>
+              <h2 className="text-xl font-bold text-[#101828]">{t("Belum ada favorit.")}</h2>
               <p className="mt-2 mx-auto max-w-md text-sm leading-relaxed text-slate-500 md:mx-0">
-                Saat menjelajah virtual tour, ketuk tombol <strong>Favorit</strong> pada detail unit
-                untuk menyimpannya di sini.
+                {t("Saat menjelajah virtual tour, ketuk tombol")} <strong>{t("Favorit")}</strong> {t("pada detail unit untuk menyimpannya di sini.")}
               </p>
               <button
                 type="button"
@@ -449,7 +454,7 @@ function FavoritesSection({
                 className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-[#c41230] px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
               >
                 <Glasses className="size-4" />
-                Cari Unit di Virtual Tour
+                {t("Cari Unit di Virtual Tour")}
               </button>
             </div>
           </div>
@@ -458,7 +463,7 @@ function FavoritesSection({
             {favorites.map((item) => {
               const priceLabel =
                 item.monthlyRent && item.monthlyRent > 0
-                  ? `${formatRupiah(item.monthlyRent)} / bulan`
+                  ? t("{price} / bulan", { price: formatRupiah(item.monthlyRent, locale) })
                   : "Hubungi tim";
               return (
                 <div
@@ -469,14 +474,14 @@ function FavoritesSection({
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-medium text-rose-700">
                         <Heart className="size-3 fill-current" />
-                        Favorit
+                        {t("Favorit")}
                       </span>
                       <span className="text-xs text-slate-400">
-                        {new Date(item.savedAt).toLocaleDateString("id-ID")}
+                        {new Date(item.savedAt).toLocaleDateString(locale)}
                       </span>
                       </div>
                     <h2 className="text-base font-bold text-[#101828]">
-                      {item.code} — {item.name}
+                      {item.code} — {content(item.name)}
                       </h2>
                     <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
                       <span className="inline-flex items-center gap-1">
@@ -493,13 +498,13 @@ function FavoritesSection({
                       onClick={() => onRemove(item.spaceId)}
                       className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                     >
-                      Hapus
+                      {t("Hapus")}
                     </button>
                     <Link
                       href={`/station/${encodeURIComponent(item.stationSlug)}?unit=${encodeURIComponent(item.spaceId)}`}
                       className="inline-flex items-center justify-center rounded-lg bg-[#c41230] px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
                     >
-                      Lihat Unit
+                      {t("Lihat Unit")}
                     </Link>
                   </div>
                 </div>

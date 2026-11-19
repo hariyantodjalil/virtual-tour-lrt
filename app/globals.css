@@ -1128,7 +1128,9 @@ body {
 }
 
 /* ─── CMS light workspace skin (sidebar tetap maroon) ─────────────── */
+:root,
 .cms-light {
+  --work-bg: #f6f7f9;
   --work-surface: #ffffff;
   --work-subtle: #f6f7f9;
   --work-text: #0f172a;
@@ -1143,6 +1145,9 @@ body {
   --work-warning-soft: #fffbeb;
   --work-danger: #b91c1c;
   --work-danger-soft: #fef2f2;
+}
+
+.cms-light {
   color: var(--work-text);
   color-scheme: light;
 }

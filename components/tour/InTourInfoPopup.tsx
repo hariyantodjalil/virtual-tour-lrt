@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import { createPortal } from "react-dom";
 import { Info, X } from "lucide-react";
 
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export default function InTourInfoPopup({ title, description, onClose }: Props) {
+  const { t, content } = useTourLanguage();
   if (typeof document === "undefined") return null;
 
   return createPortal(
@@ -18,7 +20,7 @@ export default function InTourInfoPopup({ title, description, onClose }: Props) 
         type="button"
         className="absolute inset-0 bg-[#1C0A0E]/70 backdrop-blur-sm"
         onClick={onClose}
-        aria-label="Tutup"
+        aria-label={t("Tutup")}
       />
       <div className="tour-panel-in relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-[color:rgb(255_214_218_/_0.14)] bg-[#3A161C] shadow-[0_24px_60px_rgba(28,10,14,0.55)]">
         <div className="flex items-start justify-between gap-3 border-b border-[color:rgb(255_214_218_/_0.12)] px-5 py-4">
@@ -28,14 +30,15 @@ export default function InTourInfoPopup({ title, description, onClose }: Props) 
             </div>
             <div className="min-w-0">
               <p className="font-display text-[10px] font-semibold uppercase tracking-[0.16em] text-[#C4A8AD]">
-                Informasi
+                {t("Informasi")}
               </p>
-              <h3 className="truncate font-display text-lg font-semibold text-[#F8ECEE]">{title}</h3>
+              <h3 className="truncate font-display text-lg font-semibold text-[#F8ECEE]">{content(title)}</h3>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label={t("Tutup informasi")}
             className="rounded-full p-2 text-[#C4A8AD] transition-colors hover:bg-white/10 hover:text-white"
           >
             <X className="h-5 w-5" />
@@ -43,7 +46,7 @@ export default function InTourInfoPopup({ title, description, onClose }: Props) 
         </div>
         <div className="px-5 py-4">
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#F8ECEE]/80">
-            {description || "Tidak ada deskripsi."}
+            {description ? content(description) : t("Tidak ada deskripsi.")}
           </p>
         </div>
         <div className="border-t border-[color:rgb(255_214_218_/_0.12)] px-5 py-4">
@@ -52,7 +55,7 @@ export default function InTourInfoPopup({ title, description, onClose }: Props) 
             onClick={onClose}
             className="flex h-11 w-full items-center justify-center rounded-full bg-[#E31E2D] font-display text-sm font-bold text-white transition hover:bg-[#c41926]"
           >
-            Tutup
+            {t("Tutup")}
           </button>
         </div>
       </div>

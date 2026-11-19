@@ -7,6 +7,7 @@
 */
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import type { CSSProperties } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, X } from "lucide-react";
 
@@ -39,6 +40,7 @@ export function GuidedRouteBar({
   onNext,
   onExit,
 }: Props) {
+  const { t, content } = useTourLanguage();
   const progress = stepTotal > 0 ? ((stepIndex + 1) / stepTotal) * 100 : 0;
 
   return (
@@ -58,8 +60,8 @@ export function GuidedRouteBar({
             type="button"
             onClick={onToggleAutoplay}
             aria-pressed={autoplay}
-            title={autoplay ? "Jeda putar otomatis" : finished ? "Ulangi rute" : "Putar rute otomatis"}
-            aria-label={autoplay ? "Jeda putar otomatis" : finished ? "Ulangi rute" : "Putar rute otomatis"}
+            title={autoplay ? t("Jeda putar otomatis") : finished ? t("Ulangi rute") : t("Putar rute otomatis")}
+            aria-label={autoplay ? t("Jeda putar otomatis") : finished ? t("Ulangi rute") : t("Putar rute otomatis")}
             className={`flex h-11 shrink-0 items-center justify-center gap-2 rounded-full px-3.5 font-display text-xs font-bold transition duration-300 sm:px-4 ${
               autoplay
                 ? "bg-white text-[#1C0A0E] shadow-[0_10px_24px_rgba(255,255,255,0.18)]"
@@ -69,7 +71,7 @@ export function GuidedRouteBar({
             {autoplay ? (
               <>
                 <Pause className="h-3.5 w-3.5 fill-current" />
-                <span className="hidden sm:inline">Jeda</span>
+                <span className="hidden sm:inline">{t("Jeda")}</span>
               </>
             ) : (
               <>
@@ -81,9 +83,9 @@ export function GuidedRouteBar({
 
           <div className="min-w-0 flex-1 px-0.5">
             <p className="truncate font-display text-[11px] font-semibold leading-tight text-[#F8ECEE] sm:text-xs">
-              <span className="text-[#F8ECEE]/75">{fromTitle}</span>
+              <span className="text-[#F8ECEE]/75">{content(fromTitle)}</span>
               <span className="mx-1.5 text-[#E31E2D]">→</span>
-              <span>{toTitle}</span>
+              <span>{content(toTitle)}</span>
             </p>
             <div className="mt-1 flex items-center gap-2">
               <p
@@ -91,7 +93,7 @@ export function GuidedRouteBar({
                 data-guided-step={stepIndex + 1}
                 data-guided-total={stepTotal}
               >
-                {finished ? "Selesai" : `${stepIndex + 1} / ${stepTotal}`}
+                {finished ? t("Selesai") : `${stepIndex + 1} / ${stepTotal}`}
               </p>
               {autoplay && !finished && (
                 <span className="tour-guided-bar__live inline-flex items-center gap-1 font-display text-[10px] font-semibold text-[#34d399]">
@@ -107,8 +109,8 @@ export function GuidedRouteBar({
               type="button"
               onClick={onPrev}
               disabled={!canPrev}
-              title="Scene sebelumnya"
-              aria-label="Scene sebelumnya"
+              title={t("Scene sebelumnya")}
+              aria-label={t("Scene sebelumnya")}
               className="flex size-11 items-center justify-center rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/55 text-[#F8ECEE] transition hover:bg-[#3A161C] disabled:opacity-30 sm:size-9"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -117,8 +119,8 @@ export function GuidedRouteBar({
               type="button"
               onClick={onNext}
               disabled={!canNext}
-              title="Scene berikutnya"
-              aria-label="Scene berikutnya"
+              title={t("Scene berikutnya")}
+              aria-label={t("Scene berikutnya")}
               className="flex size-11 items-center justify-center rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/55 text-[#F8ECEE] transition hover:bg-[#3A161C] disabled:opacity-30 sm:size-9"
             >
               <ChevronRight className="h-4 w-4" />
@@ -126,12 +128,12 @@ export function GuidedRouteBar({
             <button
               type="button"
               onClick={onExit}
-              title="Keluar dari rute"
-              aria-label="Keluar dari rute"
+              title={t("Keluar dari rute")}
+              aria-label={t("Keluar dari rute")}
               className="ml-0.5 flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full border border-[color:rgb(255_214_218_/_0.14)] bg-[#1C0A0E]/55 px-2.5 font-display text-[10px] font-bold uppercase tracking-[0.12em] text-[#F8ECEE]/80 transition hover:border-[#E31E2D]/40 hover:text-white sm:min-h-9 sm:min-w-9 sm:px-3"
             >
               <X className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Keluar</span>
+              <span className="hidden sm:inline">{t("Keluar")}</span>
             </button>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { getTourTranslator } from "@/lib/tour-translated-content";
 import Image from "next/image";
 import Link from "next/link";
 import { MapPinned, ArrowLeft } from "lucide-react";
@@ -7,15 +8,16 @@ import { HomeReveal, HomeShell } from "@/components/home/HomeMotion";
 import { getPickerStations } from "@/lib/station-picker-data";
 import { STATION_TOUR_ENTRY } from "@/lib/tour-nav";
 
-export const metadata = {
-  title: "Pilih Stasiun - Virtual Tour LRT Jabodebek",
-  description: "Pilih stasiun LRT Jabodebek untuk memulai virtual tour 360°.",
-};
+export async function generateMetadata() {
+  const t = await getTourTranslator();
+  return { title: t("Pilih Stasiun - Virtual Tour LRT Jabodebek"), description: t("Pilih stasiun LRT Jabodebek untuk memulai virtual tour 360°.") };
+}
 
 export const dynamic = "force-dynamic";
 
 /** Halaman pemilih stasiun — diakses dari CTA Virtual Tour di landing komersial. */
 export default async function StationPickerPage() {
+  const t = await getTourTranslator();
   const stations = await getPickerStations();
 
   return (
@@ -42,10 +44,10 @@ export default async function StationPickerPage() {
                 Virtual Tour 360°
               </p>
               <h1 className="mt-3 font-display text-2xl font-bold leading-tight text-white sm:text-3xl md:text-[40px]">
-                Pilih <span className="text-[#ff6b6b]">Stasiun</span>
+                {t("Pilih Stasiun")}
               </h1>
               <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-white/90 md:text-base">
-                Pilih stasiun untuk memulai pengalaman virtual tour interaktif.
+                {t("Pilih stasiun untuk memulai pengalaman virtual tour interaktif.")}
               </p>
             </div>
           </HomeReveal>
@@ -57,7 +59,7 @@ export default async function StationPickerPage() {
                 className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/30 px-4 py-2 text-xs font-medium text-white/90 backdrop-blur-sm transition hover:border-white/40 hover:bg-black/45"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
-                Kembali ke beranda komersial
+                {t("Kembali ke beranda komersial")}
               </Link>
             </div>
           </HomeReveal>
@@ -77,7 +79,7 @@ export default async function StationPickerPage() {
               <div className="mt-12 rounded-2xl border border-white/15 bg-black/40 px-6 py-14 text-center backdrop-blur-sm">
                 <MapPinned className="mx-auto h-10 w-10 text-[#ff8a8a]" />
                 <p className="mt-4 text-sm text-white/80">
-                  Belum ada stasiun dengan virtual tour yang aktif.
+                  {t("Belum ada stasiun dengan virtual tour yang aktif.")}
                 </p>
               </div>
             </HomeReveal>

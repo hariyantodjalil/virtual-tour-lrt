@@ -1,5 +1,6 @@
 "use client";
 
+import { useTourLanguage } from "@/components/tour/TourLanguageProvider";
 import Image from "next/image";
 import { createPortal } from "react-dom";
 import { Megaphone, MessageCircle, X } from "lucide-react";
@@ -30,11 +31,12 @@ export default function InTourAdPopup({
   contactPhone,
   onClose,
 }: Props) {
+  const { t, content } = useTourLanguage();
   const commercialProfile = useCommercialProfile();
   const resolvedContactPhone =
     contactPhone || commercialProfile.whatsappNumber;
   const displayTitle = creativeTitle || title || spaceName || "Media Iklan";
-  const waMessage = `Halo, saya tertarik dengan slot media iklan${spaceCode ? ` ${spaceCode}` : ""} di Stasiun ${stationName}. Mohon informasi lebih lanjut.`;
+  const waMessage = t("Halo, saya tertarik dengan slot media iklan{code} di Stasiun {station}. Mohon informasi lebih lanjut.", { code: spaceCode ? ` ${spaceCode}` : "", station: stationName });
   const waUrl = getWhatsAppUrl(resolvedContactPhone, waMessage);
   const imageSrc = creativeUrl ? getS3ProxyUrl(creativeUrl) : null;
 
@@ -46,6 +48,7 @@ export default function InTourAdPopup({
         <button
           type="button"
           onClick={onClose}
+          aria-label={t("Tutup detail media")}
           className="absolute right-3 top-3 z-10 rounded-full bg-[#1C0A0E]/70 p-1.5 text-[#F8ECEE]/80 hover:bg-[#1C0A0E]"
         >
           <X className="h-4 w-4" />
@@ -55,7 +58,7 @@ export default function InTourAdPopup({
           <div className="relative h-48 w-full">
             <Image
               src={imageSrc}
-              alt={displayTitle}
+              alt={content(displayTitle)}
               fill
               className="object-cover"
               sizes="(max-width: 448px) 100vw, 448px"
@@ -70,25 +73,24 @@ export default function InTourAdPopup({
         <div className="space-y-3 p-5">
           <div>
             <p className="font-display text-[10px] font-semibold uppercase tracking-[0.18em] text-[#E31E2D]">
-              Media Iklan
+              {t("Media Iklan")}
             </p>
-            <h3 className="mt-1 font-display text-lg font-semibold text-[#F8ECEE]">{displayTitle}</h3>
+            <h3 className="mt-1 font-display text-lg font-semibold text-[#F8ECEE]">{content(displayTitle)}</h3>
             {brandName && (
               <p className="mt-0.5 text-sm text-[#C4A8AD]">
-                Tenant: <span className="font-semibold text-white">{brandName}</span>
+                {t("Tenant:")} <span className="font-semibold text-white">{brandName}</span>
               </p>
             )}
             {(spaceCode || spaceName) && (
               <p className="mt-1 text-xs text-[#C4A8AD]/70">
                 {spaceCode}
-                {spaceName ? ` · ${spaceName}` : ""}
+                {spaceName ? ` · ${content(spaceName)}` : ""}
               </p>
             )}
           </div>
 
           <p className="text-sm text-[#F8ECEE]/70">
-            Slot media di Stasiun {stationName}. Hubungi {commercialProfile.teamName} untuk
-            ketersediaan dan paket penempatan.
+            {t("Slot media di Stasiun {station}. Hubungi {team} untuk ketersediaan dan paket penempatan.", { station: stationName, team: content(commercialProfile.teamName) })}
           </p>
 
           <a
@@ -98,7 +100,7 @@ export default function InTourAdPopup({
             className="inline-flex h-10 w-full items-center justify-center rounded-full bg-[#25D366] px-4 font-display text-sm font-semibold text-white hover:bg-[#1ebe57]"
           >
             <MessageCircle className="mr-2 h-4 w-4" />
-            Tanya via WhatsApp
+            {t("Tanya via WhatsApp")}
           </a>
         </div>
       </div>
